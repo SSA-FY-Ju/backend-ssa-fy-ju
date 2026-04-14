@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/ssaju?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root        # 본인의 MySQL 계정
+    password: 1234 # 본인의 MySQL 비밀번호
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
