@@ -1,0 +1,752 @@
+# Implementation Plan: Career Fortune & Consultation API
+
+**Branch**: `main` (direct planning, no feature branch) | **Date**: 2026-04-10 | **Spec**: [specs/001-career-fortune-api/spec.md](./spec.md)
+
+**Input**: Feature specification from `/specs/001-career-fortune-api/spec.md` with 6 clarifications resolved
+
+## Summary
+
+SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 관운)를 활용해 취업 준비생에게 4가지 맞춤 서비스를 제공합니다:
+
+1. **관운 기반 채용 시기 분석** (P1): FastAPI로 만세력 조회 → Spring에서 십신/관운 계산 → H1/H2 판정
+2. **AI 커리어 컨설팅** (P1): Spring AI + OpenAI JSON Mode로 산업/면접팁/강점 제공
+3. **기업/직무 궁합** (P2): 공공데이터API로 기업 설립일 조회 → 궁합 계산
+4. **사용자 만족도 피드백** (P1): 사주 분석 완료 후 만족도(만족함/만족하지 않음) 수집 → Phase 2 대시보드에서 시각화
+
+**기술 접근**: REST API (Spring Boot 4.0.5) + MySQL (JPA) + 외부 API 통합 (FastAPI, OpenAI, 공공데이터). Spring AI로 OpenAI 호출을 타입 안전하게 처리.
+
+---
+
+## Technical Context
+
+**Language/Version**: Java 21, Spring Boot 4.0.5
+**Primary Dependencies**: Spring Data JPA, Spring Web, Spring AI, Lombok, Thymeleaf, Spring Validation
+**Storage**: MySQL 8.0+ (JSON 컬럼 지원, JPA via application.yaml)
+**Testing**: JUnit 5 + AssertJ (Given-When-Then 패턴)
+**Target Platform**: Backend REST API (HTTP JSON)
+**Project Type**: Web Service / Microservice (Spring Boot)
+**Performance Goals**:
+- 관운 분석: 5초 이내 (Controller → Service → DB, FastAPI 제외)
+- AI 컨설팅: 15초 이내 (OpenAI 지연 + 재시도 포함)
+- 기업 궁합: 8초 이내
+- 동시 처리: 5,000명 사용자 (Connection Pool 기본값)
+
+**Constraints**:
+- Phase 1: Redis/Global 캐싱 금지 (도메인 로직 정확성 우선)
+- 모든 엔티티: @Data/@ToString 금지, @Getter + @Builder 사용
+- 모든 DTO: Java record 타입
+- 모든 JPA 관계: FetchType.LAZY 명시 (N+1 방지)
+- 모든 예외: @RestControllerAdvice 처리 (try-catch 금지)
+
+**Scale/Scope**:
+- 엔티티: 6개 (UserProfile, SajuResult, CareerConsultation, CompanyCompatibility, UserSatisfactionFeedback / User는 Phase 2)
+- API 엔드포인트: 4개 (`/api/career/timing`, `/api/career/consultation`, `/api/company/compatibility`, `/api/feedback/satisfaction`)
+- 외부 API 통합: 3개 (FastAPI, OpenAI, 공공데이터API)
+
+---
+
+## Constitution Check
+
+**GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.**
+
+**Constitution Compliance Review**:
+
+| 원칙 | 요구사항 | 준수 상태 | 비고 |
+|-----|--------|---------|------|
+| **I. 기술 환경** | Java 21, Spring Boot 4.0.5, MySQL, Phase 1 캐싱 금지 | ✅ Clear | Spec에 명시됨 |
+| **II. Java/JPA 표준** | @Data/@ToString 금지, record DTO, FetchType.LAZY, Optional 사용 | ✅ Clear | Spec에 모두 명시됨 |
+| **III. 계층형 아키텍처** | Controller (HTTP만), Service (비즈니스 로직), Repository (DB만), GlobalExceptionHandler | ✅ Clear | Spec에 정의됨 |
+| **IV. Test-Then-Commit** | 테스트 먼저, 커밋 전 `./gradlew test` 통과, Conventional Commits | ✅ Ready | 구현 단계에서 적용 |
+| **V. 문서화 워크플로우** | spec.md는 진실의 원천, plan.md 추적 | ✅ Clear | 현재 plan.md 작성 중 |
+
+**Gate Status**: ✅ **모든 게이트 통과 (Phase 0 진행 가능)**
+
+---
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/001-career-fortune-api/
+├── spec.md                  # Feature specification (완료, 5개 명확화 포함)
+├── plan.md                  # This file - Implementation plan
+├── research.md              # Phase 0 output (연구 및 아키텍처 검토)
+├── data-model.md            # Phase 1 output (데이터 모델, 엔티티 정의)
+├── contracts/               # Phase 1 output (API 요청/응답 스키마)
+│   ├── career-timing.md
+│   ├── career-consultation.md
+│   └── company-compatibility.md
+├── quickstart.md            # Phase 1 output (개발 시작 가이드)
+├── checklists/
+│   └── requirements.md       # 요구사항 체크리스트
+└── tasks.md                 # Phase 2 output (작업 분해, /speckit.tasks 생성)
+```
+
+### Source Code (repository root)
+
+```text
+SSAju/
+├── src/main/java/ssafy/SSAju/
+│   │
+│   ├── career/                      ← Phase 1: Career Fortune feature
+│   │   ├── entity/
+│   │   │   ├── UserProfile.java
+│   │   │   ├── SajuResult.java
+│   │   │   ├── CareerConsultation.java
+│   │   │   ├── CompanyCompatibility.java
+│   │   │   └── UserSatisfactionFeedback.java
+│   │
+│   ├── dto/
+│   │   ├── request/
+│   │   │   ├── CareerTimingRequest.java
+│   │   │   ├── ConsultationRequest.java
+│   │   │   ├── CompatibilityRequest.java
+│   │   │   └── SatisfactionFeedbackRequest.java
+│   │   ├── response/
+│   │   │   ├── CareerTimingResponse.java
+│   │   │   ├── ConsultationResponse.java
+│   │   │   ├── CompatibilityResponse.java
+│   │   │   ├── SatisfactionFeedbackResponse.java
+│   │   │   ├── ApiResponse.java
+│   │   │   └── ErrorInfo.java
+│   │   └── external/
+│   │       ├── FastAPIResponse.java (만세력 응답)
+│   │       └── CareerAdviceResponse.java (OpenAI JSON 응답)
+│   │
+│   ├── controller/
+│   │   ├── CareerTimingController.java
+│   │   ├── ConsultationController.java
+│   │   ├── CompatibilityController.java
+│   │   └── FeedbackController.java
+│   │
+│   ├── service/
+│   │   ├── CareerFortuneService.java (관운 계산, 십신 분석)
+│   │   ├── ConsultationService.java (OpenAI 통합)
+│   │   ├── CompanyMatchingService.java (궁합 계산)
+│   │   ├── FeedbackService.java (만족도 피드백 수집)
+│   │   ├── SajuDataService.java (FastAPI 조회)
+│   │   └── CompanyInfoService.java (공공데이터API 조회)
+│   │
+│   ├── repository/
+│   │   ├── UserRepository.java
+│   │   ├── UserProfileRepository.java
+│   │   ├── SajuResultRepository.java
+│   │   ├── CareerConsultationRepository.java
+│   │   ├── CompanyCompatibilityRepository.java
+│   │   └── UserSatisfactionFeedbackRepository.java
+│   │
+│   ├── exception/
+│   │   ├── SajuException.java (root)
+│   │   ├── InvalidSajuDataException.java
+│   │   ├── FastAPITimeoutException.java
+│   │   ├── OpenAIApiException.java
+│   │   ├── PublicDataApiException.java
+│   │   └── DataAccessException.java
+│   │
+│   ├── handler/
+│   │   └── SajuGlobalExceptionHandler.java (@RestControllerAdvice)
+│   │
+│   ├── config/
+│   │   ├── WebClientConfig.java (WebClient 빈, 타임아웃 설정)
+│   │   └── ChatClientConfig.java (Spring AI ChatClient 빈)
+│   │
+│   └── SSAjuApplication.java
+│
+├── src/main/resources/
+│   ├── application.yaml (DB, API 키, 외부 URL 설정)
+│   └── templates/ (필요 시)
+│
+├── src/test/java/ssafy/SSAju/
+│   ├── service/
+│   │   ├── CareerFortuneServiceTest.java
+│   │   ├── ConsultationServiceTest.java
+│   │   ├── CompanyMatchingServiceTest.java
+│   │   ├── FeedbackServiceTest.java
+│   │   ├── SajuDataServiceTest.java
+│   │   └── CompanyInfoServiceTest.java
+│   │
+│   ├── controller/
+│   │   ├── CareerTimingControllerTest.java
+│   │   ├── ConsultationControllerTest.java
+│   │   ├── CompatibilityControllerTest.java
+│   │   └── FeedbackControllerTest.java
+│   │
+│   ├── integration/
+│   │   └── CareerApiIntegrationTest.java (전체 플로우 테스트)
+│   │
+│   └── unit/
+│       ├── TenGodCalculatorTest.java (십신 계산 로직)
+│       ├── CareerFortuneAnalyzerTest.java (관운 분석)
+│       ├── CompatibilityScoreTest.java (궁합 점수 계산)
+│       └── FeedbackValidationTest.java (만족도 피드백 검증)
+│
+└── build.gradle (Spring AI, WebClient 의존성 추가)
+```
+
+**Structure Decision**:
+- **모듈화 전략 (Option C)**: 같은 Spring Boot 애플리케이션 내에서 논리적 패키지 분리
+- **Phase 1** (지금 구현): `career/` 패키지에서 Career Fortune API 구현 (로그인 제외)
+  - User 엔티티는 **제외** (추후 auth/ 패키지에서 구현)
+  - UserProfile, SajuResult, CareerConsultation, CompanyCompatibility만 포함
+- **Phase 2+** (나중): `auth/` 패키지 추가 시 User 엔티티 추가 및 통합
+- **계층형 아키텍처**: Controller → Service → Repository 준수
+- **기능 분리**: 각 핵심 기능마다 전용 Service (CareerFortuneService, ConsultationService, CompanyMatchingService)
+- **외부 API**: 별도 Service (SajuDataService, CompanyInfoService)로 분리
+
+---
+
+## Complexity Tracking
+
+> **Justification for architecture decisions**
+
+| 설계 결정 | 필요 이유 | 더 단순한 대안과 거절 이유 |
+|---------|---------|------------------------|
+| **6개 엔티티** (Phase 1) | UserProfile ↔ SajuResult (1:1, 사주 조회 캐싱), SajuResult ↔ CareerConsultation (1:N, 같은 사주에서 여러 컨설팅), UserProfile ↔ CompanyCompatibility (1:N, 여러 기업과 비교), SajuResult ↔ UserSatisfactionFeedback (1:N, 분석마다 피드백 수집) | 모든 데이터를 하나에 통합 → N+1 쿼리, 데이터 정규화 부족, 재사용성 저하 |
+| **4개 독립 Service** | 각 기능(관운, 컨설팅, 궁합, 피드백)이 독립적으로 테스트/배포 가능해야 함. P1/P2 우선순위 구분으로 점진적 개발 필요 | 단일 Service → 테스트 복잡도 증가, 변경 파급 범위 확대, 리팩토링 위험 |
+| **Spring AI 도입** | OpenAI JSON Mode 자동 처리, 타입 안전 매핑, 재시도/타임아웃 관리 자동화 → 코드 간결성 + 신뢰성 | 수동 WebClient + JSON 파싱 → 보일러플레이트 증가, 에러 처리 복잡, 스키마 불일치 위험 |
+| **공공데이터API 폴백** | 기업 설립일 자동 조회 실패 시 사용자 입력으로 전환 → 사용성 향상 | 조회 실패 시 500 Error 반환 → 사용자 경험 저하 |
+
+---
+
+## Phase 0: Research & Analysis
+
+**Goal**: 설계 단계 진행 전 모든 기술적 불확실성 해결
+
+### Research Tasks
+
+1. **FastAPI 만세력 응답 스키마 검증**
+   - Task: FastAPI 서버의 실제 응답 형식 확인 (天干, 地支, 五行, 十神 필드 정의)
+   - Output: `research.md`에 `FastAPIResponse` 필드 목록 기록
+
+2. **십신(十神) 계산 알고리즘 연구**
+   - Task: 일간(日干)을 기준으로 월간(月干)을 분석하여 정관/편관/기타 십신 판정
+   - Output: 십신 판정 로직 수식화 (`TenGodCalculator` 클래스 스켈레톤 작성)
+
+3. **관운 분석 및 H1/H2 판정 로직**
+   - Task: 관성의 변화 주기(10년 대운), 현재 연도 간지, 관성 강도 분석 → H1/H2 예측 알고리즘
+   - Output: 관운 판정 알고리즘 정의 (`CareerFortuneAnalyzer` 로직)
+
+4. **공공데이터API 선택 및 스키마**
+   - Task: 기업 설립일 조회 가능한 공공 API 조사 (국세청, 기타) 및 요청/응답 포맷
+   - Output: 선택된 API명, URL, 필드 정의
+
+5. **Spring AI ChatClient 설정 및 JSON Mode**
+   - Task: Spring AI `ChatClient`로 OpenAI JSON Mode 구현, `CareerAdviceResponse` record 스키마
+   - Output: ChatClient 빈 설정 (`ChatClientConfig.java`), JSON 스키마 정의
+
+6. **MySQL JSON 컬럼 + JPA @JdbcTypeCode 사용법**
+   - Task: Spring Data JPA에서 JSON 컬럼 매핑 (십신 배치, 추천 산업 목록)
+   - Output: 엔티티 필드 타입 정의 (List<String>, Map<String, Object> 등)
+
+### Output: `research.md`
+
+---
+
+## Phase 1: Design & Contracts
+
+**Prerequisites**: `research.md` 완료
+
+### 1.1 Data Model Definition (`data-model.md`)
+
+**Entities & Fields**:
+
+```
+[Phase 1: 현재 구현 - 로그인 로직 제외]
+
+UserProfile
+├── id: Long (PK)
+├── birthDate: LocalDate (NOT NULL, YYYY-MM-DD)
+├── createdAt: LocalDateTime
+├── updatedAt: LocalDateTime
+├── Note: Phase 2에서 User.id (FK) 추가 예정
+
+[Phase 2+: 추후 auth/ 패키지에서 구현]
+User (로그인 정보 포함)
+├── id: Long (PK)
+├── email: String (UNIQUE, NOT NULL)
+├── password: String (bcrypt, Phase 2 추가)
+├── phone: String (UNIQUE)
+├── role: String (enum, Phase 2 추가)
+└── createdAt, updatedAt: LocalDateTime
+
+SajuResult
+├── id: Long (PK)
+├── userProfileId: Long (FK to UserProfile)
+├── heavenlyStems: List<String> (JSON, 天干 배열: [甲, 乙, 丙, 丁, 戊, 己, 庚, 辛, 壬, 癸])
+├── earthlyBranches: List<String> (JSON, 地支 배열: [子, 丑, 寅, 卯, 辰, 巳, 午, 未, 申, 酉, 戌, 亥])
+├── fiveElements: Map<String, Integer> (JSON, 五行 분포: {木:1, 火:2, 土:1, 金:2, 水:2})
+├── tenGods: Map<String, List<String>> (JSON, 十神 배치: {正官:[丙], 偏官:[...], ...})
+├── careerFortune: String (JSON, 官運 상세: {favoredPeriod:"H1", confidenceScore:75, reasoning:"..."})
+├── fetchedAt: LocalDateTime
+
+CareerConsultation
+├── id: Long (PK)
+├── sajuResultId: Long (FK to SajuResult)
+├── industries: List<Map<String, String>> (JSON, [{name:"...", reason:"..."}])
+├── interviewTips: List<String> (JSON)
+├── strengths: List<String> (JSON)
+├── openaiModelVersion: String (e.g., "gpt-4-turbo")
+├── generatedAt: LocalDateTime
+
+CompanyCompatibility
+├── id: Long (PK)
+├── userProfileId: Long (FK to UserProfile)
+├── companyName: String (NOT NULL)
+├── compatibilityScore: Integer (0-100, NOT NULL)
+├── recommendedRoles: List<String> (JSON)
+├── createdAt: LocalDateTime
+├── (composite index on userProfileId + companyName)
+
+UserSatisfactionFeedback
+├── id: Long (PK)
+├── sajuResultId: Long (FK to SajuResult)
+├── feedbackType: String (Enum, CAREER_TIMING/CONSULTATION/COMPATIBILITY)
+├── satisfactionStatus: String (Enum, SATISFIED/DISSATISFIED)
+├── createdAt: LocalDateTime
+├── (index on sajuResultId + createdAt)
+```
+
+**Relationships**:
+- **Phase 1** (현재):
+  - UserProfile (1) ↔ SajuResult (1) via userProfileId, FetchType.LAZY
+  - SajuResult (1) ↔ CareerConsultation (N) via sajuResultId, FetchType.LAZY
+  - UserProfile (1) ↔ CompanyCompatibility (N) via userProfileId, FetchType.LAZY
+  - SajuResult (1) ↔ UserSatisfactionFeedback (N) via sajuResultId, FetchType.LAZY
+- **Phase 2+** (추후):
+  - User (1) ↔ UserProfile (1) via userId, FetchType.LAZY (auth/ 패키지에서 추가)
+
+**Validation Rules** (Phase 1):
+- `birthDate`: 과거 날짜, 현실적 범위 (1900-01-01 ~ 오늘)
+- `compatibilityScore`: 0 ≤ score ≤ 100
+- 모든 외래키: NOT NULL (엔티티 생성 시 필수)
+- Note: `email` 검증은 Phase 2 User 엔티티에서 추가
+
+---
+
+### 1.2 API Contracts (`contracts/`)
+
+#### `career-timing.md`
+
+```
+POST /api/career/timing
+Content-Type: application/json
+
+Request:
+{
+  "birthDate": "1990-10-10"  // YYYY-MM-DD format, required
+}
+
+Response (200 OK):
+{
+  "success": true,
+  "data": {
+    "favoredPeriod": "H1",           // "H1" (상반기) or "H2" (하반기)
+    "confidenceScore": 75,           // 0-100
+    "reasoning": "정관이 강하고 현재 대운이 상반기와 궁합..."
+  },
+  "error": null,
+  "timestamp": 1712700000000
+}
+
+Error Response (400 Bad Request):
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "INVALID_DATE_FORMAT",
+    "message": "Birth date must be in YYYY-MM-DD format",
+    "requestId": "req-12345-abc"
+  },
+  "timestamp": 1712700000000
+}
+
+Error Response (503 Service Unavailable):
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "FASTAPI_TIMEOUT",
+    "message": "Failed to fetch saju data after 2 retries. Please try again later.",
+    "requestId": "req-12345-abc"
+  },
+  "timestamp": 1712700000000
+}
+```
+
+#### `career-consultation.md`
+
+```
+POST /api/career/consultation
+Content-Type: application/json
+
+Request:
+{
+  "birthDate": "1990-10-10",     // YYYY-MM-DD format, required
+  "heavenlyStems": ["庚", "丙", "己", "辛"],     // 4개 天干 (年月日時)
+  "earthlyBranches": ["午", "戌", "未", "未"],   // 4개 地支 (年月日時)
+  "fiveElements": {                             // 五行 분포
+    "木": 1,
+    "火": 2,
+    "土": 1,
+    "金": 2,
+    "水": 2
+  }
+}
+
+Response (200 OK):
+{
+  "success": true,
+  "data": {
+    "industries": [
+      {"name": "금융/핀테크", "reason": "오행 金 강세로 재무 관련 산업 적성"},
+      {"name": "IT/소프트웨어", "reason": "오행 水 분포로 논리력 강함"},
+      {"name": "제조업", "reason": "오행 金 과다로 정밀함 강점"}
+    ],
+    "interviewTips": [
+      "일관성 있는 자기소개 준비 (정관 특성)",
+      "데이터 기반 성과 사례 강조",
+      "팀 협력 능력 어필"
+    ],
+    "strengths": [
+      "분석력과 논리성",
+      "책임감 있는 업무 추진",
+      "원칙 준수"
+    ],
+    "openaiModelVersion": "gpt-4-turbo"
+  },
+  "error": null,
+  "timestamp": 1712700000000
+}
+
+Error Response (400 Bad Request):
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "INVALID_SAJU_DATA",
+    "message": "Saju data must include 4 heavenly stems and 4 earthly branches",
+    "requestId": "req-12345-abc"
+  },
+  "timestamp": 1712700000000
+}
+
+Error Response (504 Gateway Timeout):
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "OPENAI_API_TIMEOUT",
+    "message": "OpenAI API request timed out after 8 seconds. Please try again.",
+    "requestId": "req-12345-abc"
+  },
+  "timestamp": 1712700000000
+}
+```
+
+#### `company-compatibility.md`
+
+```
+POST /api/company/compatibility
+Content-Type: application/json
+
+Request:
+{
+  "birthDate": "1990-10-10",              // 사용자 생년월일
+  "companyName": "Samsung Electronics",   // 기업명 (공공데이터 조회용)
+  "companyFoundingDate": "1938-01-13"    // (Optional) 조회 실패 시 사용자 입력
+}
+
+Response (200 OK):
+{
+  "success": true,
+  "data": {
+    "compatibilityScore": 78,                    // 0-100
+    "confidenceLevel": "HIGH",                   // LOW, MEDIUM, HIGH
+    "recommendedRoles": [
+      "제조 관리자",
+      "공급망 담당자",
+      "품질 보증팀"
+    ],
+    "reasoning": "사용자의 정관과 기업 설립일의 오행 궁합이 78점..."
+  },
+  "error": null,
+  "timestamp": 1712700000000
+}
+
+Error Response (404 Not Found):
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "COMPANY_NOT_FOUND",
+    "message": "Company not found in public database. Please provide founding date.",
+    "requestId": "req-12345-abc"
+  },
+  "timestamp": 1712700000000
+}
+
+Error Response (400 Bad Request - 재시도):
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "Either provide companyName (for API lookup) or companyFoundingDate (manual input)",
+    "requestId": "req-12345-abc"
+  },
+  "timestamp": 1712700000000
+}
+```
+
+#### `user-feedback.md`
+
+```
+POST /api/feedback/satisfaction
+Content-Type: application/json
+
+Request:
+{
+  "sajuResultId": 123,                                    // SajuResult 엔티티 ID
+  "feedbackType": "CAREER_TIMING",                       // CAREER_TIMING / CONSULTATION / COMPATIBILITY
+  "satisfactionStatus": "SATISFIED"                      // SATISFIED / DISSATISFIED
+}
+
+Response (200 OK):
+{
+  "success": true,
+  "data": {
+    "feedbackId": 456,
+    "createdAt": 1712700000000
+  },
+  "error": null,
+  "timestamp": 1712700000000
+}
+
+Error Response (400 Bad Request):
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "INVALID_FEEDBACK_TYPE",
+    "message": "feedbackType must be one of: CAREER_TIMING, CONSULTATION, COMPATIBILITY",
+    "requestId": "req-12345-abc"
+  },
+  "timestamp": 1712700000000
+}
+
+Error Response (404 Not Found):
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "SAJU_RESULT_NOT_FOUND",
+    "message": "SajuResult with id 123 not found",
+    "requestId": "req-12345-abc"
+  },
+  "timestamp": 1712700000000
+}
+```
+
+---
+
+### 1.3 Quickstart Guide (`quickstart.md`)
+
+```markdown
+# Career Fortune API - Quick Start Guide
+
+## Prerequisites
+
+- Java 21
+- Spring Boot 4.0.5
+- MySQL 8.0+
+- API Keys: FastAPI 서버 URL, OpenAI API Key, 공공데이터API Key
+
+## Setup
+
+1. **Database Configuration**
+   ```yaml
+   # src/main/resources/application.yaml
+   spring:
+     datasource:
+       url: jdbc:mysql://localhost:3306/ssaju
+       username: root
+       password: ${DB_PASSWORD}
+     jpa:
+       hibernate:
+         ddl-auto: validate
+
+   saju:
+     fastapi:
+       url: ${FASTAPI_URL}
+       timeout-seconds: 3
+     openai:
+       api-key: ${OPENAI_API_KEY}
+       model: gpt-4-turbo
+       timeout-seconds: 8
+     public-data:
+       url: ${PUBLIC_DATA_API_URL}
+       api-key: ${PUBLIC_DATA_API_KEY}
+       timeout-seconds: 5
+   ```
+
+2. **Dependencies**
+   ```gradle
+   // build.gradle
+   dependencies {
+     implementation 'org.springframework.boot:spring-boot-starter-web:4.0.5'
+     implementation 'org.springframework.boot:spring-boot-starter-data-jpa:4.0.5'
+     implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter:0.8.1'
+     implementation 'mysql:mysql-connector-java:8.0.33'
+     implementation 'org.projectlombok:lombok:1.18.30'
+     ...
+   }
+   ```
+
+3. **Build & Run**
+   ```bash
+   cd SSAju
+   ./gradlew clean build
+   ./gradlew bootRun
+   ```
+
+## API Examples
+
+### 1. Career Timing Analysis
+
+```bash
+curl -X POST http://localhost:8080/api/career/timing \
+  -H "Content-Type: application/json" \
+  -d '{"birthDate":"1990-10-10"}'
+```
+
+### 2. Career Consultation
+
+```bash
+curl -X POST http://localhost:8080/api/career/consultation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "birthDate": "1990-10-10",
+    "heavenlyStems": ["庚", "丙", "己", "辛"],
+    "earthlyBranches": ["午", "戌", "未", "未"],
+    "fiveElements": {"木":1, "火":2, "土":1, "金":2, "水":2}
+  }'
+```
+
+### 3. Company Compatibility
+
+```bash
+curl -X POST http://localhost:8080/api/company/compatibility \
+  -H "Content-Type: application/json" \
+  -d '{
+    "birthDate": "1990-10-10",
+    "companyName": "Samsung Electronics"
+  }'
+```
+
+### 4. User Satisfaction Feedback
+
+```bash
+curl -X POST http://localhost:8080/api/feedback/satisfaction \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sajuResultId": 123,
+    "feedbackType": "CAREER_TIMING",
+    "satisfactionStatus": "SATISFIED"
+  }'
+```
+
+## Testing
+
+```bash
+# 전체 테스트
+./gradlew test
+
+# 특정 테스트 클래스
+./gradlew test --tests "ssafy.SSAju.service.CareerFortuneServiceTest"
+
+# 특정 테스트 메서드
+./gradlew test --tests "ssafy.SSAju.service.CareerFortuneServiceTest.testH1FavoredAnalysis"
+```
+
+## Key Classes
+
+- **Controller**: `CareerTimingController`, `ConsultationController`, `CompatibilityController`, `FeedbackController`
+- **Service**: `CareerFortuneService`, `ConsultationService`, `CompanyMatchingService`, `FeedbackService`, `SajuDataService`, `CompanyInfoService`
+- **Repository**: `UserRepository`, `UserProfileRepository`, `SajuResultRepository`, `CareerConsultationRepository`, `CompanyCompatibilityRepository`, `UserSatisfactionFeedbackRepository`
+- **Exception Handler**: `SajuGlobalExceptionHandler`
+- **Config**: `WebClientConfig`, `ChatClientConfig`
+
+## Architecture
+
+```
+HTTP Request
+    ↓
+[Controller] → DTO validation
+    ↓
+[Service] → Business logic (十神 calculation, H1/H2 analysis, OpenAI call)
+    ↓
+[Repository] → DB query via JPA
+    ↓
+[HTTP Response] → ApiResponse<T> wrapper
+```
+
+## Common Issues
+
+- **FASTAPI_TIMEOUT**: FastAPI 서버 응답 지연. 재시도 하거나 타임아웃 설정 조정.
+- **OPENAI_API_TIMEOUT**: OpenAI API 응답 지연. 스로틀링이나 토큰 부족 확인.
+- **DATABASE_CONNECTION_ERROR**: MySQL 연결 확인. `application.yaml`의 datasource 설정 검증.
+- **INVALID_DATE_FORMAT**: 생년월일이 YYYY-MM-DD 형식이 아님.
+
+```
+
+---
+
+### 1.4 Agent Context Update
+
+Run the following to update the agent context for Claude:
+
+```bash
+.specify/scripts/bash/update-agent-context.sh claude
+```
+
+This will merge the Spring AI, FastAPI integration, and 십신/관운 계산 로직 정보를 agent context에 추가.
+
+---
+
+## Phase 1 Deliverables (생성 예정)
+
+✅ `research.md` - 모든 기술적 불확실성 해결
+✅ `data-model.md` - 6개 엔티티, 관계, 검증 규칙 정의
+✅ `contracts/career-timing.md` - API 요청/응답 스키마
+✅ `contracts/career-consultation.md` - API 요청/응답 스키마
+✅ `contracts/company-compatibility.md` - API 요청/응답 스키마
+✅ `contracts/user-feedback.md` - 사용자 만족도 피드백 API 스키마
+✅ `quickstart.md` - 개발 시작 가이드, 설정, 예제
+
+---
+
+## 다음 단계
+
+**Phase 2 (Task Generation)**: `/speckit.tasks` 명령으로 상세 작업 목록(tasks.md) 생성
+
+```bash
+/speckit.tasks
+```
+
+이 명령은:
+1. FR (Functional Requirement) 별 작업 분해
+2. 테스트 우선 작성 계획
+3. Conventional Commits 대응
+4. 체크리스트 생성
+
+을 생성합니다.
+
+---
+
+## Notes for Implementation
+
+- **Constitutional Compliance**: 모든 구현은 `/CLAUDE.md`의 Java/JPA 표준 및 Test-Then-Commit 프로토콜 준수
+- **Documentation Workflow**: spec.md → plan.md → research.md → data-model.md → tasks.md → 구현 (진실의 원천은 항상 spec.md)
+- **Test Strategy**: Given-When-Then 패턴 + AssertJ. 각 FR별 최소 2개 테스트 (Happy path + Error case)
+- **Layering**: Controller (얇음) → Service (두터움) → Repository (수동). 비즈니스 로직은 Service에만.
