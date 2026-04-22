@@ -1,14 +1,15 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/ssaju?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: root        # 본인의 MySQL 계정
-    password: 1234 # 본인의 MySQL 비밀번호
+    # DB_URL 환경 변수가 있으면 그걸 쓰고, 없으면 로컬 MySQL 주소를 기본값으로 사용합니다.
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: ${JPA_DDL_AUTO}
+    show-sql: ${SHOW_SQL}
     properties:
       hibernate:
         format_sql: true
