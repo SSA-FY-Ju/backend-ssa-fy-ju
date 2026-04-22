@@ -1,0 +1,43 @@
+name: SSAju CI/CD with Docker
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Docker Hub 로그인
+      uses: docker/login-action@v3 
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: 서버 배포 (SSH)
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          # 1. 최신 이미지 가져오기
+          sudo docker pull ${{ secrets.DOCKER_USERNAME }}/ssaju-backend:latest
+          
+          # 2. 기존 컨테이너 중지 및 삭제
+          sudo docker stop ssaju-container || true
+          sudo docker rm ssaju-container || true
+          
+          # 3. 새로운 컨테이너 실행 (application.yml에 설정한 변수명과 일치시킴)
+          sudo docker run -d --name ssaju-container \
+            -p 8080:8080 \
+            --network ssaju-network \
+            -e DB_URL="${{ secrets.DB_URL }}" \
+            -e DB_USERNAME="root" \
+            -e DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+            -e JPA_DDL_AUTO="${{ secrets.JPA_DDL_AUTO }}" \
+            -e SHOW_SQL="${{ secrets.SHOW_SQL }}" \
+            ${{ secrets.DOCKER_USERNAME }}/ssaju-backend:latest
+
+          # 4. 사용하지 않는 오래된 이미지 삭제 (서버 용량 관리)
+          sudo docker image prune -f
