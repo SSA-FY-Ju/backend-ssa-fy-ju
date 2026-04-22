@@ -100,8 +100,8 @@ git checkout -b <prefix>/<feature-name>
    ```bash
    git push origin <prefix>/<feature-name>
    ```
-4. 작업 완료 보고
-5. **관리자(사용자)가 PR 생성 및 머지 수행**
+4. PR 생성 및 제출
+5. **사용자 검토 대기** (코드 리뷰 및 피드백 대기, 결과에 따라 수정 또는 완료)
 
 ## 일반적인 워크플로우
 
@@ -127,8 +127,11 @@ git commit -m "feat: 새로운 기능 추가
 
 [Test Passed]"
 
-# 5. Push
+# 5. Push & PR 생성
 git push origin feat/new-feature
 
-# 6. 관리자 대기 (PR 생성/머지는 관리자가 담당)
+# GitHub에서 PR 생성 (온라인 또는 gh cli 사용)
+gh pr create --title "feat: 새로운 기능 추가" --body "기능 설명"
+
+# 6. 사용자 검토 대기 (코드 리뷰 결과에 따라 수정 또는 완료)
 ```

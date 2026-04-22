@@ -7,10 +7,10 @@ SSAju는 SSAFY 사주 기반 커리어 상담 서비스의 백엔드입니다. (
 - Run: `./gradlew bootRun`
 - Test: `./gradlew test` (성공 확인 필수)
 
-## 🚀 Workflow: Test-Then-Commit
-1. **구현 & 테스트**: 기능 작성 후 반드시 `./gradlew test` 실행.
-2. **커밋**: 테스트 성공 시에만 `git commit` (Prefix: `feat:`, `fix:`, `docs:` 등).
-3. **Push**: 브랜치(`prefix/name`) 푸시 후 대기 (직접 머지 금지).
+## 🚀 Workflow: Develop → Test → Commit → Push → PR
+1. **브랜치 생성 & 개발**: 적절한 이름으로 브랜치 생성 후 기능 개발.
+2. **테스트 & 커밋 & 푸시**: 테스트 통과 시 커밋 및 푸시, PR 생성.
+3. **검토 & 수정**: 코드 리뷰 결과 반영 후 완료 또는 추가 수정.
 
 ## 📚 상세 지침 (반드시 숙지)
 | 문서 | 경로 |
