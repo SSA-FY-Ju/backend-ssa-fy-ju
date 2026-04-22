@@ -38,7 +38,7 @@ jobs:
         context: ./SSAju        
         push: true
         platforms: linux/amd64
-        tags: ${{ secrets.DOCKER_USERNAME }}/ssaju-backend:latest
+        tags: hariaus/ssaju-backend:latest
 
     - name: 서버 배포 (SSH)
       uses: appleboy/ssh-action@v1.0.3
