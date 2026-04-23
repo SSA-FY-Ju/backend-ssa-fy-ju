@@ -1,15 +1,40 @@
 spring:
+  profiles:
+    active: local
+
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # DB_URL 환경 변수가 있으면 그걸 쓰고, 없으면 로컬 MySQL 주소를 기본값으로 사용합니다.
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
   jpa:
     hibernate:
-      ddl-auto: ${JPA_DDL_AUTO}
-    show-sql: ${SHOW_SQL}
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: ${SHOW_SQL:false}
     properties:
       hibernate:
         format_sql: true
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-4o-mini
+
+saju:
+  fastapi:
+    url: ${FASTAPI_URL}
+    timeout-seconds: 3
+    max-retries: 2
+
+  openai:
+    timeout-seconds: 8
+    max-retries: 1
+
+  public-data:
+    url: ${PUBLIC_DATA_API_URL}
+    api-key: ${PUBLIC_DATA_API_KEY}
+    timeout-seconds: 5
+    max-retries: 1
