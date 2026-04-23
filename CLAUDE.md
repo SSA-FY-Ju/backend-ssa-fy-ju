@@ -20,4 +20,23 @@ SSAju는 SSAFY 사주 기반 커리어 상담 서비스의 백엔드입니다. (
 | **아키텍처 & 예외** | `/skills/architecture-guide.md` |
 | **기능 명세(Spec)** | `/specs/001-career-fortune-api/spec.md` 하위 문서 |
 
-**Last Updated**: 2026-04-10
+## 🔒 보안 & 환경 설정
+
+### 민감 정보 관리 (필수)
+
+⚠️ **소스 코드에 절대 포함하면 안 됨**:
+- API Key, 토큰 (OpenAI, FastAPI, 공공데이터 API)
+- 데이터베이스 비밀번호
+- 사용자 개인정보
+
+✅ **올바른 방식**:
+- 모든 민감 정보는 환경변수 사용: `${OPENAI_API_KEY}`, `${DB_PASSWORD}`
+- `.gitignore`에 포함: `application-local.yaml`, `.env`, `*.properties`
+
+### 로컬 개발 환경
+
+**로컬 설정**은 `application-local.yaml`에서 관리:
+- 이 파일은 Git에 커밋하지 말 것 (`.gitignore` 설정됨)
+- 각 개발자가 로컬에서 자신의 정보로 설정
+
+**Last Updated**: 2026-04-23

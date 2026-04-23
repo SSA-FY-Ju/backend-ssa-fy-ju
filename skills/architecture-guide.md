@@ -258,6 +258,116 @@ openai:
 "Resource not found"
 ```
 
+## 로컬 개발 환경 설정
+
+### 1. 환경변수 (production)
+
+배포 환경에서는 다음 환경변수를 설정:
+
+```bash
+# 데이터베이스
+export DB_URL="jdbc:mysql://localhost:3306/ssaju"
+export DB_USERNAME="root"
+export DB_PASSWORD="your_password"
+
+# JPA
+export JPA_DDL_AUTO="validate"  # 스키마 검증만 수행
+export SHOW_SQL="false"
+
+# 외부 API
+export OPENAI_API_KEY="sk-..."
+```
+
+### 2. 로컬 개발 환경
+
+`application-local.yaml`이 자동 로드되므로 로컬 환경변수 설정 불필요:
+
+```bash
+# 방법 1: 로컬 프로파일로 실행 (환경변수 불필요)
+cd SSAju/
+./gradlew bootRun --args='--spring.profiles.active=local'
+
+# 방법 2: 또는 기본 실행 (이미 local 프로파일 사용)
+./gradlew bootRun
+```
+
+**로컬 기본 설정** (`application-local.yaml`에 정의):
+- DB: `jdbc:mysql://localhost:3306/ssaju`
+- JPA DDL: `update` (테이블 자동 생성/수정)
+- SQL 로깅: `true` (디버깅용)
+- 로컬 환경 자격증명은 `application-local.yaml` 참고
+
+---
+
+## 외부 API 통합 패턴
+
+SSAju는 다음 3개 외부 API와 연동:
+
+### 1. FastAPI (만세력 계산)
+
+```
+요청: POST /saju/calculate
+입력: 생년월일 (YYYY-MM-DD)
+응답: {
+  heavenlyStems: [천간 5개],
+  earthlyBranches: [지지 5개],
+  fiveElements: {목화토금수},
+  tenGods: {십신 배치}
+}
+타임아웃: 3초
+재시도: 2회 (지수 백오프)
+```
+
+**예외 처리**:
+```java
+try {
+    return fastApiClient.calculateSaju(birthDate);
+} catch (TimeoutException e) {
+    throw new FastAPITimeoutException("FastAPI 요청 시간 초과", e);
+} catch (Exception e) {
+    throw new ExternalApiException("FastAPI 호출 실패", e);
+}
+```
+
+### 2. OpenAI API (커리어 상담)
+
+```
+모델: gpt-4o-mini
+기능: JSON Mode (구조화된 응답)
+입력: {생년월일, 사주 데이터}
+응답: {
+  industries: [추천 산업],
+  interviewTips: [면접 팁],
+  strengths: [강점 분석]
+}
+타임아웃: 8초 (LLM 응답 시간)
+재시도: 1회
+```
+
+**Spring AI 사용 (권장)**:
+```java
+@Configuration
+public class ChatClientConfig {
+    @Bean
+    public ChatClient chatClient(ChatClientBuilder builder) {
+        return builder.build();
+    }
+}
+```
+
+### 3. 공공데이터 API (기업 정보)
+
+```
+기능: 기업명으로 설립연도 조회
+입력: 회사명
+응답: {foundingYear, companyId}
+타임아웃: 5초
+재시도: 1회
+Fallback: 찾지 못하면 사용자 수동입력 요청 (graceful degradation)
+```
+
+---
+
 ## Phase 1 제약사항
 
 - **캐싱 금지**: Redis, In-Memory 전역 캐시 사용 금지
@@ -270,4 +380,4 @@ openai:
 
 ---
 
-**Last Updated**: 2026-04-10
+**Last Updated**: 2026-04-23

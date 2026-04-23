@@ -1,5 +1,33 @@
 # SSAju 코드 스타일 및 개발 규칙
 
+## 📦 패키지 구조
+
+SSAju는 모듈식 아키텍처로 설계:
+
+```
+ssafy.SSAju/
+├── career/              # Phase 1: 관운 분석, AI 상담, 기업 궁합, 피드백
+│   ├── controller/      # HTTP 요청 처리
+│   ├── service/         # 비즈니스 로직
+│   ├── repository/      # DB 접근
+│   └── entity/          # JPA 엔티티
+├── dto/
+│   ├── request/         # 요청 DTO (record 타입)
+│   ├── response/        # 응답 DTO (record 타입)
+│   └── external/        # 외부 API DTO
+├── exception/           # 커스텀 예외 클래스들
+├── handler/             # @RestControllerAdvice로 전역 예외 처리
+├── config/              # 설정 클래스 (WebClient, ChatClient 등)
+└── auth/                # Phase 2: 인증/인가 (나중에 추가)
+```
+
+**핵심 원칙**:
+- Phase 1: `career/` 패키지만 구현 (auth 제외)
+- 각 계층 간 명확한 책임 분리
+- 외부 API 호출은 Service 계층에서만 담당
+
+---
+
 ## Lombok 사용 규칙
 
 엔티티(Entity) 클래스에는 무한 루프(순환 참조) 방지를 위해 `@Data` 및 `@ToString` 사용을 금지합니다.

@@ -3,7 +3,7 @@
 **Feature**: Career Fortune & Consultation API
 **Date Generated**: 2026-04-10
 **Status**: Ready for Implementation
-**Total Tasks**: 48
+**Total Tasks**: 49 (Enum definition + API documentation added)
 **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
 
 ---
@@ -73,7 +73,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/build.gradle`
 
 - [ ] T005 Create base exception hierarchy in `exception/` package
-  - Create: `SajuException.java` (root), `InvalidSajuDataException.java`, `FastAPITimeoutException.java`, `OpenAIApiException.java`, `PublicDataApiException.java`, `DataAccessException.java`
+  - Create: `SajuException.java` (root), `InvalidSajuDataException.java`, `FastAPITimeoutException.java`, `OpenAIApiException.java`, `PublicDataApiException.java`, `DataAccessException.java`, `ExternalApiException.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/exception/*.java`
 
 ---
@@ -114,11 +114,16 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/external/FastAPIResponse.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/external/CareerAdviceResponse.java`
 
-- [ ] T013 [P] Create utility classes for saju calculations
+- [ ] T013 [P] Define enums for feedback and satisfaction tracking
+  - Create: `FeedbackType.java` (CAREER_TIMING, CONSULTATION, COMPATIBILITY), `SatisfactionStatus.java` (SATISFIED, DISSATISFIED)
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/FeedbackType.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/SatisfactionStatus.java`
+
+- [ ] T013-2 [P] Create utility classes for saju calculations
   - Create: `TenGodCalculator.java` (十神 computation), `CareerFortuneAnalyzer.java` (H1/H2 logic), `CompatibilityScoreCalculator.java`
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/TenGodCalculator.java`
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/CareerFortuneAnalyzer.java`
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/CompatibilityScoreCalculator.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/util/TenGodCalculator.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/util/CareerFortuneAnalyzer.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/util/CompatibilityScoreCalculator.java`
 
 ---
 
@@ -307,12 +312,21 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ## Phase 4: Polish & Integration
 
-- [ ] T047 Write integration test for full Career API flow (all 4 endpoints)
+- [ ] T047 Generate Swagger/OpenAPI documentation
+  - Add: `springdoc-openapi-starter-webmvc-ui` dependency to `build.gradle`
+  - Configure: `@OpenAPIDefinition`, `@Info`, `@Server` annotations in `SSAjuApplication.java`
+  - Add: `@Operation`, `@RequestBody`, `@ApiResponse` annotations to all controllers
+  - Configure: `springdoc.swagger-ui.path=/swagger-ui.html` in `application.yaml`
+  - File: `SSAju/build.gradle` (dependency), `SSAju/src/main/java/ssafy/SSAju/SSAjuApplication.java` (annotations)
+  - File: All controller classes updated with OpenAPI annotations
+  - Verify: Accessible at `http://localhost:8080/swagger-ui.html` after `./gradlew bootRun`
+
+- [ ] T048 Write integration test for full Career API flow (all 4 endpoints)
   - Test: Create UserProfile → Timing analysis → Consultation → Feedback → Company compatibility
   - Verify: Data persistence, response consistency, error handling across flows
   - File: `SSAju/src/test/java/ssafy/SSAju/integration/CareerApiIntegrationTest.java`
 
-- [ ] T048 Final verification: Run full test suite and validate coverage
+- [ ] T049 Final verification: Run full test suite and validate coverage
   - Command: `./gradlew clean test`
   - Verify: 100% of Phase 1 tests pass, no warnings, coverage >80%
   - Document: Test summary in [tasks.md](./tasks.md) completion section
@@ -411,13 +425,13 @@ And:   Fallback to manual company founding date if API lookup fails
 | Phase | Task Count | Focus | Parallel? |
 |-------|-----------|-------|-----------|
 | Phase 1 (Setup) | 5 | Project structure, config, exception handling | Yes (all) |
-| Phase 2 (Foundational) | 8 | WebClient, ChatClient, base entities, repos | Yes (most) |
+| Phase 2 (Foundational) | 9 | WebClient, ChatClient, base entities, repos, Enum definitions, utilities | Yes (most) |
 | Phase 3.1 (US1) | 8 | Career timing feature | Independent |
 | Phase 3.2 (US2) | 9 | Consultation feature | Parallel with US4 |
 | Phase 3.4 (US4) | 9 | Feedback feature | Parallel with US2 |
 | Phase 3.3 (US3) | 7 | Company compatibility (P2) | After core ready |
-| Phase 4 (Polish) | 2 | Integration tests, final validation | After all stories |
-| **TOTAL** | **48** | Full MVP + P2 foundation | Strategic parallelism |
+| Phase 4 (Polish) | 3 | API documentation (Swagger), integration tests, final validation | After all stories |
+| **TOTAL** | **49** | Full MVP + P2 foundation + API docs | Strategic parallelism |
 
 ---
 

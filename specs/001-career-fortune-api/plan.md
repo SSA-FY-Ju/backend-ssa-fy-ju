@@ -95,7 +95,11 @@ SSAju/
 │   │   │   ├── SajuResult.java
 │   │   │   ├── CareerConsultation.java
 │   │   │   ├── CompanyCompatibility.java
-│   │   │   └── UserSatisfactionFeedback.java
+│   │   │   ├── UserSatisfactionFeedback.java
+│   │   ├── util/
+│   │   │   ├── TenGodCalculator.java (十神 계산)
+│   │   │   ├── CareerFortuneAnalyzer.java (H1/H2 판정)
+│   │   │   └── CompatibilityScoreCalculator.java (궁합 점수)
 │   │
 │   ├── dto/
 │   │   ├── request/
@@ -273,11 +277,17 @@ User (로그인 정보 포함)
 SajuResult
 ├── id: Long (PK)
 ├── userProfileId: Long (FK to UserProfile)
-├── heavenlyStems: List<String> (JSON, 天干 배열: [甲, 乙, 丙, 丁, 戊, 己, 庚, 辛, 壬, 癸])
-├── earthlyBranches: List<String> (JSON, 地支 배열: [子, 丑, 寅, 卯, 辰, 巳, 午, 未, 申, 酉, 戌, 亥])
-├── fiveElements: Map<String, Integer> (JSON, 五行 분포: {木:1, 火:2, 土:1, 金:2, 水:2})
-├── tenGods: Map<String, List<String>> (JSON, 十神 배치: {正官:[丙], 偏官:[...], ...})
-├── careerFortune: String (JSON, 官運 상세: {favoredPeriod:"H1", confidenceScore:75, reasoning:"..."})
+├── fullSajuData: String (JSON, FastAPI 전체 응답 저장)
+│   ├── year_pillar: String (e.g., "庚午")
+│   ├── month_pillar: String
+│   ├── day_pillar: String
+│   ├── hour_pillar: String
+│   ├── year_stem, month_stem, day_stem, hour_stem: String (천간)
+│   ├── year_branch, month_branch, day_branch, hour_branch: String (지지)
+│   ├── birth_time: String (시간, e.g., "14:30")
+│   ├── birth_date: String (생년월일, YYYY-MM-DD)
+│   └── solar_correction: Object (도시, 경도, UTC offset, 수정 시간 등)
+├── careerFortune: String (JSON, 관운 분석: {favoredPeriod:"H1", confidenceScore:75, reasoning:"..."})
 ├── fetchedAt: LocalDateTime
 
 CareerConsultation

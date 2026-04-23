@@ -10,7 +10,20 @@ Claude는 코드를 작성하거나 수정할 때 반드시 아래 프로세스�
 
 ```bash
 cd SSAju/
-./gradlew test
+./gradlew test  # 전체 테스트 실행
+```
+
+**특정 테스트만 실행하려면**:
+
+```bash
+# 특정 클래스만 실행
+./gradlew test --tests "ssafy.SSAju.service.CareerFortuneServiceTest"
+
+# 특정 메서드만 실행
+./gradlew test --tests "ssafy.SSAju.service.CareerFortuneServiceTest.shouldReturnCareerTimingWhenValidInput"
+
+# 이름 패턴으로 실행
+./gradlew test --tests "*ServiceTest"
 ```
 
 해당 기능에 대한 테스트 코드가 없다면 **먼저 작성**합니다.
