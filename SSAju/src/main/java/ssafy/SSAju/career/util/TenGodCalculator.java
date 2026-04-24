@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,6 +37,25 @@ public class TenGodCalculator {
         STEM_ELEMENT.put("壬", "水"); STEM_ELEMENT.put("癸", "水");
     }
 
+    // 상생 순환 순서: 木→火→土→金→水→木 (인덱스 차이로 관계 판별)
+    private static final List<String> ELEMENTS = List.of("木", "火", "土", "金", "水");
+
+    // 12지지별 지장간(支藏干) 테이블
+    private static final Map<String, List<String>> BRANCH_HIDDEN_STEMS = Map.ofEntries(
+            Map.entry("子", List.of("壬", "癸")),
+            Map.entry("丑", List.of("己", "癸", "辛")),
+            Map.entry("寅", List.of("戊", "丙", "甲")),
+            Map.entry("卯", List.of("甲", "乙")),
+            Map.entry("辰", List.of("乙", "癸", "戊")),
+            Map.entry("巳", List.of("戊", "庚", "丙")),
+            Map.entry("午", List.of("己", "丁")),
+            Map.entry("未", List.of("丁", "乙", "己")),
+            Map.entry("申", List.of("戊", "壬", "庚")),
+            Map.entry("酉", List.of("庚", "辛")),
+            Map.entry("戌", List.of("辛", "丁", "戊")),
+            Map.entry("亥", List.of("甲", "壬"))
+    );
+
     /**
      * 일간을 기준으로 대상 천간의 십신을 계산한다.
      */
@@ -55,7 +75,7 @@ public class TenGodCalculator {
     }
 
     /**
-     * FastAPI 응답에서 사주 전체 십신 맵을 계산한다.
+     * FastAPI 응답에서 사주 전체 십신 맵을 계산한다 (천간 기준).
      */
     public Map<String, String> calculateAll(FastAPIResponse sajuData) {
         String dayStem = sajuData.dayStem();
@@ -63,6 +83,30 @@ public class TenGodCalculator {
         result.put("yearStem", calculate(dayStem, sajuData.yearStem()));
         result.put("monthStem", calculate(dayStem, sajuData.monthStem()));
         result.put("hourStem", calculate(dayStem, sajuData.hourStem()));
+        return result;
+    }
+
+    /**
+     * 지지(地支) 하나에서 지장간(支藏干)의 십신 목록을 반환한다.
+     */
+    public List<String> calculateFromBranch(String dayStem, String branch) {
+        List<String> hiddenStems = BRANCH_HIDDEN_STEMS.get(branch);
+        if (hiddenStems == null) return List.of();
+        return hiddenStems.stream()
+                .map(stem -> calculate(dayStem, stem))
+                .toList();
+    }
+
+    /**
+     * FastAPI 응답에서 년·월·일·시 지지 4개의 지장간 십신을 모두 계산한다.
+     */
+    public Map<String, List<String>> calculateAllFromBranches(FastAPIResponse sajuData) {
+        String dayStem = sajuData.dayStem();
+        Map<String, List<String>> result = new HashMap<>();
+        result.put("yearBranch", calculateFromBranch(dayStem, sajuData.yearBranch()));
+        result.put("monthBranch", calculateFromBranch(dayStem, sajuData.monthBranch()));
+        result.put("dayBranch", calculateFromBranch(dayStem, sajuData.dayBranch()));
+        result.put("hourBranch", calculateFromBranch(dayStem, sajuData.hourBranch()));
         return result;
     }
 
@@ -78,28 +122,16 @@ public class TenGodCalculator {
     }
 
     private String getRelation(String day, String target) {
-        if (day.equals(target)) return "SAME";
-        return switch (day) {
-            case "木" -> switch (target) {
-                case "火" -> "PRODUCE"; case "土" -> "CONTROL";
-                case "金" -> "CONTROLLED_BY"; case "水" -> "PRODUCED_BY"; default -> "UNKNOWN";
-            };
-            case "火" -> switch (target) {
-                case "土" -> "PRODUCE"; case "金" -> "CONTROL";
-                case "水" -> "CONTROLLED_BY"; case "木" -> "PRODUCED_BY"; default -> "UNKNOWN";
-            };
-            case "土" -> switch (target) {
-                case "金" -> "PRODUCE"; case "水" -> "CONTROL";
-                case "木" -> "CONTROLLED_BY"; case "火" -> "PRODUCED_BY"; default -> "UNKNOWN";
-            };
-            case "金" -> switch (target) {
-                case "水" -> "PRODUCE"; case "木" -> "CONTROL";
-                case "火" -> "CONTROLLED_BY"; case "土" -> "PRODUCED_BY"; default -> "UNKNOWN";
-            };
-            case "水" -> switch (target) {
-                case "木" -> "PRODUCE"; case "火" -> "CONTROL";
-                case "土" -> "CONTROLLED_BY"; case "金" -> "PRODUCED_BY"; default -> "UNKNOWN";
-            };
+        int dayIdx = ELEMENTS.indexOf(day);
+        int targetIdx = ELEMENTS.indexOf(target);
+        if (dayIdx == -1 || targetIdx == -1) return "UNKNOWN";
+
+        return switch ((targetIdx - dayIdx + 5) % 5) {
+            case 0 -> "SAME";
+            case 1 -> "PRODUCE";
+            case 2 -> "CONTROL";
+            case 3 -> "CONTROLLED_BY";
+            case 4 -> "PRODUCED_BY";
             default -> "UNKNOWN";
         };
     }

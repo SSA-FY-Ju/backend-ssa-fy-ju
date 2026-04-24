@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -62,8 +63,13 @@ public class SajuGlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException e) {
-        String message = e.getBindingResult().getFieldErrors().stream()
-                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+        String message = e.getBindingResult().getAllErrors().stream()
+                .map(err -> {
+                    if (err instanceof FieldError fe) {
+                        return fe.getField() + ": " + fe.getDefaultMessage();
+                    }
+                    return err.getDefaultMessage();
+                })
                 .findFirst()
                 .orElse("Validation failed");
         log.warn("Validation error: {}", message);

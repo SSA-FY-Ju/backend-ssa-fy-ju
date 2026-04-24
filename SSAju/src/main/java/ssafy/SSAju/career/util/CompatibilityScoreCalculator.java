@@ -54,18 +54,13 @@ public class CompatibilityScoreCalculator {
     }
 
     private int calculateElementBonus(FastAPIResponse user, FastAPIResponse company) {
-        // 사주 기둥별 천간 오행 일치 비율로 보너스 계산
-        List<String> userStems = List.of(
-                user.yearStem(), user.monthStem(), user.dayStem(), user.hourStem()
-        );
-        List<String> companyStems = List.of(
-                company.yearStem(), company.monthStem(), company.dayStem(), company.hourStem()
-        );
+        String[] userStems = { user.yearStem(), user.monthStem(), user.dayStem(), user.hourStem() };
+        String[] companyStems = { company.yearStem(), company.monthStem(), company.dayStem(), company.hourStem() };
 
         long matchCount = 0;
         for (int i = 0; i < 4; i++) {
-            String u = userStems.get(i);
-            String c = companyStems.get(i);
+            String u = userStems[i];
+            String c = companyStems[i];
             if (u != null && c != null && u.equals(c)) {
                 matchCount++;
             }
