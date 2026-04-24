@@ -57,22 +57,22 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ## Phase 1: Setup (Project Initialization)
 
-- [ ] T001 Create project package structure in `SSAju/src/main/java/ssafy/SSAju/`
+- [v] T001 Create project package structure in `SSAju/src/main/java/ssafy/SSAju/`
   - Create directories: `career/`, `dto/`, `controller/`, `service/`, `repository/`, `exception/`, `handler/`, `config/`
   - File: `SSAju/src/main/java/ssafy/SSAju/` (directory structure)
 
-- [ ] T002 Initialize Spring Boot application class (`SSAjuApplication.java`)
+- [v] T002 Initialize Spring Boot application class (`SSAjuApplication.java`)
   - File: `SSAju/src/main/java/ssafy/SSAju/SSAjuApplication.java`
 
-- [ ] T003 Configure `application.yaml` with database, external API URLs, and timeouts
+- [v] T003 Configure `application.yaml` with database, external API URLs, and timeouts
   - Include: MySQL datasource, FastAPI URL, OpenAI API key (env var), public data API config
   - File: `SSAju/src/main/resources/application.yaml`
 
-- [ ] T004 Add Spring AI and WebClient dependencies to `build.gradle`
+- [v] T004 Add Spring AI and WebClient dependencies to `build.gradle`
   - Add: Spring AI OpenAI starter, WebClient, MySQL driver, Lombok, Spring Validation
   - File: `SSAju/build.gradle`
 
-- [ ] T005 Create base exception hierarchy in `exception/` package
+- [v] T005 Create base exception hierarchy in `exception/` package
   - Create: `SajuException.java` (root), `InvalidSajuDataException.java`, `FastAPITimeoutException.java`, `OpenAIApiException.java`, `PublicDataApiException.java`, `DataAccessException.java`, `ExternalApiException.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/exception/*.java`
 
