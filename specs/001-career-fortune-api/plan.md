@@ -2,7 +2,7 @@
 
 **Branch**: `main` (direct planning, no feature branch) | **Date**: 2026-04-10 | **Spec**: [specs/001-career-fortune-api/spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/001-career-fortune-api/spec.md` with 6 clarifications resolved
+**Input**: Feature specification from `/specs/001-career-fortune-api/spec.md` with 9 clarifications resolved (including birth_time requirement)
 
 ## Summary
 
@@ -103,9 +103,9 @@ SSAju/
 │   │
 │   ├── dto/
 │   │   ├── request/
-│   │   │   ├── CareerTimingRequest.java
-│   │   │   ├── ConsultationRequest.java
-│   │   │   ├── CompatibilityRequest.java
+│   │   │   ├── CareerTimingRequest.java (birthDate + birthTime)
+│   │   │   ├── ConsultationRequest.java (birthDate + birthTime)
+│   │   │   ├── CompatibilityRequest.java (userBirthDate + userBirthTime + companyInfo)
 │   │   │   └── SatisfactionFeedbackRequest.java
 │   │   ├── response/
 │   │   │   ├── CareerTimingResponse.java
@@ -261,6 +261,7 @@ SSAju/
 UserProfile
 ├── id: Long (PK)
 ├── birthDate: LocalDate (NOT NULL, YYYY-MM-DD)
+├── birthTime: LocalTime (NOT NULL, HH:mm format, 사주 명리학 정확성 위해 필수)
 ├── createdAt: LocalDateTime
 ├── updatedAt: LocalDateTime
 ├── Note: Phase 2에서 User.id (FK) 추가 예정
@@ -344,7 +345,8 @@ Content-Type: application/json
 
 Request:
 {
-  "birthDate": "1990-10-10"  // YYYY-MM-DD format, required
+  "birthDate": "1990-10-10",  // YYYY-MM-DD format, required
+  "birthTime": "14:30"        // HH:mm format (24-hour), required
 }
 
 Response (200 OK):
@@ -393,6 +395,7 @@ Content-Type: application/json
 Request:
 {
   "birthDate": "1990-10-10",     // YYYY-MM-DD format, required
+  "birthTime": "14:30",          // HH:mm format (24-hour), required
   "heavenlyStems": ["庚", "丙", "己", "辛"],     // 4개 天干 (年月日時)
   "earthlyBranches": ["午", "戌", "未", "未"],   // 4개 地支 (年月日時)
   "fiveElements": {                             // 五行 분포
@@ -462,9 +465,11 @@ Content-Type: application/json
 
 Request:
 {
-  "birthDate": "1990-10-10",              // 사용자 생년월일
+  "birthDate": "1990-10-10",              // 사용자 생년월일, required
+  "birthTime": "14:30",                   // 사용자 태어난 시간 (HH:mm), required
   "companyName": "Samsung Electronics",   // 기업명 (공공데이터 조회용)
-  "companyFoundingDate": "1938-01-13"    // (Optional) 조회 실패 시 사용자 입력
+  "companyFoundingDate": "1938-01-13",   // (Optional) 기업 설립일, 조회 실패 시 사용자 입력
+  "companyFoundingTime": "12:00"         // (Optional) 기업 설립 시간 (HH:mm), 미상 시 기본값 12:00
 }
 
 Response (200 OK):
@@ -627,7 +632,7 @@ Error Response (404 Not Found):
 ```bash
 curl -X POST http://localhost:8080/api/career/timing \
   -H "Content-Type: application/json" \
-  -d '{"birthDate":"1990-10-10"}'
+  -d '{"birthDate":"1990-10-10", "birthTime":"14:30"}'
 ```
 
 ### 2. Career Consultation
@@ -637,6 +642,7 @@ curl -X POST http://localhost:8080/api/career/consultation \
   -H "Content-Type: application/json" \
   -d '{
     "birthDate": "1990-10-10",
+    "birthTime": "14:30",
     "heavenlyStems": ["庚", "丙", "己", "辛"],
     "earthlyBranches": ["午", "戌", "未", "未"],
     "fiveElements": {"木":1, "火":2, "土":1, "金":2, "水":2}
@@ -650,7 +656,9 @@ curl -X POST http://localhost:8080/api/company/compatibility \
   -H "Content-Type: application/json" \
   -d '{
     "birthDate": "1990-10-10",
-    "companyName": "Samsung Electronics"
+    "birthTime": "14:30",
+    "companyName": "Samsung Electronics",
+    "companyFoundingDate": "1938-01-13"
   }'
 ```
 

@@ -93,8 +93,9 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/handler/SajuGlobalExceptionHandler.java`
 
 - [ ] T009 [P] Create base entities: `UserProfile` and `SajuResult` in `career/entity/`
-  - Implement: UserProfile (birthDate, timestamps), SajuResult (heavenlyStems, earthlyBranches, fiveElements, tenGods, careerFortune as JSON)
-  - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for relationships
+  - Implement UserProfile: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull, HH:mm format), timestamps (createdAt, updatedAt)
+  - Implement SajuResult: heavenlyStems[], earthlyBranches[], fiveElements, tenGods, careerFortune (JSON), birth_time, timestamps. Link to UserProfile (1:1)
+  - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for relationships, @JdbcTypeCode for JSON columns
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/UserProfile.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/SajuResult.java`
 
@@ -136,7 +137,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 **Expected Outcome**: Timing prediction API working end-to-end, stored in DB
 
 - [ ] T014 [US1] [P] Create `CareerTimingRequest` DTO in `dto/request/`
-  - Field: `birthDate` (LocalDate, @NotNull)
+  - Fields: `birthDate` (LocalDate, @NotNull, YYYY-MM-DD), `birthTime` (LocalTime, @NotNull, HH:mm format)
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/CareerTimingRequest.java`
 
 - [ ] T015 [US1] [P] Create `CareerTimingResponse` DTO in `dto/response/`
@@ -144,28 +145,39 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/CareerTimingResponse.java`
 
 - [ ] T016 [US1] Create `SajuDataService` in `service/`
-  - Method: `fetchSajuFromFastAPI(LocalDate birthDate)` → calls FastAPI with retry logic
-  - Handles: TimeoutException → FastAPITimeoutException, invalid response → InvalidSajuDataException
+  - Method: `fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime)` → calls FastAPI with complete birth date-time (YYYY-MM-DD HH:mm) with retry logic
+  - Handles: TimeoutException → FastAPITimeoutException, invalid response → InvalidSajuDataException, missing time → InvalidSajuDataException
   - File: `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
 
 - [ ] T017 [US1] Create `CareerFortuneService` in `service/`
-  - Method: `analyzeCareerTiming(LocalDate birthDate)` → H1/H2 prediction
-  - Logic: Use `CareerFortuneAnalyzer` to process saju data
-  - Stores: SajuResult in DB via `SajuResultRepository`
+  - Method: `analyzeCareerTiming(LocalDate birthDate, LocalTime birthTime)` → H1/H2 prediction with complete saju data
+  - Logic: Call `SajuDataService.fetchSajuFromFastAPI()` with birthDate + birthTime, use `CareerFortuneAnalyzer` to process saju data
+  - Stores: SajuResult in DB via `SajuResultRepository` (including birthTime)
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CareerFortuneService.java`
 
 - [ ] T018 [US1] Create `CareerTimingController` in `controller/`
-  - Endpoint: `POST /api/career/timing`
-  - Handles: Request validation (@Valid), calls `CareerFortuneService`, returns `ApiResponse<CareerTimingResponse>`
+  - Endpoint: `POST /api/career/timing` with CareerTimingRequest (birthDate + birthTime, both required)
+  - Handles: Request validation (@Valid on birthDate YYYY-MM-DD and birthTime HH:mm), calls `CareerFortuneService.analyzeCareerTiming()`, returns `ApiResponse<CareerTimingResponse>`
+  - Validation: Reject requests with missing/malformed birthTime (400 Bad Request)
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/CareerTimingController.java`
 
 - [ ] T019 [US1] Write unit tests for `CareerFortuneService` in `src/test/`
-  - Test: Happy path (valid birthDate → H1/H2), error cases (invalid date, FastAPI timeout, null handling)
+  - Test cases:
+    1. Happy path: valid birthDate (YYYY-MM-DD) + birthTime (HH:mm) → H1/H2 prediction
+    2. Missing birthTime → InvalidSajuDataException
+    3. Invalid time format (HH, no mm) → InvalidSajuDataException
+    4. FastAPI timeout → FastAPITimeoutException
+    5. Null birthDate/birthTime → NullPointerException / ValidationException
   - Pattern: Given-When-Then with AssertJ
   - File: `SSAju/src/test/java/ssafy/SSAju/service/CareerFortuneServiceTest.java`
 
 - [ ] T020 [US1] Write unit tests for `CareerTimingController` in `src/test/`
-  - Test: Valid request → 200 OK, invalid date → 400 Bad Request, timeout → 503 Service Unavailable
+  - Test cases:
+    1. Valid request (birthDate + birthTime both provided) → 200 OK with H1/H2 response
+    2. Missing birthTime field → 400 Bad Request with error message "birthTime is required in HH:mm format"
+    3. Invalid time format (only hour, no minutes) → 400 Bad Request
+    4. Invalid date format → 400 Bad Request
+    5. FastAPI timeout via service → 503 Service Unavailable
   - File: `SSAju/src/test/java/ssafy/SSAju/controller/CareerTimingControllerTest.java`
 
 - [ ] T021 [US1] Run all tests for US1 features
@@ -188,8 +200,8 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/CareerConsultationRepository.java`
 
 - [ ] T024 [US2] [P] Create `ConsultationRequest` DTO in `dto/request/`
-  - Fields: birthDate, heavenlyStems (List<String>), earthlyBranches (List<String>), fiveElements (Map<String, Integer>)
-  - Validation: @NotNull, size checks for stems/branches (must be 4 each), fiveElements must sum correctly
+  - Fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), heavenlyStems (List<String>), earthlyBranches (List<String>), fiveElements (Map<String, Integer>)
+  - Validation: @NotNull on birthDate/birthTime, size checks for stems/branches (must be 4 each), fiveElements must sum correctly
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/ConsultationRequest.java`
 
 - [ ] T025 [US2] [P] Create `ConsultationResponse` DTO in `dto/response/`
@@ -197,23 +209,35 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/ConsultationResponse.java`
 
 - [ ] T026 [US2] Create `ConsultationService` in `service/`
-  - Method: `getCareerConsultation(LocalDate, saju data)` → calls OpenAI via ChatClient
-  - Logic: Use JSON Mode for structured output mapping
-  - Handles: Timeout → OpenAIApiException, invalid response → InvalidSajuDataException
-  - Stores: CareerConsultation in DB
+  - Method: `getCareerConsultation(LocalDate birthDate, LocalTime birthTime, saju data)` → fetches saju via SajuDataService, calls OpenAI via ChatClient
+  - Logic: Call `SajuDataService.fetchSajuFromFastAPI()` with birthDate + birthTime, use JSON Mode for structured output mapping
+  - Handles: Timeout → OpenAIApiException, invalid response → InvalidSajuDataException, missing time → InvalidSajuDataException
+  - Stores: CareerConsultation in DB (linked to SajuResult with birthTime)
   - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
 
 - [ ] T027 [US2] Create `ConsultationController` in `controller/`
-  - Endpoint: `POST /api/career/consultation`
-  - Handles: Request validation, calls `ConsultationService`, returns `ApiResponse<ConsultationResponse>`
+  - Endpoint: `POST /api/career/consultation` with ConsultationRequest (birthDate + birthTime both required, heavenlyStems/earthlyBranches/fiveElements)
+  - Handles: Request validation (@Valid on all fields), calls `ConsultationService.getCareerConsultation()`, returns `ApiResponse<ConsultationResponse>`
+  - Validation: Reject requests with missing birthTime or malformed HH:mm format (400 Bad Request)
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/ConsultationController.java`
 
 - [ ] T028 [US2] Write unit tests for `ConsultationService` in `src/test/`
-  - Test: Valid saju data → consultation returned, invalid stems → 400, OpenAI timeout → 504, null handling
+  - Test cases:
+    1. Valid saju data (birthDate + birthTime + stems/branches/fiveElements) → consultation returned with industries/tips/strengths
+    2. Missing birthTime → InvalidSajuDataException
+    3. Invalid stem count (not 4) → InvalidSajuDataException
+    4. Invalid branch count (not 4) → InvalidSajuDataException
+    5. OpenAI timeout → OpenAIApiException
+    6. Null birthTime → NullPointerException / ValidationException
   - File: `SSAju/src/test/java/ssafy/SSAju/service/ConsultationServiceTest.java`
 
 - [ ] T029 [US2] Write unit tests for `ConsultationController` in `src/test/`
-  - Test: Valid request → 200 OK with advice, invalid data → 400, timeout → 504
+  - Test cases:
+    1. Valid request (birthDate + birthTime + stems/branches/fiveElements) → 200 OK with consultation response
+    2. Missing birthTime field → 400 Bad Request
+    3. Invalid time format → 400 Bad Request
+    4. Invalid stem count or format → 400 Bad Request
+    5. OpenAI timeout via service → 504 Gateway Timeout
   - File: `SSAju/src/test/java/ssafy/SSAju/controller/ConsultationControllerTest.java`
 
 - [ ] T030 [US2] Run all tests for US2 features
@@ -282,29 +306,39 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/CompanyCompatibilityRepository.java`
 
 - [ ] T042 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs
-  - Request fields: birthDate, companyName, companyFoundingDate (optional)
+  - Request fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), companyName (@NotNull), companyFoundingDate (LocalDate, optional), companyFoundingTime (LocalTime, optional, default 12:00)
   - Response fields: compatibilityScore (0-100), confidenceLevel (LOW/MEDIUM/HIGH), recommendedRoles, reasoning
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/CompatibilityRequest.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/CompatibilityResponse.java`
 
 - [ ] T043 [US3] Create `CompanyInfoService` in `service/`
-  - Method: `lookupCompanyFoundingDate(companyName)` → calls public data API with fallback to manual input
-  - Handles: API timeout → PublicDataApiException, company not found → informative error
+  - Method: `lookupCompanyFoundingDate(companyName)` → calls public data API with fallback to manual input. If time not found, use default 12:00
+  - Handles: API timeout → PublicDataApiException, company not found → inform user to provide founding date. If time missing → auto-set to 12:00
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyInfoService.java`
 
 - [ ] T044 [US3] Create `CompanyMatchingService` in `service/`
-  - Method: `analyzeCompatibility(userSaju, companySaju)` → compatibility score + role recommendations
-  - Logic: Use `CompatibilityScoreCalculator` for scoring
-  - Stores: CompanyCompatibility in DB
+  - Method: `analyzeCompatibility(LocalDate userBirthDate, LocalTime userBirthTime, LocalDate companyFoundingDate, LocalTime companyFoundingTime)` → compatibility score + role recommendations
+  - Logic: Fetch user saju via SajuDataService with birthDate + birthTime. Fetch/receive company saju (with time defaulting to 12:00 if missing). Use `CompatibilityScoreCalculator` for scoring
+  - Stores: CompanyCompatibility in DB with both date-time information
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyMatchingService.java`
 
 - [ ] T045 [US3] Create `CompatibilityController` in `controller/`
-  - Endpoint: `POST /api/company/compatibility`
-  - Handles: Request validation, looks up company, calculates compatibility, returns `ApiResponse<CompatibilityResponse>`
+  - Endpoint: `POST /api/company/compatibility` with CompatibilityRequest (userBirthDate + userBirthTime required, companyFoundingDate optional, companyFoundingTime optional)
+  - Handles: Request validation (@Valid), validates user birth time required, looks up company (with time fallback to 12:00), calculates compatibility, returns `ApiResponse<CompatibilityResponse>`
+  - Validation: Reject requests with missing userBirthTime (400 Bad Request)
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/CompatibilityController.java`
 
 - [ ] T046 [US3] Write unit & integration tests for Company Compatibility
-  - Test: Valid compatibility analysis → 200 OK, company not found → 404, invalid date → 400
+  - Test cases (CompanyMatchingService):
+    1. Valid compatibility analysis (user birthDate + birthTime, company founding date) → compatibility score + roles
+    2. Company founding time missing → default to 12:00
+    3. Missing user birthTime → InvalidSajuDataException
+    4. Invalid user birthTime format → InvalidSajuDataException
+  - Test cases (CompatibilityController):
+    1. Valid request (user birthDate + birthTime + company) → 200 OK with score/roles
+    2. Missing user birthTime → 400 Bad Request
+    3. Company not found (with company founding date fallback) → score still calculated
+    4. Invalid user time format → 400 Bad Request
   - File: `SSAju/src/test/java/ssafy/SSAju/service/CompanyMatchingServiceTest.java`
   - File: `SSAju/src/test/java/ssafy/SSAju/controller/CompatibilityControllerTest.java`
 
@@ -322,8 +356,13 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Verify: Accessible at `http://localhost:8080/swagger-ui.html` after `./gradlew bootRun`
 
 - [ ] T048 Write integration test for full Career API flow (all 4 endpoints)
-  - Test: Create UserProfile → Timing analysis → Consultation → Feedback → Company compatibility
-  - Verify: Data persistence, response consistency, error handling across flows
+  - Test:
+    1. Create UserProfile with birthDate + birthTime
+    2. POST /api/career/timing with birthDate + birthTime → Get H1/H2
+    3. POST /api/career/consultation with birthDate + birthTime + saju data → Get advice
+    4. POST /api/feedback/satisfaction with results → Save feedback
+    5. POST /api/company/compatibility with birthDate + birthTime + company → Get compatibility score
+  - Verify: Data persistence (SajuResult with birthTime), response consistency, birthTime required fields validated, error handling across flows
   - File: `SSAju/src/test/java/ssafy/SSAju/integration/CareerApiIntegrationTest.java`
 
 - [ ] T049 Final verification: Run full test suite and validate coverage
@@ -361,20 +400,22 @@ feat: Career Timing Analysis API endpoint
 
 ### US1: Career Timing Analysis (Complete MVP)
 ```
-Given: Valid birthDate (YYYY-MM-DD)
-When:  POST /api/career/timing
+Given: Valid birthDate (YYYY-MM-DD) and birthTime (HH:mm, 24-hour format)
+When:  POST /api/career/timing with {"birthDate":"1990-10-10", "birthTime":"14:30"}
 Then:  Response includes favoredPeriod (H1/H2), confidenceScore (0-100), reasoning
-And:   SajuResult entity persisted in DB
-And:   FastAPI integration works with timeout handling
+And:   SajuResult entity persisted in DB with both birthDate and birthTime
+And:   FastAPI integration works with complete birth date-time (YYYY-MM-DD HH:mm) and timeout handling
+And:   Missing birthTime → 400 Bad Request with clear error message
 ```
 
 ### US2: AI Consultation (Complete MVP)
 ```
-Given: Valid saju data (stems, branches, fiveElements)
-When:  POST /api/career/consultation
+Given: Valid birthDate (YYYY-MM-DD), birthTime (HH:mm), stems (4 values), branches (4 values), fiveElements
+When:  POST /api/career/consultation with complete saju data including birthTime
 Then:  Response includes industries (3-5), interviewTips, strengths
-And:   CareerConsultation entity persisted in DB
-And:   Spring AI / OpenAI JSON Mode structured output works
+And:   CareerConsultation entity persisted in DB linked to SajuResult (with birthTime)
+And:   Spring AI / OpenAI JSON Mode structured output works with complete saju (including hour stem/branch)
+And:   Missing birthTime → 400 Bad Request with validation error
 ```
 
 ### US4: Feedback (Complete MVP)
@@ -388,10 +429,12 @@ And:   Feedback accessible for Phase 2 admin dashboard
 
 ### US3: Company Compatibility (P2 Deferred)
 ```
-Given: Valid user birthDate and company name
-When:  POST /api/company/compatibility
+Given: Valid user birthDate (YYYY-MM-DD) and birthTime (HH:mm, required), company name, and optional company founding date
+When:  POST /api/company/compatibility with {"birthDate":"1990-10-10", "birthTime":"14:30", "companyName":"Samsung", "companyFoundingDate":"1938-01-13"}
 Then:  Response includes compatibilityScore (0-100), recommendedRoles
-And:   Fallback to manual company founding date if API lookup fails
+And:   Company founding time defaults to 12:00 if not provided
+And:   Fallback to manual company founding date if API lookup fails (time still defaults to 12:00)
+And:   Missing user birthTime → 400 Bad Request
 ```
 
 ---

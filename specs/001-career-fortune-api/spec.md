@@ -7,11 +7,11 @@
 
 ## Overview
 
-SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업 준비생에게 최적의 직무, 합격 시기, 기업 궁합을 제안하는 커리어 특화 백엔드 서비스입니다. 3가지 핵심 기능을 제공합니다:
+SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업 준비생에게 최적의 직무, 합격 시기, 기업 궁합을 제안하는 커리어 특화 백엔드 서비스입니다. 사용자 생년월일시(四柱: 연월일시)를 입력받아 3가지 핵심 기능을 제공합니다:
 
-1. **관운 기반 합격 시기 분석**: 정관/편관 흐름으로 상/하반기 취업 유리 시기 예측
+1. **관운 기반 합격 시기 분석**: 생년월일시를 기반으로 정관/편관 흐름을 분석하여 상/하반기 취업 유리 시기 예측
 2. **AI 커리어 컨설팅**: 오행과 십신 분포로 추천 산업군(3~5개), 면접 전략, 강점 분석
-3. **기업/직무 궁합**: 사용자 사주와 기업 설립일 사주 대조로 궁합 점수 및 추천 포지션
+3. **기업/직무 궁합**: 사용자 생년월일시와 기업 설립일 사주 대조로 궁합 점수 및 추천 포지션
 
 ## Clarifications
 
@@ -35,6 +35,12 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 - Q: UserSatisfactionFeedback의 분석 결과 추적 방식은? → A: SajuResultId FK만 저장. 모든 분석(관운/컨설팅/궁합)이 SajuResult 기반이므로, SajuResult를 통해 추적 가능. feedbackType(ENUM)으로 어떤 분석의 피드백인지 명시.
 
+### Session 2026-04-24 (Birth Time Clarification)
+
+- Q: 태어난 시간(Birth Time)은 필수 입력인가, 선택 입력인가? → A: **필수 입력**. 사주 명리학에서 정확한 분석을 위해 생년월일시(四柱) 모두 필요.
+- Q: 태어난 시간의 입력 형식은? → A: **HH:mm (24시간 형식)**. 예: 14:30, 09:00. 분(minute) 단위까지 지원하여 정밀도 향상.
+- Q: 관운 분석(User Story 1)에서 birth_time은 어떻게 처리할 것인가? → A: **생년월일시 모두 사용**. FastAPI로 완전한 생년월일시(YYYY-MM-DD HH:mm)를 전송하여 가장 정확한 사주 계산 제공.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Career Timing Analysis (Priority: P1)
@@ -43,12 +49,13 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 **Why this priority**: 핵심 가치 제안. 언제 집중적으로 취업 활동해야 하는지는 사주 기반 조언의 기초입니다.
 
-**Independent Test**: 생년월일 입력 → FastAPI 연동으로 관운 계산 → 유리한 채용 시기 반환. 다른 기능 없이 독립적으로 동작합니다.
+**Independent Test**: 생년월일시(YYYY-MM-DD HH:mm) 입력 → FastAPI 연동으로 생년월일시 기반 사주 데이터 수신 → 관운 계산 → 유리한 채용 시기 반환. 다른 기능 없이 독립적으로 동작합니다.
 
 **Acceptance Scenarios**:
 
-1. **Given** 완전한 생년월일(YYYY-MM-DD) 입력, **When** 관운 분석 요청, **Then** 유리한 채용 시기(H1/H2) + 신뢰도 점수 반환
+1. **Given** 완전한 생년월일시(YYYY-MM-DD HH:mm) 입력, **When** 관운 분석 요청, **Then** 유리한 채용 시기(H1/H2) + 신뢰도 점수 반환
 2. **Given** 정관/편관 데이터 조회, **When** 상/하반기 단위 분석, **Then** 채용 확률 높은 시기와 이유 제시
+3. **Given** 부정확한 시간(시간만, 분 없음) 또는 미상 시, **When** 요청 제출, **Then** 400 Bad Request + "HH:mm 형식으로 정확한 시간 입력 필요" 오류 메시지 반환
 
 ---
 
@@ -70,7 +77,7 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 ### User Story 3 - Company & Job Fit Analysis (Priority: P2)
 
-취업 준비생이 목표 기업의 설립일(사주)과 자신의 생년월일을 입력하여 궁합 점수(0~100)와 추천 직무를 얻습니다.
+취업 준비생이 목표 기업의 설립일시(사주)와 자신의 생년월일시를 입력하여 궁합 점수(0~100)와 추천 직무를 얻습니다.
 
 **Why this priority**: 보조 기능. 기업 선택 신뢰도를 높이지만, P1 기능(타이밍+컨설팅)이 핵심가치입니다.
 
@@ -78,8 +85,9 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 **Acceptance Scenarios**:
 
-1. **Given** 사용자 사주 + 기업 설립일(YYYY-MM-DD), **When** 호환성 분석, **Then** 호환성 점수(0~100) + 추천 직무 + 정렬 이유 반환
+1. **Given** 사용자 사주(YYYY-MM-DD HH:mm) + 기업 설립일(YYYY-MM-DD, 선택사항으로 시간 HH:mm 추가 가능), **When** 호환성 분석, **Then** 호환성 점수(0~100) + 추천 직무 + 정렬 이유 반환
 2. **Given** 유효한 두 사주 데이터, **When** 매칭 실행, **Then** 응답에 신뢰도 수준 포함
+3. **Given** 기업 설립일시가 불완전할 경우(시간 정보 미상), **When** 요청 제출, **Then** 기업 설립일시를 정오(12:00)로 자동 설정하고 계속 진행
 
 ---
 
@@ -103,8 +111,10 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 ### Edge Cases
 
-- **불완전한 날짜 입력**: 생년월일과 기업 설립일 모두 완전한 YYYY-MM-DD 형식 필수. 월/일 미상 시 400 Bad Request 반환 (상세 ErrorInfo 제시)
-- **기업 설립일 조회 실패**: 공공데이터API 조회 실패 시 사용자에게 기업 설립일을 직접 입력하도록 요청 (폴백 시나리오)
+- **불완전한 날짜/시간 입력**:
+  - 사용자 생년월일시: **완전한 YYYY-MM-DD HH:mm 형식 필수**. 미상 시 400 Bad Request 반환 (상세 ErrorInfo 제시)
+  - 기업 설립일: YYYY-MM-DD 최소 필수. 시간(HH:mm)은 선택사항. 시간 미상 시 기본값(12:00)으로 자동 설정하여 계속 진행
+- **기업 설립일 조회 실패**: 공공데이터API 조회 실패 시 사용자에게 기업 설립일을 직접 입력하도록 요청 (폴백 시나리오). 이 경우에도 시간 형식 규칙 동일 적용
 - 외부 API(FastAPI, OpenAI, 공공데이터API) 일시 다운 상황 → Graceful Error 반환 + 재시도 안내
 - 수천 명의 동시 요청 처리 → Connection Pool로 안정성 보장
 
@@ -162,10 +172,14 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 ```java
 // Request example
-public record CareerTimingRequest(LocalDate birthDate) { }
+public record CareerTimingRequest(
+    LocalDate birthDate,      // YYYY-MM-DD
+    LocalTime birthTime       // HH:mm (24-hour format)
+) { }
 
 // Response example
 public record CareerTimingResponse(
+   
     String favoredPeriod,  // "H1" or "H2"
     int confidenceScore,   // 0-100
     String reasoning
@@ -236,8 +250,8 @@ SajuException (root)
 ### Functional Requirements
 
 - **FR-001**: Controller는 HTTP 처리만 담당. DTO 입력 → Service 위임 → DTO 응답
-- **FR-002**: Service에서 생년월일 검증 (YYYY-MM-DD 형식, 현실적 범위)
-- **FR-003**: Service는 생년월일을 FastAPI로 전송하여 만세력 데이터 수신 (천간, 지지, 오행 등 기본 사주 정보)
+- **FR-002**: Service에서 생년월일시 검증 (YYYY-MM-DD HH:mm 형식, 현실적 범위). 시간이 미상일 경우 400 Bad Request + ErrorInfo 반환
+- **FR-003**: Service는 생년월일시(YYYY-MM-DD HH:mm)를 FastAPI로 전송하여 만세력 데이터 수신 (천간, 지지, 오행, 시간주(시주) 등 기본 사주 정보)
 - **FR-004**: Service에서 만세력 데이터를 기반으로 십신(十神) 계산. 일간을 기준으로 월간을 분석하여 정관(正官)/편관(偏官) 판정 및 관운 강도 평가
 - **FR-004-1**: 관운 강도와 현재 연도의 대운 주기를 분석하여 H1(상반기) vs H2(하반기) 중 취업 유리 시기 판정
 - **FR-005**: Service에서 SajuResult를 MySQL에 저장 (Entity로 영속화)
@@ -258,7 +272,7 @@ SajuException (root)
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
 | **User** | id, email, phone, createdAt | | PK, UNIQUE(email) |
-| **UserProfile** | id, userId, birthDate, createdAt, updatedAt | | PK, FK to User, UNIQUE(userId) |
+| **UserProfile** | id, userId, birthDate, birthTime, createdAt, updatedAt | DATE + TIME | PK, FK to User, UNIQUE(userId) |
 | **SajuResult** | id, userProfileId, heavenlyStems[], earthlyBranches[], fiveElements, tenGods, careerFortune, fetchedAt | Enums + JSON | PK, FK to UserProfile, @JdbcTypeCode for JSON |
 | **CareerConsultation** | id, sajuResultId, industries[], interviewTips, strengths, openaiModelVersion, generatedAt | JSON columns | PK, FK to SajuResult, timestamp |
 | **CompanyCompatibility** | id, userProfileId, companyName, compatibilityScore, recommendedRoles[], createdAt | INT + JSON | PK, FK to UserProfile, composite index on (userProfileId, companyName) |
@@ -280,7 +294,7 @@ SajuException (root)
 
 ## Assumptions
 
-- 생년월일 입력은 사용자 정확도를 신뢰 (검증은 형식만)
+- 생년월일시(YYYY-MM-DD HH:mm) 입력은 사용자 정확도를 신뢰 (검증은 형식만). 사주 명리학의 정확한 분석을 위해 분(minute) 단위까지 지원
 - FastAPI 서비스는 정상 조건에서 <3초 응답
 - OpenAI API는 <8초 응답
 - 기업 설립일은 사용자 입력 또는 외부 DB 조회 (MVP에서는 사용자 제공)
