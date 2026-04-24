@@ -57,6 +57,77 @@ public class UserRequest {
 }
 ```
 
+## 상수 및 열거형(Enum) 관리 규칙
+
+### 매직 리터럴(Magic Literal) 사용 금지
+
+코드 내에 의미를 알 수 없는 문자열이나 숫자를 직접 사용하지 않습니다. 반드시 상수(`static final`) 또는 Enum으로 정의하여 사용합니다.
+
+```java
+// 나쁨 - 매직 리터럴
+if ("H1".equals(favoredPeriod)) { ... }
+
+// 좋음 - Enum 사용
+if (favoredPeriod == FavoredPeriod.H1) { ... }
+```
+
+### Enum 사용 우선순위
+
+**도메인 모델의 상태, 유형, 카테고리** 등 고정된 집합을 나타낼 때는 반드시 **Enum을 사용**합니다.
+
+- 예시: `FavoredPeriod` (H1/H2), `FeedbackType` (CAREER_TIMING/CONSULTATION/COMPATIBILITY), `SatisfactionStatus` (SATISFIED/DISSATISFIED)
+- 장점: 타입 안정성 보장, 관련 로직을 Enum 내부에 응집 가능
+
+```java
+// 좋음
+public enum FavoredPeriod {
+    H1("상반기"),
+    H2("하반기");
+    
+    private final String displayName;
+    FavoredPeriod(String displayName) { this.displayName = displayName; }
+    public String displayName() { return displayName; }
+}
+```
+
+### 클래스 내부 상수 (private static final)
+
+특정 클래스 내부에서만 계산 로직이나 설정값으로 쓰이는 상수는 **클래스 상단에 `private static final`로 정의**합니다.
+
+- 외부 공유 불필요 → `private` 접근 제어자 필수
+- 예시: `BASE_CONFIDENCE`, `GWAN_BOOST`, `ELEMENT_ORDER`
+
+```java
+@Component
+public class CareerFortuneAnalyzer {
+    private static final int BASE_CONFIDENCE = 50;
+    private static final int GWAN_BOOST = 15;
+    // ...
+}
+```
+
+### 공통 상수 (Global Constants)
+
+여러 클래스에서 공통으로 사용되는 상수는:
+- **도메인 개념이면 Enum** (`career/enums/` 디렉토리)
+- **기술적 설정값이면 Constants 클래스** (`config/Constants.java` 등)
+
+```java
+// 좋음 - 도메인 Enum
+public enum SajuElement {
+    WOOD("木"), FIRE("火"), EARTH("土"), METAL("金"), WATER("水");
+    // ...
+}
+
+// 좋음 - 기술 상수
+public class ApiConstants {
+    public static final int OPENAI_TIMEOUT_SECONDS = 8;
+    public static final int FASTAPI_TIMEOUT_SECONDS = 3;
+}
+```
+
+---
+
 ## JPA 연관관계 설정
 
 모든 연관관계 매핑(`@ManyToOne`, `@OneToMany`, `@OneToOne` 등)은 반드시 **`fetch = FetchType.LAZY`** 명시:
