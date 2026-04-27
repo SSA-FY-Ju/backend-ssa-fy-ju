@@ -22,11 +22,9 @@ public class CareerFortuneAnalyzer {
     private static final List<String> FAVORABLE_OFFICER_BRANCHES_H2 = List.of("午", "未", "申", "酉", "戌", "亥");
 
     private final TenGodCalculator tenGodCalculator;
-    private final HiddenStemCalculator hiddenStemCalculator;
 
-    public CareerFortuneAnalyzer(TenGodCalculator tenGodCalculator, HiddenStemCalculator hiddenStemCalculator) {
+    public CareerFortuneAnalyzer(TenGodCalculator tenGodCalculator) {
         this.tenGodCalculator = tenGodCalculator;
-        this.hiddenStemCalculator = hiddenStemCalculator;
     }
 
     /**
@@ -42,6 +40,9 @@ public class CareerFortuneAnalyzer {
                                         Map<String, List<String>> hiddenStems,
                                         String dayMaster,
                                         List<String> earthlyBranches) {
+        if (earthlyBranches == null || earthlyBranches.size() < 4) {
+            throw new IllegalArgumentException("지지 목록은 정확히 4개(年月日時)여야 합니다.");
+        }
         int officerScore = calculateOfficerScore(tenGodDistribution, hiddenStems, dayMaster);
         String monthBranch = earthlyBranches.get(1);
 

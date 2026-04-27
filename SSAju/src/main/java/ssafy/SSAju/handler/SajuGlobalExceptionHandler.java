@@ -43,6 +43,11 @@ public class SajuGlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleOpenAIApiException(
             OpenAIApiException e, HttpServletRequest request) {
         log.error("OpenAI API error: {}", e.getMessage());
+        // TODO: Phase 2 - Differentiate OpenAIApiException types by status code:
+        // 401 -> UNAUTHORIZED (인증 오류)
+        // 429 -> TOO_MANY_REQUESTS (할당량 초과)
+        // 5xx -> GATEWAY_TIMEOUT (서버 오류)
+        // Current implementation maps all to 504 GATEWAY_TIMEOUT
         return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
                 .body(ApiResponse.failure(new ErrorInfo("OPENAI_API_TIMEOUT",
                         "OpenAI API request failed. Please try again.", generateRequestId())));

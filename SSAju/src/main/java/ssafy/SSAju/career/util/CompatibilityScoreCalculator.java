@@ -36,22 +36,18 @@ public class CompatibilityScoreCalculator {
     /**
      * 궁합 점수를 계산합니다.
      *
-     * @param userTenGods 사용자 십신 분포
      * @param userHiddenStems 사용자 지장간
      * @param userDayMaster 사용자 일간
-     * @param companyTenGods 기업 십신 분포
      * @param companyHiddenStems 기업 지장간
      * @param companyDayMaster 기업 설립일 일간
      * @return 궁합 점수 (0~100)
      */
-    public int calculate(Map<String, Integer> userTenGods,
-                         Map<String, List<String>> userHiddenStems,
+    public int calculate(Map<String, List<String>> userHiddenStems,
                          String userDayMaster,
-                         Map<String, Integer> companyTenGods,
                          Map<String, List<String>> companyHiddenStems,
                          String companyDayMaster) {
 
-        int officerHarmonyScore = calculateOfficerHarmony(userTenGods, userHiddenStems,
+        int officerHarmonyScore = calculateOfficerHarmony(userHiddenStems,
                 userDayMaster, companyDayMaster);
         int elementBalanceScore = calculateElementBalance(userHiddenStems, companyHiddenStems);
 
@@ -60,8 +56,7 @@ public class CompatibilityScoreCalculator {
         return Math.max(0, Math.min(rawScore, 100));
     }
 
-    private int calculateOfficerHarmony(Map<String, Integer> userTenGods,
-                                         Map<String, List<String>> userHiddenStems,
+    private int calculateOfficerHarmony(Map<String, List<String>> userHiddenStems,
                                          String userDayMaster,
                                          String companyDayMaster) {
         // 기업 일간이 사용자 일간의 관성(정관/편관)에 해당하는지 확인
@@ -70,11 +65,18 @@ public class CompatibilityScoreCalculator {
 
         int baseScore = isOfficer ? 70 : 40;
 
-        // 사용자 관성 강도 보정
-        int userOfficerCount = userTenGods.getOrDefault("정관", 0)
-                + userTenGods.getOrDefault("편관", 0);
+        // 지장간 내 사용자 관성 강도 보정
+        int userOfficerCount = 0;
+        for (List<String> stems : userHiddenStems.values()) {
+            for (String stem : stems) {
+                String god = tenGodCalculator.getTenGod(userDayMaster, stem);
+                if (god.equals("정관") || god.equals("편관")) {
+                    userOfficerCount++;
+                }
+            }
+        }
 
-        return Math.min(baseScore + userOfficerCount * 10, 100);
+        return Math.min(baseScore + userOfficerCount * 5, 100);
     }
 
     private int calculateElementBalance(Map<String, List<String>> userHiddenStems,

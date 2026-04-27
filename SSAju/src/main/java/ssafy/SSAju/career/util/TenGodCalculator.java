@@ -56,8 +56,8 @@ public class TenGodCalculator {
     );
 
     public Map<String, Integer> calculate(List<String> heavenlyStems) {
-        if (heavenlyStems == null || heavenlyStems.size() < 2) {
-            throw new IllegalArgumentException("천간 목록은 최소 2개 이상 필요합니다.");
+        if (heavenlyStems == null || heavenlyStems.size() < 4) {
+            throw new IllegalArgumentException("천간 목록은 정확히 4개(年月日時)여야 합니다.");
         }
         String dayMaster = heavenlyStems.get(2); // 일간(日干) - 인덱스 2 (年月日時 순서)
         Map<String, Integer> distribution = new HashMap<>();

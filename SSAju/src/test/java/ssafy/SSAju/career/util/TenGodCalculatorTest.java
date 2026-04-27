@@ -90,14 +90,14 @@ class TenGodCalculatorTest {
     }
 
     @Test
-    @DisplayName("천간 목록이 2개 미만이면 예외 발생")
-    void shouldThrowException_WhenStemsLessThanTwo() {
+    @DisplayName("천간 목록이 4개 미만이면 예외 발생")
+    void shouldThrowException_WhenStemsLessThanFour() {
         // Given
         List<String> stems = List.of("甲");
 
         // When & Then
         assertThatThrownBy(() -> calculator.calculate(stems))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("최소 2개");
+                .hasMessageContaining("정확히 4개");
     }
 }
