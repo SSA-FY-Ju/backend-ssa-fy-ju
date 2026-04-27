@@ -307,15 +307,18 @@ SSAju는 다음 3개 외부 API와 연동:
 
 ```
 요청: POST /saju/calculate
-입력: 생년월일 (YYYY-MM-DD)
+입력: 생년월일시 (YYYY-MM-DD HH:mm)
 응답: {
-  heavenlyStems: [천간 5개],
-  earthlyBranches: [지지 5개],
-  fiveElements: {목화토금수},
-  tenGods: {십신 배치}
+  heavenlyStems: ["庚", "丙", "己", "辛"],        // 4개 (年月日時)
+  earthlyBranches: ["午", "戌", "未", "未"],     // 4개 (年月日時)
+  fiveElements: {"木": 1, "火": 2, "土": 1, "金": 2, "水": 2}
 }
 타임아웃: 3초
 재시도: 2회 (지수 백오프)
+
+참고: 
+- 십神은 FastAPI에서 제공하지 않음 (Spring의 TenGodCalculator에서 계산)
+- 地藏干도 FastAPI에서 제공하지 않음 (Spring의 HiddenStemCalculator에서 계산)
 ```
 
 **예외 처리**:
@@ -355,6 +358,30 @@ public class ChatClientConfig {
 }
 ```
 
+### FastAPI-Spring 역할 분담 (Phase 1 중요 결정)
+
+**FastAPI 책임** (기본 사주 데이터만):
+- 생년월일시(4 기둥: 年月日時) 입력 받음
+- 천간(Heavenly Stems) 계산 → 4개
+- 지지(Earthly Branches) 계산 → 4개  
+- 오행(Five Elements) 계산 → {목화토금수} 개수 매핑
+- JSON 응답
+
+**Spring 백엔드 책임** (도메인 로직):
+- FastAPI 응답 수신
+- **TenGodCalculator**: 십신(十神) 계산 (일간 기준으로 월간/시간 분석)
+- **HiddenStemCalculator**: 지장간(地藏干) 계산 (지지별 숨겨진 천간 → Map<String, List<String>>)
+- **CareerFortuneAnalyzer**: 관운 분석 (십신 + 지장간 결과 활용하여 H1/H2 판정)
+- **CompatibilityScoreCalculator**: 궁합 분석 (두 사주의 십신 + 지장간 비교)
+
+**이점**:
+✅ FastAPI 변경에 영향받지 않음 (Spring이 계산 로직 통제)
+✅ 십신/지장간 계산 로직을 Spring에서 관리 가능
+✅ 도메인 정확성 향상 (전체 사주 분석을 Spring 단에서 수행)
+✅ 기업 설립일도 동일 수준의 정확성 유지 (시간 미상 시 12:00 기본값)
+
+---
+
 ### 3. 공공데이터 API (기업 정보)
 
 ```
@@ -380,4 +407,4 @@ Fallback: 찾지 못하면 사용자 수동입력 요청 (graceful degradation)
 
 ---
 
-**Last Updated**: 2026-04-23
+**Last Updated**: 2026-04-27 (FastAPI 응답 구조 수정, 십신/지장간 Spring 계산 명시, FastAPI-Spring 역할 분담 추가)

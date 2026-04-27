@@ -116,6 +116,103 @@ throw new InvalidSajuDataException("Invalid date format");
 | 상수 | UPPER_SNAKE_CASE | `CAREER_TIMING_API_TIMEOUT` |
 | REST API URI | 소문자 kebab-case | `/api/users/profile-images` |
 
+## 상수 및 열거형 관리
+
+상수는 **용도별로** 다음과 같이 관리합니다:
+
+### Enum: 비즈니스 도메인 상수 (여러 곳에서 사용)
+
+여러 파일/모듈에서 사용하는 상수 → **별도 클래스로 정의** (career/enums/)
+
+```java
+// CareerTimingType.java
+public enum CareerTimingType {
+    FIRST_HALF("H1", "상반기"),
+    SECOND_HALF("H2", "하반기");
+    
+    private final String code;
+    private final String description;
+    
+    CareerTimingType(String code, String description) {
+        this.code = code;
+        this.description = description;
+    }
+}
+
+// FeedbackType.java
+public enum FeedbackType {
+    CAREER_TIMING("관운 분석"),
+    CONSULTATION("AI 컨설팅"),
+    COMPATIBILITY("기업 궁합");
+    
+    private final String description;
+    FeedbackType(String description) { this.description = description; }
+}
+
+// SatisfactionStatus.java
+public enum SatisfactionStatus {
+    SATISFIED("만족함"),
+    DISSATISFIED("만족하지 않음");
+    
+    private final String description;
+    SatisfactionStatus(String description) { this.description = description; }
+}
+```
+
+### final static: 파일 내부용 상수 (특정 파일에서만 사용)
+
+해당 클래스 내에서만 사용하는 상수 → **해당 클래스 내에서 선언**
+
+```java
+public class CareerFortuneService {
+    private static final String LOG_PREFIX = "[CareerFortune]";
+    private static final int MAX_RETRY_ATTEMPTS = 2;
+    
+    // ...
+}
+```
+
+### 외부 설정: 환경별 값 (application.yaml에서 관리)
+
+**타임아웃, URL, API Key 등** 환경마다 변하는 값 → **application.yaml 및 환경 변수 사용**
+
+```yaml
+# application.yaml
+saju:
+  fastapi:
+    url: ${FASTAPI_URL}          # 환경 변수
+    timeout-seconds: 3           # 또는 ${FASTAPI_TIMEOUT:3}
+    max-retries: 2
+  openai:
+    api-key: ${OPENAI_API_KEY}   # 환경 변수 (필수)
+    timeout-seconds: 8
+    max-retries: 1
+  public-data:
+    url: ${PUBLIC_DATA_API_URL}
+    api-key: ${PUBLIC_DATA_API_KEY}
+    timeout-seconds: 5
+    max-retries: 1
+```
+
+**Java에서 사용** (ConfigurationProperties 또는 @Value):
+```java
+@Configuration
+@ConfigurationProperties(prefix = "saju.fastapi")
+public class SajuProperties {
+    private String url;
+    private long timeoutSeconds;
+    private int maxRetries;
+    // getters, setters
+}
+```
+
+**규칙**:
+- ✅ **Enum**: 비즈니스 도메인 상수 (FeedbackType, SatisfactionStatus, CareerTimingType)
+- ✅ **final static**: 파일 내부용 로그 프리픽스, 계산 상수 등
+- ✅ **application.yaml**: 타임아웃, URL, API Key, 재시도 횟수 등
+- ❌ **Magic number 금지**: 항상 상수로 추상화
+- ❌ **하드코딩된 타임아웃/URL/Key 금지**: 환경 설정으로 관리
+
 ## Null 처리
 
 서비스 계층에서 엔티티를 조회할 때는 반드시 `Optional`을 반환받아 처리:
