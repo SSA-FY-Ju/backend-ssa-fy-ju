@@ -82,14 +82,17 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 - [ ] T006 Implement WebClient configuration with timeout and retry policies
   - Configure WebClient bean with 3-5 second timeouts, exponential backoff for retries
+  - Note: `buildHttpClient()` 메서드에 `timeoutSeconds <= 0` 유효성 검증은 Phase 3에서 서비스 통합 시 추가 (현재 TODO 주석으로 표기)
   - File: `SSAju/src/main/java/ssafy/SSAju/config/WebClientConfig.java`
 
 - [ ] T007 Implement Spring AI ChatClient configuration with OpenAI JSON Mode
   - Configure ChatClient bean for JSON structured outputs
+  - Note: JSON Mode 동작 검증 및 에러 처리는 Phase 3.2 (ConsultationService)에서 추가 구현
   - File: `SSAju/src/main/java/ssafy/SSAju/config/ChatClientConfig.java`
 
 - [ ] T008 Create global exception handler using `@RestControllerAdvice`
   - Handle: InvalidSajuDataException, FastAPITimeoutException, OpenAIApiException, PublicDataApiException, DataAccessException
+  - Note: OpenAIApiException 세분화 (401/429/5xx 구분)는 Phase 3.2 (ConsultationService)에서 구현
   - File: `SSAju/src/main/java/ssafy/SSAju/handler/SajuGlobalExceptionHandler.java`
 
 - [ ] T009 [P] Create base entities: `UserProfile` and `SajuResult` in `career/entity/`
@@ -125,7 +128,10 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Create: `TenGodCalculator.java` (十神 computation from heavenlyStems)
   - Create: `HiddenStemCalculator.java` (地藏干 computation from earthlyBranches, returns Map<String, List<String>>)
   - Create: `CareerFortuneAnalyzer.java` (H1/H2 logic using both TenGod and HiddenStem data)
+    - 관성 점수 산정: 정관·편관 가점(×20), 식신·상관 감점(×15), 비겁 2개↑ 감점(×5)
+    - 지장간 보정: 정관·편관(+5), 식신·상관(-3)
   - Create: `CompatibilityScoreCalculator.java` (compatibility score using both calculators)
+    - 입력 검증 필수: userHiddenStems/userDayMaster/companyHiddenStems/companyDayMaster null·blank 체크 → IllegalArgumentException
   - Note: HiddenStemCalculator must be used together with TenGodCalculator for accurate 오행 분포 calculation
   - File: `SSAju/src/main/java/ssafy/SSAju/career/util/TenGodCalculator.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/util/HiddenStemCalculator.java`
