@@ -47,6 +47,7 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 - Q: 십신 외에 지장간(地藏干)을 어떻게 처리할 것인가? → A: **지장간 계산을 별도로 수행**. 각 지지(地支) 내 숨겨진 천간(地藏干)을 계산하여 십신 분석을 더 정확하게 구성. SajuResult의 `hiddenStems[]` 필드에 저장. FastAPI 응답에서 지장간 데이터를 수신하고, Spring에서 `TenGodCalculator`와 함께 `HiddenStemCalculator`를 통해 정확한 오행 분포 계산.
 - Q: 지장간 계산이 AI 컨설팅과 기업 궁합에 어떻게 영향을 미치는가? → A: 오행 분포 계산 시 지장간을 포함하여 더 정확한 오행 비율 제공. OpenAI 프롬프트에 십신 + 지장간 분석 결과를 모두 포함하여 더 정밀한 커리어 컨설팅 제공. 기업 궁합도 마찬가지로 지장간 분석을 포함하여 신뢰도 향상.
 - Q: FastAPI의 지장간(地藏干) 데이터 제공 여부는? → A: **FastAPI는 천간/지지/오행만 제공**. Spring 백엔드에서 `TenGodCalculator`와 `HiddenStemCalculator`를 통해 십신 및 지장간을 모두 계산. 이렇게 하면 Spring 단에서 모든 사주 계산을 통제 가능하고 FastAPI 변경에 영향받지 않음.
+- Q: hiddenStems[] 필드의 정확한 데이터 구조는? → A: **`hiddenStems`는 `Map<String, List<String>>`** (JSON으로 저장). 예: `{"子": ["癸"], "丑": ["癸", "辛", "己"], "寅": ["甲", "丙", "戊"], ...}`. 각 지지(年月日時)별로 포함된 지장간들을 매핑하여 저장.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -155,8 +156,9 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 **Key Entities**:
 - **User**: 사용자 신원 및 연락처 (Phase 2)
 - **UserProfile**: 생년월일, 사주 분석 결과 참조
-- **SajuResult**: 사주 상세 정보 (천간, 지지, 오행, 십신, 관운 데이터, FastAPI 전체 응답)
+- **SajuResult**: 사주 상세 정보 (천간, 지지, 오행, 십신, 지장간, 관운 데이터, FastAPI 전체 응답)
   - **FastAPI 응답 포함**: year_pillar, month_pillar, day_pillar, hour_pillar, year_stem, year_branch, month_stem, month_branch, day_stem, day_branch, hour_stem, hour_branch, birth_time, solar_correction (city, longitude, utc_offset, etc.) 등
+  - **Spring에서 계산**: `hiddenStems` (Map<String, List<String>>으로 지지별 지장간 저장)
 - **CareerConsultation**: AI 생성 권고사항 (산업, 면접팁, 강점, OpenAI 메타데이터). SajuResult 외래키로 참조하여 어떤 사주 데이터 기반 생성인지 추적
 - **CompanyCompatibility**: 사용자 사주와 기업 궁합 점수 및 추천 직무 (기업 정보는 요청 시 공공데이터API로 조회, 설립일 미상 시 사용자 입력으로 폴백)
 - **UserSatisfactionFeedback**: 사용자 만족도 피드백 (만족함/만족하지 않음). SajuResult와 연관되어 어떤 분석 결과에 대한 피드백인지 추적
@@ -280,7 +282,7 @@ SajuException (root)
 |--------|--------|------|-------------|
 | **User** | id, email, phone, createdAt | | PK, UNIQUE(email) |
 | **UserProfile** | id, userId, birthDate, birthTime, createdAt, updatedAt | DATE + TIME | PK, FK to User, UNIQUE(birthDate, birthTime) |
-| **SajuResult** | id, userProfileId, heavenlyStems[], earthlyBranches[], fiveElements, tenGods, hiddenStems[], careerFortune, fetchedAt | Enums + JSON | PK, FK to UserProfile, @JdbcTypeCode for JSON |
+| **SajuResult** | id, userProfileId, heavenlyStems[], earthlyBranches[], fiveElements, tenGods, hiddenStems(Map), careerFortune, fetchedAt | Enums + JSON | PK, FK to UserProfile, @JdbcTypeCode for JSON. hiddenStems: Map<String, List<String>> (지지명→지장간 리스트) |
 | **CareerConsultation** | id, sajuResultId, industries[], interviewTips, strengths, openaiModelVersion, generatedAt | JSON columns | PK, FK to SajuResult, timestamp |
 | **CompanyCompatibility** | id, userProfileId, companyName, compatibilityScore, recommendedRoles[], createdAt | INT + JSON | PK, FK to UserProfile, composite index on (userProfileId, companyName) |
 | **UserSatisfactionFeedback** | id, sajuResultId, feedbackType, satisfactionStatus, createdAt | FK + Enum + ENUM | PK, FK to SajuResult, index on (sajuResultId, createdAt) |
