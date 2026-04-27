@@ -86,10 +86,12 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 - [ ] T007 Implement Spring AI ChatClient configuration with OpenAI JSON Mode
   - Configure ChatClient bean for JSON structured outputs
+  - Note: JSON Mode 동작 검증 및 에러 처리는 Phase 3.2 (ConsultationService)에서 추가 구현
   - File: `SSAju/src/main/java/ssafy/SSAju/config/ChatClientConfig.java`
 
 - [ ] T008 Create global exception handler using `@RestControllerAdvice`
   - Handle: InvalidSajuDataException, FastAPITimeoutException, OpenAIApiException, PublicDataApiException, DataAccessException
+  - Note: OpenAIApiException 세분화 (401/429/5xx 구분)는 Phase 3.2 (ConsultationService)에서 구현
   - File: `SSAju/src/main/java/ssafy/SSAju/handler/SajuGlobalExceptionHandler.java`
 
 - [ ] T009 [P] Create base entities: `UserProfile` and `SajuResult` in `career/entity/`
