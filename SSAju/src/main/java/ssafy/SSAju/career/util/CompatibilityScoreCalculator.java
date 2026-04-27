@@ -47,6 +47,18 @@ public class CompatibilityScoreCalculator {
                          String userDayMaster,
                          Map<String, List<String>> companyHiddenStems,
                          String companyDayMaster) {
+        if (userHiddenStems == null) {
+            throw new IllegalArgumentException("사용자 지장간 데이터가 null입니다.");
+        }
+        if (userDayMaster == null || userDayMaster.isBlank()) {
+            throw new IllegalArgumentException("사용자 일간이 null이거나 비어있습니다.");
+        }
+        if (companyHiddenStems == null) {
+            throw new IllegalArgumentException("기업 지장간 데이터가 null입니다.");
+        }
+        if (companyDayMaster == null || companyDayMaster.isBlank()) {
+            throw new IllegalArgumentException("기업 일간이 null이거나 비어있습니다.");
+        }
 
         int officerHarmonyScore = calculateOfficerHarmony(userHiddenStems,
                 userDayMaster, companyDayMaster);

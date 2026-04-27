@@ -18,6 +18,10 @@ import java.util.Map;
 public class CareerFortuneAnalyzer {
 
     private static final List<String> OFFICER_GODS = List.of("정관", "편관");
+    // 관성을 설기(洩氣)시키는 십신 → 감점 대상
+    private static final List<String> WEAKENING_GODS = List.of("식신", "상관");
+    // 비겁 과다도 관성 부담 요인
+    private static final List<String> COMPETING_GODS = List.of("비견", "겁재");
     private static final List<String> FAVORABLE_OFFICER_BRANCHES_H1 = List.of("子", "丑", "寅", "卯", "辰", "巳");
 
     private final TenGodCalculator tenGodCalculator;
@@ -62,26 +66,39 @@ public class CareerFortuneAnalyzer {
 
     /**
      * 관성 강도 점수를 계산합니다. 양수이면 상반기, 음수이면 하반기 유리.
+     * - 정관·편관: 가점 (관성 강도)
+     * - 식신·상관: 감점 (관성 설기)
+     * - 비겁 2개 이상: 감점 (관성 부담)
      */
     private int calculateOfficerScore(Map<String, Integer> tenGodDistribution,
                                        Map<String, List<String>> hiddenStems,
                                        String dayMaster) {
         int score = 0;
 
-        // 천간 관성 점수
-        for (String god : OFFICER_GODS) {
-            score += tenGodDistribution.getOrDefault(god, 0) * 2;
+        for (Map.Entry<String, Integer> entry : tenGodDistribution.entrySet()) {
+            if (OFFICER_GODS.contains(entry.getKey())) {
+                score += entry.getValue() * 20;
+            }
+            if (WEAKENING_GODS.contains(entry.getKey())) {
+                score -= entry.getValue() * 15;
+            }
+            if (COMPETING_GODS.contains(entry.getKey()) && entry.getValue() >= 2) {
+                score -= entry.getValue() * 5;
+            }
         }
 
-        // 지장간 관성 점수 (보정)
-        for (Map.Entry<String, List<String>> entry : hiddenStems.entrySet()) {
-            for (String hiddenStem : entry.getValue()) {
-                String god = tenGodCalculator.getTenGod(dayMaster, hiddenStem);
-                if (OFFICER_GODS.contains(god)) {
-                    score += 1;
+        // 지장간 기반 보정 (가점/감점 동일 적용)
+        for (List<String> stems : hiddenStems.values()) {
+            for (String stem : stems) {
+                String tenGod = tenGodCalculator.getTenGod(dayMaster, stem);
+                if (OFFICER_GODS.contains(tenGod)) {
+                    score += 5;
+                } else if (WEAKENING_GODS.contains(tenGod)) {
+                    score -= 3;
                 }
             }
         }
+
         return score;
     }
 

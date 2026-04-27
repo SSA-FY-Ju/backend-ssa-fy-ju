@@ -128,7 +128,10 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Create: `TenGodCalculator.java` (十神 computation from heavenlyStems)
   - Create: `HiddenStemCalculator.java` (地藏干 computation from earthlyBranches, returns Map<String, List<String>>)
   - Create: `CareerFortuneAnalyzer.java` (H1/H2 logic using both TenGod and HiddenStem data)
+    - 관성 점수 산정: 정관·편관 가점(×20), 식신·상관 감점(×15), 비겁 2개↑ 감점(×5)
+    - 지장간 보정: 정관·편관(+5), 식신·상관(-3)
   - Create: `CompatibilityScoreCalculator.java` (compatibility score using both calculators)
+    - 입력 검증 필수: userHiddenStems/userDayMaster/companyHiddenStems/companyDayMaster null·blank 체크 → IllegalArgumentException
   - Note: HiddenStemCalculator must be used together with TenGodCalculator for accurate 오행 분포 calculation
   - File: `SSAju/src/main/java/ssafy/SSAju/career/util/TenGodCalculator.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/util/HiddenStemCalculator.java`
