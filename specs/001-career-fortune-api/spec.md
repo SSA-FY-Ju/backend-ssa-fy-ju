@@ -9,8 +9,8 @@
 
 SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업 준비생에게 최적의 직무, 합격 시기, 기업 궁합을 제안하는 커리어 특화 백엔드 서비스입니다. 사용자 생년월일시(四柱: 연월일시)를 입력받아 3가지 핵심 기능을 제공합니다:
 
-1. **관운 기반 합격 시기 분석**: 생년월일시를 기반으로 정관/편관 흐름을 분석하여 상/하반기 취업 유리 시기 예측
-2. **AI 커리어 컨설팅**: 오행과 십신 분포로 추천 산업군(3~5개), 면접 전략, 강점 분석
+1. **관운 기반 합격 시기 분석**: 생년월일시를 기반으로 정관/편관 흐름 및 지장간(地藏干) 분석을 통해 상/하반기 취업 유리 시기 예측
+2. **AI 커리어 컨설팅**: 오행, 십신(十神), 지장간(地藏干) 분포로 추천 산업군(3~5개), 면접 전략, 강점 분석
 3. **기업/직무 궁합**: 사용자 생년월일시와 기업 설립일 사주 대조로 궁합 점수 및 추천 포지션
 
 ## Clarifications
@@ -41,6 +41,12 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 - Q: 태어난 시간의 입력 형식은? → A: **HH:mm (24시간 형식)**. 예: 14:30, 09:00. 분(minute) 단위까지 지원하여 정밀도 향상.
 - Q: 관운 분석(User Story 1)에서 birth_time은 어떻게 처리할 것인가? → A: **생년월일시 모두 사용**. FastAPI로 완전한 생년월일시(YYYY-MM-DD HH:mm)를 전송하여 가장 정확한 사주 계산 제공.
 
+### Session 2026-04-27 (Data Uniqueness & Hidden Stem Calculation)
+
+- Q: UserProfile에서 사용자를 식별하는 유니크 키는 무엇인가? → A: **생년월일시 조합 (birthDate + birthTime)이 유니크 키**. 같은 생년월일시를 가진 사용자는 동일한 사주 분석 결과를 공유하므로, 이를 중심으로 데이터를 구성. `UNIQUE(birthDate, birthTime)` 제약 추가.
+- Q: 십신 외에 지장간(地藏干)을 어떻게 처리할 것인가? → A: **지장간 계산을 별도로 수행**. 각 지지(地支) 내 숨겨진 천간(地藏干)을 계산하여 십신 분석을 더 정확하게 구성. SajuResult의 `hiddenStems[]` 필드에 저장. FastAPI 응답에서 지장간 데이터를 수신하고, Spring에서 `TenGodCalculator`와 함께 `HiddenStemCalculator`를 통해 정확한 오행 분포 계산.
+- Q: 지장간 계산이 AI 컨설팅과 기업 궁합에 어떻게 영향을 미치는가? → A: 오행 분포 계산 시 지장간을 포함하여 더 정확한 오행 비율 제공. OpenAI 프롬프트에 십신 + 지장간 분석 결과를 모두 포함하여 더 정밀한 커리어 컨설팅 제공. 기업 궁합도 마찬가지로 지장간 분석을 포함하여 신뢰도 향상.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Career Timing Analysis (Priority: P1)
@@ -69,7 +75,7 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 **Acceptance Scenarios**:
 
-1. **Given** 완전한 사주 데이터(5 천간 + 12 지지 + 오행/십신 분포), **When** AI 커리어 컨설팅 요청, **Then** JSON 형식으로 3~5개 산업 추천 + 면접 전략 + 강점 분석 반환
+1. **Given** 완전한 사주 데이터(4 천간/지지 + 오행/십신/지장간 분포), **When** AI 커리어 컨설팅 요청, **Then** JSON 형식으로 3~5개 산업 추천 + 면접 전략 + 강점 분석 반환
 2. **Given** 느린 외부 API(OpenAI), **When** Timeout 초과, **Then** 정중한 오류 메시지 + 재시도 안내 반환
 3. **Given** 유효한 사주 데이터, **When** 컨설팅 응답, **Then** 타임스탬프 + AI 모델 버전 메타데이터 포함
 
@@ -252,10 +258,10 @@ SajuException (root)
 - **FR-001**: Controller는 HTTP 처리만 담당. DTO 입력 → Service 위임 → DTO 응답
 - **FR-002**: Service에서 생년월일시 검증 (YYYY-MM-DD HH:mm 형식, 현실적 범위). 시간이 미상일 경우 400 Bad Request + ErrorInfo 반환
 - **FR-003**: Service는 생년월일시(YYYY-MM-DD HH:mm)를 FastAPI로 전송하여 만세력 데이터 수신 (천간, 지지, 오행, 시간주(시주) 등 기본 사주 정보)
-- **FR-004**: Service에서 만세력 데이터를 기반으로 십신(十神) 계산. 일간을 기준으로 월간을 분석하여 정관(正官)/편관(偏官) 판정 및 관운 강도 평가
+- **FR-004**: Service에서 만세력 데이터를 기반으로 십신(十神) 및 지장간(地藏干) 계산. 일간을 기준으로 월간을 분석하여 정관(正官)/편관(偏官) 판정 및 관운 강도 평가. 지장간 분석을 통해 더 정확한 오행 분포 파악
 - **FR-004-1**: 관운 강도와 현재 연도의 대운 주기를 분석하여 H1(상반기) vs H2(하반기) 중 취업 유리 시기 판정
 - **FR-005**: Service에서 SajuResult를 MySQL에 저장 (Entity로 영속화)
-- **FR-006**: Service에서 사주 데이터(천간, 지지, 오행, 십신 분포)를 구조화하여 Spring AI ChatClient + JSON Mode로 OpenAI API 호출. 응답은 `CareerAdviceResponse` Record에 자동 매핑
+- **FR-006**: Service에서 사주 데이터(천간, 지지, 오행, 십신, 지장간 분포)를 구조화하여 Spring AI ChatClient + JSON Mode로 OpenAI API 호출. 응답은 `CareerAdviceResponse` Record에 자동 매핑
 - **FR-006-1**: OpenAI 프롬프트는 사주 정보 + 컨텍스트를 명확히 포함 (예: "다음 사주를 분석하여 추천 산업 3~5개, 면접 전략, 강점 분석을 JSON 형식으로 제공하세요")
 - **FR-007**: `CareerAdviceResponse`의 필드(`industries`, `interviewTips`, `strengths`)를 JSON 컬럼에 저장
 - **FR-008**: Timeout/API 실패 시 @RestControllerAdvice로 처리 (try-catch 금지)
@@ -272,8 +278,8 @@ SajuException (root)
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
 | **User** | id, email, phone, createdAt | | PK, UNIQUE(email) |
-| **UserProfile** | id, userId, birthDate, birthTime, createdAt, updatedAt | DATE + TIME | PK, FK to User, UNIQUE(userId) |
-| **SajuResult** | id, userProfileId, heavenlyStems[], earthlyBranches[], fiveElements, tenGods, careerFortune, fetchedAt | Enums + JSON | PK, FK to UserProfile, @JdbcTypeCode for JSON |
+| **UserProfile** | id, userId, birthDate, birthTime, createdAt, updatedAt | DATE + TIME | PK, FK to User, UNIQUE(birthDate, birthTime) |
+| **SajuResult** | id, userProfileId, heavenlyStems[], earthlyBranches[], fiveElements, tenGods, hiddenStems[], careerFortune, fetchedAt | Enums + JSON | PK, FK to UserProfile, @JdbcTypeCode for JSON |
 | **CareerConsultation** | id, sajuResultId, industries[], interviewTips, strengths, openaiModelVersion, generatedAt | JSON columns | PK, FK to SajuResult, timestamp |
 | **CompanyCompatibility** | id, userProfileId, companyName, compatibilityScore, recommendedRoles[], createdAt | INT + JSON | PK, FK to UserProfile, composite index on (userProfileId, companyName) |
 | **UserSatisfactionFeedback** | id, sajuResultId, feedbackType, satisfactionStatus, createdAt | FK + Enum + ENUM | PK, FK to SajuResult, index on (sajuResultId, createdAt) |
@@ -298,7 +304,7 @@ SajuException (root)
 - FastAPI 서비스는 정상 조건에서 <3초 응답
 - OpenAI API는 <8초 응답
 - 기업 설립일은 사용자 입력 또는 외부 DB 조회 (MVP에서는 사용자 제공)
-- 오행/십신 계산은 전적으로 FastAPI 담당 (Spring 백엔드는 결과만 수신/저장)
+- 오행/십신/지장간 계산: FastAPI에서 기본 만세력 데이터(천간, 지지) 제공 → Spring 백엔드에서 십신 및 지장간(地藏干) 계산 → 더 정확한 오행 분포 도출
 - 사용자는 취업 준비 전문직 (미성년 보호 불필요)
 - **Phase 1에서 인증/인가 없음**: 모든 API 공개 제공. Phase 2에서 JWT 기반 인증 추가
 - **Phase 1 OpenAI 호출 제한 없음**: 비용 관리는 환경 변수(API Key)로 수동 제어. Phase 2에서 사용자당 일일 한도(예: 5회/일) 방식으로 자동 제한 도입
