@@ -2,18 +2,21 @@
 
 **Branch**: `main` (direct planning, no feature branch) | **Date**: 2026-04-10 | **Spec**: [specs/001-career-fortune-api/spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/001-career-fortune-api/spec.md` with 9 clarifications resolved (including birth_time requirement)
+**Input**: Feature specification from `/specs/001-career-fortune-api/spec.md` with 13 clarifications resolved (including birth_time requirement, 지장간 calculation role separation)
 
 ## Summary
 
-SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 관운)를 활용해 취업 준비생에게 4가지 맞춤 서비스를 제공합니다:
+SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관운)를 활용해 취업 준비생에게 4가지 맞춤 서비스를 제공합니다:
 
-1. **관운 기반 채용 시기 분석** (P1): FastAPI로 만세력 조회 → Spring에서 십신/관운 계산 → H1/H2 판정
-2. **AI 커리어 컨설팅** (P1): Spring AI + OpenAI JSON Mode로 산업/면접팁/강점 제공
-3. **기업/직무 궁합** (P2): 공공데이터API로 기업 설립일 조회 → 궁합 계산
+1. **관운 기반 채용 시기 분석** (P1): FastAPI로 만세력 조회 → Spring에서 십신/지장간 계산 → 관운 분석 → H1/H2 판정
+2. **AI 커리어 컨설팅** (P1): Spring에서 십신+지장간 기반 오행 분포 계산 → Spring AI + OpenAI JSON Mode로 산업/면접팁/강점 제공
+3. **기업/직무 궁합** (P2): 공공데이터API로 기업 설립일 조회 → 지장간 포함 사주 계산 → 궁합 계산 (시간 미상 시 12:00 기본값)
 4. **사용자 만족도 피드백** (P1): 사주 분석 완료 후 만족도(만족함/만족하지 않음) 수집 → Phase 2 대시보드에서 시각화
 
-**기술 접근**: REST API (Spring Boot 4.0.5) + MySQL (JPA) + 외부 API 통합 (FastAPI, OpenAI, 공공데이터). Spring AI로 OpenAI 호출을 타입 안전하게 처리.
+**기술 접근**: REST API (Spring Boot 4.0.5) + MySQL (JPA) + 외부 API 통합 (FastAPI, OpenAI, 공공데이터). 
+- **FastAPI 역할**: 천간/지지/오행만 제공 (기본 사주 데이터)
+- **Spring 역할**: TenGodCalculator + HiddenStemCalculator로 십신 및 지장간 모두 계산 → 더 정확한 오행 분포 파악
+- Spring AI로 OpenAI 호출을 타입 안전하게 처리.
 
 ---
 
@@ -42,6 +45,7 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 관운)를 활�
 - 엔티티: 6개 (UserProfile, SajuResult, CareerConsultation, CompanyCompatibility, UserSatisfactionFeedback / User는 Phase 2)
 - API 엔드포인트: 4개 (`/api/career/timing`, `/api/career/consultation`, `/api/company/compatibility`, `/api/feedback/satisfaction`)
 - 외부 API 통합: 3개 (FastAPI, OpenAI, 공공데이터API)
+- **계산 로직**: TenGodCalculator (십신), HiddenStemCalculator (지장간), CareerFortuneAnalyzer (관운), CompatibilityScoreCalculator (궁합)
 
 ---
 
@@ -98,6 +102,7 @@ SSAju/
 │   │   │   ├── UserSatisfactionFeedback.java
 │   │   ├── util/
 │   │   │   ├── TenGodCalculator.java (十神 계산)
+│   │   │   ├── HiddenStemCalculator.java (地藏干 계산)
 │   │   │   ├── CareerFortuneAnalyzer.java (H1/H2 판정)
 │   │   │   └── CompatibilityScoreCalculator.java (궁합 점수)
 │   │
@@ -208,6 +213,8 @@ SSAju/
 |---------|---------|------------------------|
 | **6개 엔티티** (Phase 1) | UserProfile ↔ SajuResult (1:1, 사주 조회 캐싱), SajuResult ↔ CareerConsultation (1:N, 같은 사주에서 여러 컨설팅), UserProfile ↔ CompanyCompatibility (1:N, 여러 기업과 비교), SajuResult ↔ UserSatisfactionFeedback (1:N, 분석마다 피드백 수집) | 모든 데이터를 하나에 통합 → N+1 쿼리, 데이터 정규화 부족, 재사용성 저하 |
 | **4개 독립 Service** | 각 기능(관운, 컨설팅, 궁합, 피드백)이 독립적으로 테스트/배포 가능해야 함. P1/P2 우선순위 구분으로 점진적 개발 필요 | 단일 Service → 테스트 복잡도 증가, 변경 파급 범위 확대, 리팩토링 위험 |
+| **TenGodCalculator + HiddenStemCalculator 분리** | 십신(十神)과 지장간(地藏干)은 별개의 계산 로직. 분리하면 각각 독립 테스트 가능, 재사용성 향상. 더 정확한 오행 분포 계산 가능 | 통합 Calculator → 로직 혼재, 테스트 복잡도 증대, 유지보수 어려움. 지장간 미포함 시 사주 분석 정확도 저하 |
+| **Spring에서 십신+지장간 계산** | FastAPI는 기본 데이터(천간/지지/오행)만 제공 → Spring 단에서 모든 계산 담당하므로 FastAPI 변경에 영향받지 않음. 도메인 로직 통제 가능 | FastAPI에서 십신/지장간까지 계산 → FastAPI 변경 시 Spring도 영향, 통제 불가. 지장간 미포함 시 정확도 저하 |
 | **Spring AI 도입** | OpenAI JSON Mode 자동 처리, 타입 안전 매핑, 재시도/타임아웃 관리 자동화 → 코드 간결성 + 신뢰성 | 수동 WebClient + JSON 파싱 → 보일러플레이트 증가, 에러 처리 복잡, 스키마 불일치 위험 |
 | **공공데이터API 폴백** | 기업 설립일 자동 조회 실패 시 사용자 입력으로 전환 → 사용성 향상 | 조회 실패 시 500 Error 반환 → 사용자 경험 저하 |
 
@@ -226,6 +233,11 @@ SSAju/
 2. **십신(十神) 계산 알고리즘 연구**
    - Task: 일간(日干)을 기준으로 월간(月干)을 분석하여 정관/편관/기타 십신 판정
    - Output: 십신 판정 로직 수식화 (`TenGodCalculator` 클래스 스켈레톤 작성)
+
+2.5. **지장간(地藏干) 계산 알고리즘 연구**
+   - Task: 각 지지(地支)에 숨겨진 천간(地藏干) 정의 및 계산 규칙. 예: 子→癸, 丑→癸/辛/己, 寅→甲/丙/戊 등
+   - Output: 지장간 매핑 테이블 및 `HiddenStemCalculator` 로직. 십신과 함께 정확한 오행 분포 계산에 활용
+   - 의존성: TenGodCalculator 완료 후 함께 사용
 
 3. **관운 분석 및 H1/H2 판정 로직**
    - Task: 관성의 변화 주기(10년 대운), 현재 연도 간지, 관성 강도 분석 → H1/H2 예측 알고리즘
@@ -264,6 +276,7 @@ UserProfile
 ├── birthTime: LocalTime (NOT NULL, HH:mm format, 사주 명리학 정확성 위해 필수)
 ├── createdAt: LocalDateTime
 ├── updatedAt: LocalDateTime
+├── UNIQUE(birthDate, birthTime): 같은 생년월일시를 가진 사용자는 동일한 사주 분석 결과 공유
 ├── Note: Phase 2에서 User.id (FK) 추가 예정
 
 [Phase 2+: 추후 auth/ 패키지에서 구현]
@@ -285,9 +298,15 @@ SajuResult
 │   ├── hour_pillar: String
 │   ├── year_stem, month_stem, day_stem, hour_stem: String (천간)
 │   ├── year_branch, month_branch, day_branch, hour_branch: String (지지)
+│   ├── five_elements: Object ({木:1, 火:2, 土:1, 金:2, 水:2} 등)
 │   ├── birth_time: String (시간, e.g., "14:30")
 │   ├── birth_date: String (생년월일, YYYY-MM-DD)
 │   └── solar_correction: Object (도시, 경도, UTC offset, 수정 시간 등)
+├── hiddenStems: Map (JSON, 지지별 지장간 저장)
+│   ├── 구조: Map<String, List<String>>
+│   ├── 예: {"子": ["癸"], "丑": ["癸", "辛", "己"], "寅": ["甲", "丙", "戊"], ...}
+│   ├── 용도: TenGodCalculator와 함께 사용하여 더 정확한 오행 분포 계산
+├── tenGodDistribution: String (JSON, 십신 분포: {正官: 1, 偏官: 1, ...})
 ├── careerFortune: String (JSON, 관운 분석: {favoredPeriod:"H1", confidenceScore:75, reasoning:"..."})
 ├── fetchedAt: LocalDateTime
 
@@ -329,6 +348,8 @@ UserSatisfactionFeedback
 
 **Validation Rules** (Phase 1):
 - `birthDate`: 과거 날짜, 현실적 범위 (1900-01-01 ~ 오늘)
+- `birthTime`: HH:mm 형식 (00:00 ~ 23:59)
+- `UNIQUE(birthDate, birthTime)`: 같은 생년월일시 조합은 중복 불가
 - `compatibilityScore`: 0 ≤ score ≤ 100
 - 모든 외래키: NOT NULL (엔티티 생성 시 필수)
 - Note: `email` 검증은 Phase 2 User 엔티티에서 추가
@@ -404,6 +425,17 @@ Request:
     "土": 1,
     "金": 2,
     "水": 2
+  },
+  "hiddenStems": {                              // 地藏干 분포 (지지별 숨겨진 천간)
+    "午": ["丁", "己"],
+    "戌": ["戊", "辛", "丁"],
+    "未": ["己", "丁", "乙"]
+  },
+  "tenGodDistribution": {                       // 十神 분포
+    "正官": 1,
+    "偏官": 1,
+    "正财": 1,
+    "偏财": 1
   }
 }
 
@@ -469,8 +501,10 @@ Request:
   "birthTime": "14:30",                   // 사용자 태어난 시간 (HH:mm), required
   "companyName": "Samsung Electronics",   // 기업명 (공공데이터 조회용)
   "companyFoundingDate": "1938-01-13",   // (Optional) 기업 설립일, 조회 실패 시 사용자 입력
-  "companyFoundingTime": "12:00"         // (Optional) 기업 설립 시간 (HH:mm), 미상 시 기본값 12:00
+  "companyFoundingTime": "12:00"         // (Optional) 기업 설립 시간 (HH:mm), 미상 시 기본값 12:00으로 자동 설정
 }
+
+참고: 기업 설립일도 사용자 생년월일과 동일한 수준으로 지장간 포함하여 사주 계산. 설립 시간 미상 시 정오(12:00)로 기본 설정.
 
 Response (200 OK):
 {
@@ -645,7 +679,9 @@ curl -X POST http://localhost:8080/api/career/consultation \
     "birthTime": "14:30",
     "heavenlyStems": ["庚", "丙", "己", "辛"],
     "earthlyBranches": ["午", "戌", "未", "未"],
-    "fiveElements": {"木":1, "火":2, "土":1, "金":2, "水":2}
+    "fiveElements": {"木":1, "火":2, "土":1, "金":2, "水":2},
+    "hiddenStems": {"午": ["丁", "己"], "戌": ["戊", "辛", "丁"], "未": ["己", "丁", "乙"], "未": ["己", "丁", "乙"]},
+    "tenGodDistribution": {"正官": 1, "偏官": 1, "正財": 1, "偏財": 1}
   }'
 ```
 
@@ -766,5 +802,8 @@ This will merge the Spring AI, FastAPI integration, and 십신/관운 계산 로
 
 - **Constitutional Compliance**: 모든 구현은 `/CLAUDE.md`의 Java/JPA 표준 및 Test-Then-Commit 프로토콜 준수
 - **Documentation Workflow**: spec.md → plan.md → research.md → data-model.md → tasks.md → 구현 (진실의 원천은 항상 spec.md)
-- **Test Strategy**: Given-When-Then 패턴 + AssertJ. 각 FR별 최소 2개 테스트 (Happy path + Error case)
-- **Layering**: Controller (얇음) → Service (두터움) → Repository (수동). 비즈니스 로직은 Service에만.
+- **FastAPI-Spring 역할 분리**: FastAPI는 천간/지지/오행만 제공 (기본 사주 데이터). Spring은 TenGodCalculator + HiddenStemCalculator로 십신 및 지장간 모두 계산. 도메인 로직 통제 가능, FastAPI 변경에 영향 없음.
+- **지장간 계산의 중요성**: 십신(十神)만으로 부족함. 지장간(地藏干)을 함께 계산해야 정확한 오행 분포를 파악 가능. AI 컨설팅, 기업 궁합 분석의 신뢰도 향상.
+- **데이터 모델링**: UserProfile의 UNIQUE(birthDate, birthTime)으로 중복 데이터 방지. SajuResult에 hiddenStems(Map) 저장으로 재계산 불필요.
+- **Test Strategy**: Given-When-Then 패턴 + AssertJ. 각 FR별 최소 2개 테스트 (Happy path + Error case). TenGodCalculator, HiddenStemCalculator는 각각 독립 단위 테스트 필수.
+- **Layering**: Controller (얇음) → Service (두터움) → Repository (수동). 비즈니스 로직은 Service에만. 계산 로직(TenGod, HiddenStem, CareerFortune, CompatibilityScore)은 util/ 패키지에서 테스트 가능하게 관리.
