@@ -1,9 +1,9 @@
 # Task List: Career Fortune & Consultation API
 
 **Feature**: Career Fortune & Consultation API
-**Date Generated**: 2026-04-10
-**Status**: Ready for Implementation
-**Total Tasks**: 49 (Enum definition + API documentation added)
+**Date Generated**: 2026-04-27
+**Status**: Ready for Implementation (Updated with Hidden Stem Calculation)
+**Total Tasks**: 50 (HiddenStemCalculator added to foundational phase)
 **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
 
 ---
@@ -93,9 +93,10 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/handler/SajuGlobalExceptionHandler.java`
 
 - [ ] T009 [P] Create base entities: `UserProfile` and `SajuResult` in `career/entity/`
-  - Implement UserProfile: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull, HH:mm format), timestamps (createdAt, updatedAt)
-  - Implement SajuResult: heavenlyStems[], earthlyBranches[], fiveElements, tenGods, careerFortune (JSON), birth_time, timestamps. Link to UserProfile (1:1)
+  - Implement UserProfile: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull, HH:mm format), timestamps (createdAt, updatedAt). **Add UNIQUE(birthDate, birthTime) constraint**
+  - Implement SajuResult: fullSajuData (JSON from FastAPI), hiddenStems (Map<String, List<String>>, 지지별 지장간 저장), tenGodDistribution (JSON), careerFortune (JSON), timestamps. Link to UserProfile (1:1)
   - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for relationships, @JdbcTypeCode for JSON columns
+  - Note: hiddenStems 구조 예시: `{"子": ["癸"], "丑": ["癸", "辛", "己"], ...}`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/UserProfile.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/SajuResult.java`
 
@@ -121,8 +122,13 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/SatisfactionStatus.java`
 
 - [ ] T013-2 [P] Create utility classes for saju calculations
-  - Create: `TenGodCalculator.java` (十神 computation), `CareerFortuneAnalyzer.java` (H1/H2 logic), `CompatibilityScoreCalculator.java`
+  - Create: `TenGodCalculator.java` (十神 computation from heavenlyStems)
+  - Create: `HiddenStemCalculator.java` (地藏干 computation from earthlyBranches, returns Map<String, List<String>>)
+  - Create: `CareerFortuneAnalyzer.java` (H1/H2 logic using both TenGod and HiddenStem data)
+  - Create: `CompatibilityScoreCalculator.java` (compatibility score using both calculators)
+  - Note: HiddenStemCalculator must be used together with TenGodCalculator for accurate 오행 분포 calculation
   - File: `SSAju/src/main/java/ssafy/SSAju/career/util/TenGodCalculator.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/util/HiddenStemCalculator.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/util/CareerFortuneAnalyzer.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/util/CompatibilityScoreCalculator.java`
 
@@ -150,9 +156,10 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
 
 - [ ] T017 [US1] Create `CareerFortuneService` in `service/`
-  - Method: `analyzeCareerTiming(LocalDate birthDate, LocalTime birthTime)` → H1/H2 prediction with complete saju data
-  - Logic: Call `SajuDataService.fetchSajuFromFastAPI()` with birthDate + birthTime, use `CareerFortuneAnalyzer` to process saju data
-  - Stores: SajuResult in DB via `SajuResultRepository` (including birthTime)
+  - Method: `analyzeCareerTiming(LocalDate birthDate, LocalTime birthTime)` → H1/H2 prediction with complete saju data including 지장간
+  - Logic: Call `SajuDataService.fetchSajuFromFastAPI()` with birthDate + birthTime → Calculate HiddenStems via `HiddenStemCalculator` → Use `CareerFortuneAnalyzer` with both 십신 and 지장간 data for H1/H2 prediction
+  - Stores: SajuResult in DB via `SajuResultRepository` (including birthTime, hiddenStems, tenGodDistribution)
+  - Note: HiddenStemCalculator와 TenGodCalculator를 함께 사용하여 더 정확한 관운 분석 제공
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CareerFortuneService.java`
 
 - [ ] T018 [US1] Create `CareerTimingController` in `controller/`
@@ -200,8 +207,9 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/CareerConsultationRepository.java`
 
 - [ ] T024 [US2] [P] Create `ConsultationRequest` DTO in `dto/request/`
-  - Fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), heavenlyStems (List<String>), earthlyBranches (List<String>), fiveElements (Map<String, Integer>)
-  - Validation: @NotNull on birthDate/birthTime, size checks for stems/branches (must be 4 each), fiveElements must sum correctly
+  - Fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), heavenlyStems (List<String>), earthlyBranches (List<String>), fiveElements (Map<String, Integer>), hiddenStems (Map<String, List<String>>), tenGodDistribution (Map<String, Integer>)
+  - Validation: @NotNull on birthDate/birthTime, size checks for stems/branches (must be 4 each), fiveElements must sum correctly, hiddenStems structure validation
+  - Note: hiddenStems from HiddenStemCalculator result, tenGodDistribution from TenGodCalculator result
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/ConsultationRequest.java`
 
 - [ ] T025 [US2] [P] Create `ConsultationResponse` DTO in `dto/response/`
@@ -209,10 +217,11 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/ConsultationResponse.java`
 
 - [ ] T026 [US2] Create `ConsultationService` in `service/`
-  - Method: `getCareerConsultation(LocalDate birthDate, LocalTime birthTime, saju data)` → fetches saju via SajuDataService, calls OpenAI via ChatClient
-  - Logic: Call `SajuDataService.fetchSajuFromFastAPI()` with birthDate + birthTime, use JSON Mode for structured output mapping
+  - Method: `getCareerConsultation(LocalDate birthDate, LocalTime birthTime, saju data)` → fetches saju via SajuDataService, calculates TenGod + HiddenStem, calls OpenAI via ChatClient
+  - Logic: Call `SajuDataService.fetchSajuFromFastAPI()` with birthDate + birthTime → Use `TenGodCalculator` + `HiddenStemCalculator` to get accurate 오행 분포 → call OpenAI with complete saju data (including hiddenStems) via JSON Mode
   - Handles: Timeout → OpenAIApiException, invalid response → InvalidSajuDataException, missing time → InvalidSajuDataException
-  - Stores: CareerConsultation in DB (linked to SajuResult with birthTime)
+  - Stores: CareerConsultation in DB (linked to SajuResult with birthTime, includes hiddenStems-based 오행 분포)
+  - Note: HiddenStemCalculator 결과(hiddenStems Map)와 TenGodCalculator 결과(tenGodDistribution)를 모두 OpenAI 프롬프트에 포함
   - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
 
 - [ ] T027 [US2] Create `ConsultationController` in `controller/`
@@ -306,8 +315,9 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/CompanyCompatibilityRepository.java`
 
 - [ ] T042 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs
-  - Request fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), companyName (@NotNull), companyFoundingDate (LocalDate, optional), companyFoundingTime (LocalTime, optional, default 12:00)
+  - Request fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), companyName (@NotNull), companyFoundingDate (LocalDate, optional), companyFoundingTime (LocalTime, optional, **defaults to 12:00 if missing**)
   - Response fields: compatibilityScore (0-100), confidenceLevel (LOW/MEDIUM/HIGH), recommendedRoles, reasoning
+  - Note: companyFoundingTime 미상 시 자동으로 12:00으로 설정하고 지장간 포함 계산. 사용자 사주와 동일 수준의 정확성 유지
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/CompatibilityRequest.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/CompatibilityResponse.java`
 
@@ -317,9 +327,10 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyInfoService.java`
 
 - [ ] T044 [US3] Create `CompanyMatchingService` in `service/`
-  - Method: `analyzeCompatibility(LocalDate userBirthDate, LocalTime userBirthTime, LocalDate companyFoundingDate, LocalTime companyFoundingTime)` → compatibility score + role recommendations
-  - Logic: Fetch user saju via SajuDataService with birthDate + birthTime. Fetch/receive company saju (with time defaulting to 12:00 if missing). Use `CompatibilityScoreCalculator` for scoring
-  - Stores: CompanyCompatibility in DB with both date-time information
+  - Method: `analyzeCompatibility(LocalDate userBirthDate, LocalTime userBirthTime, LocalDate companyFoundingDate, LocalTime companyFoundingTime)` → compatibility score + role recommendations with 지장간 calculation
+  - Logic: Fetch user saju via SajuDataService with birthDate + birthTime → Calculate user HiddenStems + TenGod. Fetch company saju (with time defaulting to 12:00 if missing) → Calculate company HiddenStems + TenGod. Use `CompatibilityScoreCalculator` with both sets of data for accurate scoring
+  - Stores: CompanyCompatibility in DB with both date-time information (company founding time defaults to 12:00 if not provided)
+  - Note: 기업 설립일도 사용자 사주와 동일한 수준으로 지장간 포함 계산. 시간 미상 시 정오(12:00)로 기본 설정
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyMatchingService.java`
 
 - [ ] T045 [US3] Create `CompatibilityController` in `controller/`
@@ -330,15 +341,17 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 - [ ] T046 [US3] Write unit & integration tests for Company Compatibility
   - Test cases (CompanyMatchingService):
-    1. Valid compatibility analysis (user birthDate + birthTime, company founding date) → compatibility score + roles
-    2. Company founding time missing → default to 12:00
-    3. Missing user birthTime → InvalidSajuDataException
-    4. Invalid user birthTime format → InvalidSajuDataException
+    1. Valid compatibility analysis (user birthDate + birthTime, company founding date + time) → compatibility score + roles including 지장간-based analysis
+    2. Company founding time missing → auto-default to 12:00 and calculate 지장간
+    3. Company founding date missing but time provided → Invalid request (date required)
+    4. Missing user birthTime → InvalidSajuDataException
+    5. Invalid user birthTime format → InvalidSajuDataException
   - Test cases (CompatibilityController):
-    1. Valid request (user birthDate + birthTime + company) → 200 OK with score/roles
-    2. Missing user birthTime → 400 Bad Request
-    3. Company not found (with company founding date fallback) → score still calculated
-    4. Invalid user time format → 400 Bad Request
+    1. Valid request (user birthDate + birthTime + company founding date) → 200 OK with score/roles
+    2. Valid request (user birthDate + birthTime + company, no company time) → 200 OK with score (company time defaults to 12:00)
+    3. Missing user birthTime → 400 Bad Request
+    4. Company not found (with company founding date fallback) → score still calculated with 지장간 included
+    5. Invalid user time format → 400 Bad Request
   - File: `SSAju/src/test/java/ssafy/SSAju/service/CompanyMatchingServiceTest.java`
   - File: `SSAju/src/test/java/ssafy/SSAju/controller/CompatibilityControllerTest.java`
 
@@ -403,18 +416,20 @@ feat: Career Timing Analysis API endpoint
 Given: Valid birthDate (YYYY-MM-DD) and birthTime (HH:mm, 24-hour format)
 When:  POST /api/career/timing with {"birthDate":"1990-10-10", "birthTime":"14:30"}
 Then:  Response includes favoredPeriod (H1/H2), confidenceScore (0-100), reasoning
-And:   SajuResult entity persisted in DB with both birthDate and birthTime
+And:   SajuResult entity persisted in DB with birthDate, birthTime, hiddenStems (Map), tenGodDistribution
 And:   FastAPI integration works with complete birth date-time (YYYY-MM-DD HH:mm) and timeout handling
+And:   HiddenStemCalculator + TenGodCalculator 결과가 SajuResult에 저장되고 관운 분석에 사용됨
 And:   Missing birthTime → 400 Bad Request with clear error message
 ```
 
 ### US2: AI Consultation (Complete MVP)
 ```
-Given: Valid birthDate (YYYY-MM-DD), birthTime (HH:mm), stems (4 values), branches (4 values), fiveElements
-When:  POST /api/career/consultation with complete saju data including birthTime
-Then:  Response includes industries (3-5), interviewTips, strengths
-And:   CareerConsultation entity persisted in DB linked to SajuResult (with birthTime)
-And:   Spring AI / OpenAI JSON Mode structured output works with complete saju (including hour stem/branch)
+Given: Valid birthDate (YYYY-MM-DD), birthTime (HH:mm), stems (4 values), branches (4 values), fiveElements, hiddenStems (Map), tenGodDistribution
+When:  POST /api/career/consultation with complete saju data including birthTime and 지장간 information
+Then:  Response includes industries (3-5), interviewTips, strengths based on TenGod + HiddenStem analysis
+And:   CareerConsultation entity persisted in DB linked to SajuResult (with birthTime, hiddenStems, tenGodDistribution)
+And:   Spring AI / OpenAI JSON Mode receives complete saju data including 지장간 for more accurate advice
+And:   OpenAI 프롬프트에 십신(十神) + 지장간(地藏干) 분석 결과 포함하여 더 정밀한 커리어 컨설팅 제공
 And:   Missing birthTime → 400 Bad Request with validation error
 ```
 
@@ -431,9 +446,11 @@ And:   Feedback accessible for Phase 2 admin dashboard
 ```
 Given: Valid user birthDate (YYYY-MM-DD) and birthTime (HH:mm, required), company name, and optional company founding date
 When:  POST /api/company/compatibility with {"birthDate":"1990-10-10", "birthTime":"14:30", "companyName":"Samsung", "companyFoundingDate":"1938-01-13"}
-Then:  Response includes compatibilityScore (0-100), recommendedRoles
-And:   Company founding time defaults to 12:00 if not provided
+Then:  Response includes compatibilityScore (0-100), recommendedRoles based on user + company 지장간 analysis
+And:   Company founding time defaults to 12:00 if not provided, with 지장간 included in calculation
+And:   Both user and company saju calculated with TenGod + HiddenStem for accurate compatibility scoring
 And:   Fallback to manual company founding date if API lookup fails (time still defaults to 12:00)
+And:   기업 설립일도 사용자 사주와 동일한 수준으로 지장간 포함하여 신뢰도 향상
 And:   Missing user birthTime → 400 Bad Request
 ```
 
@@ -448,6 +465,8 @@ And:   Missing user birthTime → 400 Bad Request
 | Database N+1 queries | FetchType.LAZY on all relationships (mandatory), eager loading only when needed |
 | Invalid external API responses | Request validation, DTO mapping with clear error messages, schema validation |
 | Circular entity references | No @ToString/@Data on entities, use explicit @Getter + @Builder |
+| 지장간 계산 오류 | HiddenStemCalculator와 TenGodCalculator는 독립적으로 단위 테스트 + 통합 테스트 필수. 정확한 지장간 매핑 테이블 정의 및 검증 |
+| 기업 설립시간 미상 처리 | 12:00 기본값 설정은 CompatibilityRequest에서 자동 처리. 시간대 오류 위험 최소화 |
 
 ---
 
@@ -468,15 +487,16 @@ And:   Missing user birthTime → 400 Bad Request
 | Phase | Task Count | Focus | Parallel? |
 |-------|-----------|-------|-----------|
 | Phase 1 (Setup) | 5 | Project structure, config, exception handling | Yes (all) |
-| Phase 2 (Foundational) | 9 | WebClient, ChatClient, base entities, repos, Enum definitions, utilities | Yes (most) |
-| Phase 3.1 (US1) | 8 | Career timing feature | Independent |
-| Phase 3.2 (US2) | 9 | Consultation feature | Parallel with US4 |
+| Phase 2 (Foundational) | 10 | WebClient, ChatClient, base entities, repos, Enum definitions, TenGod + HiddenStem calculators | Yes (most) |
+| Phase 3.1 (US1) | 8 | Career timing feature with 지장간 calculation | Independent |
+| Phase 3.2 (US2) | 9 | Consultation feature with TenGod + HiddenStem analysis | Parallel with US4 |
 | Phase 3.4 (US4) | 9 | Feedback feature | Parallel with US2 |
-| Phase 3.3 (US3) | 7 | Company compatibility (P2) | After core ready |
+| Phase 3.3 (US3) | 7 | Company compatibility (P2) with 지장간 and 12:00 default | After core ready |
 | Phase 4 (Polish) | 3 | API documentation (Swagger), integration tests, final validation | After all stories |
-| **TOTAL** | **49** | Full MVP + P2 foundation + API docs | Strategic parallelism |
+| **TOTAL** | **50** | Full MVP + 지장간 calculation + P2 foundation + API docs | Strategic parallelism |
 
 ---
 
 **Generated by `/speckit-tasks` on 2026-04-10**
+**Updated**: 2026-04-27 (Added HiddenStemCalculator, 지장간 calculation logic, company founding time 12:00 default)
 **Status**: Ready for implementation team
