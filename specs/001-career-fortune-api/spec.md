@@ -46,6 +46,7 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 - Q: UserProfile에서 사용자를 식별하는 유니크 키는 무엇인가? → A: **생년월일시 조합 (birthDate + birthTime)이 유니크 키**. 같은 생년월일시를 가진 사용자는 동일한 사주 분석 결과를 공유하므로, 이를 중심으로 데이터를 구성. `UNIQUE(birthDate, birthTime)` 제약 추가.
 - Q: 십신 외에 지장간(地藏干)을 어떻게 처리할 것인가? → A: **지장간 계산을 별도로 수행**. 각 지지(地支) 내 숨겨진 천간(地藏干)을 계산하여 십신 분석을 더 정확하게 구성. SajuResult의 `hiddenStems[]` 필드에 저장. FastAPI 응답에서 지장간 데이터를 수신하고, Spring에서 `TenGodCalculator`와 함께 `HiddenStemCalculator`를 통해 정확한 오행 분포 계산.
 - Q: 지장간 계산이 AI 컨설팅과 기업 궁합에 어떻게 영향을 미치는가? → A: 오행 분포 계산 시 지장간을 포함하여 더 정확한 오행 비율 제공. OpenAI 프롬프트에 십신 + 지장간 분석 결과를 모두 포함하여 더 정밀한 커리어 컨설팅 제공. 기업 궁합도 마찬가지로 지장간 분석을 포함하여 신뢰도 향상.
+- Q: FastAPI의 지장간(地藏干) 데이터 제공 여부는? → A: **FastAPI는 천간/지지/오행만 제공**. Spring 백엔드에서 `TenGodCalculator`와 `HiddenStemCalculator`를 통해 십신 및 지장간을 모두 계산. 이렇게 하면 Spring 단에서 모든 사주 계산을 통제 가능하고 FastAPI 변경에 영향받지 않음.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -257,7 +258,7 @@ SajuException (root)
 
 - **FR-001**: Controller는 HTTP 처리만 담당. DTO 입력 → Service 위임 → DTO 응답
 - **FR-002**: Service에서 생년월일시 검증 (YYYY-MM-DD HH:mm 형식, 현실적 범위). 시간이 미상일 경우 400 Bad Request + ErrorInfo 반환
-- **FR-003**: Service는 생년월일시(YYYY-MM-DD HH:mm)를 FastAPI로 전송하여 만세력 데이터 수신 (천간, 지지, 오행, 시간주(시주) 등 기본 사주 정보)
+- **FR-003**: Service는 생년월일시(YYYY-MM-DD HH:mm)를 FastAPI로 전송하여 만세력 데이터 수신 (천간, 지지, 오행 등 기본 사주 정보. 지장간은 Spring에서 계산)
 - **FR-004**: Service에서 만세력 데이터를 기반으로 십신(十神) 및 지장간(地藏干) 계산. 일간을 기준으로 월간을 분석하여 정관(正官)/편관(偏官) 판정 및 관운 강도 평가. 지장간 분석을 통해 더 정확한 오행 분포 파악
 - **FR-004-1**: 관운 강도와 현재 연도의 대운 주기를 분석하여 H1(상반기) vs H2(하반기) 중 취업 유리 시기 판정
 - **FR-005**: Service에서 SajuResult를 MySQL에 저장 (Entity로 영속화)
@@ -304,7 +305,7 @@ SajuException (root)
 - FastAPI 서비스는 정상 조건에서 <3초 응답
 - OpenAI API는 <8초 응답
 - 기업 설립일은 사용자 입력 또는 외부 DB 조회 (MVP에서는 사용자 제공)
-- 오행/십신/지장간 계산: FastAPI에서 기본 만세력 데이터(천간, 지지) 제공 → Spring 백엔드에서 십신 및 지장간(地藏干) 계산 → 더 정확한 오행 분포 도출
+- **오행/십신/지장간 계산 역할 분담**: FastAPI는 만세력 기본 데이터(천간, 지지, 오행)만 제공 → Spring 백엔드에서 `TenGodCalculator` + `HiddenStemCalculator`를 통해 십신(十神) 및 지장간(地藏干) 계산 → 더 정확한 오행 분포 도출
 - 사용자는 취업 준비 전문직 (미성년 보호 불필요)
 - **Phase 1에서 인증/인가 없음**: 모든 API 공개 제공. Phase 2에서 JWT 기반 인증 추가
 - **Phase 1 OpenAI 호출 제한 없음**: 비용 관리는 환경 변수(API Key)로 수동 제어. Phase 2에서 사용자당 일일 한도(예: 5회/일) 방식으로 자동 제한 도입
