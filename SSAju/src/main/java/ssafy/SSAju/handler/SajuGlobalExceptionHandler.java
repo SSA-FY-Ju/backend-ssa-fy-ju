@@ -17,6 +17,7 @@ import ssafy.SSAju.exception.PublicDataApiException;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.validation.FieldError;
 
 @Slf4j
 @RestControllerAdvice
@@ -74,8 +75,10 @@ public class SajuGlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(
             MethodArgumentNotValidException e, HttpServletRequest request) {
-        String message = e.getBindingResult().getFieldErrors().stream()
-                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+        String message = e.getBindingResult().getAllErrors().stream()
+                .map(error -> error instanceof FieldError fe
+                        ? fe.getField() + ": " + fe.getDefaultMessage()
+                        : error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
         log.warn("Validation failed: {}", message);
         return ResponseEntity.badRequest()

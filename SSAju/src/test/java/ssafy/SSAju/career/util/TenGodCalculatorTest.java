@@ -100,4 +100,16 @@ class TenGodCalculatorTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("정확히 4개");
     }
+
+    @Test
+    @DisplayName("천간 목록이 4개 초과이면 예외 발생")
+    void shouldThrowException_WhenStemsMoreThanFour() {
+        // Given
+        List<String> stems = List.of("甲", "乙", "丙", "丁", "戊");
+
+        // When & Then
+        assertThatThrownBy(() -> calculator.calculate(stems))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("정확히 4개");
+    }
 }

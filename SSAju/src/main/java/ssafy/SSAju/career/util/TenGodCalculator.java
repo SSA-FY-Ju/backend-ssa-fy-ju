@@ -56,7 +56,7 @@ public class TenGodCalculator {
     );
 
     public Map<String, Integer> calculate(List<String> heavenlyStems) {
-        if (heavenlyStems == null || heavenlyStems.size() < 4) {
+        if (heavenlyStems == null || heavenlyStems.size() != 4) {
             throw new IllegalArgumentException("천간 목록은 정확히 4개(年月日時)여야 합니다.");
         }
         String dayMaster = heavenlyStems.get(2); // 일간(日干) - 인덱스 2 (年月日時 순서)
@@ -72,6 +72,12 @@ public class TenGodCalculator {
     }
 
     public String getTenGod(String dayMaster, String targetStem) {
+        if (dayMaster == null || !FIVE_ELEMENT_MAP.containsKey(dayMaster)) {
+            throw new IllegalArgumentException("유효하지 않은 일간: " + dayMaster);
+        }
+        if (targetStem == null || !FIVE_ELEMENT_MAP.containsKey(targetStem)) {
+            throw new IllegalArgumentException("유효하지 않은 천간: " + targetStem);
+        }
         String masterElement = FIVE_ELEMENT_MAP.get(dayMaster);
         String targetElement = FIVE_ELEMENT_MAP.get(targetStem);
         String masterPolarity = YANG_YIN_MAP.get(dayMaster);

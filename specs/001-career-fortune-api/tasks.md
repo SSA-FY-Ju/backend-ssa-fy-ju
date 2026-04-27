@@ -82,6 +82,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 - [ ] T006 Implement WebClient configuration with timeout and retry policies
   - Configure WebClient bean with 3-5 second timeouts, exponential backoff for retries
+  - Note: `buildHttpClient()` 메서드에 `timeoutSeconds <= 0` 유효성 검증은 Phase 3에서 서비스 통합 시 추가 (현재 TODO 주석으로 표기)
   - File: `SSAju/src/main/java/ssafy/SSAju/config/WebClientConfig.java`
 
 - [ ] T007 Implement Spring AI ChatClient configuration with OpenAI JSON Mode

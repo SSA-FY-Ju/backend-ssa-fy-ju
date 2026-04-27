@@ -42,6 +42,7 @@ public class WebClientConfig {
     }
 
     private HttpClient buildHttpClient(int timeoutSeconds) {
+        // TODO: Phase 3 - timeoutSeconds <= 0 유효성 검증 추가 (misconfiguration 조기 차단)
         return HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, timeoutSeconds * 1000)
                 .responseTimeout(Duration.ofSeconds(timeoutSeconds));

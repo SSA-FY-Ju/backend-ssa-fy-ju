@@ -2,6 +2,7 @@ package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -99,7 +100,7 @@ public class CompatibilityScoreCalculator {
     }
 
     private Map<String, Integer> countElements(Map<String, List<String>> hiddenStems) {
-        Map<String, Integer> counts = new java.util.HashMap<>();
+        Map<String, Integer> counts = new HashMap<>();
         for (List<String> stems : hiddenStems.values()) {
             for (String stem : stems) {
                 String element = ELEMENT_MAP.get(stem);

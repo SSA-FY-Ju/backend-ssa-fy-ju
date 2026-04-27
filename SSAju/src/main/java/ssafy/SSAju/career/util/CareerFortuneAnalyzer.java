@@ -19,7 +19,6 @@ public class CareerFortuneAnalyzer {
 
     private static final List<String> OFFICER_GODS = List.of("정관", "편관");
     private static final List<String> FAVORABLE_OFFICER_BRANCHES_H1 = List.of("子", "丑", "寅", "卯", "辰", "巳");
-    private static final List<String> FAVORABLE_OFFICER_BRANCHES_H2 = List.of("午", "未", "申", "酉", "戌", "亥");
 
     private final TenGodCalculator tenGodCalculator;
 
@@ -40,7 +39,16 @@ public class CareerFortuneAnalyzer {
                                         Map<String, List<String>> hiddenStems,
                                         String dayMaster,
                                         List<String> earthlyBranches) {
-        if (earthlyBranches == null || earthlyBranches.size() < 4) {
+        if (tenGodDistribution == null) {
+            throw new IllegalArgumentException("십신 분포 데이터가 null입니다.");
+        }
+        if (hiddenStems == null) {
+            throw new IllegalArgumentException("지장간 데이터가 null입니다.");
+        }
+        if (dayMaster == null || dayMaster.isBlank()) {
+            throw new IllegalArgumentException("일간이 null이거나 비어있습니다.");
+        }
+        if (earthlyBranches == null || earthlyBranches.size() != 4) {
             throw new IllegalArgumentException("지지 목록은 정확히 4개(年月日時)여야 합니다.");
         }
         int officerScore = calculateOfficerScore(tenGodDistribution, hiddenStems, dayMaster);
