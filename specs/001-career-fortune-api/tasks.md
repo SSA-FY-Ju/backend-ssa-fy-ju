@@ -80,22 +80,22 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ## Phase 2: Foundational Infrastructure (Prerequisites for all User Stories)
 
-- [ ] T006 Implement WebClient configuration with timeout and retry policies
+- [v] T006 Implement WebClient configuration with timeout and retry policies
   - Configure WebClient bean with 3-5 second timeouts, exponential backoff for retries
   - Note: `buildHttpClient()` 메서드에 `timeoutSeconds <= 0` 유효성 검증은 Phase 3에서 서비스 통합 시 추가 (현재 TODO 주석으로 표기)
   - File: `SSAju/src/main/java/ssafy/SSAju/config/WebClientConfig.java`
 
-- [ ] T007 Implement Spring AI ChatClient configuration with OpenAI JSON Mode
+- [v] T007 Implement Spring AI ChatClient configuration with OpenAI JSON Mode
   - Configure ChatClient bean for JSON structured outputs
   - Note: JSON Mode 동작 검증 및 에러 처리는 Phase 3.2 (ConsultationService)에서 추가 구현
   - File: `SSAju/src/main/java/ssafy/SSAju/config/ChatClientConfig.java`
 
-- [ ] T008 Create global exception handler using `@RestControllerAdvice`
+- [v] T008 Create global exception handler using `@RestControllerAdvice`
   - Handle: InvalidSajuDataException, FastAPITimeoutException, OpenAIApiException, PublicDataApiException, DataAccessException
   - Note: OpenAIApiException 세분화 (401/429/5xx 구분)는 Phase 3.2 (ConsultationService)에서 구현
   - File: `SSAju/src/main/java/ssafy/SSAju/handler/SajuGlobalExceptionHandler.java`
 
-- [ ] T009 [P] Create base entities: `UserProfile` and `SajuResult` in `career/entity/`
+- [v] T009 [P] Create base entities: `UserProfile` and `SajuResult` in `career/entity/`
   - Implement UserProfile: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull, HH:mm format), timestamps (createdAt, updatedAt). **Add UNIQUE(birthDate, birthTime) constraint**
   - Implement SajuResult: fullSajuData (JSON from FastAPI), hiddenStems (Map<String, List<String>>, 지지별 지장간 저장), tenGodDistribution (JSON), careerFortune (JSON), timestamps. Link to UserProfile (1:1)
   - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for relationships, @JdbcTypeCode for JSON columns
@@ -103,28 +103,28 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/UserProfile.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/SajuResult.java`
 
-- [ ] T010 [P] Create repositories: `UserProfileRepository` and `SajuResultRepository` in `repository/`
+- [v] T010 [P] Create repositories: `UserProfileRepository` and `SajuResultRepository` in `repository/`
   - Implement: Spring Data JPA repositories with custom query methods (e.g., findByBirthDate, findLatestByUserProfileId)
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/UserProfileRepository.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/SajuResultRepository.java`
 
-- [ ] T011 [P] Create base DTO classes in `dto/request/` and `dto/response/`
+- [v] T011 [P] Create base DTO classes in `dto/request/` and `dto/response/`
   - Create: `ApiResponse.java` (generic wrapper), `ErrorInfo.java` (error details)
   - Use: Java record type for all DTOs
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/ApiResponse.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/ErrorInfo.java`
 
-- [ ] T012 [P] Create external API response DTOs in `dto/external/`
+- [v] T012 [P] Create external API response DTOs in `dto/external/`
   - Create: `FastAPIResponse.java` (heavenlyStems, earthlyBranches, fiveElements, tenGods), `CareerAdviceResponse.java` (for OpenAI JSON Mode)
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/external/FastAPIResponse.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/external/CareerAdviceResponse.java`
 
-- [ ] T013 [P] Define enums for feedback and satisfaction tracking
+- [v] T013 [P] Define enums for feedback and satisfaction tracking
   - Create: `FeedbackType.java` (CAREER_TIMING, CONSULTATION, COMPATIBILITY), `SatisfactionStatus.java` (SATISFIED, DISSATISFIED)
   - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/FeedbackType.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/SatisfactionStatus.java`
 
-- [ ] T013-2 [P] Create utility classes for saju calculations
+- [v] T013-2 [P] Create utility classes for saju calculations
   - Create: `TenGodCalculator.java` (十神 computation from heavenlyStems)
   - Create: `HiddenStemCalculator.java` (地藏干 computation from earthlyBranches, returns Map<String, List<String>>)
   - Create: `CareerFortuneAnalyzer.java` (H1/H2 logic using both TenGod and HiddenStem data)
