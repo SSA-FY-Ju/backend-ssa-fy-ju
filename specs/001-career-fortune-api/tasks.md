@@ -98,10 +98,17 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 - [v] T009 [P] Create base entities: `UserProfile` and `SajuResult` in `career/entity/`
   - Implement UserProfile: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull, HH:mm format), timestamps (createdAt, updatedAt). **Add UNIQUE(birthDate, birthTime) constraint**
   - Implement SajuResult: fullSajuData (JSON from FastAPI), hiddenStems (Map<String, List<String>>, 지지별 지장간 저장), tenGodDistribution (JSON), careerFortune (JSON), timestamps. Link to UserProfile (1:1)
-  - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for relationships, @JdbcTypeCode for JSON columns
+  - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for relationships
+  - **JSON 컬럼 처리 (Spring Boot 4.x Hibernate 7.2.7)**: @JdbcTypeCode 대신 @Convert + custom AttributeConverter 사용 (Jackson 3.x 호환성)
+    - ObjectMapConverter: Map<String, Object> 직렬화/역직렬화
+    - StringListMapConverter: Map<String, List<String>> 직렬화/역직렬화
+    - IntegerMapConverter: Map<String, Integer> 직렬화/역직렬화
   - Note: hiddenStems 구조 예시: `{"子": ["癸"], "丑": ["癸", "辛", "己"], ...}`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/UserProfile.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/SajuResult.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/converter/ObjectMapConverter.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/converter/StringListMapConverter.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/converter/IntegerMapConverter.java`
 
 - [v] T010 [P] Create repositories: `UserProfileRepository` and `SajuResultRepository` in `repository/`
   - Implement: Spring Data JPA repositories with custom query methods (e.g., findByBirthDate, findLatestByUserProfileId)
@@ -115,7 +122,19 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/ErrorInfo.java`
 
 - [v] T012 [P] Create external API response DTOs in `dto/external/`
-  - Create: `FastAPIResponse.java` (heavenlyStems, earthlyBranches, fiveElements, tenGods), `CareerAdviceResponse.java` (for OpenAI JSON Mode)
+  - Create: `FastAPIResponse.java` (camelCase 필드: heavenlyStems, earthlyBranches, fiveElements, yearPillar, monthPillar, dayPillar, hourPillar, birthTime, birthDate, solarCorrection), `CareerAdviceResponse.java` (for OpenAI JSON Mode)
+  - FastAPIResponse fields:
+    ```java
+    public record FastAPIResponse(
+        List<String> heavenlyStems,
+        List<String> earthlyBranches,
+        Map<String, Integer> fiveElements,
+        String yearPillar, monthPillar, dayPillar, hourPillar,
+        String birthTime,
+        String birthDate,
+        Map<String, Object> solarCorrection
+    ) {}
+    ```
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/external/FastAPIResponse.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/external/CareerAdviceResponse.java`
 
@@ -156,9 +175,11 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Fields: `favoredPeriod` (String: "H1"/"H2"), `confidenceScore` (0-100), `reasoning`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/CareerTimingResponse.java`
 
-- [ ] T016 [US1] Create `SajuDataService` in `service/`
-  - Method: `fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime)` → calls FastAPI with complete birth date-time (YYYY-MM-DD HH:mm) with retry logic
-  - Handles: TimeoutException → FastAPITimeoutException, invalid response → InvalidSajuDataException, missing time → InvalidSajuDataException
+- [v] T016 [US1] Create `SajuDataService` in `service/`
+  - Method: `fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime)` → calls FastAPI with complete birth date-time in request body ({"birthDate": "YYYY-MM-DD", "birthTime": "HH:mm"}) with retry logic
+  - FastAPI URI: `POST /api/saju/calculate`
+  - Response: `FastAPIResponse` (camelCase: heavenlyStems, earthlyBranches, fiveElements, yearPillar, monthPillar, dayPillar, hourPillar, birthTime, birthDate, solarCorrection)
+  - Handles: TimeoutException → FastAPITimeoutException, invalid response (heavenlyStems/earthlyBranches < 4 items) → InvalidSajuDataException, missing birthTime → InvalidSajuDataException
   - File: `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
 
 - [ ] T017 [US1] Create `CareerFortuneService` in `service/`
@@ -174,23 +195,26 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Validation: Reject requests with missing/malformed birthTime (400 Bad Request)
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/CareerTimingController.java`
 
-- [ ] T019 [US1] Write unit tests for `CareerFortuneService` in `src/test/`
+- [v] T019 [US1] Write unit tests for `CareerFortuneService` in `src/test/`
   - Test cases:
-    1. Happy path: valid birthDate (YYYY-MM-DD) + birthTime (HH:mm) → H1/H2 prediction
-    2. Missing birthTime → InvalidSajuDataException
-    3. Invalid time format (HH, no mm) → InvalidSajuDataException
-    4. FastAPI timeout → FastAPITimeoutException
-    5. Null birthDate/birthTime → NullPointerException / ValidationException
+    1. Happy path: valid birthDate (YYYY-MM-DD) + birthTime (HH:mm) → H1/H2 prediction + SajuResult saved with hiddenStems/tenGodDistribution
+    2. Existing user (same birthDate+birthTime) → UserProfile reused, no duplicate SajuResult
+    3. Invalid heavenlyStems (< 4 items) → InvalidSajuDataException
+    4. Invalid earthlyBranches (< 4 items) → InvalidSajuDataException
+    5. FastAPI timeout → FastAPITimeoutException
+  - Approach: @ExtendWith(MockitoExtension.class) with @Mock on SajuDataService, UserProfileRepository, SajuResultRepository. Real TenGodCalculator/HiddenStemCalculator/CareerFortuneAnalyzer 사용
   - Pattern: Given-When-Then with AssertJ
+  - Note: FastAPIResponse fixture는 camelCase 필드 사용 (heavenlyStems, earthlyBranches 등)
   - File: `SSAju/src/test/java/ssafy/SSAju/service/CareerFortuneServiceTest.java`
 
-- [ ] T020 [US1] Write unit tests for `CareerTimingController` in `src/test/`
+- [v] T020 [US1] Write unit tests for `CareerTimingController` in `src/test/`
   - Test cases:
     1. Valid request (birthDate + birthTime both provided) → 200 OK with H1/H2 response
     2. Missing birthTime field → 400 Bad Request with error message "birthTime is required in HH:mm format"
     3. Invalid time format (only hour, no minutes) → 400 Bad Request
     4. Invalid date format → 400 Bad Request
-    5. FastAPI timeout via service → 503 Service Unavailable
+    5. Empty body → 400 Bad Request
+  - Approach: MockMvcBuilders.standaloneSetup(controller) + SajuGlobalExceptionHandler (Spring Boot 4.x에서 @WebMvcTest 미지원)
   - File: `SSAju/src/test/java/ssafy/SSAju/controller/CareerTimingControllerTest.java`
 
 - [ ] T021 [US1] Run all tests for US1 features

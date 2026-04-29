@@ -291,23 +291,20 @@ User (로그인 정보 포함)
 SajuResult
 ├── id: Long (PK)
 ├── userProfileId: Long (FK to UserProfile)
-├── fullSajuData: String (JSON, FastAPI 전체 응답 저장)
-│   ├── year_pillar: String (e.g., "庚午")
-│   ├── month_pillar: String
-│   ├── day_pillar: String
-│   ├── hour_pillar: String
-│   ├── year_stem, month_stem, day_stem, hour_stem: String (천간)
-│   ├── year_branch, month_branch, day_branch, hour_branch: String (지지)
-│   ├── five_elements: Object ({木:1, 火:2, 土:1, 金:2, 水:2} 등)
-│   ├── birth_time: String (시간, e.g., "14:30")
-│   ├── birth_date: String (생년월일, YYYY-MM-DD)
-│   └── solar_correction: Object (도시, 경도, UTC offset, 수정 시간 등)
-├── hiddenStems: Map (JSON, 지지별 지장간 저장)
+├── fullSajuData: Map<String, Object> (JSON, FastAPI 전체 응답 저장 - camelCase)
+│   ├── heavenlyStems: List<String> (e.g., ["庚", "丙", "己", "辛"] 年月日時)
+│   ├── earthlyBranches: List<String> (e.g., ["午", "戌", "未", "寅"] 年月日時)
+│   ├── fiveElements: Map<String, Integer> (e.g., {木:1, 火:2, 土:1, 金:2, 水:2})
+│   ├── yearPillar, monthPillar, dayPillar, hourPillar: String (e.g., "庚午", "丙戌")
+│   ├── birthTime: String (시간, HH:mm 형식, e.g., "14:30")
+│   ├── birthDate: String (생년월일, YYYY-MM-DD)
+│   └── solarCorrection: Map<String, Object> (도시, 경도, UTC offset, 수정 시간 등)
+├── hiddenStems: Map<String, List<String>> (JSON, 지지별 지장간 저장)
 │   ├── 구조: Map<String, List<String>>
 │   ├── 예: {"子": ["癸"], "丑": ["癸", "辛", "己"], "寅": ["甲", "丙", "戊"], ...}
 │   ├── 용도: TenGodCalculator와 함께 사용하여 더 정확한 오행 분포 계산
-├── tenGodDistribution: String (JSON, 십신 분포: {正官: 1, 偏官: 1, ...})
-├── careerFortune: String (JSON, 관운 분석: {favoredPeriod:"H1", confidenceScore:75, reasoning:"..."})
+├── tenGodDistribution: Map<String, Integer> (JSON, 십신 분포: {正官: 1, 偏官: 1, ...})
+├── careerFortune: Map<String, Object> (JSON, 관운 분석: {favoredPeriod:"H1", confidenceScore:75, reasoning:"..."})
 ├── fetchedAt: LocalDateTime
 
 CareerConsultation
