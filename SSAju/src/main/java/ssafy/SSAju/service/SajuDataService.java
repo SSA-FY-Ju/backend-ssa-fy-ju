@@ -1,5 +1,6 @@
 package ssafy.SSAju.service;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,7 +12,6 @@ import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Service
@@ -36,18 +36,15 @@ public class SajuDataService {
             throw new InvalidSajuDataException("태어난 시간이 필수입니다 (HH:mm 형식)");
         }
 
-        String birthDateTime = birthDate.format(DateTimeFormatter.ISO_DATE)
-                + " " + birthTime.format(DateTimeFormatter.ofPattern("HH:mm"));
-        log.info("FastAPI 사주 조회 시작: {}", birthDateTime);
 
-        return executeWithRetry(birthDateTime, 0);
+        return executeWithRetry(birthDate, birthTime, 0);
     }
 
-    private FastAPIResponse executeWithRetry(String birthDateTime, int attempt) {
+    private FastAPIResponse executeWithRetry(LocalDate birthDate, LocalTime birthTime, int attempt) {
         try {
             return fastApiWebClient.post()
-                    .uri("/saju/calculate")
-                    .bodyValue(new FastApiRequest(birthDateTime))
+                    .uri("/api/saju/calculate")
+                    .bodyValue(new FastApiRequest(birthDate, birthTime))
                     .retrieve()
                     .bodyToMono(FastAPIResponse.class)
                     .block();
@@ -61,14 +58,14 @@ public class SajuDataService {
                     Thread.currentThread().interrupt();
                     throw new FastAPITimeoutException("FastAPI 호출 중 스레드 중단됨", ie);
                 }
-                return executeWithRetry(birthDateTime, attempt + 1);
+                return executeWithRetry(birthDate, birthTime, attempt + 1);
             }
 
             if (isTimeout(e)) {
                 throw new FastAPITimeoutException(
                         "FastAPI 요청 시간 초과 (" + (maxRetries + 1) + "회 시도)", e);
             }
-            log.error("FastAPI 호출 실패: {}", birthDateTime, e);
+            log.error("FastAPI 호출 실패: {} {}", birthDate, birthTime, e);
             throw new FastAPITimeoutException("FastAPI 호출 실패", e);
         }
     }
@@ -79,6 +76,10 @@ public class SajuDataService {
         return msg != null && (msg.contains("timeout") || msg.contains("Timeout") || msg.contains("timed out"));
     }
 
-    private record FastApiRequest(String birthDateTime) {
+    private record FastApiRequest(@JsonFormat(pattern = "yyyy-MM-dd")
+                                  LocalDate birthDate,
+
+                                  @JsonFormat(pattern = "HH:mm") // :ss를 빼서 5글자(HH:mm)로 고정!
+                                  LocalTime birthTime) {
     }
 }

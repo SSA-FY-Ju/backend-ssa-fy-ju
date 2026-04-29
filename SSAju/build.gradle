@@ -30,7 +30,6 @@ dependencyManagement {
 }
 
 dependencies {
-
 	runtimeOnly "io.netty:netty-resolver-dns-native-macos:4.2.12.Final:osx-aarch_64"
 
 	// Web

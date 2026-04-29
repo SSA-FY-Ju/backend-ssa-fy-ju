@@ -4,8 +4,9 @@ import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import ssafy.SSAju.career.converter.IntegerMapConverter;
+import ssafy.SSAju.career.converter.ObjectMapConverter;
+import ssafy.SSAju.career.converter.StringListMapConverter;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,19 +26,19 @@ public class SajuResult {
     @JoinColumn(name = "user_profile_id", nullable = false)
     private UserProfile userProfile;
 
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = ObjectMapConverter.class)
     @Column(name = "full_saju_data", columnDefinition = "json")
     private Map<String, Object> fullSajuData;
 
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = StringListMapConverter.class)
     @Column(name = "hidden_stems", columnDefinition = "json")
     private Map<String, List<String>> hiddenStems;
 
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = IntegerMapConverter.class)
     @Column(name = "ten_god_distribution", columnDefinition = "json")
     private Map<String, Integer> tenGodDistribution;
 
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = ObjectMapConverter.class)
     @Column(name = "career_fortune", columnDefinition = "json")
     private Map<String, Object> careerFortune;
 
