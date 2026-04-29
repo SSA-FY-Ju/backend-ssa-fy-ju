@@ -11,6 +11,7 @@ import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
+import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.repository.SajuResultRepository;
@@ -39,7 +40,6 @@ class CareerFortuneServiceTest {
 
     private CareerFortuneService service;
 
-    // 순수 계산 로직은 실제 구현체 사용
     private final TenGodCalculator tenGodCalculator = new TenGodCalculator();
     private final HiddenStemCalculator hiddenStemCalculator = new HiddenStemCalculator();
     private final CareerFortuneAnalyzer careerFortuneAnalyzer = new CareerFortuneAnalyzer(tenGodCalculator);
@@ -47,7 +47,7 @@ class CareerFortuneServiceTest {
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 10, 10);
     private static final LocalTime BIRTH_TIME = LocalTime.of(14, 30);
 
-    // FastAPI가 camelCase로 응답하는 정상 케이스 (heavenlyStems, earthlyBranches 등)
+    // 일간: 己(土, 陰) / 월지: 戌 → H2 판정 / confidenceScore: 62
     private static final FastAPIResponse VALID_FASTAPI_RESPONSE = new FastAPIResponse(
             List.of("庚", "甲", "己", "丁"),
             List.of("午", "戌", "未", "寅"),
@@ -68,7 +68,7 @@ class CareerFortuneServiceTest {
     // ─────────────────────────────────────────
 
     @Test
-    @DisplayName("신규 사용자 → UserProfile 생성 후 SajuResult 저장, H1/H2 반환")
+    @DisplayName("신규 사용자 → UserProfile 생성 후 SajuResult 저장, H2 반환")
     void shouldCreateProfileAndSaveResult_WhenNewUser() {
         // Given
         var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
@@ -82,10 +82,10 @@ class CareerFortuneServiceTest {
         // When
         var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
 
-        // Then
-        assertThat(result.favoredPeriod()).isIn("H1", "H2");
-        assertThat(result.confidenceScore()).isBetween(0, 100);
-        assertThat(result.reasoning()).isNotBlank();
+        // Then — 고정 입력에 대한 구체적 기대값 (己 일간, 戌 월지 → H2)
+        assertThat(result.favoredPeriod()).isEqualTo("H2");
+        assertThat(result.confidenceScore()).isEqualTo(62);
+        assertThat(result.reasoning()).contains("하반기");
         verify(userProfileRepository).save(any(UserProfile.class));
         verify(sajuResultRepository).save(any());
     }
@@ -104,9 +104,40 @@ class CareerFortuneServiceTest {
         // When
         service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
 
-        // Then - UserProfile.save는 호출되지 않아야 함
+        // Then
         verify(userProfileRepository, never()).save(any(UserProfile.class));
         verify(sajuResultRepository).save(any());
+    }
+
+    // ─────────────────────────────────────────
+    // H1 판정 케이스 — 월지가 H1 유리 지지인 경우
+    // ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("월지가 子(H1 유리 지지) + 관성 양수 → H1 반환")
+    void shouldReturnH1_WhenMonthBranchFavorH1() {
+        // Given — 일간: 己, 월지: 子 → H1 유리 지지, officerScore 양수면 H1
+        // 천간: 己(일간), 甲(정관), 己(일간반복), 丁(편인) → 정관 있음 → score 양수
+        var h1Response = new FastAPIResponse(
+                List.of("甲", "甲", "己", "丁"),  // 정관 2개
+                List.of("午", "子", "未", "寅"),   // 월지 子 → H1 유리
+                Map.of("木", 2, "火", 1, "土", 1, "金", 0, "水", 1),
+                "甲午", "甲子", "己未", "丁寅",
+                "14:30", "1990-10-10", null
+        );
+        var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
+                .willReturn(Optional.empty());
+        given(userProfileRepository.save(any())).willReturn(savedProfile);
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(h1Response);
+        given(sajuResultRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+
+        // When
+        var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
+
+        // Then
+        assertThat(result.favoredPeriod()).isEqualTo("H1");
+        assertThat(result.reasoning()).contains("상반기");
     }
 
     // ─────────────────────────────────────────
@@ -116,7 +147,7 @@ class CareerFortuneServiceTest {
     @Test
     @DisplayName("FastAPI 응답의 heavenlyStems가 4개 미만 → InvalidSajuDataException")
     void shouldThrow_WhenHeavenlyStems_LessThanFour() {
-        // Given - 3개 천간 (비정상 응답)
+        // Given
         var badResponse = new FastAPIResponse(
                 List.of("庚", "甲", "己"),
                 List.of("午", "戌", "未", "寅"),
@@ -137,7 +168,7 @@ class CareerFortuneServiceTest {
     @Test
     @DisplayName("FastAPI 응답의 earthlyBranches가 4개 미만 → InvalidSajuDataException")
     void shouldThrow_WhenEarthlyBranches_LessThanFour() {
-        // Given - 3개 지지 (비정상 응답)
+        // Given
         var badResponse = new FastAPIResponse(
                 List.of("庚", "甲", "己", "丁"),
                 List.of("午", "戌", "未"),
@@ -155,6 +186,10 @@ class CareerFortuneServiceTest {
                 .hasMessageContaining("지지");
     }
 
+    // ─────────────────────────────────────────
+    // 외부 API 예외 전파
+    // ─────────────────────────────────────────
+
     @Test
     @DisplayName("FastAPI 타임아웃 → FastAPITimeoutException 전파")
     void shouldPropagate_FastAPITimeoutException() {
@@ -170,5 +205,22 @@ class CareerFortuneServiceTest {
         assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME))
                 .isInstanceOf(FastAPITimeoutException.class)
                 .hasMessageContaining("시간 초과");
+    }
+
+    @Test
+    @DisplayName("FastAPI 일반 오류(4xx/5xx) → ExternalApiException 전파")
+    void shouldPropagate_ExternalApiException() {
+        // Given — 타임아웃이 아닌 일반 API 오류
+        var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
+                .willReturn(Optional.empty());
+        given(userProfileRepository.save(any())).willReturn(savedProfile);
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
+                .willThrow(new ExternalApiException("FastAPI 호출 실패"));
+
+        // When & Then
+        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME))
+                .isInstanceOf(ExternalApiException.class)
+                .isNotInstanceOf(FastAPITimeoutException.class);
     }
 }

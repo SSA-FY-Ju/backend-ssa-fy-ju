@@ -25,7 +25,7 @@ public class CareerTimingController {
     public ResponseEntity<ApiResponse<CareerTimingResponse>> getCareerTiming(
             @Valid @RequestBody CareerTimingRequest request
     ) {
-        log.info("관운 분석 요청: {} {}", request.birthDate(), request.birthTime());
+        log.info("관운 분석 요청 수신");
         CareerTimingResponse response = careerFortuneService.analyzeCareerTiming(
                 request.birthDate(), request.birthTime());
         return ResponseEntity.ok(ApiResponse.success(response));

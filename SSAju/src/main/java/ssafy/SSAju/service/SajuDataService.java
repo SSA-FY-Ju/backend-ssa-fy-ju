@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import ssafy.SSAju.dto.external.FastAPIResponse;
+import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
@@ -65,8 +66,8 @@ public class SajuDataService {
                 throw new FastAPITimeoutException(
                         "FastAPI 요청 시간 초과 (" + (maxRetries + 1) + "회 시도)", e);
             }
-            log.error("FastAPI 호출 실패: {} {}", birthDate, birthTime, e);
-            throw new FastAPITimeoutException("FastAPI 호출 실패", e);
+            log.error("FastAPI 호출 실패", e);
+            throw new ExternalApiException("FastAPI 호출 실패", e);
         }
     }
 

@@ -1,6 +1,7 @@
 # Local configuration
 SSAju/src/main/resources/application-local.yaml
 .env
+*.properties
 
 # IDE
 .idea/

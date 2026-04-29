@@ -13,7 +13,7 @@ spring:
 
   ai:
     openai:
-      api-key: test-key
+      api-key: ${OPENAI_API_KEY:test-key}
 
 saju:
   fastapi:
@@ -27,6 +27,6 @@ saju:
 
   public-data:
     url: http://localhost:9000
-    api-key: test-key
+    api-key: ${PUBLIC_DATA_API_KEY:test-key}
     timeout-seconds: 5
     max-retries: 1
