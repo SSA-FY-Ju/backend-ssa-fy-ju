@@ -1,81 +1,92 @@
 package ssafy.SSAju.controller;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import ssafy.SSAju.dto.request.CareerTimingRequest;
-import ssafy.SSAju.exception.FastAPITimeoutException;
-import ssafy.SSAju.exception.InvalidSajuDataException;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import ssafy.SSAju.dto.response.CareerTimingResponse;
+import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
+import ssafy.SSAju.service.CareerFortuneService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@DisplayName("CareerTimingController 유효성 검증 테스트")
+@ExtendWith(MockitoExtension.class)
+@DisplayName("CareerTimingController HTTP 레이어 테스트")
 class CareerTimingControllerTest {
 
-    @Test
-    @DisplayName("유효한 birthDate + birthTime으로 DTO 생성 성공")
-    void shouldCreateValidRequest() {
-        // Given
-        LocalDate birthDate = LocalDate.of(1990, 10, 10);
-        LocalTime birthTime = LocalTime.of(14, 30);
+    @Mock
+    private CareerFortuneService careerFortuneService;
 
-        // When
-        CareerTimingRequest request = new CareerTimingRequest(birthDate, birthTime);
+    private MockMvc mockMvc;
 
-        // Then
-        assertThat(request.birthDate()).isEqualTo(birthDate);
-        assertThat(request.birthTime()).isEqualTo(birthTime);
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders
+                .standaloneSetup(new CareerTimingController(careerFortuneService))
+                .setControllerAdvice(new SajuGlobalExceptionHandler())
+                .build();
     }
 
     @Test
-    @DisplayName("null birthTime → InvalidSajuDataException 발생")
-    void shouldFailWhenBirthTimeIsNull() {
-        // Given
-        LocalTime birthTime = null;
+    @DisplayName("유효한 birthDate + birthTime → 200 OK + H1/H2 응답")
+    void shouldReturn200_WhenValidRequest() throws Exception {
+        given(careerFortuneService.analyzeCareerTiming(any(LocalDate.class), any(LocalTime.class)))
+                .willReturn(new CareerTimingResponse("H1", 75, "상반기가 취업에 유리합니다."));
 
-        // When & Then
-        assertThatThrownBy(() -> {
-            if (birthTime == null)
-                throw new InvalidSajuDataException("태어난 시간은 필수입니다 (HH:mm 형식)");
-        }).isInstanceOf(InvalidSajuDataException.class)
-                .hasMessageContaining("HH:mm");
+        mockMvc.perform(post("/api/career/timing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"birthDate": "1990-10-10", "birthTime": "14:30"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.favoredPeriod").value("H1"))
+                .andExpect(jsonPath("$.data.confidenceScore").value(75))
+                .andExpect(jsonPath("$.data.reasoning").isNotEmpty());
     }
 
     @Test
-    @DisplayName("null birthDate → InvalidSajuDataException 발생")
-    void shouldFailWhenBirthDateIsNull() {
-        // Given
-        LocalDate birthDate = null;
-
-        // When & Then
-        assertThatThrownBy(() -> {
-            if (birthDate == null)
-                throw new InvalidSajuDataException("생년월일은 필수입니다 (YYYY-MM-DD 형식)");
-        }).isInstanceOf(InvalidSajuDataException.class)
-                .hasMessageContaining("YYYY-MM-DD");
+    @DisplayName("birthDate 누락 → 400 Bad Request")
+    void shouldReturn400_WhenBirthDateMissing() throws Exception {
+        mockMvc.perform(post("/api/career/timing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"birthTime": "14:30"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test
-    @DisplayName("FastAPI 타임아웃 → FastAPITimeoutException 발생")
-    void shouldPropagateTimeoutException() {
-        // When & Then
-        assertThatThrownBy(() -> {
-            throw new FastAPITimeoutException("FastAPI 요청 시간 초과");
-        }).isInstanceOf(FastAPITimeoutException.class)
-                .hasMessageContaining("시간 초과");
+    @DisplayName("birthTime 누락 → 400 Bad Request")
+    void shouldReturn400_WhenBirthTimeMissing() throws Exception {
+        mockMvc.perform(post("/api/career/timing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"birthDate": "1990-10-10"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test
-    @DisplayName("record 동등성 - 같은 값이면 동일 객체")
-    void shouldBeEqualWhenSameValues() {
-        // Given
-        var r1 = new CareerTimingRequest(LocalDate.of(1990, 1, 1), LocalTime.of(12, 0));
-        var r2 = new CareerTimingRequest(LocalDate.of(1990, 1, 1), LocalTime.of(12, 0));
-
-        // Then
-        assertThat(r1).isEqualTo(r2);
-        assertThat(r1.hashCode()).isEqualTo(r2.hashCode());
+    @DisplayName("빈 바디 → 400 Bad Request")
+    void shouldReturn400_WhenEmptyBody() throws Exception {
+        mockMvc.perform(post("/api/career/timing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
     }
 }

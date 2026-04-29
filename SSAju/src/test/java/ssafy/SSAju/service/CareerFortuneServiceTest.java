@@ -1,141 +1,174 @@
 package ssafy.SSAju.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.TenGodCalculator;
+import ssafy.SSAju.dto.external.FastAPIResponse;
+import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
+import ssafy.SSAju.repository.SajuResultRepository;
+import ssafy.SSAju.repository.UserProfileRepository;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
-@SpringBootTest
+@ExtendWith(MockitoExtension.class)
 @DisplayName("CareerFortuneService 단위 테스트")
 class CareerFortuneServiceTest {
 
-    @Autowired
-    private TenGodCalculator tenGodCalculator;
+    @Mock private SajuDataService sajuDataService;
+    @Mock private UserProfileRepository userProfileRepository;
+    @Mock private SajuResultRepository sajuResultRepository;
 
-    @Autowired
-    private HiddenStemCalculator hiddenStemCalculator;
+    private CareerFortuneService service;
 
-    @Autowired
-    private CareerFortuneAnalyzer careerFortuneAnalyzer;
+    // 순수 계산 로직은 실제 구현체 사용
+    private final TenGodCalculator tenGodCalculator = new TenGodCalculator();
+    private final HiddenStemCalculator hiddenStemCalculator = new HiddenStemCalculator();
+    private final CareerFortuneAnalyzer careerFortuneAnalyzer = new CareerFortuneAnalyzer(tenGodCalculator);
 
-    // ─────────────────────────────────────────
-    // SajuDataService 예외 검증 (로직 수준)
-    // ─────────────────────────────────────────
+    private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 10, 10);
+    private static final LocalTime BIRTH_TIME = LocalTime.of(14, 30);
 
-    @Test
-    @DisplayName("null birthTime → InvalidSajuDataException")
-    void shouldThrowWhenBirthTimeIsNull() {
-        // Given
-        LocalDate birthDate = LocalDate.of(1990, 10, 10);
-        LocalTime birthTime = null;
+    // FastAPI가 camelCase로 응답하는 정상 케이스 (heavenlyStems, earthlyBranches 등)
+    private static final FastAPIResponse VALID_FASTAPI_RESPONSE = new FastAPIResponse(
+            List.of("庚", "甲", "己", "丁"),
+            List.of("午", "戌", "未", "寅"),
+            Map.of("木", 1, "火", 2, "土", 2, "金", 2, "水", 1),
+            "庚午", "甲戌", "己未", "丁寅",
+            "14:30", "1990-10-10", null
+    );
 
-        // When & Then
-        assertThatThrownBy(() -> {
-            if (birthTime == null) throw new InvalidSajuDataException("태어난 시간이 필수입니다 (HH:mm 형식)");
-        }).isInstanceOf(InvalidSajuDataException.class)
-                .hasMessageContaining("시간");
-    }
-
-    @Test
-    @DisplayName("null birthDate → InvalidSajuDataException")
-    void shouldThrowWhenBirthDateIsNull() {
-        // Given
-        LocalDate birthDate = null;
-        LocalTime birthTime = LocalTime.of(14, 30);
-
-        // When & Then
-        assertThatThrownBy(() -> {
-            if (birthDate == null) throw new InvalidSajuDataException("생년월일이 필수입니다");
-        }).isInstanceOf(InvalidSajuDataException.class)
-                .hasMessageContaining("생년월일");
+    @BeforeEach
+    void setUp() {
+        service = new CareerFortuneService(
+                sajuDataService, userProfileRepository, sajuResultRepository,
+                tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer);
     }
 
     // ─────────────────────────────────────────
-    // TenGodCalculator 동작 검증
+    // 정상 플로우
     // ─────────────────────────────────────────
 
     @Test
-    @DisplayName("TenGodCalculator - 유효한 천간 4개로 십신 계산 성공")
-    void shouldCalculateTenGodWithValidStems() {
-        // Given - 庚(년), 甲(월), 己(일/일간), 丁(시)
-        var heavenlyStems = List.of("庚", "甲", "己", "丁");
+    @DisplayName("신규 사용자 → UserProfile 생성 후 SajuResult 저장, H1/H2 반환")
+    void shouldCreateProfileAndSaveResult_WhenNewUser() {
+        // Given
+        var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
+                .willReturn(Optional.empty());
+        given(userProfileRepository.save(any(UserProfile.class))).willReturn(savedProfile);
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
+                .willReturn(VALID_FASTAPI_RESPONSE);
+        given(sajuResultRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
         // When
-        var result = tenGodCalculator.calculate(heavenlyStems);
+        var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
 
         // Then
-        assertThat(result).isNotNull().isNotEmpty();
+        assertThat(result.favoredPeriod()).isIn("H1", "H2");
+        assertThat(result.confidenceScore()).isBetween(0, 100);
+        assertThat(result.reasoning()).isNotBlank();
+        verify(userProfileRepository).save(any(UserProfile.class));
+        verify(sajuResultRepository).save(any());
     }
 
     @Test
-    @DisplayName("TenGodCalculator - 천간 3개로 계산 시 IllegalArgumentException")
-    void shouldThrowWhenStemsCountIsWrong() {
+    @DisplayName("기존 사용자 → UserProfile 재사용, 신규 저장 없음")
+    void shouldReuseExistingProfile_WhenUserExists() {
         // Given
-        var wrongStems = List.of("庚", "甲", "己"); // 3개 (4개여야 함)
-
-        // When & Then
-        assertThatThrownBy(() -> tenGodCalculator.calculate(wrongStems))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    // ─────────────────────────────────────────
-    // HiddenStemCalculator 동작 검증
-    // ─────────────────────────────────────────
-
-    @Test
-    @DisplayName("HiddenStemCalculator - 유효한 지지 4개로 지장간 계산 성공")
-    void shouldCalculateHiddenStemsWithValidBranches() {
-        // Given - 午(년), 戌(월), 未(일), 寅(시)
-        var earthlyBranches = List.of("午", "戌", "未", "寅");
+        var existingProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
+                .willReturn(Optional.of(existingProfile));
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
+                .willReturn(VALID_FASTAPI_RESPONSE);
+        given(sajuResultRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
         // When
-        var result = hiddenStemCalculator.calculate(earthlyBranches);
+        service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
 
-        // Then
-        assertThat(result).isNotNull().hasSize(4);
-        assertThat(result.get("午")).containsExactly("丁", "己");
+        // Then - UserProfile.save는 호출되지 않아야 함
+        verify(userProfileRepository, never()).save(any(UserProfile.class));
+        verify(sajuResultRepository).save(any());
     }
 
+    // ─────────────────────────────────────────
+    // FastAPI 응답 데이터 검증
+    // ─────────────────────────────────────────
+
     @Test
-    @DisplayName("HiddenStemCalculator - 지지 3개로 계산 시 IllegalArgumentException")
-    void shouldThrowWhenBranchesCountIsWrong() {
-        // Given
-        var wrongBranches = List.of("午", "戌", "未"); // 3개
+    @DisplayName("FastAPI 응답의 heavenlyStems가 4개 미만 → InvalidSajuDataException")
+    void shouldThrow_WhenHeavenlyStems_LessThanFour() {
+        // Given - 3개 천간 (비정상 응답)
+        var badResponse = new FastAPIResponse(
+                List.of("庚", "甲", "己"),
+                List.of("午", "戌", "未", "寅"),
+                null, null, null, null, null, null, null, null
+        );
+        var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
+                .willReturn(Optional.empty());
+        given(userProfileRepository.save(any())).willReturn(savedProfile);
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(badResponse);
 
         // When & Then
-        assertThatThrownBy(() -> hiddenStemCalculator.calculate(wrongBranches))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME))
+                .isInstanceOf(InvalidSajuDataException.class)
+                .hasMessageContaining("천간");
     }
 
-    // ─────────────────────────────────────────
-    // CareerFortuneAnalyzer 동작 검증
-    // ─────────────────────────────────────────
+    @Test
+    @DisplayName("FastAPI 응답의 earthlyBranches가 4개 미만 → InvalidSajuDataException")
+    void shouldThrow_WhenEarthlyBranches_LessThanFour() {
+        // Given - 3개 지지 (비정상 응답)
+        var badResponse = new FastAPIResponse(
+                List.of("庚", "甲", "己", "丁"),
+                List.of("午", "戌", "未"),
+                null, null, null, null, null, null, null, null
+        );
+        var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
+                .willReturn(Optional.empty());
+        given(userProfileRepository.save(any())).willReturn(savedProfile);
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(badResponse);
+
+        // When & Then
+        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME))
+                .isInstanceOf(InvalidSajuDataException.class)
+                .hasMessageContaining("지지");
+    }
 
     @Test
-    @DisplayName("CareerFortuneAnalyzer - H1 또는 H2 판정 정상 반환")
-    void shouldReturnH1OrH2() {
+    @DisplayName("FastAPI 타임아웃 → FastAPITimeoutException 전파")
+    void shouldPropagate_FastAPITimeoutException() {
         // Given
-        var heavenlyStems = List.of("庚", "甲", "己", "丁");
-        var earthlyBranches = List.of("午", "戌", "未", "寅");
-        var tenGodDistribution = tenGodCalculator.calculate(heavenlyStems);
-        var hiddenStems = hiddenStemCalculator.calculate(earthlyBranches);
-        String dayMaster = heavenlyStems.get(2); // 己
+        var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
+                .willReturn(Optional.empty());
+        given(userProfileRepository.save(any())).willReturn(savedProfile);
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
+                .willThrow(new FastAPITimeoutException("FastAPI 요청 시간 초과"));
 
-        // When
-        String result = careerFortuneAnalyzer.analyzeFavoredPeriod(
-                tenGodDistribution, hiddenStems, dayMaster, earthlyBranches);
-
-        // Then
-        assertThat(result).isIn("H1", "H2");
+        // When & Then
+        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME))
+                .isInstanceOf(FastAPITimeoutException.class)
+                .hasMessageContaining("시간 초과");
     }
 }
