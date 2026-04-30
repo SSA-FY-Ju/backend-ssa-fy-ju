@@ -4,6 +4,7 @@ import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import ssafy.SSAju.exception.DataAccessException;
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -29,7 +30,11 @@ public class StringListMapConverter implements AttributeConverter<Map<String, Li
     public Map<String, List<String>> convertToEntityAttribute(String dbData) {
         if (dbData == null) return null;
         try {
-            return MAPPER.readValue(dbData, TYPE_REF);
+            JsonNode node = MAPPER.readTree(dbData);
+            if (node.isTextual()) {
+                node = MAPPER.readTree(node.textValue());
+            }
+            return MAPPER.convertValue(node, TYPE_REF);
         } catch (Exception e) {
             throw new DataAccessException("JSON 역직렬화 실패 (Map<String,List<String>>)", e);
         }
