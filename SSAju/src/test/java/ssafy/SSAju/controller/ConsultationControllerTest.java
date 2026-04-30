@@ -10,7 +10,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ssafy.SSAju.dto.response.ConsultationResponse;
-import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
 import ssafy.SSAju.service.ConsultationService;
@@ -43,12 +42,7 @@ class ConsultationControllerTest {
     private static final String VALID_REQUEST_BODY = """
             {
               "birthDate": "1990-10-10",
-              "birthTime": "14:30",
-              "heavenlyStems": ["庚", "甲", "己", "丁"],
-              "earthlyBranches": ["午", "戌", "未", "寅"],
-              "fiveElements": {"木": 1, "火": 2, "土": 2, "金": 2, "水": 1},
-              "hiddenStems": {"午": ["丁", "己"], "戌": ["戊", "辛", "丁"]},
-              "tenGodDistribution": {"정관": 1, "편관": 1}
+              "birthTime": "14:30"
             }
             """;
 
@@ -91,31 +85,7 @@ class ConsultationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "birthDate": "1990-10-10",
-                                  "heavenlyStems": ["庚", "甲", "己", "丁"],
-                                  "earthlyBranches": ["午", "戌", "未", "寅"],
-                                  "fiveElements": {"木": 1},
-                                  "hiddenStems": {},
-                                  "tenGodDistribution": {}
-                                }
-                                """))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("heavenlyStems 4개 미만 → 400 Bad Request")
-    void shouldReturn400_WhenHeavenlyStems_LessThanFour() throws Exception {
-        mockMvc.perform(post("/api/career/consultation")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "birthDate": "1990-10-10",
-                                  "birthTime": "14:30",
-                                  "heavenlyStems": ["庚", "甲", "己"],
-                                  "earthlyBranches": ["午", "戌", "未", "寅"],
-                                  "fiveElements": {"木": 1},
-                                  "hiddenStems": {},
-                                  "tenGodDistribution": {}
+                                  "birthDate": "1990-10-10"
                                 }
                                 """))
                 .andExpect(status().isBadRequest());
@@ -133,18 +103,6 @@ class ConsultationControllerTest {
     // ─────────────────────────────────────────
     // 서비스 예외 전파
     // ─────────────────────────────────────────
-
-    @Test
-    @DisplayName("관운 분석 이력 없음 → 400 Bad Request")
-    void shouldReturn400_WhenSajuResultNotFound() throws Exception {
-        given(consultationService.getCareerConsultation(any()))
-                .willThrow(new InvalidSajuDataException("관운 분석을 먼저 진행해주세요"));
-
-        mockMvc.perform(post("/api/career/consultation")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(VALID_REQUEST_BODY))
-                .andExpect(status().isBadRequest());
-    }
 
     @Test
     @DisplayName("OpenAI 타임아웃 → 504 Gateway Timeout")

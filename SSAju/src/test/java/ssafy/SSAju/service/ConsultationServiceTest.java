@@ -9,10 +9,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.util.HiddenStemCalculator;
+import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
+import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.ConsultationRequest;
 import ssafy.SSAju.dto.response.ConsultationResponse;
-import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
@@ -36,6 +38,9 @@ import static org.mockito.Mockito.verify;
 class ConsultationServiceTest {
 
     @Mock private ChatClient chatClient;
+    @Mock private SajuDataService sajuDataService;
+    @Mock private TenGodCalculator tenGodCalculator;
+    @Mock private HiddenStemCalculator hiddenStemCalculator;
     @Mock private UserProfileRepository userProfileRepository;
     @Mock private SajuResultRepository sajuResultRepository;
     @Mock private CareerConsultationRepository careerConsultationRepository;
@@ -45,21 +50,24 @@ class ConsultationServiceTest {
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 10, 10);
     private static final LocalTime BIRTH_TIME = LocalTime.of(14, 30);
 
-    private static final ConsultationRequest VALID_REQUEST = new ConsultationRequest(
-            BIRTH_DATE,
-            BIRTH_TIME,
+    private static final ConsultationRequest VALID_REQUEST = new ConsultationRequest(BIRTH_DATE, BIRTH_TIME);
+
+    private static final FastAPIResponse MOCK_SAJU = new FastAPIResponse(
             List.of("庚", "甲", "己", "丁"),
             List.of("午", "戌", "未", "寅"),
             Map.of("木", 1, "火", 2, "土", 2, "金", 2, "水", 1),
-            Map.of("午", List.of("丁", "己"), "戌", List.of("戊", "辛", "丁")),
-            Map.of("정관", 1, "편관", 1)
+            "庚午", "甲戌", "己未", "丁寅",
+            "14:30", "1990-10-10", Map.of()
     );
 
+    private static final Map<String, Integer> TEN_GOD = Map.of("정관", 1, "편관", 1);
+    private static final Map<String, List<String>> HIDDEN_STEMS =
+            Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
+                   "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊"));
+
     private static final CareerAdviceResponse MOCK_ADVICE = new CareerAdviceResponse(
-            List.of(
-                    Map.of("name", "금융/핀테크", "reason", "오행 金 강세로 재무 분야 적합"),
-                    Map.of("name", "IT/소프트웨어", "reason", "논리력 강함")
-            ),
+            List.of(Map.of("name", "금융/핀테크", "reason", "오행 金 강세로 재무 분야 적합"),
+                    Map.of("name", "IT/소프트웨어", "reason", "논리력 강함")),
             List.of("일관성 있는 자기소개 준비", "데이터 기반 성과 사례 강조"),
             List.of("분석력과 논리성", "책임감 있는 업무 추진")
     );
@@ -67,8 +75,8 @@ class ConsultationServiceTest {
     @BeforeEach
     void setUp() {
         service = new ConsultationService(
-                chatClient, userProfileRepository, sajuResultRepository, careerConsultationRepository);
-        // modelVersion 필드는 @Value로 주입되므로 리플렉션으로 직접 설정
+                chatClient, sajuDataService, tenGodCalculator, hiddenStemCalculator,
+                userProfileRepository, sajuResultRepository, careerConsultationRepository);
         try {
             var field = ConsultationService.class.getDeclaredField("modelVersion");
             field.setAccessible(true);
@@ -79,22 +87,23 @@ class ConsultationServiceTest {
     }
 
     // ─────────────────────────────────────────
-    // 정상 플로우
+    // 정상 플로우 — SajuResult 기존 존재
     // ─────────────────────────────────────────
 
     @Test
-    @DisplayName("유효한 요청 → 컨설팅 결과 반환 및 DB 저장")
-    void shouldReturnConsultation_WhenValidRequest() {
-        // Given
+    @DisplayName("유효한 요청 + SajuResult 존재 → 컨설팅 결과 반환 및 DB 저장")
+    void shouldReturnConsultation_WhenSajuResultExists() {
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         var sajuResult = mock(SajuResult.class);
 
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
+        given(tenGodCalculator.calculate(MOCK_SAJU.heavenlyStems())).willReturn(TEN_GOD);
+        given(hiddenStemCalculator.calculate(MOCK_SAJU.earthlyBranches())).willReturn(HIDDEN_STEMS);
         given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(Optional.of(userProfile));
-        given(sajuResultRepository.findByUserProfile(userProfile))
-                .willReturn(Optional.of(sajuResult));
+        given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));
+        given(careerConsultationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
-        // ChatClient 체인 모킹
         var promptSpec = mock(ChatClient.ChatClientRequestSpec.class);
         var callSpec = mock(ChatClient.CallResponseSpec.class);
         given(chatClient.prompt()).willReturn(promptSpec);
@@ -102,12 +111,8 @@ class ConsultationServiceTest {
         given(promptSpec.call()).willReturn(callSpec);
         given(callSpec.entity(CareerAdviceResponse.class)).willReturn(MOCK_ADVICE);
 
-        given(careerConsultationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
-
-        // When
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST);
 
-        // Then
         assertThat(result.industries()).hasSize(2);
         assertThat(result.interviewTips()).hasSize(2);
         assertThat(result.strengths()).hasSize(2);
@@ -116,40 +121,36 @@ class ConsultationServiceTest {
     }
 
     // ─────────────────────────────────────────
-    // UserProfile 없을 때
+    // 정상 플로우 — SajuResult 신규 생성
     // ─────────────────────────────────────────
 
     @Test
-    @DisplayName("관운 분석 이력 없음 → InvalidSajuDataException")
-    void shouldThrow_WhenUserProfileNotFound() {
-        // Given
-        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
-                .willReturn(Optional.empty());
-
-        // When & Then
-        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
-                .isInstanceOf(InvalidSajuDataException.class)
-                .hasMessageContaining("관운 분석");
-    }
-
-    // ─────────────────────────────────────────
-    // SajuResult 없을 때
-    // ─────────────────────────────────────────
-
-    @Test
-    @DisplayName("SajuResult 없음 → InvalidSajuDataException")
-    void shouldThrow_WhenSajuResultNotFound() {
-        // Given
+    @DisplayName("유효한 요청 + SajuResult 없음 → 신규 SajuResult 생성 후 컨설팅 반환")
+    void shouldReturnConsultation_WhenSajuResultCreated() {
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        var sajuResult = mock(SajuResult.class);
+
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
+        given(tenGodCalculator.calculate(MOCK_SAJU.heavenlyStems())).willReturn(TEN_GOD);
+        given(hiddenStemCalculator.calculate(MOCK_SAJU.earthlyBranches())).willReturn(HIDDEN_STEMS);
         given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(Optional.of(userProfile));
-        given(sajuResultRepository.findByUserProfile(userProfile))
-                .willReturn(Optional.empty());
+        given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.empty());
+        given(sajuResultRepository.save(any())).willReturn(sajuResult);
+        given(careerConsultationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
-        // When & Then
-        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
-                .isInstanceOf(InvalidSajuDataException.class)
-                .hasMessageContaining("관운 분석");
+        var promptSpec = mock(ChatClient.ChatClientRequestSpec.class);
+        var callSpec = mock(ChatClient.CallResponseSpec.class);
+        given(chatClient.prompt()).willReturn(promptSpec);
+        given(promptSpec.user(any(String.class))).willReturn(promptSpec);
+        given(promptSpec.call()).willReturn(callSpec);
+        given(callSpec.entity(CareerAdviceResponse.class)).willReturn(MOCK_ADVICE);
+
+        ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST);
+
+        assertThat(result.openaiModelVersion()).isEqualTo("gpt-4o-mini");
+        verify(sajuResultRepository).save(any());
+        verify(careerConsultationRepository).save(any());
     }
 
     // ─────────────────────────────────────────
@@ -159,14 +160,15 @@ class ConsultationServiceTest {
     @Test
     @DisplayName("OpenAI API 호출 실패 → OpenAIApiException")
     void shouldThrow_WhenOpenAIFails() {
-        // Given
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         var sajuResult = mock(SajuResult.class);
 
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
+        given(tenGodCalculator.calculate(any())).willReturn(TEN_GOD);
+        given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
         given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(Optional.of(userProfile));
-        given(sajuResultRepository.findByUserProfile(userProfile))
-                .willReturn(Optional.of(sajuResult));
+        given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));
 
         var promptSpec = mock(ChatClient.ChatClientRequestSpec.class);
         var callSpec = mock(ChatClient.CallResponseSpec.class);
@@ -176,7 +178,6 @@ class ConsultationServiceTest {
         given(callSpec.entity(CareerAdviceResponse.class))
                 .willThrow(new RuntimeException("OpenAI connection failed"));
 
-        // When & Then
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("OpenAI API 호출 실패");
@@ -189,14 +190,15 @@ class ConsultationServiceTest {
     @Test
     @DisplayName("OpenAI 응답 null → OpenAIApiException")
     void shouldThrow_WhenOpenAIReturnsNull() {
-        // Given
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         var sajuResult = mock(SajuResult.class);
 
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
+        given(tenGodCalculator.calculate(any())).willReturn(TEN_GOD);
+        given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
         given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(Optional.of(userProfile));
-        given(sajuResultRepository.findByUserProfile(userProfile))
-                .willReturn(Optional.of(sajuResult));
+        given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));
 
         var promptSpec = mock(ChatClient.ChatClientRequestSpec.class);
         var callSpec = mock(ChatClient.CallResponseSpec.class);
@@ -205,7 +207,6 @@ class ConsultationServiceTest {
         given(promptSpec.call()).willReturn(callSpec);
         given(callSpec.entity(CareerAdviceResponse.class)).willReturn(null);
 
-        // When & Then
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("비어있습니다");
