@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.ErrorInfo;
 import ssafy.SSAju.exception.DataAccessException;
+import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.exception.OpenAIApiException;
@@ -61,6 +62,15 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo("COMPANY_NOT_FOUND",
                         "Company not found in public database. Please provide founding date.", generateRequestId())));
+    }
+
+    @ExceptionHandler(ExternalApiException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExternalApiException(
+            ExternalApiException e, HttpServletRequest request) {
+        log.error("외부 API 호출 실패: {}", e.getMessage(), e);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ApiResponse.failure(new ErrorInfo("EXTERNAL_API_ERROR",
+                        "External API call failed. Please try again later.", generateRequestId())));
     }
 
     @ExceptionHandler(DataAccessException.class)

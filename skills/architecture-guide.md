@@ -306,13 +306,26 @@ SSAju는 다음 3개 외부 API와 연동:
 ### 1. FastAPI (만세력 계산)
 
 ```
-요청: POST /saju/calculate
-입력: 생년월일시 (YYYY-MM-DD HH:mm)
-응답: {
-  heavenlyStems: ["庚", "丙", "己", "辛"],        // 4개 (年月日時)
-  earthlyBranches: ["午", "戌", "未", "未"],     // 4개 (年月日時)
-  fiveElements: {"木": 1, "火": 2, "土": 1, "金": 2, "水": 2}
+요청: POST /api/saju/calculate
+입력 형식: {
+  "birthDate": "1990-10-10",    // YYYY-MM-DD
+  "birthTime": "14:30"          // HH:mm (24시간 형식)
 }
+
+응답 형식 (camelCase):
+{
+  "heavenlyStems": ["庚", "丙", "己", "辛"],        // 4개 (年月日時)
+  "earthlyBranches": ["午", "戌", "未", "寅"],     // 4개 (年月日時)
+  "fiveElements": {"木": 1, "火": 2, "土": 1, "金": 2, "水": 2},
+  "yearPillar": "庚午",
+  "monthPillar": "丙戌",
+  "dayPillar": "己未",
+  "hourPillar": "辛寅",
+  "birthTime": "14:30",
+  "birthDate": "1990-10-10",
+  "solarCorrection": {...}
+}
+
 타임아웃: 3초
 재시도: 2회 (지수 백오프)
 

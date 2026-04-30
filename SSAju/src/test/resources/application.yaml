@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+    show-sql: false
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:test-key}
+
+saju:
+  fastapi:
+    url: http://localhost:8000
+    timeout-seconds: 3
+    max-retries: 2
+
+  openai:
+    timeout-seconds: 8
+    max-retries: 1
+
+  public-data:
+    url: http://localhost:9000
+    api-key: ${PUBLIC_DATA_API_KEY:test-key}
+    timeout-seconds: 5
+    max-retries: 1

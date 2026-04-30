@@ -30,6 +30,8 @@ dependencyManagement {
 }
 
 dependencies {
+	runtimeOnly "io.netty:netty-resolver-dns-native-macos:4.2.12.Final:osx-aarch_64"
+
 	// Web
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
@@ -57,6 +59,7 @@ dependencies {
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testRuntimeOnly 'com.h2database:h2'
 }
 
 tasks.named('test') {

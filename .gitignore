@@ -1,0 +1,25 @@
+# Local configuration
+SSAju/src/main/resources/application-local.yaml
+.env
+*.properties
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build
+target/
+build/
+.gradle/
+*.jar
+*.war
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+*.log
