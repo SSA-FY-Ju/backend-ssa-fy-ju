@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
@@ -12,12 +11,10 @@ import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
 import ssafy.SSAju.exception.InvalidSajuDataException;
-import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,7 +25,7 @@ public class CareerFortuneService {
 
     private final SajuDataService sajuDataService;
     private final UserProfileRepository userProfileRepository;
-    private final SajuResultRepository sajuResultRepository;
+    private final SajuResultWriteService sajuResultWriteService;
     private final TenGodCalculator tenGodCalculator;
     private final HiddenStemCalculator hiddenStemCalculator;
     private final CareerFortuneAnalyzer careerFortuneAnalyzer;
@@ -70,8 +67,13 @@ public class CareerFortuneService {
         String reasoning = buildReasoning(favoredPeriod, tenGodDistribution);
 
         // 트랜잭션 2 (수 ms): SajuResult upsert 후 커넥션 즉시 반납
-        upsertSajuResult(userProfile, sajuData, tenGodDistribution, hiddenStems,
-                favoredPeriod, confidenceScore, reasoning);
+        // DIVE = 동시 요청이 먼저 commit → rollback(delete 포함)되어 기존 결과 유지
+        try {
+            sajuResultWriteService.replaceForUserProfile(userProfile, sajuData,
+                    tenGodDistribution, hiddenStems, favoredPeriod, confidenceScore, reasoning);
+        } catch (DataIntegrityViolationException ex) {
+            log.warn("SajuResult 동시 insert 경합, 기존 결과 유지 (userProfileId={})", userProfile.getId());
+        }
 
         log.info("관운 분석 완료: userProfileId={}, result={}", userProfile.getId(), favoredPeriod);
         return new CareerTimingResponse(favoredPeriod, confidenceScore, reasoning);
@@ -101,45 +103,6 @@ public class CareerFortuneService {
                 });
     }
 
-    /**
-     * JPQL 직접 DELETE + INSERT 방식의 upsert.
-     * merge() 기반 update는 내부적으로 SELECT → AttributeConverter 역직렬화를 거치므로
-     * H2 json 타입 호환 문제를 피하기 위해 delete-then-insert 사용.
-     * 동시 요청 시 insert 충돌은 catch 후 무시 (선착순 결과 유지).
-     */
-    private void upsertSajuResult(
-            UserProfile userProfile,
-            FastAPIResponse sajuData,
-            Map<String, Integer> tenGodDistribution,
-            Map<String, List<String>> hiddenStems,
-            String favoredPeriod,
-            int confidenceScore,
-            String reasoning) {
-
-        Map<String, Object> careerFortune = new HashMap<>();
-        careerFortune.put("favoredPeriod", favoredPeriod);
-        careerFortune.put("confidenceScore", confidenceScore);
-        careerFortune.put("reasoning", reasoning);
-
-        // 기존 결과 삭제 (JPQL 직접 실행 → 엔티티 로드/converter 미경유)
-        sajuResultRepository.deleteByUserProfileJpql(userProfile);
-
-        SajuResult newResult = SajuResult.builder()
-                .userProfile(userProfile)
-                .fullSajuData(convertToObjectMap(sajuData))
-                .hiddenStems(hiddenStems)
-                .tenGodDistribution(tenGodDistribution)
-                .careerFortune(careerFortune)
-                .build();
-        try {
-            sajuResultRepository.save(newResult);
-        } catch (DataIntegrityViolationException ex) {
-            // delete → insert 사이에 다른 스레드가 먼저 insert한 경우 → 해당 결과 유지
-            log.warn("SajuResult 동시 insert 경합, 기존 결과 유지 (userProfileId={})",
-                    userProfile.getId());
-        }
-    }
-
     private int buildConfidenceScore(Map<String, Integer> tenGodDistribution) {
         int score = 60;
         score += (tenGodDistribution.getOrDefault("정관", 0)
@@ -157,19 +120,5 @@ public class CareerFortuneService {
         if (officerCount > 0) sb.append("관성이 강해 리더십 역할에 적합합니다. ");
         sb.append("십신·지장간 통합 분석 기준입니다.");
         return sb.toString();
-    }
-
-    private Map<String, Object> convertToObjectMap(FastAPIResponse r) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("heavenlyStems", r.heavenlyStems());
-        map.put("earthlyBranches", r.earthlyBranches());
-        map.put("fiveElements", r.fiveElements());
-        map.put("yearPillar", r.yearPillar());
-        map.put("monthPillar", r.monthPillar());
-        map.put("dayPillar", r.dayPillar());
-        map.put("hourPillar", r.hourPillar());
-        map.put("birthTime", r.birthTime());
-        map.put("birthDate", r.birthDate());
-        return map;
     }
 }

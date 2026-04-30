@@ -14,7 +14,6 @@ import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
-import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 
 import java.time.LocalDate;
@@ -26,6 +25,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -36,7 +36,7 @@ class CareerFortuneServiceTest {
 
     @Mock private SajuDataService sajuDataService;
     @Mock private UserProfileRepository userProfileRepository;
-    @Mock private SajuResultRepository sajuResultRepository;
+    @Mock private SajuResultWriteService sajuResultWriteService;
 
     private CareerFortuneService service;
 
@@ -59,7 +59,7 @@ class CareerFortuneServiceTest {
     @BeforeEach
     void setUp() {
         service = new CareerFortuneService(
-                sajuDataService, userProfileRepository, sajuResultRepository,
+                sajuDataService, userProfileRepository, sajuResultWriteService,
                 tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer);
     }
 
@@ -77,7 +77,6 @@ class CareerFortuneServiceTest {
         given(userProfileRepository.save(any(UserProfile.class))).willReturn(savedProfile);
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(VALID_FASTAPI_RESPONSE);
-        given(sajuResultRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
         // When
         var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
@@ -87,7 +86,7 @@ class CareerFortuneServiceTest {
         assertThat(result.confidenceScore()).isEqualTo(62);
         assertThat(result.reasoning()).contains("하반기");
         verify(userProfileRepository).save(any(UserProfile.class));
-        verify(sajuResultRepository).save(any());
+        verify(sajuResultWriteService).replaceForUserProfile(any(), any(), any(), any(), any(), anyInt(), any());
     }
 
     @Test
@@ -99,14 +98,13 @@ class CareerFortuneServiceTest {
                 .willReturn(Optional.of(existingProfile));
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(VALID_FASTAPI_RESPONSE);
-        given(sajuResultRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
         // When
         service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
 
         // Then
         verify(userProfileRepository, never()).save(any(UserProfile.class));
-        verify(sajuResultRepository).save(any());
+        verify(sajuResultWriteService).replaceForUserProfile(any(), any(), any(), any(), any(), anyInt(), any());
     }
 
     // ─────────────────────────────────────────
@@ -130,7 +128,6 @@ class CareerFortuneServiceTest {
                 .willReturn(Optional.empty());
         given(userProfileRepository.save(any())).willReturn(savedProfile);
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(h1Response);
-        given(sajuResultRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
         // When
         var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
