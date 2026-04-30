@@ -22,6 +22,8 @@ spring:
       chat:
         options:
           model: gpt-4o-mini
+          response-format:
+            type: JSON_OBJECT
 
 saju:
   fastapi:
