@@ -51,7 +51,6 @@ class ConsultationServiceTest {
 
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 10, 10);
     private static final LocalTime BIRTH_TIME = LocalTime.of(14, 30);
-
     private static final ConsultationRequest VALID_REQUEST = new ConsultationRequest(BIRTH_DATE, BIRTH_TIME);
 
     private static final FastAPIResponse MOCK_SAJU = new FastAPIResponse(
@@ -68,10 +67,43 @@ class ConsultationServiceTest {
                    "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊"));
 
     private static final CareerAdviceResponse MOCK_ADVICE = new CareerAdviceResponse(
-            List.of(Map.of("name", "금융/핀테크", "reason", "오행 金 강세로 재무 분야 적합"),
-                    Map.of("name", "IT/소프트웨어", "reason", "논리력 강함")),
-            List.of("일관성 있는 자기소개 준비", "데이터 기반 성과 사례 강조"),
-            List.of("분석력과 논리성", "책임감 있는 업무 추진")
+            List.of(new CareerAdviceResponse.IndustryRecommendation(
+                    "금융/핀테크", "오행 金 강세로 재무 분야 적합", List.of("백엔드 개발자", "데이터 엔지니어"))),
+            List.of("일관성 있는 자기소개 준비", "데이터 기반 성과 강조"),
+            List.of("분석력과 논리성", "책임감"),
+            List.of("지나친 꼼꼼함으로 인한 업무 속도 저하 주의"),
+            new CareerAdviceResponse.WealthStyle(
+                    "안정적인 월급 중심", "기술 전문성으로 몸값 향상", "보수적 투자 성향", "기술 블로그 추천"),
+            new CareerAdviceResponse.LongTermRoadmap(
+                    new CareerAdviceResponse.PhaseAdvice("기본기 다지기", "백엔드 심화", "오픈소스 기여"),
+                    new CareerAdviceResponse.PhaseAdvice("시니어 전환", "팀리드 경험", "아키텍처 참여"),
+                    "CTO", "정관 기운으로 기술 방향 주도"),
+            new CareerAdviceResponse.PersonalBranding(
+                    "네이비 수트", "신뢰감 있는 인상", "정돈된 스타일", "책임감 있는 엔지니어", "안정과 혁신의 기술 리더"),
+            new CareerAdviceResponse.PowerKeywords(
+                    List.of(new CareerAdviceResponse.PowerKeyword(
+                            "뿌리깊은_책임감", "土", "안정적이고 책임감 있는 성향",
+                            "뿌리깊은 책임감으로 팀의 신뢰를 얻는 개발자입니다.", "자소서 첫 문장")),
+                    "하나를 메인으로 선택", List.of("첫 문장 활용", "일관되게 사용"), "3개 동시 사용 금지"),
+            new CareerAdviceResponse.MentalCare(
+                    List.of("남의 시선을 많이 신경 쓰는 편"), List.of("혼자 조용히 산책"),
+                    "완벽함은 적의다", "성과 리스트 보기"),
+            new CareerAdviceResponse.EnvironmentFit(
+                    "규칙과 체계가 명확한 분위기", "대기업", "경험 많은 시니어 상사", "객관적 논의 선호",
+                    "햇빛 드는 창가", "기술 존중 조직"),
+            new CareerAdviceResponse.WorkStyle(
+                    "대기업 안정성 선호", "멘토형 리더", "신중한 정보 수집 후 결정", "시간을 두고 유연하게 대처"),
+            new CareerAdviceResponse.RelationshipStrategy(
+                    "조력자 스타일", "깊이 있는 관계 구축", "go-to person", "데이터 기반 논의", "전문가 네트워크"),
+            new CareerAdviceResponse.CareerTimeline(
+                    2026,
+                    Map.of("March", new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
+                    List.of(new CareerAdviceResponse.PivotPoint("March", "적극기", 9, "정관 기운의 절정")),
+                    List.of("May", "July"),
+                    "이 기간엔 급하게 결정하지 말 것"),
+            List.of("정관", "편관"),
+            "己土(기토) - 수용적이고 꼼꼼한 성향",
+            "火와 金의 기운이 강해 전략성과 실행력이 뛰어남"
     );
 
     @BeforeEach
@@ -93,7 +125,7 @@ class ConsultationServiceTest {
     // ─────────────────────────────────────────
 
     @Test
-    @DisplayName("유효한 요청 + SajuResult 존재 → 컨설팅 결과 반환 및 DB 저장")
+    @DisplayName("유효한 요청 + SajuResult 존재 → 확장 컨설팅 결과 반환 및 DB 저장")
     void shouldReturnConsultation_WhenSajuResultExists() {
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         var sajuResult = mock(SajuResult.class);
@@ -117,13 +149,35 @@ class ConsultationServiceTest {
 
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST);
 
-        assertThat(result.industries()).hasSize(2);
+        // 기존 필드 검증
+        assertThat(result.industries()).hasSize(1);
+        assertThat(result.industries().get(0).recommendedRoles()).contains("백엔드 개발자");
         assertThat(result.interviewTips()).hasSize(2);
         assertThat(result.strengths()).hasSize(2);
         assertThat(result.openaiModelVersion()).isEqualTo("gpt-4o-mini");
         assertThat(result.favoredPeriod()).isEqualTo("H1");
         assertThat(result.confidenceScore()).isEqualTo(80);
         assertThat(result.reasoning()).isNotBlank();
+
+        // 신규 필드 검증
+        assertThat(result.sajuProfile()).isNotNull();
+        assertThat(result.sajuProfile().dayMaster()).isEqualTo("己");
+        assertThat(result.sajuProfile().fiveElements()).containsKey("木");
+        assertThat(result.sajuProfile().tenGodDistribution()).containsKey("정관");
+        assertThat(result.sajuProfile().keyTenGods()).contains("정관", "편관");
+        assertThat(result.cautions()).isNotEmpty();
+        assertThat(result.wealthStyle()).isNotNull();
+        assertThat(result.longTermRoadmap()).isNotNull();
+        assertThat(result.personalBranding()).isNotNull();
+        assertThat(result.powerKeywords()).isNotNull();
+        assertThat(result.powerKeywords().keywords()).hasSize(1);
+        assertThat(result.mentalCare()).isNotNull();
+        assertThat(result.environmentFit()).isNotNull();
+        assertThat(result.workStyle()).isNotNull();
+        assertThat(result.relationshipStrategy()).isNotNull();
+        assertThat(result.careerTimeline()).isNotNull();
+        assertThat(result.careerTimeline().year()).isEqualTo(2026);
+
         verify(careerConsultationRepository).save(any());
     }
 
@@ -158,6 +212,7 @@ class ConsultationServiceTest {
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST);
 
         assertThat(result.openaiModelVersion()).isEqualTo("gpt-4o-mini");
+        assertThat(result.sajuProfile()).isNotNull();
         verify(sajuResultRepository).save(any());
         verify(careerConsultationRepository).save(any());
     }
