@@ -167,11 +167,11 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 **Independent Test**: birthDate → FastAPI → Saju calculation → H1/H2 response (no other stories required)
 **Expected Outcome**: Timing prediction API working end-to-end, stored in DB
 
-- [ ] T014 [US1] [P] Create `CareerTimingRequest` DTO in `dto/request/`
+- [v] T014 [US1] [P] Create `CareerTimingRequest` DTO in `dto/request/`
   - Fields: `birthDate` (LocalDate, @NotNull, YYYY-MM-DD), `birthTime` (LocalTime, @NotNull, HH:mm format)
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/CareerTimingRequest.java`
 
-- [ ] T015 [US1] [P] Create `CareerTimingResponse` DTO in `dto/response/`
+- [v] T015 [US1] [P] Create `CareerTimingResponse` DTO in `dto/response/`
   - Fields: `favoredPeriod` (String: "H1"/"H2"), `confidenceScore` (0-100), `reasoning`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/CareerTimingResponse.java`
 
@@ -182,14 +182,14 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Handles: TimeoutException → FastAPITimeoutException, invalid response (heavenlyStems/earthlyBranches < 4 items) → InvalidSajuDataException, missing birthTime → InvalidSajuDataException
   - File: `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
 
-- [ ] T017 [US1] Create `CareerFortuneService` in `service/`
+- [v] T017 [US1] Create `CareerFortuneService` in `service/`
   - Method: `analyzeCareerTiming(LocalDate birthDate, LocalTime birthTime)` → H1/H2 prediction with complete saju data including 지장간
   - Logic: Call `SajuDataService.fetchSajuFromFastAPI()` with birthDate + birthTime → Calculate HiddenStems via `HiddenStemCalculator` → Use `CareerFortuneAnalyzer` with both 십신 and 지장간 data for H1/H2 prediction
   - Stores: SajuResult in DB via `SajuResultRepository` (including birthTime, hiddenStems, tenGodDistribution)
   - Note: HiddenStemCalculator와 TenGodCalculator를 함께 사용하여 더 정확한 관운 분석 제공
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CareerFortuneService.java`
 
-- [ ] T018 [US1] Create `CareerTimingController` in `controller/`
+- [v] T018 [US1] Create `CareerTimingController` in `controller/`
   - Endpoint: `POST /api/career/timing` with CareerTimingRequest (birthDate + birthTime, both required)
   - Handles: Request validation (@Valid on birthDate YYYY-MM-DD and birthTime HH:mm), calls `CareerFortuneService.analyzeCareerTiming()`, returns `ApiResponse<CareerTimingResponse>`
   - Validation: Reject requests with missing/malformed birthTime (400 Bad Request)
@@ -217,7 +217,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Approach: MockMvcBuilders.standaloneSetup(controller) + SajuGlobalExceptionHandler (Spring Boot 4.x에서 @WebMvcTest 미지원)
   - File: `SSAju/src/test/java/ssafy/SSAju/controller/CareerTimingControllerTest.java`
 
-- [ ] T021 [US1] Run all tests for US1 features
+- [v] T021 [US1] Run all tests for US1 features
   - Command: `./gradlew test --tests "ssafy.SSAju.service.CareerFortuneServiceTest OR ssafy.SSAju.controller.CareerTimingControllerTest"`
   - Verify: BUILD SUCCESSFUL before committing
 
