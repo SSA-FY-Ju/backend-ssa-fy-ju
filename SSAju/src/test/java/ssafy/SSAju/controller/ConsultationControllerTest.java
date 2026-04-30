@@ -36,7 +36,10 @@ class ConsultationControllerTest {
             List.of(Map.of("name", "금융/핀테크", "reason", "오행 金 강세")),
             List.of("일관성 있는 자기소개 준비", "데이터 기반 성과 강조"),
             List.of("분석력과 논리성", "책임감"),
-            "gpt-4o-mini"
+            "gpt-4o-mini",
+            "H1",
+            80,
+            "상반기가 취업에 유리합니다. 십신·지장간 통합 분석 기준입니다."
     );
 
     private static final String VALID_REQUEST_BODY = """

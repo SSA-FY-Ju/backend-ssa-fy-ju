@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
@@ -36,6 +37,7 @@ public class ConsultationService {
     private final SajuDataService sajuDataService;
     private final TenGodCalculator tenGodCalculator;
     private final HiddenStemCalculator hiddenStemCalculator;
+    private final CareerFortuneAnalyzer careerFortuneAnalyzer;
     private final UserProfileRepository userProfileRepository;
     private final SajuResultRepository sajuResultRepository;
     private final CareerConsultationRepository careerConsultationRepository;
@@ -66,6 +68,14 @@ public class ConsultationService {
         Map<String, Integer> tenGodDistribution = tenGodCalculator.calculate(heavenlyStems);
         Map<String, List<String>> hiddenStems = hiddenStemCalculator.calculate(earthlyBranches);
 
+        // 관운 분석 (H1/H2, 신뢰도, 근거)
+        String dayMaster = heavenlyStems.get(2);
+        String favoredPeriod = careerFortuneAnalyzer.analyzeFavoredPeriod(
+                tenGodDistribution, hiddenStems, dayMaster, earthlyBranches);
+        int confidenceScore = careerFortuneAnalyzer.calculateConfidenceScore(
+                tenGodDistribution, hiddenStems, dayMaster);
+        String reasoning = buildReasoning(favoredPeriod, tenGodDistribution);
+
         // DB 1: UserProfile 조회/생성 후 커넥션 즉시 반납
         UserProfile userProfile = findOrCreateUserProfile(request.birthDate(), request.birthTime());
 
@@ -85,8 +95,10 @@ public class ConsultationService {
                 .build();
         careerConsultationRepository.save(consultation);
 
-        log.info("커리어 컨설팅 완료: sajuResultId={}", sajuResult.getId());
-        return new ConsultationResponse(advice.industries(), advice.interviewTips(), advice.strengths(), modelVersion);
+        log.info("커리어 컨설팅 완료: sajuResultId={}, favoredPeriod={}", sajuResult.getId(), favoredPeriod);
+        return new ConsultationResponse(
+                advice.industries(), advice.interviewTips(), advice.strengths(),
+                modelVersion, favoredPeriod, confidenceScore, reasoning);
     }
 
     private UserProfile findOrCreateUserProfile(LocalDate birthDate, LocalTime birthTime) {
@@ -160,6 +172,16 @@ public class ConsultationService {
             log.error("OpenAI API 호출 실패: {}", e.getMessage());
             throw new OpenAIApiException("OpenAI API 호출 실패: " + e.getMessage(), e);
         }
+    }
+
+    private String buildReasoning(String favoredPeriod, Map<String, Integer> tenGodDistribution) {
+        int officerCount = tenGodDistribution.getOrDefault("정관", 0)
+                + tenGodDistribution.getOrDefault("편관", 0);
+        StringBuilder sb = new StringBuilder(
+                "H1".equals(favoredPeriod) ? "상반기가 취업에 유리합니다. " : "하반기가 취업에 유리합니다. ");
+        if (officerCount > 0) sb.append("관성이 강해 리더십 역할에 적합합니다. ");
+        sb.append("십신·지장간 통합 분석 기준입니다.");
+        return sb.toString();
     }
 
     private String buildPrompt(FastAPIResponse sajuData,

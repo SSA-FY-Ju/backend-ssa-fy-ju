@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
@@ -41,6 +42,7 @@ class ConsultationServiceTest {
     @Mock private SajuDataService sajuDataService;
     @Mock private TenGodCalculator tenGodCalculator;
     @Mock private HiddenStemCalculator hiddenStemCalculator;
+    @Mock private CareerFortuneAnalyzer careerFortuneAnalyzer;
     @Mock private UserProfileRepository userProfileRepository;
     @Mock private SajuResultRepository sajuResultRepository;
     @Mock private CareerConsultationRepository careerConsultationRepository;
@@ -75,7 +77,7 @@ class ConsultationServiceTest {
     @BeforeEach
     void setUp() {
         service = new ConsultationService(
-                chatClient, sajuDataService, tenGodCalculator, hiddenStemCalculator,
+                chatClient, sajuDataService, tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer,
                 userProfileRepository, sajuResultRepository, careerConsultationRepository);
         try {
             var field = ConsultationService.class.getDeclaredField("modelVersion");
@@ -99,6 +101,8 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(tenGodCalculator.calculate(MOCK_SAJU.heavenlyStems())).willReturn(TEN_GOD);
         given(hiddenStemCalculator.calculate(MOCK_SAJU.earthlyBranches())).willReturn(HIDDEN_STEMS);
+        given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
+        given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(80);
         given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(Optional.of(userProfile));
         given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));
@@ -117,6 +121,9 @@ class ConsultationServiceTest {
         assertThat(result.interviewTips()).hasSize(2);
         assertThat(result.strengths()).hasSize(2);
         assertThat(result.openaiModelVersion()).isEqualTo("gpt-4o-mini");
+        assertThat(result.favoredPeriod()).isEqualTo("H1");
+        assertThat(result.confidenceScore()).isEqualTo(80);
+        assertThat(result.reasoning()).isNotBlank();
         verify(careerConsultationRepository).save(any());
     }
 
@@ -133,6 +140,8 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(tenGodCalculator.calculate(MOCK_SAJU.heavenlyStems())).willReturn(TEN_GOD);
         given(hiddenStemCalculator.calculate(MOCK_SAJU.earthlyBranches())).willReturn(HIDDEN_STEMS);
+        given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H2");
+        given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(60);
         given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(Optional.of(userProfile));
         given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.empty());
@@ -166,6 +175,8 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(tenGodCalculator.calculate(any())).willReturn(TEN_GOD);
         given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
+        given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
+        given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
         given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(Optional.of(userProfile));
         given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));
@@ -196,6 +207,8 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(tenGodCalculator.calculate(any())).willReturn(TEN_GOD);
         given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
+        given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
+        given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
         given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(Optional.of(userProfile));
         given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));

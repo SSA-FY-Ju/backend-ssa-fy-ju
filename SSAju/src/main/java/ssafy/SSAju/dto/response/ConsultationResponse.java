@@ -7,6 +7,9 @@ public record ConsultationResponse(
         List<Map<String, String>> industries,
         List<String> interviewTips,
         List<String> strengths,
-        String openaiModelVersion
+        String openaiModelVersion,
+        String favoredPeriod,
+        int confidenceScore,
+        String reasoning
 ) {
 }
