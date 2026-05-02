@@ -6,9 +6,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.ai.chat.client.ChatClient;
+import ssafy.SSAju.career.caller.ConsultationOpenAICaller;
+import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.mapper.ConsultationMapper;
+import ssafy.SSAju.career.mapper.SajuResultMapper;
+import ssafy.SSAju.career.provider.SajuResultProvider;
+import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.TenGodCalculator;
@@ -18,18 +23,16 @@ import ssafy.SSAju.dto.request.ConsultationRequest;
 import ssafy.SSAju.dto.response.ConsultationResponse;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
-import ssafy.SSAju.repository.SajuResultRepository;
-import ssafy.SSAju.repository.UserProfileRepository;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -38,13 +41,15 @@ import static org.mockito.Mockito.verify;
 @DisplayName("ConsultationService 단위 테스트")
 class ConsultationServiceTest {
 
-    @Mock private ChatClient chatClient;
+    @Mock private ConsultationOpenAICaller openAICaller;
     @Mock private SajuDataService sajuDataService;
     @Mock private TenGodCalculator tenGodCalculator;
     @Mock private HiddenStemCalculator hiddenStemCalculator;
     @Mock private CareerFortuneAnalyzer careerFortuneAnalyzer;
-    @Mock private UserProfileRepository userProfileRepository;
-    @Mock private SajuResultRepository sajuResultRepository;
+    @Mock private UserProfileProvider userProfileProvider;
+    @Mock private SajuResultProvider sajuResultProvider;
+    @Mock private SajuResultMapper sajuResultMapper;
+    @Mock private ConsultationMapper consultationMapper;
     @Mock private CareerConsultationRepository careerConsultationRepository;
 
     private ConsultationService service;
@@ -109,8 +114,9 @@ class ConsultationServiceTest {
     @BeforeEach
     void setUp() {
         service = new ConsultationService(
-                chatClient, sajuDataService, tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer,
-                userProfileRepository, sajuResultRepository, careerConsultationRepository);
+                openAICaller, sajuDataService, tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer,
+                userProfileProvider, sajuResultProvider, sajuResultMapper, consultationMapper,
+                careerConsultationRepository);
         try {
             var field = ConsultationService.class.getDeclaredField("modelVersion");
             field.setAccessible(true);
@@ -129,23 +135,23 @@ class ConsultationServiceTest {
     void shouldReturnConsultation_WhenSajuResultExists() {
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         var sajuResult = mock(SajuResult.class);
+        var consultation = mock(CareerConsultation.class);
 
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(tenGodCalculator.calculate(MOCK_SAJU.heavenlyStems())).willReturn(TEN_GOD);
         given(hiddenStemCalculator.calculate(MOCK_SAJU.earthlyBranches())).willReturn(HIDDEN_STEMS);
         given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(80);
-        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
-                .willReturn(Optional.of(userProfile));
-        given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));
+        given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
+        given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
+                .willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(userProfile, sajuResult)).willReturn(sajuResult);
+        given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(consultationMapper.buildConsultation(any(), any(), any())).willReturn(consultation);
         given(careerConsultationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
-
-        var promptSpec = mock(ChatClient.ChatClientRequestSpec.class);
-        var callSpec = mock(ChatClient.CallResponseSpec.class);
-        given(chatClient.prompt()).willReturn(promptSpec);
-        given(promptSpec.user(any(String.class))).willReturn(promptSpec);
-        given(promptSpec.call()).willReturn(callSpec);
-        given(callSpec.entity(CareerAdviceResponse.class)).willReturn(MOCK_ADVICE);
+        given(consultationMapper.buildAnalysisSummary(any(), any(), any(), any()))
+                .willReturn("己 일간 · 오행 火·金 강세 · 정관·편관 기운 기반 | 2026년 12개월 타임라인 + 관운 분석 (H1)");
 
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST);
 
@@ -182,6 +188,7 @@ class ConsultationServiceTest {
         assertThat(result.analysisSummary()).contains("H1");
 
         verify(careerConsultationRepository).save(any());
+        verify(sajuResultProvider).findOrCreate(userProfile, sajuResult);
     }
 
     // ─────────────────────────────────────────
@@ -192,31 +199,30 @@ class ConsultationServiceTest {
     @DisplayName("유효한 요청 + SajuResult 없음 → 신규 SajuResult 생성 후 컨설팅 반환")
     void shouldReturnConsultation_WhenSajuResultCreated() {
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
-        var sajuResult = mock(SajuResult.class);
+        var newSajuResult = mock(SajuResult.class);
+        var consultation = mock(CareerConsultation.class);
 
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(tenGodCalculator.calculate(MOCK_SAJU.heavenlyStems())).willReturn(TEN_GOD);
         given(hiddenStemCalculator.calculate(MOCK_SAJU.earthlyBranches())).willReturn(HIDDEN_STEMS);
         given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H2");
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(60);
-        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
-                .willReturn(Optional.of(userProfile));
-        given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.empty());
-        given(sajuResultRepository.save(any())).willReturn(sajuResult);
+        given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("하반기가 취업에 유리합니다.");
+        given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
+                .willReturn(newSajuResult);
+        given(sajuResultProvider.findOrCreate(userProfile, newSajuResult)).willReturn(newSajuResult);
+        given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(consultationMapper.buildConsultation(any(), any(), any())).willReturn(consultation);
         given(careerConsultationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
-
-        var promptSpec = mock(ChatClient.ChatClientRequestSpec.class);
-        var callSpec = mock(ChatClient.CallResponseSpec.class);
-        given(chatClient.prompt()).willReturn(promptSpec);
-        given(promptSpec.user(any(String.class))).willReturn(promptSpec);
-        given(promptSpec.call()).willReturn(callSpec);
-        given(callSpec.entity(CareerAdviceResponse.class)).willReturn(MOCK_ADVICE);
+        given(consultationMapper.buildAnalysisSummary(any(), any(), any(), any()))
+                .willReturn("己 일간 · 오행 火·金 강세 | H2");
 
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST);
 
         assertThat(result.openaiModelVersion()).isEqualTo("gpt-4o-mini");
         assertThat(result.sajuProfile()).isNotNull();
-        verify(sajuResultRepository).save(any());
+        verify(sajuResultProvider).findOrCreate(userProfile, newSajuResult);
         verify(careerConsultationRepository).save(any());
     }
 
@@ -235,17 +241,13 @@ class ConsultationServiceTest {
         given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
         given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
-        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
-                .willReturn(Optional.of(userProfile));
-        given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));
-
-        var promptSpec = mock(ChatClient.ChatClientRequestSpec.class);
-        var callSpec = mock(ChatClient.CallResponseSpec.class);
-        given(chatClient.prompt()).willReturn(promptSpec);
-        given(promptSpec.user(any(String.class))).willReturn(promptSpec);
-        given(promptSpec.call()).willReturn(callSpec);
-        given(callSpec.entity(CareerAdviceResponse.class))
-                .willThrow(new RuntimeException("OpenAI connection failed"));
+        given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
+        given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
+                .willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
+        given(openAICaller.call(any(), any(), any(), any()))
+                .willThrow(new OpenAIApiException("OpenAI API 호출 실패: connection failed"));
 
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
                 .isInstanceOf(OpenAIApiException.class)
@@ -257,7 +259,7 @@ class ConsultationServiceTest {
     // ─────────────────────────────────────────
 
     @Test
-    @DisplayName("OpenAI 응답 null → OpenAIApiException")
+    @DisplayName("OpenAI 응답 null → OpenAIApiException (ConsultationOpenAICaller에서 발생)")
     void shouldThrow_WhenOpenAIReturnsNull() {
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         var sajuResult = mock(SajuResult.class);
@@ -267,16 +269,13 @@ class ConsultationServiceTest {
         given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
         given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
-        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
-                .willReturn(Optional.of(userProfile));
-        given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));
-
-        var promptSpec = mock(ChatClient.ChatClientRequestSpec.class);
-        var callSpec = mock(ChatClient.CallResponseSpec.class);
-        given(chatClient.prompt()).willReturn(promptSpec);
-        given(promptSpec.user(any(String.class))).willReturn(promptSpec);
-        given(promptSpec.call()).willReturn(callSpec);
-        given(callSpec.entity(CareerAdviceResponse.class)).willReturn(null);
+        given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
+        given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
+                .willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
+        given(openAICaller.call(any(), any(), any(), any()))
+                .willThrow(new OpenAIApiException("OpenAI 응답이 비어있습니다"));
 
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
                 .isInstanceOf(OpenAIApiException.class)
@@ -284,7 +283,7 @@ class ConsultationServiceTest {
     }
 
     @Test
-    @DisplayName("OpenAI 부분 응답 (industries 빔) → OpenAIApiException")
+    @DisplayName("OpenAI 부분 응답 (industries 빔) → OpenAIApiException (ConsultationOpenAICaller에서 발생)")
     void shouldThrow_WhenOpenAIReturnsPartialResponse_EmptyIndustries() {
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         var sajuResult = mock(SajuResult.class);
@@ -294,36 +293,13 @@ class ConsultationServiceTest {
         given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
         given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
-        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
-                .willReturn(Optional.of(userProfile));
-        given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));
-
-        var partialAdvice = new CareerAdviceResponse(
-                List.of(),  // ❌ 빈 industries
-                List.of("팁"),
-                List.of("강점"),
-                List.of(),
-                new CareerAdviceResponse.WealthStyle("", "", "", ""),
-                new CareerAdviceResponse.LongTermRoadmap(
-                        new CareerAdviceResponse.PhaseAdvice("", "", ""),
-                        new CareerAdviceResponse.PhaseAdvice("", "", ""),
-                        "", ""),
-                new CareerAdviceResponse.PersonalBranding("", "", "", "", ""),
-                new CareerAdviceResponse.PowerKeywords(List.of(), "", List.of(), ""),
-                new CareerAdviceResponse.MentalCare(List.of(), List.of(), "", ""),
-                new CareerAdviceResponse.EnvironmentFit("", "", "", "", "", ""),
-                new CareerAdviceResponse.WorkStyle("", "", "", ""),
-                new CareerAdviceResponse.RelationshipStrategy("", "", "", "", ""),
-                new CareerAdviceResponse.CareerTimeline(2026, Map.of(), List.of(), List.of(), ""),
-                List.of(), "", ""
-        );
-
-        var promptSpec = mock(ChatClient.ChatClientRequestSpec.class);
-        var callSpec = mock(ChatClient.CallResponseSpec.class);
-        given(chatClient.prompt()).willReturn(promptSpec);
-        given(promptSpec.user(any(String.class))).willReturn(promptSpec);
-        given(promptSpec.call()).willReturn(callSpec);
-        given(callSpec.entity(CareerAdviceResponse.class)).willReturn(partialAdvice);
+        given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
+        given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
+                .willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
+        given(openAICaller.call(any(), any(), any(), any()))
+                .willThrow(new OpenAIApiException("산업 추천 정보가 누락되었습니다"));
 
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
                 .isInstanceOf(OpenAIApiException.class)

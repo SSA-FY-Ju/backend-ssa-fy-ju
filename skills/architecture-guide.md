@@ -815,6 +815,149 @@ public class CareerFortuneService {
 
 ---
 
+## Phase 3-Refactor: Entity Normalization 패턴
+
+### JSON → 행 단위 정규화 (TenGodData, HiddenStemData)
+
+**목표**: JSON 컬럼을 완전히 정규화된 엔티티로 변환하여 쿼리 최적화 + 타입 안전성 향상
+
+#### TenGodData (1:N with SajuResult)
+
+**변환 전** (JSON):
+```java
+// SajuResult에 JSON 저장
+Map<String, Integer> tenGodDistribution = Map.of(
+    "正官", 1,
+    "偏官", 1,
+    "正财", 2,
+    "偏财", 1
+);
+sajuResult.setTenGodDistribution(tenGodDistribution);
+```
+
+**변환 후** (정규화 엔티티):
+```java
+// 각 십신별 1행씩 저장
+TenGodData row1 = TenGodData.builder()
+    .sajuResult(sajuResult)
+    .tenGodName("正官")
+    .score(1)
+    .build();
+
+TenGodData row2 = TenGodData.builder()
+    .sajuResult(sajuResult)
+    .tenGodName("偏官")
+    .score(1)
+    .build();
+// ... 4개 행 저장
+```
+
+**Repository 쿼리**:
+```java
+@Repository
+public interface TenGodDataRepository extends JpaRepository<TenGodData, Long> {
+    // 특정 SajuResult의 모든 십신 데이터 조회
+    List<TenGodData> findBySajuResult(SajuResult sajuResult);
+    
+    // 특정 十神으로 검색
+    TenGodData findBySajuResultAndTenGodName(SajuResult sajuResult, String tenGodName);
+}
+```
+
+#### HiddenStemData (1:N with SajuResult)
+
+**변환 전** (JSON):
+```java
+// SajuResult에 JSON 저장
+Map<String, List<String>> hiddenStems = Map.of(
+    "子", List.of("癸"),
+    "丑", List.of("癸", "辛", "己"),
+    "寅", List.of("甲", "丙", "戊")
+);
+sajuResult.setHiddenStems(hiddenStems);
+```
+
+**변환 후** (정규화 엔티티):
+```java
+// 각 지지-지장간 조합별 1행씩 저장
+HiddenStemData row1 = HiddenStemData.builder()
+    .sajuResult(sajuResult)
+    .earthlyBranch("子")
+    .hiddenStem("癸")
+    .build();
+
+HiddenStemData row2 = HiddenStemData.builder()
+    .sajuResult(sajuResult)
+    .earthlyBranch("丑")
+    .hiddenStem("癸")
+    .build();
+
+HiddenStemData row3 = HiddenStemData.builder()
+    .sajuResult(sajuResult)
+    .earthlyBranch("丑")
+    .hiddenStem("辛")
+    .build();
+// ... (지지별 × 지장간별 행수) 저장
+```
+
+**Repository 쿼리**:
+```java
+@Repository
+public interface HiddenStemDataRepository extends JpaRepository<HiddenStemData, Long> {
+    // 특정 SajuResult의 모든 지장간 데이터 조회
+    List<HiddenStemData> findBySajuResult(SajuResult sajuResult);
+    
+    // 특정 지지의 모든 지장간 조회
+    List<HiddenStemData> findBySajuResultAndEarthlyBranch(SajuResult sajuResult, String earthlyBranch);
+    
+    // 특정 지지-지장간 조합 조회
+    HiddenStemData findBySajuResultAndEarthlyBranchAndHiddenStem(
+        SajuResult sajuResult, String earthlyBranch, String hiddenStem);
+}
+```
+
+**Service에서의 변환**:
+```java
+@Service
+public class CareerFortuneService {
+    
+    private final TenGodDataRepository tenGodDataRepository;
+    private final HiddenStemDataRepository hiddenStemDataRepository;
+    
+    // 저장 시: Map → Entity 배치로 변환
+    public void saveTenGodData(SajuResult sajuResult, Map<String, Integer> tenGodDistribution) {
+        tenGodDistribution.forEach((tenGodName, score) -> {
+            TenGodData data = TenGodData.builder()
+                .sajuResult(sajuResult)
+                .tenGodName(tenGodName)
+                .score(score)
+                .build();
+            tenGodDataRepository.save(data);
+        });
+    }
+    
+    // 조회 시: Entity → Map 재조립
+    public Map<String, Integer> getTenGodDistribution(SajuResult sajuResult) {
+        return tenGodDataRepository.findBySajuResult(sajuResult)
+            .stream()
+            .collect(Collectors.toMap(
+                TenGodData::getTenGodName,
+                TenGodData::getScore
+            ));
+    }
+    
+    // 같은 방식으로 HiddenStemData도 처리
+}
+```
+
+**장점**:
+- ✅ JSON 쿼리 제거 (MySQL LIKE 검색 불가능한 JSON 대신 SQL WHERE 절 사용)
+- ✅ 정규화로 인한 데이터 무결성 향상 (예: tenGodName 중복 불가 등)
+- ✅ 인덱싱 가능 (tenGodName, earthlyBranch)
+- ✅ 타입 안전성 (String 대신 Enum 사용 가능하도록 향후 확장)
+
+---
+
 ## Phase 1 제약사항
 
 - **캐싱 금지**: Redis, In-Memory 전역 캐시 사용 금지
