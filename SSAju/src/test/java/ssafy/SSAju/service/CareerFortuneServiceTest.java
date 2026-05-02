@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
 import ssafy.SSAju.career.provider.UserProfileProvider;
@@ -25,6 +26,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -71,11 +73,13 @@ class CareerFortuneServiceTest {
     void shouldCreateProfileAndSaveResult_WhenNewUser() {
         // Given
         var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        var expectedResult = SajuResult.builder().userProfile(savedProfile).build();
+
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(savedProfile);
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(VALID_FASTAPI_RESPONSE);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
-                .willReturn(null);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(expectedResult);
 
         // When
         var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
@@ -85,7 +89,8 @@ class CareerFortuneServiceTest {
         assertThat(result.confidenceScore()).isEqualTo(70);
         assertThat(result.reasoning()).contains("하반기");
         verify(userProfileProvider).findOrCreate(BIRTH_DATE, BIRTH_TIME);
-        verify(sajuResultWriteService).replaceForUserProfile(any(), any());
+        // mapper → service → writer 배선 검증: 실제 expectedResult가 전달됐는지 확인
+        verify(sajuResultWriteService).replaceForUserProfile(savedProfile, expectedResult);
     }
 
     @Test
@@ -93,18 +98,20 @@ class CareerFortuneServiceTest {
     void shouldReuseExistingProfile_WhenUserExists() {
         // Given
         var existingProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        var expectedResult = SajuResult.builder().userProfile(existingProfile).build();
+
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(existingProfile);
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(VALID_FASTAPI_RESPONSE);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
-                .willReturn(null);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(expectedResult);
 
         // When
         service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
 
         // Then
         verify(userProfileProvider).findOrCreate(BIRTH_DATE, BIRTH_TIME);
-        verify(sajuResultWriteService).replaceForUserProfile(any(), any());
+        verify(sajuResultWriteService).replaceForUserProfile(existingProfile, expectedResult);
     }
 
     // ─────────────────────────────────────────
@@ -125,8 +132,9 @@ class CareerFortuneServiceTest {
         var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(savedProfile);
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(h1Response);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
-                .willReturn(null);
+        var expectedResult = SajuResult.builder().userProfile(savedProfile).build();
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(expectedResult);
 
         // When
         var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);

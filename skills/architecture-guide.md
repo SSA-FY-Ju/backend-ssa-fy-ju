@@ -970,4 +970,46 @@ public class CareerFortuneService {
 
 ---
 
-**Last Updated**: 2026-05-02 (Service Layer 경량화 + Domain Model 캡슐화 추가)
+---
+
+## 로깅 정책 (민감정보 보호)
+
+### ❌ 로그에 절대 포함 금지
+
+| 분류 | 금지 항목 |
+|------|-----------|
+| **개인정보** | `birthDate`, `birthTime`, `email`, `phone`, `name` |
+| **인증 정보** | API Key, Bearer 토큰, Authorization 헤더값 |
+| **외부 API 원문** | FastAPI 요청 body 전문, OpenAI 프롬프트 전문 |
+| **예외 메시지 직접 출력** | `e.getMessage()` — 내부 정보 노출 가능 |
+
+### ✅ 로그에 허용하는 식별자
+
+- 숫자 ID만: `userId`, `userProfileId`, `sajuResultId`
+- 추적 ID: `requestId`, `traceId`
+- 상태 정보: 성공/실패 여부, HTTP 상태코드, 지연시간(ms)
+
+### 📌 예시
+
+```java
+// ❌ 잘못된 예
+log.warn("동시 경합 발생 (birthDate={})", birthDate);
+log.error("OpenAI 호출 실패: {}", e.getMessage());
+
+// ✅ 올바른 예
+log.warn("동시 경합 발생 (userId={})", userProfile.getId());
+log.error("OpenAI 호출 실패", e);  // 스택트레이스만 로깅
+```
+
+### 로그 레벨 기준
+
+| 레벨 | 용도 |
+|------|------|
+| `DEBUG` | 개발 환경 상세 정보 (프로덕션에서 비활성화) |
+| `INFO` | 주요 비즈니스 이벤트 (요청 시작/완료) |
+| `WARN` | 예상 가능한 예외 (동시성 경합, 재시도) |
+| `ERROR` | 예상 불가능한 예외 + 스택트레이스 |
+
+---
+
+**Last Updated**: 2026-05-03 (CodeRabbit 리뷰 반영 — 로깅 정책 + try-catch 규칙 명확화)

@@ -114,13 +114,21 @@ public class ConsultationService {
     }
 
     private void validateSajuData(FastAPIResponse sajuData) {
+        if (sajuData == null) {
+            throw new InvalidSajuDataException("사주 데이터는 null이 아니어야 합니다");
+        }
         List<String> heavenlyStems = sajuData.heavenlyStems();
-        List<String> earthlyBranches = sajuData.earthlyBranches();
         if (heavenlyStems == null || heavenlyStems.size() != 4) {
             throw new InvalidSajuDataException("천간은 정확히 4개여야 합니다");
         }
+        List<String> earthlyBranches = sajuData.earthlyBranches();
         if (earthlyBranches == null || earthlyBranches.size() != 4) {
             throw new InvalidSajuDataException("지지는 정확히 4개여야 합니다");
+        }
+        // fiveElements: ConsultationResponse.SajuProfile 생성 시 sajuData.fiveElements() 사용됨
+        Map<String, Integer> fiveElements = sajuData.fiveElements();
+        if (fiveElements == null || fiveElements.isEmpty()) {
+            throw new InvalidSajuDataException("오행(목화토금수) 데이터는 필수입니다");
         }
     }
 }

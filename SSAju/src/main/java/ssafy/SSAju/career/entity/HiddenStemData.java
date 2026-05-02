@@ -11,7 +11,11 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-@Table(name = "hidden_stem_data")
+@Table(name = "hidden_stem_data",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"saju_result_id", "earthly_branch", "hidden_stem"},
+                        name = "uk_hidden_stem_data_result_branch_stem")
+        })
 public class HiddenStemData {
 
     @Id

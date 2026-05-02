@@ -8,6 +8,7 @@ import ssafy.SSAju.career.entity.TenGodData;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +73,9 @@ public class SajuResultMapper {
     }
 
     private List<TenGodData> toTenGodDataList(SajuResult result, Map<String, Integer> tenGodDistribution) {
+        if (tenGodDistribution == null || tenGodDistribution.isEmpty()) {
+            return new ArrayList<>();
+        }
         return tenGodDistribution.entrySet().stream()
                 .map(entry -> TenGodData.builder()
                         .sajuResult(result)
@@ -82,13 +86,22 @@ public class SajuResultMapper {
     }
 
     private List<HiddenStemData> toHiddenStemDataList(SajuResult result, Map<String, List<String>> hiddenStems) {
+        if (hiddenStems == null || hiddenStems.isEmpty()) {
+            return new ArrayList<>();
+        }
         return hiddenStems.entrySet().stream()
-                .flatMap(entry -> entry.getValue().stream()
-                        .map(stem -> HiddenStemData.builder()
-                                .sajuResult(result)
-                                .earthlyBranch(entry.getKey())
-                                .hiddenStem(stem)
-                                .build()))
+                .flatMap(entry -> {
+                    List<String> stems = entry.getValue();
+                    if (stems == null || stems.isEmpty()) {
+                        return java.util.stream.Stream.empty();
+                    }
+                    return stems.stream()
+                            .map(stem -> HiddenStemData.builder()
+                                    .sajuResult(result)
+                                    .earthlyBranch(entry.getKey())
+                                    .hiddenStem(stem)
+                                    .build());
+                })
                 .toList();
     }
 }

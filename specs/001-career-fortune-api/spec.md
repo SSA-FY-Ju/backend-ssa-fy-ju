@@ -170,7 +170,7 @@ UserProfile (생년월일시)
   ↓ 1:1
 SajuResult (사주 기본 데이터)
   ├─ 1:1 → CareerFortune (관운 분석: H1/H2, 신뢰도, 근거)
-  ├─ 1:1 → TenGodData (십신 분포)
+  ├─ 1:N → TenGodData (십신 분포 - 십신별 행 단위)
   ├─ 1:N → HiddenStemData (지지별 지장간)
   ├─ 1:N → CareerConsultation (AI 컨설팅 기록)
   │         ├─ 1:N → Industry (추천 산업)
@@ -310,7 +310,7 @@ public record ErrorInfo(
 | **Service** | Orchestration 전담: 외부 API 호출, 비즈니스 흐름 제어 | CareerFortuneService, ConsultationService, CompanyMatchingService |
 | **Analyzer/Calculator** | 분석/계산 로직 전담 (비즈니스 규칙) | TenGodAnalyzer, HiddenStemAnalyzer, CareerFortuneAnalyzer, CompatibilityScoreCalculator |
 | **Mapper** | DTO ↔ Entity 변환 (데이터 구조 변환만) | CareerConsultationMapper, SajuResultMapper |
-| **Provider** | 설정/프롬프트 관리 (하드코딩 제거) | PromptProvider, ConfigProvider |
+| **Provider** | 데이터 조회/생성 + 설정/프롬프트 관리 (동시성 보정, 재사용 로직 포함) | UserProfileProvider, SajuResultProvider, PromptProvider, ConfigProvider |
 | **Repository** | DB 접근만 담당 (Spring Data JPA) | UserRepository, SajuResultRepository, TenGodDataRepository, HiddenStemDataRepository 등 |
 | **Global Exception Handler** | @RestControllerAdvice로 모든 예외 처리 (try-catch 금지) | SajuGlobalExceptionHandler |
 
@@ -325,7 +325,7 @@ public record ErrorInfo(
 ### Exception Handling Strategy
 
 **예외 계층**:
-```
+```text
 SajuException (root)
 ├── InvalidSajuDataException (입력 유효성 / 데이터 검증)
 ├── FastAPITimeoutException (FastAPI 외부 API 지연)
@@ -334,10 +334,12 @@ SajuException (root)
 └── DataAccessException (DB 오류)
 ```
 
-**사용 규칙** (try-catch 금지):
-- ✅ Service에서 조건을 검사하고, 조건이 맞지 않으면 **커스텀 예외 throw**
-- ❌ try-catch로 예외를 "삼키지" 말 것 (예외를 throw해서 @RestControllerAdvice에 위임)
+**사용 규칙**:
+- ✅ 기본: 조건 검사 후 커스텀 예외 throw → @RestControllerAdvice 위임
+- ⚠️ 예외 허용: 동시성 보정(DIVE, CannotAcquireLockException 등) 또는 명확한 재시도 로직이 필요한 경우에만 try-catch 허용
+- ❌ 비즈니스 예외를 무조건 삼키는 것 금지 (반드시 로깅 또는 재throw)
 - 예: `if (heavenlyStems == null || heavenlyStems.size() != 4) throw new InvalidSajuDataException("천간은 정확히 4개여야 합니다")`
+- 동시성 try-catch 예: UserProfileProvider.findOrCreate(), SajuResultProvider.findOrCreate() — DIVE 잡아서 재조회
 
 **GlobalExceptionHandler 처리**:
 - 모든 SajuException 및 하위 클래스 → @ExceptionHandler로 catch
@@ -394,7 +396,7 @@ SajuException (root)
 
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
-| **TenGodData** | id, sajuResultId, dayMaster, tenGodDistribution (별도 엔티티로) | PK, FK, VARCHAR, | FK to SajuResult (1:1) |
+| **TenGodData** | id, sajuResultId, tenGodName, score | PK, FK, VARCHAR, INT | FK to SajuResult (1:N) - 십신별 행 단위 정규화 |
 | **HiddenStemData** | id, sajuResultId, earthlyBranch, hiddenStem | PK, FK, VARCHAR, VARCHAR | FK to SajuResult (1:N), 지지별 지장간 |
 | **CareerFortune** | id, sajuResultId, favoredPeriod, confidenceScore, reasoning | PK, FK, VARCHAR, INT, TEXT | FK to SajuResult (1:1) |
 

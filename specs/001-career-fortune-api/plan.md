@@ -124,7 +124,7 @@ SSAju/
 │   │   ├── entity/
 │   │   │   ├── UserProfile.java
 │   │   │   ├── SajuResult.java
-│   │   │   ├── TenGodData.java (1:1 to SajuResult, 십신 분포)
+│   │   │   ├── TenGodData.java (1:N to SajuResult, 십신 분포 - 십신별 행 단위)
 │   │   │   ├── HiddenStemData.java (1:N to SajuResult, 지지별 지장간)
 │   │   │   ├── CareerFortune.java (1:1 to SajuResult, 관운 분석)
 │   │   │   ├── CareerConsultation.java
@@ -257,7 +257,7 @@ SSAju/
 
 | 설계 결정 | 필요 이유 | 더 단순한 대안과 거절 이유 |
 |---------|---------|------------------------|
-| **11개 정규화된 엔티티** (Phase 1, JSON 저장 제거) | UserProfile ↔ SajuResult (1:1), SajuResult ↔ TenGodData (1:1, 십신), SajuResult ↔ CareerFortune (1:1, 관운), SajuResult ↔ HiddenStemData (1:N, 지장간), SajuResult ↔ CareerConsultation (1:N), CareerConsultation ↔ Industry/InterviewTip/Strength (1:N), UserProfile ↔ CompanyCompatibility (1:N), CompanyCompatibility ↔ RecommendedRole (1:N), SajuResult ↔ UserSatisfactionFeedback (1:N) | JSON 저장 방식 → N+1 쿼리, 데이터 정규화 부족, 재사용성 저하, 타입 안전성 낮음, 쿼리 최적화 어려움 |
+| **11개 정규화된 엔티티** (Phase 1, JSON 저장 제거) | UserProfile ↔ SajuResult (1:1), SajuResult ↔ TenGodData (1:N, 십신 - 십신별 행 단위), SajuResult ↔ CareerFortune (1:1, 관운), SajuResult ↔ HiddenStemData (1:N, 지장간), SajuResult ↔ CareerConsultation (1:N), CareerConsultation ↔ Industry/InterviewTip/Strength (1:N), UserProfile ↔ CompanyCompatibility (1:N), CompanyCompatibility ↔ RecommendedRole (1:N), SajuResult ↔ UserSatisfactionFeedback (1:N) | JSON 저장 방식 → N+1 쿼리, 데이터 정규화 부족, 재사용성 저하, 타입 안전성 낮음, 쿼리 최적화 어려움 |
 | **4개 독립 Service** | 각 기능(관운, 컨설팅, 궁합, 피드백)이 독립적으로 테스트/배포 가능해야 함. P1/P2 우선순위 구분으로 점진적 개발 필요 | 단일 Service → 테스트 복잡도 증가, 변경 파급 범위 확대, 리팩토링 위험 |
 | **TenGodCalculator + HiddenStemCalculator 분리** | 십신(十神)과 지장간(地藏干)은 별개의 계산 로직. 분리하면 각각 독립 테스트 가능, 재사용성 향상. 더 정확한 오행 분포 계산 가능 | 통합 Calculator → 로직 혼재, 테스트 복잡도 증대, 유지보수 어려움. 지장간 미포함 시 사주 분석 정확도 저하 |
 | **Spring에서 십신+지장간 계산** | FastAPI는 기본 데이터(천간/지지/오행)만 제공 → Spring 단에서 모든 계산 담당하므로 FastAPI 변경에 영향받지 않음. 도메인 로직 통제 가능 | FastAPI에서 십신/지장간까지 계산 → FastAPI 변경 시 Spring도 영향, 통제 불가. 지장간 미포함 시 정확도 저하 |
@@ -421,7 +421,7 @@ UserSatisfactionFeedback (1:N to SajuResult, 만족도 피드백)
 **Relationships & FetchType**:
 - **Phase 1** (현재, 모든 관계에 FetchType.LAZY 명시):
   - UserProfile (1) ↔ SajuResult (1:1) via userProfileId, FetchType.LAZY
-  - SajuResult (1) ↔ TenGodData (1:1) via sajuResultId, FetchType.LAZY
+  - SajuResult (1) ↔ TenGodData (1:N) via sajuResultId, FetchType.LAZY
   - SajuResult (1) ↔ CareerFortune (1:1) via sajuResultId, FetchType.LAZY
   - SajuResult (1) ↔ HiddenStemData (1:N) via sajuResultId, FetchType.LAZY
   - SajuResult (1) ↔ CareerConsultation (1:N) via sajuResultId, FetchType.LAZY

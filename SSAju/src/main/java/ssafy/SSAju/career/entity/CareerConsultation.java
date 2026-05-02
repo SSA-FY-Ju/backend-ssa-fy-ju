@@ -30,12 +30,15 @@ public class CareerConsultation {
     private LocalDateTime generatedAt;
 
     @OneToMany(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("createdAt ASC")
     private List<Industry> industries = new ArrayList<>();
 
     @OneToMany(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("createdAt ASC")
     private List<InterviewTip> interviewTips = new ArrayList<>();
 
     @OneToMany(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("createdAt ASC")
     private List<Strength> strengths = new ArrayList<>();
 
     @Builder

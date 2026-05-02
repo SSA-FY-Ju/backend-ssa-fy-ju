@@ -23,8 +23,9 @@ public class ConsultationOpenAICaller {
                                      Map<String, Integer> tenGodDistribution,
                                      Map<String, List<String>> hiddenStems,
                                      String dayMaster) {
-        String prompt = buildPrompt(sajuData, tenGodDistribution, hiddenStems, dayMaster);
         try {
+            // buildPrompt를 try 안에서 호출: 내부 NPE도 OpenAIApiException으로 래핑
+            String prompt = buildPrompt(sajuData, tenGodDistribution, hiddenStems, dayMaster);
             CareerAdviceResponse response = chatClient.prompt()
                     .user(prompt)
                     .call()
@@ -34,8 +35,9 @@ public class ConsultationOpenAICaller {
         } catch (OpenAIApiException e) {
             throw e;
         } catch (Exception e) {
-            log.error("OpenAI API 호출 실패: {}", e.getMessage());
-            throw new OpenAIApiException("OpenAI API 호출 실패: " + e.getMessage(), e);
+            // 스택트레이스만 로깅 (e.getMessage()는 민감 내부 정보 포함 가능)
+            log.error("OpenAI API 호출 실패", e);
+            throw new OpenAIApiException("OpenAI API 호출 실패", e);
         }
     }
 

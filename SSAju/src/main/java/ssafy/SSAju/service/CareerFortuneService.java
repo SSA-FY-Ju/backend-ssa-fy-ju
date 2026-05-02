@@ -65,7 +65,7 @@ public class CareerFortuneService {
         try {
             sajuResultWriteService.replaceForUserProfile(userProfile, newResult);
         } catch (DataIntegrityViolationException ex) {
-            log.warn("SajuResult 동시 insert 경합, 기존 결과 유지 (birthDate={})", birthDate);
+            log.warn("SajuResult 동시 insert 경합, 기존 결과 유지 (userId={})", userProfile.getId());
         }
 
         log.info("관운 분석 완료: favoredPeriod={}", favoredPeriod);

@@ -128,6 +128,13 @@ public class CareerFortuneAnalyzer {
     }
 
     public String buildReasoning(String favoredPeriod, Map<String, Integer> tenGodDistribution) {
+        if (tenGodDistribution == null || tenGodDistribution.isEmpty()) {
+            throw new InvalidSajuDataException("십신 데이터는 null이 아니어야 합니다");
+        }
+        if (!"H1".equals(favoredPeriod) && !"H2".equals(favoredPeriod)) {
+            throw new InvalidSajuDataException(
+                    "길한 시기는 H1 또는 H2만 가능합니다. 받은 값: " + favoredPeriod);
+        }
         int officerCount = OFFICER_GODS.stream()
                 .mapToInt(god -> tenGodDistribution.getOrDefault(god, 0))
                 .sum();

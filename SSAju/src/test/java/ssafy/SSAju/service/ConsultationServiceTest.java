@@ -32,6 +32,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -144,7 +145,7 @@ class ConsultationServiceTest {
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(80);
         given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(userProfile, sajuResult)).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
@@ -209,7 +210,7 @@ class ConsultationServiceTest {
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(60);
         given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("하반기가 취업에 유리합니다.");
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(newSajuResult);
         given(sajuResultProvider.findOrCreate(userProfile, newSajuResult)).willReturn(newSajuResult);
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
@@ -243,7 +244,7 @@ class ConsultationServiceTest {
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
         given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
@@ -271,7 +272,7 @@ class ConsultationServiceTest {
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
         given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
@@ -295,7 +296,7 @@ class ConsultationServiceTest {
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
         given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(Integer.class), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
