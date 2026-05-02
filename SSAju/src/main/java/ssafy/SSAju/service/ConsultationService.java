@@ -51,7 +51,7 @@ public class ConsultationService {
      * 각 DB 작업은 Repository의 @Transactional에 의해 개별 트랜잭션으로 실행됨.
      */
     public ConsultationResponse getCareerConsultation(ConsultationRequest request) {
-        log.info("커리어 컨설팅 시작: birthDate={}, birthTime={}", request.birthDate(), request.birthTime());
+        log.info("커리어 컨설팅 시작");
 
         // FastAPI로부터 사주 데이터 조회 (외부 I/O — 트랜잭션 밖)
         FastAPIResponse sajuData = sajuDataService.fetchSajuFromFastAPI(request.birthDate(), request.birthTime());
@@ -92,6 +92,9 @@ public class ConsultationService {
                 .industries(toIndustriesMap(advice.industries()))
                 .interviewTips(advice.interviewTips())
                 .strengths(advice.strengths())
+                .favoredPeriod(favoredPeriod)
+                .confidenceScore(confidenceScore)
+                .reasoning(reasoning)
                 .openaiModelVersion(modelVersion)
                 .build();
         careerConsultationRepository.save(consultation);
@@ -181,6 +184,7 @@ public class ConsultationService {
         map.put("hourPillar", r.hourPillar());
         map.put("birthTime", r.birthTime());
         map.put("birthDate", r.birthDate());
+        map.put("solarCorrection", r.solarCorrection());
         return map;
     }
 
@@ -200,15 +204,28 @@ public class ConsultationService {
                     .user(prompt)
                     .call()
                     .entity(CareerAdviceResponse.class);
-            if (response == null) {
-                throw new OpenAIApiException("OpenAI 응답이 비어있습니다");
-            }
+            validateCareerAdviceResponse(response);
             return response;
         } catch (OpenAIApiException e) {
             throw e;
         } catch (Exception e) {
             log.error("OpenAI API 호출 실패: {}", e.getMessage());
             throw new OpenAIApiException("OpenAI API 호출 실패: " + e.getMessage(), e);
+        }
+    }
+
+    private void validateCareerAdviceResponse(CareerAdviceResponse response) {
+        if (response == null) {
+            throw new OpenAIApiException("OpenAI 응답이 비어있습니다");
+        }
+        if (response.industries() == null || response.industries().isEmpty()) {
+            throw new OpenAIApiException("산업 추천 정보가 누락되었습니다");
+        }
+        if (response.interviewTips() == null || response.interviewTips().isEmpty()) {
+            throw new OpenAIApiException("면접 팁 정보가 누락되었습니다");
+        }
+        if (response.strengths() == null || response.strengths().isEmpty()) {
+            throw new OpenAIApiException("강점 분석 정보가 누락되었습니다");
         }
     }
 
@@ -270,11 +287,13 @@ public class ConsultationService {
                                          Map<String, Integer> tenGodDistribution,
                                          Map<String, Integer> fiveElements,
                                          String favoredPeriod) {
-        String dominantElements = fiveElements.entrySet().stream()
-                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                .limit(2)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.joining("·"));
+        String dominantElements = (fiveElements == null || fiveElements.isEmpty())
+                ? "정보 없음"
+                : fiveElements.entrySet().stream()
+                        .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                        .limit(2)
+                        .map(Map.Entry::getKey)
+                        .collect(Collectors.joining("·"));
 
         int officerCount = tenGodDistribution.getOrDefault("정관", 0)
                 + tenGodDistribution.getOrDefault("편관", 0);

@@ -481,9 +481,12 @@ public ConsultationResponse getCareerConsultation(ConsultationRequest request) {
     // 6단계: 컨설팅 결과 저장
     CareerConsultation consultation = CareerConsultation.builder()
         .sajuResult(sajuResult)
-        .industries(advice.industries())
+        .industries(toIndustriesMap(advice.industries()))  // ✅ 타입 변환
         .interviewTips(advice.interviewTips())
         .strengths(advice.strengths())
+        .favoredPeriod(favoredPeriod)  // ✅ 추가됨
+        .confidenceScore(confidenceScore)  // ✅ 추가됨
+        .reasoning(reasoning)  // ✅ 추가됨
         .openaiModelVersion(modelVersion)
         .build();
     careerConsultationRepository.save(consultation);

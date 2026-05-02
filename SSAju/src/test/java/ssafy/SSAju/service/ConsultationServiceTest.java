@@ -282,4 +282,51 @@ class ConsultationServiceTest {
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("비어있습니다");
     }
+
+    @Test
+    @DisplayName("OpenAI 부분 응답 (industries 빔) → OpenAIApiException")
+    void shouldThrow_WhenOpenAIReturnsPartialResponse_EmptyIndustries() {
+        var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        var sajuResult = mock(SajuResult.class);
+
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
+        given(tenGodCalculator.calculate(any())).willReturn(TEN_GOD);
+        given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
+        given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
+        given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
+        given(userProfileRepository.findByBirthDateAndBirthTime(BIRTH_DATE, BIRTH_TIME))
+                .willReturn(Optional.of(userProfile));
+        given(sajuResultRepository.findByUserProfile(userProfile)).willReturn(Optional.of(sajuResult));
+
+        var partialAdvice = new CareerAdviceResponse(
+                List.of(),  // ❌ 빈 industries
+                List.of("팁"),
+                List.of("강점"),
+                List.of(),
+                new CareerAdviceResponse.WealthStyle("", "", "", ""),
+                new CareerAdviceResponse.LongTermRoadmap(
+                        new CareerAdviceResponse.PhaseAdvice("", "", ""),
+                        new CareerAdviceResponse.PhaseAdvice("", "", ""),
+                        "", ""),
+                new CareerAdviceResponse.PersonalBranding("", "", "", "", ""),
+                new CareerAdviceResponse.PowerKeywords(List.of(), "", List.of(), ""),
+                new CareerAdviceResponse.MentalCare(List.of(), List.of(), "", ""),
+                new CareerAdviceResponse.EnvironmentFit("", "", "", "", "", ""),
+                new CareerAdviceResponse.WorkStyle("", "", "", ""),
+                new CareerAdviceResponse.RelationshipStrategy("", "", "", "", ""),
+                new CareerAdviceResponse.CareerTimeline(2026, Map.of(), List.of(), List.of(), ""),
+                List.of(), "", ""
+        );
+
+        var promptSpec = mock(ChatClient.ChatClientRequestSpec.class);
+        var callSpec = mock(ChatClient.CallResponseSpec.class);
+        given(chatClient.prompt()).willReturn(promptSpec);
+        given(promptSpec.user(any(String.class))).willReturn(promptSpec);
+        given(promptSpec.call()).willReturn(callSpec);
+        given(callSpec.entity(CareerAdviceResponse.class)).willReturn(partialAdvice);
+
+        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
+                .isInstanceOf(OpenAIApiException.class)
+                .hasMessageContaining("산업 추천 정보가 누락");
+    }
 }

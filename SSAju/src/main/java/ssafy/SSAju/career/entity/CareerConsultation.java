@@ -40,6 +40,15 @@ public class CareerConsultation {
     @Column(name = "openai_model_version")
     private String openaiModelVersion;
 
+    @Column(name = "favored_period")
+    private String favoredPeriod;
+
+    @Column(name = "confidence_score")
+    private int confidenceScore;
+
+    @Column(name = "reasoning")
+    private String reasoning;
+
     @Column(name = "generated_at", nullable = false)
     private LocalDateTime generatedAt;
 
@@ -48,12 +57,18 @@ public class CareerConsultation {
                               List<Map<String, String>> industries,
                               List<String> interviewTips,
                               List<String> strengths,
-                              String openaiModelVersion) {
+                              String openaiModelVersion,
+                              String favoredPeriod,
+                              int confidenceScore,
+                              String reasoning) {
         this.sajuResult = sajuResult;
         this.industries = industries;
         this.interviewTips = interviewTips;
         this.strengths = strengths;
         this.openaiModelVersion = openaiModelVersion;
+        this.favoredPeriod = favoredPeriod;
+        this.confidenceScore = confidenceScore;
+        this.reasoning = reasoning;
         this.generatedAt = LocalDateTime.now();
     }
 }

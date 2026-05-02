@@ -555,7 +555,7 @@ And:   Missing birthTime → 400 Bad Request with clear error message
 ```
 
 ### US2: AI Consultation (Complete MVP - Expanded to 19 Fields)
-```
+```text
 Given: Valid birthDate (YYYY-MM-DD), birthTime (HH:mm, required, 24-hour format)
 When:  POST /api/career/consultation with {"birthDate":"YYYY-MM-DD", "birthTime":"HH:mm"}
 Then:  Response includes 19 fields across 16 field groups:
