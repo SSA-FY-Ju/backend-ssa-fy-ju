@@ -177,6 +177,9 @@ class ConsultationServiceTest {
         assertThat(result.relationshipStrategy()).isNotNull();
         assertThat(result.careerTimeline()).isNotNull();
         assertThat(result.careerTimeline().year()).isEqualTo(2026);
+        assertThat(result.analysisSummary()).isNotBlank();
+        assertThat(result.analysisSummary()).contains("己");
+        assertThat(result.analysisSummary()).contains("H1");
 
         verify(careerConsultationRepository).save(any());
     }

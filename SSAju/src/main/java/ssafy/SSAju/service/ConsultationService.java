@@ -27,6 +27,7 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -105,6 +106,8 @@ public class ConsultationService {
                 advice.keyTenGods()
         );
 
+        String analysisSummary = buildAnalysisSummary(dayMaster, tenGodDistribution, sajuData.fiveElements(), favoredPeriod);
+
         log.info("커리어 컨설팅 완료: sajuResultId={}, favoredPeriod={}", sajuResult.getId(), favoredPeriod);
         return new ConsultationResponse(
                 advice.industries(),
@@ -124,7 +127,8 @@ public class ConsultationService {
                 advice.environmentFit(),
                 advice.workStyle(),
                 advice.relationshipStrategy(),
-                advice.careerTimeline()
+                advice.careerTimeline(),
+                analysisSummary
         );
     }
 
@@ -227,7 +231,8 @@ public class ConsultationService {
                                 String dayMaster) {
         int currentYear = LocalDate.now().getYear();
         return """
-                당신은 사주 명리학 전문가입니다. 아래 사주 데이터를 분석하여 취업 준비생에게 맞춤 커리어 조언을 제공해주세요.
+                당신은 사주 명리학 전문가이자 취업 커리어 컨설턴트입니다.
+                아래 사주 데이터를 분석하여 취업 준비생에게 맞춤 커리어 조언을 제공해주세요.
 
                 [사주 데이터]
                 - 일간(日干): %s
@@ -237,112 +242,14 @@ public class ConsultationService {
                 - 지장간(地藏干): %s
                 - 십신 분포(十神): %s
 
-                아래 JSON 형식으로 정확히 응답해주세요:
-                {
-                  "industries": [
-                    {"name": "산업명", "reason": "사주 기반 이유", "recommendedRoles": ["직무1", "직무2"]}
-                  ],
-                  "interviewTips": ["팁1", "팁2", "팁3"],
-                  "strengths": ["강점1", "강점2", "강점3"],
-                  "cautions": ["주의사항1", "주의사항2", "주의사항3"],
-                  "wealthStyle": {
-                    "incomeSource": "...",
-                    "financialAdvice": "...",
-                    "investmentTendency": "...",
-                    "additionalIncome": "..."
-                  },
-                  "longTermRoadmap": {
-                    "phase0to2years": {"goal": "...", "focus": "...", "action": "..."},
-                    "phase3to5years": {"goal": "...", "focus": "...", "action": "..."},
-                    "ultimateGoal": "...",
-                    "goalDescription": "..."
-                  },
-                  "personalBranding": {
-                    "suitColor": "...",
-                    "impression": "...",
-                    "hairAndMakeup": "...",
-                    "brandingKeyword": "...",
-                    "taglineForResume": "..."
-                  },
-                  "powerKeywords": {
-                    "keywords": [
-                      {"keyword": "해시태그형_키워드", "element": "오행", "description": "...", "usageExample": "...", "context": "..."}
-                    ],
-                    "selectionGuide": "...",
-                    "usageTips": ["팁1", "팁2"],
-                    "avoidanceTip": "..."
-                  },
-                  "mentalCare": {
-                    "stressVulnerability": ["약점1", "약점2"],
-                    "rechargeMethod": ["방법1", "방법2"],
-                    "mindsetMantra": "...",
-                    "emergencyTactic": "..."
-                  },
-                  "environmentFit": {
-                    "workVibe": "...",
-                    "companySize": "...",
-                    "colleagueType": "...",
-                    "conflictApproach": "...",
-                    "physicalEnv": "...",
-                    "culturalFit": "..."
-                  },
-                  "workStyle": {
-                    "preferredCompanyType": "...",
-                    "leadershipType": "...",
-                    "decisionMaking": "...",
-                    "conflictResolution": "..."
-                  },
-                  "relationshipStrategy": {
-                    "socialStyle": "...",
-                    "networkingApproach": "...",
-                    "teamPosition": "...",
-                    "conflictResolution": "...",
-                    "careerNetworking": "..."
-                  },
-                  "careerTimeline": {
-                    "year": %d,
-                    "months": {
-                      "January": {"type": "운세유형", "description": "..."},
-                      "February": {"type": "...", "description": "..."},
-                      "March": {"type": "...", "description": "..."},
-                      "April": {"type": "...", "description": "..."},
-                      "May": {"type": "...", "description": "..."},
-                      "June": {"type": "...", "description": "..."},
-                      "July": {"type": "...", "description": "..."},
-                      "August": {"type": "...", "description": "..."},
-                      "September": {"type": "...", "description": "..."},
-                      "October": {"type": "...", "description": "..."},
-                      "November": {"type": "...", "description": "..."},
-                      "December": {"type": "...", "description": "..."}
-                    },
-                    "pivotPoints": [
-                      {"month": "월이름", "type": "유형", "score": 점수(1~10), "description": "..."}
-                    ],
-                    "warningMonths": ["Month1", "Month2"],
-                    "warningDescription": "..."
-                  },
-                  "keyTenGods": ["십신1", "십신2"],
-                  "dayMasterDescription": "일간 기운과 성향 (1~2문장)",
-                  "fiveElementsAnalysis": "오행 분포 종합 분석 (1~2문장)"
-                }
-
-                규칙:
-                - industries: 추천 산업군 3~5개 (name, reason, recommendedRoles 포함)
-                - interviewTips: 면접 준비 팁 3개 (사주 특성 기반)
-                - strengths: 직무 강점 3개 (십신·지장간 분석 기반)
-                - cautions: 취업 활동에서 주의해야 할 약점 3개 (사주 기반)
-                - wealthStyle: 재물운과 커리어 상관관계 분석
-                - longTermRoadmap: 0~2년·3~5년 단계별 목표와 최종 지향점
-                - personalBranding: 면접 이미지 전략 및 자소서 브랜딩
-                - powerKeywords: 자소서 필살기 키워드 3개 (해시태그 형식, 오행 기반)
-                - mentalCare: 취업 준비 멘탈 관리 및 번아웃 방지책
-                - environmentFit: 최적 근무 환경 및 조직 문화 적합성
-                - workStyle: 업무 스타일 및 조직 내 포지션
-                - relationshipStrategy: 직장 인간관계 및 네트워킹 전략
-                - careerTimeline: %d년 기준 12달 월별 운세 (pivotPoints는 점수 8 이상 달만)
-                - keyTenGods: 커리어에 가장 큰 영향을 주는 핵심 십신 2~3개
-                - dayMasterDescription: 일간의 기운과 성향 (간결하게 1~2문장)
-                - fiveElementsAnalysis: 오행 분포 종합 분석 (1~2문장)
+                [분석 요청]
+                - 취업 적합 산업군 3~5개 (name, reason, recommendedRoles 포함)
+                - 면접 전략 및 직무 강점·약점 분석
+                - 재물운, 장기 커리어 로드맵(0~2년, 3~5년 단계)
+                - 퍼스널 브랜딩, 자소서 파워키워드(3개, 오행 기반, 해시태그 형식)
+                - 멘탈 케어, 최적 근무 환경, 업무 스타일, 인간관계 전략
+                - %d년 기준 12개월 월별 운세 및 전환점(pivotPoints: 점수 8 이상인 달만)
+                - 일간(%s) 기반 성향 분석 및 핵심 십신 2~3개 선별
                 """.formatted(
                 dayMaster,
                 sajuData.heavenlyStems(),
@@ -351,7 +258,26 @@ public class ConsultationService {
                 hiddenStems,
                 tenGodDistribution,
                 currentYear,
-                currentYear
+                dayMaster
         );
+    }
+
+    private String buildAnalysisSummary(String dayMaster,
+                                         Map<String, Integer> tenGodDistribution,
+                                         Map<String, Integer> fiveElements,
+                                         String favoredPeriod) {
+        String dominantElements = fiveElements.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(2)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.joining("·"));
+
+        int officerCount = tenGodDistribution.getOrDefault("정관", 0)
+                + tenGodDistribution.getOrDefault("편관", 0);
+        String tenGodSummary = officerCount > 0 ? "정관·편관 기운" : "십신 종합";
+
+        int currentYear = LocalDate.now().getYear();
+        return "%s 일간 · 오행 %s 강세 · %s 기반 | %d년 12개월 타임라인 + 관운 분석 (%s)"
+                .formatted(dayMaster, dominantElements, tenGodSummary, currentYear, favoredPeriod);
     }
 }

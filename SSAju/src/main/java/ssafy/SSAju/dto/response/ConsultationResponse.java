@@ -30,7 +30,10 @@ public record ConsultationResponse(
         CareerAdviceResponse.EnvironmentFit environmentFit,
         CareerAdviceResponse.WorkStyle workStyle,
         CareerAdviceResponse.RelationshipStrategy relationshipStrategy,
-        CareerAdviceResponse.CareerTimeline careerTimeline
+        CareerAdviceResponse.CareerTimeline careerTimeline,
+
+        // 분석에 사용된 사주 데이터 한 줄 요약
+        String analysisSummary
 ) {
     public record SajuProfile(
             String dayMaster,

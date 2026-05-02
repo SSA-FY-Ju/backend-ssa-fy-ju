@@ -228,60 +228,162 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 **Goal**: Users receive AI-powered career consultation (recommended industries, interview tips, strengths).
 **Independent Test**: Saju data → OpenAI JSON Mode → Structured advice response (requires US1 SajuResult)
 **Expected Outcome**: Consultation endpoint working, storing CareerConsultation in DB
+**Implementation Status**: ✅ **COMPLETED** (Commits 62ae1b3 + 657e77a, 2026-04-30)
 
-- [ ] T022 [US2] Create `CareerConsultation` entity in `career/entity/`
+#### Key Implementation Notes (Session 2026-04-30)
+
+**1-Call Design Refactoring** (Commit 62ae1b3):
+- ConsultationService: 내부적으로 FastAPI 호출, 십신/지장간 계산, 관운 분석 수행
+- ConsultationRequest: 7개 필드 → 2개 필드 단순화 (birthDate + birthTime만 필요)
+- ConsultationResponse 확장: favoredPeriod, confidenceScore, reasoning 추가
+- 트랜잭션 분리: FastAPI/OpenAI I/O는 트랜잭션 밖에서 수행
+
+**Response Data Completeness** (Commit 657e77a):
+- ConsultationResponse에 3개 새 필드 추가: favoredPeriod (H1/H2), confidenceScore (0-100), reasoning
+- 클라이언트는 단일 POST 요청으로 AI 조언 + 관운 분석 모두 수신
+- SajuResult 자동 생성 (없을 경우): findOrCreateSajuResult() 메서드로 처리
+
+---
+
+- [v] T022 [US2] Create `CareerConsultation` entity in `career/entity/`
   - Fields: id, sajuResultId (FK), industries (JSON list), interviewTips (JSON list), strengths (JSON list), openaiModelVersion, generatedAt
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/CareerConsultation.java`
 
-- [ ] T023 [US2] [P] Create `CareerConsultationRepository` in `repository/`
+- [v] T023 [US2] [P] Create `CareerConsultationRepository` in `repository/`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/CareerConsultationRepository.java`
 
-- [ ] T024 [US2] [P] Create `ConsultationRequest` DTO in `dto/request/`
-  - Fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), heavenlyStems (List<String>), earthlyBranches (List<String>), fiveElements (Map<String, Integer>), hiddenStems (Map<String, List<String>>), tenGodDistribution (Map<String, Integer>)
-  - Validation: @NotNull on birthDate/birthTime, size checks for stems/branches (must be 4 each), fiveElements must sum correctly, hiddenStems structure validation
-  - Note: hiddenStems from HiddenStemCalculator result, tenGodDistribution from TenGodCalculator result
+- [v] T024 [US2] [P] Create `ConsultationRequest` DTO in `dto/request/`
+  - **Simplified** (Session 2026-04-30): 2개 필드만 필요
+    - birthDate (LocalDate, @NotNull, YYYY-MM-DD format)
+    - birthTime (LocalTime, @NotNull, HH:mm format)
+  - **Before**: 7 필드 (heavenlyStems, earthlyBranches, fiveElements, hiddenStems, tenGodDistribution 포함)
+  - **After**: 내부에서 모두 계산하므로 기본 정보만 입력
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/ConsultationRequest.java`
 
-- [ ] T025 [US2] [P] Create `ConsultationResponse` DTO in `dto/response/`
-  - Fields: industries (List with name + reason), interviewTips (List), strengths (List), openaiModelVersion
+- [v] T025 [US2] [P] Create `ConsultationResponse` DTO in `dto/response/`
+  - **Massively Expanded** (Session 2026-04-30): 19개 필드 그룹 (16개 필드 그룹 + 3개 메타필드)
+    - **기본 AI 조언** (3 필드):
+      - industries (List<CareerAdviceResponse.IndustryRecommendation> with name + reason)
+      - interviewTips (List<String>)
+      - strengths (List<String>)
+    - **관운 분석** (3 필드):
+      - favoredPeriod (String: "H1"/"H2")
+      - confidenceScore (int: 0-100)
+      - reasoning (String)
+    - **사주 베이스 데이터** (1 필드):
+      - sajuProfile (SajuProfile with dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods)
+    - **OpenAI 분석 결과** (12 필드):
+      - cautions (List<String>)
+      - wealthStyle (CareerAdviceResponse.WealthStyle: incomeSource, financialAdvice, investmentTendency, additionalIncome)
+      - longTermRoadmap (CareerAdviceResponse.LongTermRoadmap: phase0to2years, phase3to5years, ultimateGoal, goalDescription)
+      - personalBranding (CareerAdviceResponse.PersonalBranding: suitColor, impression, hairAndMakeup, brandingKeyword, taglineForResume)
+      - powerKeywords (CareerAdviceResponse.PowerKeywords: keywords[], selectionGuide, usageTips[], avoidanceTip)
+      - mentalCare (CareerAdviceResponse.MentalCare: stressVulnerability[], rechargeMethod[], mindsetMantra, emergencyTactic)
+      - environmentFit (CareerAdviceResponse.EnvironmentFit: workVibe, companySize, colleagueType, conflictApproach, physicalEnv, culturalFit)
+      - workStyle (CareerAdviceResponse.WorkStyle: preferredCompanyType, leadershipType, decisionMaking, conflictResolution)
+      - relationshipStrategy (CareerAdviceResponse.RelationshipStrategy: socialStyle, networkingApproach, teamPosition, conflictResolution, careerNetworking)
+      - careerTimeline (CareerAdviceResponse.CareerTimeline: year, months[], pivotPoints[], warningMonths[], warningDescription)
+    - **메타정보** (1 필드):
+      - openaiModelVersion (String)
+  - **Nested Records Structure**:
+    ```java
+    record CareerAdviceResponse.IndustryRecommendation(String name, String reason, List<String> recommendedRoles)
+    record CareerAdviceResponse.WealthStyle(String incomeSource, String financialAdvice, String investmentTendency, String additionalIncome)
+    record CareerAdviceResponse.PhaseAdvice(String goal, String focus, String action)
+    record CareerAdviceResponse.LongTermRoadmap(PhaseAdvice phase0to2years, PhaseAdvice phase3to5years, String ultimateGoal, String goalDescription)
+    record CareerAdviceResponse.PersonalBranding(String suitColor, String impression, String hairAndMakeup, String brandingKeyword, String taglineForResume)
+    record CareerAdviceResponse.PowerKeyword(String keyword, String element, String description, String usageExample, String context)
+    record CareerAdviceResponse.PowerKeywords(List<PowerKeyword> keywords, String selectionGuide, List<String> usageTips, String avoidanceTip)
+    record CareerAdviceResponse.MentalCare(List<String> stressVulnerability, List<String> rechargeMethod, String mindsetMantra, String emergencyTactic)
+    record CareerAdviceResponse.EnvironmentFit(String workVibe, String companySize, String colleagueType, String conflictApproach, String physicalEnv, String culturalFit)
+    record CareerAdviceResponse.WorkStyle(String preferredCompanyType, String leadershipType, String decisionMaking, String conflictResolution)
+    record CareerAdviceResponse.RelationshipStrategy(String socialStyle, String networkingApproach, String teamPosition, String conflictResolution, String careerNetworking)
+    record CareerAdviceResponse.MonthFortune(String type, String description)
+    record CareerAdviceResponse.PivotPoint(String month, String type, int score, String description)
+    record CareerAdviceResponse.CareerTimeline(int year, Map<String, MonthFortune> months, List<PivotPoint> pivotPoints, List<String> warningMonths, String warningDescription)
+    record ConsultationResponse.SajuProfile(String dayMaster, String dayMasterDescription, Map<String, Integer> fiveElements, String fiveElementsAnalysis, Map<String, Integer> tenGodDistribution, List<String> keyTenGods)
+    ```
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/ConsultationResponse.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/dto/external/CareerAdviceResponse.java` (14개+ 중첩 record 타입 포함)
 
-- [ ] T026 [US2] Create `ConsultationService` in `service/`
-  - Method: `getCareerConsultation(LocalDate birthDate, LocalTime birthTime, saju data)` → fetches saju via SajuDataService, calculates TenGod + HiddenStem, calls OpenAI via ChatClient
-  - Logic: Call `SajuDataService.fetchSajuFromFastAPI()` with birthDate + birthTime → Use `TenGodCalculator` + `HiddenStemCalculator` to get accurate 오행 분포 → call OpenAI with complete saju data (including hiddenStems) via JSON Mode
-  - Handles: Timeout → OpenAIApiException, invalid response → InvalidSajuDataException, missing time → InvalidSajuDataException
-  - Stores: CareerConsultation in DB (linked to SajuResult with birthTime, includes hiddenStems-based 오행 분포)
-  - Note: HiddenStemCalculator 결과(hiddenStems Map)와 TenGodCalculator 결과(tenGodDistribution)를 모두 OpenAI 프롬프트에 포함
+- [v] T026 [US2] Create `ConsultationService` in `service/`
+  - **1-Call Design with Expanded Response** (Session 2026-04-30):
+    - Method: `getCareerConsultation(ConsultationRequest)` → birthDate + birthTime만 입력받음
+    - Logic: 
+      1. SajuDataService.fetchSajuFromFastAPI(birthDate, birthTime) 호출
+      2. TenGodCalculator + HiddenStemCalculator로 십신 + 지장간 계산
+      3. CareerFortuneAnalyzer로 관운 분석 (favoredPeriod, confidenceScore, reasoning)
+      4. findOrCreateUserProfile(birthDate, birthTime)
+      5. findOrCreateSajuResult(userProfile, sajuData, tenGodDistribution, hiddenStems)
+      6. OpenAI 호출 (ChatClient JSON Mode with 16+ field groups in schema)
+      7. CareerConsultation 저장
+      8. ConsultationResponse 반환 (19개 필드 모두 포함: 기본 조언 3 + 관운 분석 3 + 사주 프로필 1 + OpenAI 분석 12 필드)
+  - **Transaction Management**: @Transactional 제거. FastAPI/OpenAI I/O는 트랜잭션 밖. 각 DB 작업은 개별 트랜잭션.
+  - **OpenAI Prompt Enhancement**: buildPrompt() 메서드에 현재 연도(LocalDate.now().getYear()), 12개월 타임라인 요청, 16개 필드 그룹 명시 포함
+  - **Helper Methods**:
+    - `findOrCreateUserProfile()`: UNIQUE(birthDate, birthTime) 제약 활용, DIVE 처리
+    - `findOrCreateSajuResult()`: 기존 SajuResult 재사용, 신규 생성 시 hiddenStems + tenGodDistribution 저장
+    - `callOpenAI()`: ChatClient + JSON Mode로 CareerAdviceResponse 매핑 (16+ field groups)
+    - `buildReasoning()`: favoredPeriod + tenGodDistribution + dayMaster 종합 분석으로 근거 문자열 생성 (예: "정관 기운" 설명 포함)
+    - `buildPrompt()`: 현재 연도, 12개월 타임라인, 십신 + 지장간 분석 결과를 모두 포함한 완전한 JSON 스키마 정의
+    - `toObjectMap()`: FastAPIResponse → Map<String, Object> 변환
+    - `toIndustriesMap()`: IndustryRecommendation → Map<String, String> 변환 (DB 저장용)
   - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
 
-- [ ] T027 [US2] Create `ConsultationController` in `controller/`
-  - Endpoint: `POST /api/career/consultation` with ConsultationRequest (birthDate + birthTime both required, heavenlyStems/earthlyBranches/fiveElements)
-  - Handles: Request validation (@Valid on all fields), calls `ConsultationService.getCareerConsultation()`, returns `ApiResponse<ConsultationResponse>`
-  - Validation: Reject requests with missing birthTime or malformed HH:mm format (400 Bad Request)
+- [v] T027 [US2] Create `ConsultationController` in `controller/`
+  - Endpoint: `POST /api/career/consultation` with ConsultationRequest (birthDate + birthTime, both required)
+  - **Simplified Request** (Session 2026-04-30): JSON body에 birthDate, birthTime만 포함
+    ```json
+    {
+      "birthDate": "1990-10-10",
+      "birthTime": "14:30"
+    }
+    ```
+  - **Expanded Response** (Session 2026-04-30): ApiResponse<ConsultationResponse> (19개 필드)
+    - 기본 조언: industries, interviewTips, strengths
+    - 관운: favoredPeriod, confidenceScore, reasoning
+    - 사주: sajuProfile (dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods)
+    - OpenAI 분석: cautions, wealthStyle, longTermRoadmap, personalBranding, powerKeywords, mentalCare, environmentFit, workStyle, relationshipStrategy, careerTimeline
+    - 메타: openaiModelVersion
+  - Validation: @Valid 어노테이션으로 필수 필드 + 형식 검증 (birthDate YYYY-MM-DD, birthTime HH:mm)
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/ConsultationController.java`
 
-- [ ] T028 [US2] Write unit tests for `ConsultationService` in `src/test/`
+- [v] T028 [US2] Write unit tests for `ConsultationService` in `src/test/`
+  - **Mock Setup** (Session 2026-04-30):
+    - @Mock: ChatClient, SajuDataService, TenGodCalculator, HiddenStemCalculator, CareerFortuneAnalyzer, UserProfileRepository, SajuResultRepository, CareerConsultationRepository
   - Test cases:
-    1. Valid saju data (birthDate + birthTime + stems/branches/fiveElements) → consultation returned with industries/tips/strengths
-    2. Missing birthTime → InvalidSajuDataException
-    3. Invalid stem count (not 4) → InvalidSajuDataException
-    4. Invalid branch count (not 4) → InvalidSajuDataException
-    5. OpenAI timeout → OpenAIApiException
-    6. Null birthTime → NullPointerException / ValidationException
+    1. Happy path: valid birthDate + birthTime → consultation with 19 fields (모든 필드 그룹 포함: industries/tips/strengths/version/favoredPeriod/confidenceScore/reasoning/sajuProfile/cautions/wealthStyle/longTermRoadmap/personalBranding/powerKeywords/mentalCare/environmentFit/workStyle/relationshipStrategy/careerTimeline)
+    2. SajuResult 기존 존재 → 재사용하고 저장
+    3. SajuResult 신규 생성 → 저장 (hiddenStems, tenGodDistribution 포함)
+    4. OpenAI API 호출 실패 → OpenAIApiException
+    5. OpenAI 응답 null → OpenAIApiException
+    6. 모든 nested record 타입 검증 (CareerAdviceResponse.IndustryRecommendation, WealthStyle, LongTermRoadmap, 등)
+  - Test Fixture: MOCK_SAJU (FastAPIResponse), MOCK_ADVICE (CareerAdviceResponse with 16+ field groups)
   - File: `SSAju/src/test/java/ssafy/SSAju/service/ConsultationServiceTest.java`
 
-- [ ] T029 [US2] Write unit tests for `ConsultationController` in `src/test/`
+- [v] T029 [US2] Write unit tests for `ConsultationController` in `src/test/`
+  - **Simplified Request Body** (Session 2026-04-30):
+    ```json
+    {
+      "birthDate": "1990-10-10",
+      "birthTime": "14:30"
+    }
+    ```
+  - **Expanded Response** (Session 2026-04-30): 19개 필드 모두 포함 (기본 조언 3 + 관운 3 + 사주 프로필 1 + OpenAI 분석 12 필드)
+  - Setup: MockMvcBuilders.standaloneSetup(controller) + SajuGlobalExceptionHandler
   - Test cases:
-    1. Valid request (birthDate + birthTime + stems/branches/fiveElements) → 200 OK with consultation response
-    2. Missing birthTime field → 400 Bad Request
+    1. Valid request (birthDate + birthTime) → 200 OK with 19-field response including all nested structures
+    2. Missing birthTime → 400 Bad Request
     3. Invalid time format → 400 Bad Request
-    4. Invalid stem count or format → 400 Bad Request
-    5. OpenAI timeout via service → 504 Gateway Timeout
+    4. Empty body → 400 Bad Request
+    5. OpenAI timeout → 504 Gateway Timeout (via service exception)
+    6. Verify response includes sajuProfile, all OpenAI field groups (wealthStyle, powerKeywords, careerTimeline 등)
   - File: `SSAju/src/test/java/ssafy/SSAju/controller/ConsultationControllerTest.java`
 
-- [ ] T030 [US2] Run all tests for US2 features
-  - Command: `./gradlew test --tests "ssafy.SSAju.service.ConsultationServiceTest OR ssafy.SSAju.controller.ConsultationControllerTest"`
-  - Verify: BUILD SUCCESSFUL before committing
+- [v] T030 [US2] Run all tests for US2 features
+  - Command: `./gradlew test`
+  - **Result**: BUILD SUCCESSFUL (all tests passed, 2026-04-30)
+  - Verified: 전체 테스트 스위트 통과, CommitID 657e77a
 
 ---
 
@@ -452,14 +554,18 @@ And:   HiddenStemCalculator + TenGodCalculator 결과가 SajuResult에 저장되
 And:   Missing birthTime → 400 Bad Request with clear error message
 ```
 
-### US2: AI Consultation (Complete MVP)
+### US2: AI Consultation (Complete MVP - Expanded to 19 Fields)
 ```
-Given: Valid birthDate (YYYY-MM-DD), birthTime (HH:mm), stems (4 values), branches (4 values), fiveElements, hiddenStems (Map), tenGodDistribution
-When:  POST /api/career/consultation with complete saju data including birthTime and 지장간 information
-Then:  Response includes industries (3-5), interviewTips, strengths based on TenGod + HiddenStem analysis
+Given: Valid birthDate (YYYY-MM-DD), birthTime (HH:mm, required, 24-hour format)
+When:  POST /api/career/consultation with {"birthDate":"YYYY-MM-DD", "birthTime":"HH:mm"}
+Then:  Response includes 19 fields across 16 field groups:
+       - 기본 조언: industries (3-5), interviewTips, strengths
+       - 관운 분석: favoredPeriod (H1/H2), confidenceScore (0-100), reasoning (정관 기운 설명 포함)
+       - 사주 데이터: sajuProfile (dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods)
+       - OpenAI 분석: cautions, wealthStyle (4 필드), longTermRoadmap (2 단계 + 목표), personalBranding (5 필드), powerKeywords (키워드 배열 + 선택가이드), mentalCare (취약점 + 충전방법), environmentFit (6 필드), workStyle (4 필드), relationshipStrategy (5 필드), careerTimeline (연도 + 12개월 + 전환점)
 And:   CareerConsultation entity persisted in DB linked to SajuResult (with birthTime, hiddenStems, tenGodDistribution)
-And:   Spring AI / OpenAI JSON Mode receives complete saju data including 지장간 for more accurate advice
-And:   OpenAI 프롬프트에 십신(十神) + 지장간(地藏干) 분석 결과 포함하여 더 정밀한 커리어 컨설팅 제공
+And:   Spring AI / OpenAI JSON Mode receives complete saju data including 지장간 for more accurate advice across all 16 field groups
+And:   OpenAI 프롬프트에 현재 연도, 12개월 타임라인, 십신(十神) + 지장간(地藏干) 분석 결과, 모든 16개 필드 그룹 요청 포함
 And:   Missing birthTime → 400 Bad Request with validation error
 ```
 

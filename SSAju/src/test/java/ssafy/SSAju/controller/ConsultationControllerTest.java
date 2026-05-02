@@ -79,7 +79,8 @@ class ConsultationControllerTest {
                     Map.of("March", new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
                     List.of(new CareerAdviceResponse.PivotPoint("March", "적극기", 9, "정관 기운의 절정")),
                     List.of("May", "July"),
-                    "이 기간엔 급하게 결정하지 말 것")
+                    "이 기간엔 급하게 결정하지 말 것"),
+            "己 일간 · 오행 火·金 강세 · 정관·편관 기운 기반 | 2026년 12개월 타임라인 + 관운 분석 (H1)"
     );
 
     private static final String VALID_REQUEST_BODY = """
@@ -132,7 +133,8 @@ class ConsultationControllerTest {
                 .andExpect(jsonPath("$.data.workStyle").exists())
                 .andExpect(jsonPath("$.data.relationshipStrategy").exists())
                 .andExpect(jsonPath("$.data.careerTimeline").exists())
-                .andExpect(jsonPath("$.data.careerTimeline.year").value(2026));
+                .andExpect(jsonPath("$.data.careerTimeline.year").value(2026))
+                .andExpect(jsonPath("$.data.analysisSummary").isNotEmpty());
     }
 
     // ─────────────────────────────────────────

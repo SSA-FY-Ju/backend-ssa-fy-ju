@@ -23,7 +23,7 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 ## Technical Context
 
 **Language/Version**: Java 21, Spring Boot 4.0.5
-**Primary Dependencies**: Spring Data JPA, Spring Web, Spring AI, Lombok, Thymeleaf, Spring Validation
+**Primary Dependencies**: Spring Data JPA, Spring Web, Spring AI (ChatClient), Lombok, Spring Validation
 **Storage**: MySQL 8.0+ (JSON 컬럼 지원, JPA via application.yaml)
 **Testing**: JUnit 5 + AssertJ (Given-When-Then 패턴)
 **Target Platform**: Backend REST API (HTTP JSON)
@@ -33,6 +33,14 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - AI 컨설팅: 15초 이내 (OpenAI 지연 + 재시도 포함)
 - 기업 궁합: 8초 이내
 - 동시 처리: 5,000명 사용자 (Connection Pool 기본값)
+
+**Key Technical Decisions** (Session 2026-04-30):
+- **1-Call API Design**: `/api/career/consultation` 엔드포인트가 내부적으로 모든 외부 API 호출 오케스트레이션 (FastAPI, OpenAI). 클라이언트는 birthDate + birthTime만 제공하고, 모든 계산(십신, 지장간, 관운 분석) 및 16개 필드 그룹의 완전한 AI 조언을 한 번의 요청으로 수신.
+- **Expanded Response (16+ Field Groups)**: ConsultationResponse는 19개 필드 포함: 기본 조언(industries, interviewTips, strengths) + 관운 분석(favoredPeriod, confidenceScore, reasoning) + 사주 프로필(sajuProfile with dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods) + OpenAI 분석(cautions, wealthStyle, longTermRoadmap, personalBranding, powerKeywords, mentalCare, environmentFit, workStyle, relationshipStrategy, careerTimeline). OpenAI 프롬프트에 현재 연도, 12개월 타임라인, 모든 필드 그룹 포함.
+- **Transaction Separation**: ConsultationService에서 @Transactional 제거. FastAPI/OpenAI I/O는 트랜잭션 밖에서 수행. 각 DB 작업은 Repository의 @Transactional에 의해 개별 트랜잭션으로 실행. Network 지연이 Connection Pool을 점유하지 않음.
+- **Jackson 3.x (Spring Boot 4.0.5)**: 패키지명이 `tools.jackson.*`으로 변경됨. `com.fasterxml.jackson.*`은 Jackson 2.x용이므로 사용 금지.
+- **Spring AI ChatClient**: OpenAI JSON Mode로 `CareerAdviceResponse` record에 자동 매핑. 16개 필드 그룹 모두 포함. 타입 안전성 + 에러 처리 자동화.
+- **Race Condition Handling**: `DataIntegrityViolationException` 발생 시 호출 서비스에서 catch하여 다시 find 수행 (이미 생성된 결과 재사용).
 
 **Constraints**:
 - Phase 1: Redis/Global 캐싱 금지 (도메인 로직 정확성 우선)
