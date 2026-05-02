@@ -448,139 +448,29 @@ CareerAdviceResponse response = chatClient.prompt()
 ```
 
 **1-Call Design Pattern (Expanded to 16 Field Groups)** (Session 2026-04-30):
-```java
-public ConsultationResponse getCareerConsultation(ConsultationRequest request) {
-    // 1단계: FastAPI로부터 기본 사주 데이터 조회
-    FastAPIResponse sajuData = sajuDataService.fetchSajuFromFastAPI(
-        request.birthDate(), request.birthTime());
-    
-    // 2단계: Spring에서 십신 및 지장간 계산
-    Map<String, Integer> tenGodDistribution = tenGodCalculator.calculate(
-        sajuData.heavenlyStems());
-    Map<String, List<String>> hiddenStems = hiddenStemCalculator.calculate(
-        sajuData.earthlyBranches());
-    String dayMaster = calculateDayMaster(sajuData.heavenlyStems());
-    
-    // 3단계: 관운 분석 (H1/H2 판정)
-    String favoredPeriod = careerFortuneAnalyzer.analyzeFavoredPeriod(
-        tenGodDistribution, hiddenStems, dayMaster, sajuData.earthlyBranches());
-    int confidenceScore = careerFortuneAnalyzer.calculateConfidenceScore(
-        tenGodDistribution, hiddenStems, dayMaster);
-    String reasoning = buildReasoning(favoredPeriod, tenGodDistribution, dayMaster);
-    
-    // 4단계: 사용자 프로필 및 사주 결과 저장
-    UserProfile userProfile = findOrCreateUserProfile(
-        request.birthDate(), request.birthTime());
-    SajuResult sajuResult = findOrCreateSajuResult(
-        userProfile, sajuData, tenGodDistribution, hiddenStems);
-    
-    // 5단계: OpenAI 호출 (십신 + 지장간 + 16개 필드 그룹 포함 프롬프트)
-    CareerAdviceResponse advice = callOpenAI(
-        sajuData, tenGodDistribution, hiddenStems, dayMaster);
-    
-    // 6단계: 컨설팅 결과 저장
-    CareerConsultation consultation = CareerConsultation.builder()
-        .sajuResult(sajuResult)
-        .industries(toIndustriesMap(advice.industries()))  // ✅ 타입 변환
-        .interviewTips(advice.interviewTips())
-        .strengths(advice.strengths())
-        .favoredPeriod(favoredPeriod)  // ✅ 추가됨
-        .confidenceScore(confidenceScore)  // ✅ 추가됨
-        .reasoning(reasoning)  // ✅ 추가됨
-        .openaiModelVersion(modelVersion)
-        .build();
-    careerConsultationRepository.save(consultation);
-    
-    // 7단계: 응답 반환 (19개 필드: 기본 조언 3 + 관운 분석 3 + 사주 프로필 1 + OpenAI 분석 12 필드)
-    return new ConsultationResponse(
-        advice.industries(), advice.interviewTips(), advice.strengths(),
-        modelVersion, favoredPeriod, confidenceScore, reasoning,
-        new ConsultationResponse.SajuProfile(
-            dayMaster, advice.dayMasterDescription(), sajuData.fiveElements(),
-            advice.fiveElementsAnalysis(), tenGodDistribution, advice.keyTenGods()),
-        advice.cautions(),
-        advice.wealthStyle(),
-        advice.longTermRoadmap(),
-        advice.personalBranding(),
-        advice.powerKeywords(),
-        advice.mentalCare(),
-        advice.environmentFit(),
-        advice.workStyle(),
-        advice.relationshipStrategy(),
-        advice.careerTimeline());
-}
-```
 
-**프롬프트 구성** (현재 연도 + 12개월 타임라인 + 십신 + 지장간 + 16개 필드 그룹):
-```java
-private String buildPrompt(FastAPIResponse sajuData,
-                          Map<String, Integer> tenGodDistribution,
-                          Map<String, List<String>> hiddenStems,
-                          String dayMaster) {
-    int currentYear = LocalDate.now().getYear();
-    return """
-        당신은 사주 명리학 전문가이자 취업 커리어 컨설턴트입니다. 아래 사주 데이터를 분석하여 취업 준비생에게 맞춤 커리어 조언을 제공해주세요.
+▶️ **실제 구현 참고**: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
 
-        [사주 데이터]
-        - 일간(日干): %s
-        - 천간(天干): %s
-        - 지지(地支): %s
-        - 오행 분포: %s
-        - 지장간(地藏干): %s
-        - 십신 분포(十神): %s
+- **메서드**: `getCareerConsultation()` (line 53-136)
+- **흐름**: FastAPI 조회 → 십신/지장간 계산 → 관운 분석 → DB 저장 → OpenAI 호출 → 응답 반환
+- **트랜잭션**: @Transactional 제거 (Network I/O 동안 DB 커넥션 점유 방지)
+- **응답**: 19개 필드 (기본 조언 3 + 관운 분석 3 + 사주 프로필 1 + OpenAI 분석 12 필드)
 
-        [분석 요청]
-        - 현재 연도: %d
-        - 12개월 타임라인별 기운 및 취업 최적 시기 분석
-        - 일간(%s) 기반 성향 분석
+**프롬프트 구성** (실제 구현):
 
-        [JSON 응답 형식 - 16개 필드 그룹 포함]
-        {
-          // 기본 조언 (3)
-          "industries": [{"name": "산업명", "reason": "사주 분석 근거", "recommendedRoles": ["직무1", "직무2"]}],
-          "interviewTips": ["면접팁1", "면접팁2", "면접팁3"],
-          "strengths": ["강점1", "강점2", "강점3"],
-          
-          // 사주 데이터 (6)
-          "dayMasterDescription": "일간 설명",
-          "fiveElementsAnalysis": "오행 분석",
-          "keyTenGods": ["십신1", "십신2"],
-          
-          // OpenAI 분석 (7)
-          "cautions": ["주의사항"],
-          "wealthStyle": {"incomeSource": "...", "financialAdvice": "...", "investmentTendency": "...", "additionalIncome": "..."},
-          "longTermRoadmap": {"phase0to2years": {...}, "phase3to5years": {...}, "ultimateGoal": "...", "goalDescription": "..."},
-          "personalBranding": {"suitColor": "...", "impression": "...", "hairAndMakeup": "...", "brandingKeyword": "...", "taglineForResume": "..."},
-          "powerKeywords": {"keywords": [{"keyword": "...", "element": "...", "description": "...", "usageExample": "...", "context": "..."}], "selectionGuide": "...", "usageTips": ["팁1"], "avoidanceTip": "..."},
-          "mentalCare": {"stressVulnerability": ["..."], "rechargeMethod": ["..."], "mindsetMantra": "...", "emergencyTactic": "..."},
-          "environmentFit": {"workVibe": "...", "companySize": "...", "colleagueType": "...", "conflictApproach": "...", "physicalEnv": "...", "culturalFit": "..."},
-          "workStyle": {"preferredCompanyType": "...", "leadershipType": "...", "decisionMaking": "...", "conflictResolution": "..."},
-          "relationshipStrategy": {"socialStyle": "...", "networkingApproach": "...", "teamPosition": "...", "conflictResolution": "...", "careerNetworking": "..."},
-          "careerTimeline": {
-            "year": %d,
-            "months": {
-              "January": {"type": "...", "description": "..."},
-              ...
-              "December": {"type": "...", "description": "..."}
-            },
-            "pivotPoints": [{"month": "March", "type": "적극기", "score": 9, "description": "..."}],
-            "warningMonths": ["May", "July"],
-            "warningDescription": "..."
-          }
-        }
-        """.formatted(
-            dayMaster,
-            sajuData.heavenlyStems(),
-            sajuData.earthlyBranches(),
-            sajuData.fiveElements(),
-            hiddenStems,
-            tenGodDistribution,
-            currentYear,
-            dayMaster,
-            currentYear
-        );
-}
-```
+▶️ **실제 프롬프트 참고**: `ConsultationService.buildPrompt()` (line 245-284)
+
+실제 프롬프트는 다음을 포함합니다:
+- **사주 데이터**: 일간, 천간, 지지, 오행, 지장간, 십신 분포
+- **분석 요청** (상세):
+  - 취업 적합 산업군 3~5개 (name, reason, recommendedRoles 포함)
+  - 면접 전략 및 직무 강점·약점 분석
+  - 재물운, 장기 커리어 로드맵(0~2년, 3~5년 단계)
+  - 퍼스널 브랜딩, 자소서 파워키워드(3개, 오행 기반)
+  - 멘탈 케어, 최적 근무 환경, 업무 스타일, 인간관계 전략
+  - 12개월 월별 운세 및 전환점(점수 8 이상인 달만)
+  - 일간 기반 성향 분석 및 핵심 십신 2~3개 선별
+- **JSON 형식 지정**: careerTimeline.months는 객체 형식 필수 (올바른 예/잘못된 예 명시)
 
 **Transaction Separation** (Session 2026-04-30):
 - ConsultationService에서 @Transactional 제거 (Network I/O 시간 동안 DB 커넥션 점유 방지)
@@ -626,6 +516,305 @@ Fallback: 찾지 못하면 사용자 수동입력 요청 (graceful degradation)
 
 ---
 
+---
+
+## Service Layer 경량화 패턴
+
+### Rule 1: Prompt 외부 분리
+
+프롬프트는 비즈니스 로직이 아니라 '설정'입니다. 서비스 코드에 하드코딩하지 마세요.
+
+❌ **나쁜 예** (프롬프트 하드코딩):
+```java
+@Service
+public class ConsultationService {
+    public String getConsultation() {
+        String prompt = "다음 사주를 분석하여...";  // 서비스에 박힘
+        return openaiClient.call(prompt);
+    }
+}
+```
+
+✅ **좋은 예** (PromptProvider로 분리):
+```java
+// PromptProvider.java (설정 전용)
+@Component
+public class PromptProvider {
+    public String getCareerConsultationPrompt(SajuData data, int currentYear) {
+        // application.yaml 또는 프로퍼티에서 로드
+        return String.format(
+            "당신은 사주 명리학 전문가입니다. 다음 데이터를 분석하세요:\n" +
+            "- 일간: %s\n" +
+            "- 오행: %s\n" +
+            "- 십신: %s\n" +
+            "- 지장간: %s\n" +
+            "현재 연도: %d\n" +
+            "12개월 타임라인을 포함한 JSON 응답을 제공하세요.",
+            data.dayMaster(), data.fiveElements(),
+            data.tenGods(), data.hiddenStems(), currentYear
+        );
+    }
+}
+
+// Service (간결)
+@Service
+public class ConsultationService {
+    private final PromptProvider promptProvider;
+
+    public ConsultationResponse getConsultation(ConsultationRequest req) {
+        String prompt = promptProvider.getCareerConsultationPrompt(
+            sajuData, LocalDate.now().getYear());
+        return openaiClient.call(prompt);
+    }
+}
+```
+
+### Rule 2: Analyzer 분리
+
+덩치가 큰 분석 로직은 별도의 컴포넌트로 추출하세요.
+
+❌ **나쁜 예** (거대 서비스):
+```java
+@Service
+public class CareerFortuneService {
+    public H1H2Result analyzeCareerTiming(SajuData data) {
+        // 십신 계산, 지장간 계산, 관운 판정, 신뢰도 계산...
+        // 모두 여기에 있음 (200+ 라인)
+        int tenGodScore = calculateTenGod(...);
+        Map<String, List<String>> hiddenStems = calculateHiddenStems(...);
+        String favoredPeriod = determineFavoredPeriod(...);
+        // ...
+    }
+}
+```
+
+✅ **좋은 예** (Analyzer 분리 - Composition):
+```java
+// 1. Analyzer 컴포넌트 (단일 책임)
+@Component
+public class CareerFortuneAnalyzer {
+    public H1H2Result analyze(SajuData data,
+                              Map<String, Integer> tenGods,
+                              Map<String, List<String>> hiddenStems) {
+        // 관운 분석 로직만 집중
+        int confidenceScore = calculateConfidence(tenGods, hiddenStems);
+        String period = determineFavoredPeriod(tenGods, hiddenStems);
+        String reasoning = buildReasoning(period, tenGods);
+        return new H1H2Result(period, confidenceScore, reasoning);
+    }
+}
+
+// 2. Service는 orchestration만 (흐름 제어)
+@Service
+public class CareerFortuneService {
+    private final TenGodCalculator tenGodCalc;
+    private final HiddenStemCalculator hiddenStemCalc;
+    private final CareerFortuneAnalyzer analyzer;
+
+    public H1H2Result analyzeCareerTiming(SajuData data) {
+        // 1단계: 계산
+        var tenGods = tenGodCalc.calculate(data.heavenlyStems());
+        var hiddenStems = hiddenStemCalc.calculate(data.earthlyBranches());
+
+        // 2단계: Analyzer에 위임
+        return analyzer.analyze(data, tenGods, hiddenStems);  // Composition
+    }
+}
+```
+
+**이점**:
+- ✅ 각 컴포넌트는 단일 책임만 수행
+- ✅ Service는 흐름만 담당 (orchestration)
+- ✅ Analyzer, Calculator는 독립적으로 테스트 가능
+- ✅ 변경의 파급 범위 최소화
+
+### Rule 3: Mapper 분리
+
+DTO ↔ Entity 변환 로직은 서비스에서 분리하세요.
+
+❌ **나쁜 예** (서비스에서 변환):
+```java
+@Service
+public class ConsultationService {
+    public CareerConsultation createConsultation(CareerAdviceResponse advice) {
+        // 변환 로직이 서비스에 박힘
+        var industries = advice.industries().stream()
+            .map(ind -> Industry.builder()
+                .name(ind.name())
+                .reason(ind.reason())
+                .build())
+            .collect(toList());
+
+        var tips = advice.interviewTips().stream()
+            .map(tip -> InterviewTip.builder()
+                .content(tip)
+                .build())
+            .collect(toList());
+
+        // ... 더 많은 변환
+
+        return CareerConsultation.builder()
+            .industries(industries)
+            .interviewTips(tips)
+            .build();
+    }
+}
+```
+
+✅ **좋은 예** (Mapper로 분리):
+```java
+// Mapper 컴포넌트
+@Component
+public class CareerConsultationMapper {
+    public CareerConsultation toEntity(CareerAdviceResponse advice,
+                                       SajuResult sajuResult) {
+        return CareerConsultation.builder()
+            .sajuResult(sajuResult)
+            .industries(mapIndustries(advice.industries()))
+            .interviewTips(mapInterviewTips(advice.interviewTips()))
+            .strengths(mapStrengths(advice.strengths()))
+            .openaiModelVersion(advice.openaiModelVersion())
+            .build();
+    }
+
+    private List<Industry> mapIndustries(List<CareerAdviceResponse.IndustryRecommendation> dtos) {
+        return dtos.stream()
+            .map(dto -> Industry.builder()
+                .name(dto.name())
+                .reason(dto.reason())
+                .build())
+            .collect(toList());
+    }
+
+    private List<InterviewTip> mapInterviewTips(List<String> tips) {
+        return tips.stream()
+            .map(tip -> InterviewTip.builder().content(tip).build())
+            .collect(toList());
+    }
+
+    private List<Strength> mapStrengths(List<String> strengths) {
+        return strengths.stream()
+            .map(str -> Strength.builder().description(str).build())
+            .collect(toList());
+    }
+}
+
+// Service는 간결하게
+@Service
+public class ConsultationService {
+    private final CareerConsultationMapper mapper;
+
+    public CareerConsultation createConsultation(CareerAdviceResponse advice,
+                                                  SajuResult sajuResult) {
+        return mapper.toEntity(advice, sajuResult);  // 한 줄로 끝
+    }
+}
+```
+
+**Mapper 원칙**:
+- ✅ 변환 로직은 전용 Mapper에 집중
+- ✅ Service는 흐름 제어(orchestration)만 담당
+- ✅ 복잡한 변환은 여러 메서드로 분리
+- ✅ Mapper는 독립적으로 단위 테스트 가능
+
+---
+
+## Domain Model 캡슐화
+
+비즈니스 로직을 엔티티 내부에 담으세요. getter로 필드를 꺼내 로직을 짜지 마세요.
+
+❌ **나쁜 예** (getter 남용):
+```java
+// Service에서 필드 꺼냄
+var tenGodType = sajuResult.getTenGodData().getType();
+var hiddenStems = sajuResult.getHiddenStemData();
+var confidence = sajuResult.getConfidenceScore();
+
+if (confidence > 80 && hiddenStems != null) {
+    // 로직이 Service에 흩어짐
+    result = "HIGH";
+} else if (confidence > 50) {
+    result = "MEDIUM";
+}
+```
+
+✅ **좋은 예** (엔티티가 로직 수행):
+```java
+// SajuResult 엔티티 (비즈니스 메서드 제공)
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Builder
+public class SajuResult {
+    private Long id;
+    private TenGodData tenGodData;
+    private List<HiddenStemData> hiddenStemData;
+    private Integer confidenceScore;
+
+    // 비즈니스 메서드 (도메인 로직을 엔티티가 담당)
+    public ConfidenceLevel getConfidenceLevel() {
+        if (confidenceScore == null) {
+            throw new InvalidSajuDataException("Confidence score not set");
+        }
+        if (confidenceScore >= 80) return ConfidenceLevel.HIGH;
+        if (confidenceScore >= 50) return ConfidenceLevel.MEDIUM;
+        return ConfidenceLevel.LOW;
+    }
+
+    public boolean isHighConfidence() {
+        return getConfidenceLevel() == ConfidenceLevel.HIGH;
+    }
+
+    public void validateForAnalysis() {
+        if (tenGodData == null) {
+            throw new InvalidSajuDataException("Ten God data required");
+        }
+        if (hiddenStemData == null || hiddenStemData.isEmpty()) {
+            throw new InvalidSajuDataException("Hidden stem data required");
+        }
+        if (confidenceScore == null) {
+            throw new InvalidSajuDataException("Confidence score required");
+        }
+    }
+
+    public String buildAnalysisReasoning() {
+        // 관운 분석 근거 생성
+        StringBuilder sb = new StringBuilder();
+        sb.append("일간(").append(tenGodData.getDayMaster()).append(") ");
+        sb.append("기반 십신 분포가 ").append(tenGodData.getDistribution()).append(", ");
+        sb.append("신뢰도는 ").append(confidenceScore).append("점입니다.");
+        return sb.toString();
+    }
+}
+
+// Service에서는 엔티티의 메서드만 호출 (간결)
+@Service
+public class CareerFortuneService {
+    public void useCareerResult(SajuResult result) {
+        // 엔티티가 검증
+        result.validateForAnalysis();
+
+        // 엔티티의 메서드로 판단
+        if (result.isHighConfidence()) {
+            // HIGH confidence 처리
+        }
+
+        // 엔티티가 제공하는 정보
+        String reasoning = result.buildAnalysisReasoning();
+        log.info("Analysis reasoning: {}", reasoning);
+    }
+}
+```
+
+**캡슐화 원칙**:
+- ✅ 엔티티는 `@Getter` 제공 (읽기 용도)
+- ❌ 엔티티는 setter 최소화 (불변성 선호, Builder 사용)
+- ✅ 비즈니스 로직은 엔티티의 public 메서드로
+- ❌ Service에서 getter로 필드 꺼내 계산하지 말 것
+- ✅ 검증, 판단, 계산 로직은 엔티티가 담당
+
+---
+
 ## Phase 1 제약사항
 
 - **캐싱 금지**: Redis, In-Memory 전역 캐시 사용 금지
@@ -638,4 +827,4 @@ Fallback: 찾지 못하면 사용자 수동입력 요청 (graceful degradation)
 
 ---
 
-**Last Updated**: 2026-04-27 (FastAPI 응답 구조 수정, 십신/지장간 Spring 계산 명시, FastAPI-Spring 역할 분담 추가)
+**Last Updated**: 2026-05-02 (Service Layer 경량화 + Domain Model 캡슐화 추가)

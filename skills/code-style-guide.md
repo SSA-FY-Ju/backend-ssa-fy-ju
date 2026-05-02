@@ -272,6 +272,105 @@ void shouldReturnCareerTimingWhenValidBirthDateProvided() {
 }
 ```
 
+## 아키텍처 패턴 및 설계 원칙
+
+Domain Model 캡슐화, Mapper 패턴, Service Layer 경량화 등의 아키텍처 패턴은 **[architecture-guide.md](./architecture-guide.md)**에서 상세히 다룹니다.
+
+**참고해야 할 섹션**:
+- [Service Layer 경량화](./architecture-guide.md#service-layer-경량화-및-책임-분리): Analyzer 분리, Prompt 외부화
+- [Domain Model 캡슐화](./architecture-guide.md#domain-model-캡슐화): 비즈니스 메서드, validate*/is*/build* 패턴
+- [Mapper 패턴](./architecture-guide.md#mapper-분리): DTO ↔ Entity 변환 분리
+
+본 가이드는 **코드 스타일**에 집중합니다 (Lombok, record DTO, JPA, 로깅, 상수 관리).
+@Service
+public class ConsultationService {
+    private final CareerConsultationMapper mapper;
+
+    public CareerConsultation createConsultation(CareerAdviceResponse advice,
+                                                  SajuResult sajuResult) {
+        return mapper.toEntity(advice, sajuResult);  // 한 줄로 끝
+    }
+
+    public CareerConsultationResponse getConsultation(Long id) {
+        CareerConsultation entity = repository.findById(id);
+        return mapper.toResponse(entity);  // 한 줄로 끝
+    }
+}
+```
+
+**Mapper 원칙**:
+- ✅ 변환 로직은 전용 Mapper에 집중
+- ✅ Service는 흐름 제어(orchestration)만 담당
+- ✅ 복잡한 변환은 여러 메서드로 분리
+- ❌ Service 중간에 new Entity(...) builder 체인 금지
+- ✅ Mapper는 독립적으로 단위 테스트 가능
+
+## 상수 추출 (Constant Extraction)
+
+코드에 박힌 "magic number"나 문자열을 상수로 교체하세요.
+
+```java
+// ❌ 나쁜 예: magic number
+@Service
+public class CareerFortuneService {
+    public void analyzeCareerTiming(SajuResult result) {
+        if (result.getConfidenceScore() > 80) {  // magic number: 80
+            // ...
+        }
+        if (result.getTenGodData().getCount() < 2) {  // magic number: 2
+            // ...
+        }
+    }
+}
+
+// ✅ 좋은 예: 상수화
+@Service
+public class CareerFortuneService {
+    private static final int HIGH_CONFIDENCE_THRESHOLD = 80;
+    private static final int MIN_TEN_GOD_COUNT = 2;
+
+    public void analyzeCareerTiming(SajuResult result) {
+        if (result.getConfidenceScore() > HIGH_CONFIDENCE_THRESHOLD) {
+            // ...
+        }
+        if (result.getTenGodData().getCount() < MIN_TEN_GOD_COUNT) {
+            // ...
+        }
+    }
+}
+
+// 또는 Enum으로 (권장):
+public enum ConfidenceThreshold {
+    HIGH(80),
+    MEDIUM(50),
+    LOW(0);
+
+    private final int score;
+
+    ConfidenceThreshold(int score) {
+        this.score = score;
+    }
+
+    public boolean isMet(int confidenceScore) {
+        return confidenceScore >= this.score;
+    }
+}
+
+// 사용
+if (ConfidenceThreshold.HIGH.isMet(result.getConfidenceScore())) {
+    // ...
+}
+```
+
+**상수 관리 원칙**:
+- ✅ 비즈니스 도메인 상수 → Enum으로 관리 (여러 곳에서 사용)
+- ✅ 파일 내부용 상수 → `private static final`로 관리
+- ✅ 환경별 설정값 → application.yaml + 환경변수로 관리
+- ❌ magic number/string을 코드에 박지 말 것
+- ✅ IntelliJ 단축키 `Opt + Cmd + C`로 자동 추출 가능
+
+---
+
 ## 보안
 
 API Key, DB 비밀번호 등 민감 정보는 소스에 직접 노출 금지. 환경 변수 활용:

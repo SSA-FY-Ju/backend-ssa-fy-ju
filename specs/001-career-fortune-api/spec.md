@@ -26,14 +26,11 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 ### Session 2026-04-10 (Clarification Phase)
 
 - Q: Phase 1에서 API 인증 정책은? → A: 인증 없이 모든 API 공개 제공. Phase 2에서 JWT 기반 인증 추가 예정.
-- Q: OpenAI 호출 빈도 제어 정책은? → A: Phase 1에서는 제한 없음. Phase 2에서 사용자당 일일 한도(예: 하루 5회) 방식으로 제한 도입 예정.
-- Q: 사용자 사주 결과 및 AI 컨설팅 기록 보관 정책은? → A: Phase 1에서는 무제한 보관. Phase 2에서 법적/운영 요건에 따라 보관 정책(예: 1년/6개월) 수립 예정.
-- Q: 서비스 신뢰도(Uptime SLA) 목표는? → A: Phase 1에서는 SLA 정의 없음 (Best Effort 운영). Phase 2에서 실제 운영 경험을 바탕으로 SLA 수립 예정.
-- Q: 사용자 만족도 피드백 방식은? → A: 사주 분석 완료 후 간단한 이진 평가(만족함/만족하지 않음)만 수집. Phase 1에서 수집 기능 구현, Phase 2에서 관리자 대시보드를 통한 통계 시각화.
-
-### Session 2026-04-10 (Clarification Phase - Continued)
-
-- Q: UserSatisfactionFeedback의 분석 결과 추적 방식은? → A: SajuResultId FK만 저장. 모든 분석(관운/컨설팅/궁합)이 SajuResult 기반이므로, SajuResult를 통해 추적 가능. feedbackType(ENUM)으로 어떤 분석의 피드백인지 명시.
+- Q: OpenAI 호출 빈도 제어 정책은? → A: Phase 1에서는 제한 없음. Phase 2에서 사용자당 일일 한도 도입 예정.
+- Q: 사주 결과 및 컨설팅 기록 보관 정책은? → A: Phase 1에서는 무제한 보관. Phase 2에서 보관 정책 수립 예정.
+- Q: 서비스 신뢰도(Uptime SLA) 목표는? → A: Phase 1에서는 Best Effort 운영. Phase 2에서 SLA 수립 예정.
+- Q: 사용자 만족도 피드백 방식은? → A: 간단한 이진 평가(만족함/만족하지 않음)만 수집. Phase 2에서 통계 시각화.
+- Q: UserSatisfactionFeedback의 분석 결과 추적 방식은? → A: SajuResultId FK만 저장. feedbackType(ENUM)으로 분석 타입 명시.
 
 ### Session 2026-04-24 (Birth Time Clarification)
 
@@ -106,9 +103,9 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 **Acceptance Scenarios**:
 
-1. **Given** 사용자 사주(YYYY-MM-DD HH:mm) + 기업 설립일(YYYY-MM-DD, 선택사항으로 시간 HH:mm 추가 가능 → 미상 시 12:00 자동 설정), **When** 호환성 분석, **Then** 호환성 점수(0~100) + 추천 직무 + 정렬 이유 반환. 기업 설립일도 지장간을 포함하여 계산
+1. **Given** 사용자 사주(YYYY-MM-DD HH:mm) + 기업 설립일(YYYY-MM-DD, 선택사항으로 시간 HH:mm 추가 가능), **When** 호환성 분석, **Then** 호환성 점수(0~100) + 추천 직무 + 정렬 이유 반환. (기본값 및 지장간 계산은 Clarifications 참고)
 2. **Given** 유효한 두 사주 데이터, **When** 매칭 실행, **Then** 응답에 신뢰도 수준 포함
-3. **Given** 기업 설립일시가 불완전할 경우(시간 정보 미상), **When** 요청 제출, **Then** 기업 설립일시를 정오(12:00)로 자동 설정하고 계속 진행
+3. **Given** 기업 설립일시가 불완전할 경우(시간 정보 미상), **When** 요청 제출, **Then** 계속 진행 (기본값 12:00 적용, Clarifications 참고)
 
 ---
 
@@ -134,7 +131,7 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 - **불완전한 날짜/시간 입력**:
   - 사용자 생년월일시: **완전한 YYYY-MM-DD HH:mm 형식 필수**. 미상 시 400 Bad Request 반환 (상세 ErrorInfo 제시)
-  - 기업 설립일: YYYY-MM-DD 최소 필수. 시간(HH:mm)은 선택사항. 시간 미상 시 기본값(12:00)으로 자동 설정하여 계속 진행
+  - 기업 설립일: YYYY-MM-DD 최소 필수. 시간(HH:mm)은 선택사항. 시간 미상 시 기본값(12:00) 자동 적용
 - **기업 설립일 조회 실패**: 공공데이터API 조회 실패 시 사용자에게 기업 설립일을 직접 입력하도록 요청 (폴백 시나리오). 이 경우에도 시간 형식 규칙 동일 적용
 - 외부 API(FastAPI, OpenAI, 공공데이터API) 일시 다운 상황 → Graceful Error 반환 + 재시도 안내
 - 수천 명의 동시 요청 처리 → Connection Pool로 안정성 보장
@@ -166,25 +163,79 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 ### Data Modeling & Entity Relationship
 
+**Entity Structure** (완전 정규화):
+
+```
+UserProfile (생년월일시)
+  ↓ 1:1
+SajuResult (사주 기본 데이터)
+  ├─ 1:1 → CareerFortune (관운 분석: H1/H2, 신뢰도, 근거)
+  ├─ 1:1 → TenGodData (십신 분포)
+  ├─ 1:N → HiddenStemData (지지별 지장간)
+  ├─ 1:N → CareerConsultation (AI 컨설팅 기록)
+  │         ├─ 1:N → Industry (추천 산업)
+  │         ├─ 1:N → InterviewTip (면접 팁)
+  │         └─ 1:N → Strength (강점 분석)
+  └─ 1:N → UserSatisfactionFeedback (만족도 피드백)
+
+UserProfile
+  ↓ 1:N
+CompanyCompatibility (기업 궁합)
+  └─ 1:N → RecommendedRole (추천 직무)
+```
+
 **Key Entities**:
 - **User**: 사용자 신원 및 연락처 (Phase 2)
-- **UserProfile**: 생년월일, 사주 분석 결과 참조
-- **SajuResult**: 사주 상세 정보 (천간, 지지, 오행, 십신, 지장간, 관운 데이터, FastAPI 전체 응답)
-  - **FastAPI 응답 포함** (camelCase): heavenlyStems, earthlyBranches, fiveElements, yearPillar, monthPillar, dayPillar, hourPillar, birthTime, birthDate, solarCorrection (city, longitude, utc_offset, etc.) 등
-  - **Spring에서 계산**: `hiddenStems` (Map<String, List<String>>으로 지지별 지장간 저장), `tenGodDistribution` (Map<String, Integer>으로 십신 분포 저장)
-- **CareerConsultation**: AI 생성 권고사항 (산업, 면접팁, 강점, OpenAI 메타데이터). SajuResult 외래키로 참조하여 어떤 사주 데이터 기반 생성인지 추적
-- **CompanyCompatibility**: 사용자 사주와 기업 궁합 점수 및 추천 직무 (기업 정보는 요청 시 공공데이터API로 조회, 설립일 미상 시 사용자 입력으로 폴백)
-- **UserSatisfactionFeedback**: 사용자 만족도 피드백 (만족함/만족하지 않음). SajuResult와 연관되어 어떤 분석 결과에 대한 피드백인지 추적
+- **UserProfile**: 생년월일(DATE), 생시(TIME), UNIQUE(birthDate, birthTime)
 
-**Mapping Strategy** (CLAUDE.md 준수):
-- **불변 사주 개념 → Java Enum**: 천간(HeavenlyStem), 지지(EarthlyStem), 오행(FiveElement), 십신(TenGod)
-- **동적/복잡 데이터 → MySQL JSON 컬럼** (@JdbcTypeCode): 십신 배치, 추천 산업 목록, 면접 전략 등
-- **모든 연관관계 → FetchType.LAZY**:
-  - UserProfile ↔ SajuResult (1:1)
-  - User ↔ UserProfile (1:1)
-  - SajuResult ↔ CareerConsultation (1:N) - CareerConsultation은 특정 SajuResult 기반으로 생성된 권고사항 추적
-  - User ↔ CompanyCompatibility (1:N) - 기업 정보는 요청 시 공공데이터API 조회, CompanyCompatibility는 계산 결과만 저장
-  - SajuResult ↔ UserSatisfactionFeedback (1:N) - 특정 사주 분석(관운/컨설팅/궁합) 결과에 대한 피드백 추적
+- **SajuResult**: FastAPI 응답 + Spring 계산 결과 저장
+  - fullSajuData (String): FastAPI JSON 원시 응답 (직렬화)
+  - fetchedAt (LocalDateTime): 조회 시간
+
+- **TenGodData** (1:1 to SajuResult): 십신 분포
+  - tenGodDistribution (Map<String, Integer> → 정규화된 필드들)
+  - dayMaster (String): 일간
+
+- **HiddenStemData** (1:N to SajuResult): 지지별 지장간
+  - earthlyBranch (String): 지지 (年/月/日/時)
+  - hiddenStems (List<String>): 해당 지지의 지장간
+
+- **CareerFortune** (1:1 to SajuResult): 관운 분석
+  - favoredPeriod (String): "H1" or "H2"
+  - confidenceScore (Integer): 0-100
+  - reasoning (String): 분석 근거
+
+- **CareerConsultation** (1:N to SajuResult): AI 생성 권고사항
+  - openaiModelVersion (String): 사용 모델
+  - generatedAt (LocalDateTime): 생성 시간
+
+- **Industry** (1:N to CareerConsultation): 추천 산업
+  - name (String): 산업명
+  - reason (String): 추천 이유
+
+- **InterviewTip** (1:N to CareerConsultation): 면접 팁
+  - content (String): 팁 내용
+
+- **Strength** (1:N to CareerConsultation): 강점 분석
+  - description (String): 강점 설명
+
+- **CompanyCompatibility** (1:N to UserProfile): 기업 궁합
+  - companyName (String): 회사명
+  - compatibilityScore (Integer): 0-100
+  - createdAt (LocalDateTime)
+
+- **RecommendedRole** (1:N to CompanyCompatibility): 추천 직무
+  - roleName (String): 직무명
+
+- **UserSatisfactionFeedback** (1:N to SajuResult): 만족도 피드백
+  - feedbackType (Enum): CAREER_TIMING, CONSULTATION, COMPATIBILITY
+  - satisfactionStatus (Enum): SATISFIED, DISSATISFIED
+  - createdAt (LocalDateTime)
+
+**설계 원칙**:
+- ✅ **JSON 저장 금지**: 모든 복잡 데이터를 정규화된 엔티티로 구성
+- ✅ **불변 도메인 → Enum**: HeavenlyStem, EarthlyStem, FiveElement, TenGod
+- ✅ **모든 관계 → FetchType.LAZY**: N+1 문제 방지
 
 ### API Design & Response Format
 
@@ -272,14 +323,16 @@ SajuException (root)
 ### Functional Requirements
 
 - **FR-001**: Controller는 HTTP 처리만 담당. DTO 입력 → Service 위임 → DTO 응답
+- **FR-001-1**: Service 계층은 PromptProvider, Analyzer, Mapper를 조합(Composition)하여 orchestration만 수행. 프롬프트, 분석, 변환 로직은 각 컴포넌트에 위임
+- **FR-001-2**: Domain Model (엔티티)은 비즈니스 메서드(validate*, is*, build*)를 제공하고, Service는 엔티티의 public 메서드만 호출. getter로 필드 꺼내 로직을 짜지 말 것
 - **FR-002**: Service에서 생년월일시 검증 (YYYY-MM-DD HH:mm 형식, 현실적 범위). 시간이 미상일 경우 400 Bad Request + ErrorInfo 반환
-- **FR-003**: Service는 생년월일시(YYYY-MM-DD HH:mm)를 FastAPI로 전송하여 만세력 데이터 수신 (천간, 지지, 오행 등 기본 사주 정보. 지장간은 Spring에서 계산)
-- **FR-004**: Service에서 만세력 데이터를 기반으로 십신(十神) 및 지장간(地藏干) 계산. 일간을 기준으로 월간을 분석하여 정관(正官)/편관(偏官) 판정 및 관운 강도 평가. 지장간 분석을 통해 더 정확한 오행 분포 파악
+- **FR-003**: Service는 생년월일시(YYYY-MM-DD HH:mm)를 FastAPI로 전송하여 만세력 데이터 수신 (천간, 지지, 오행 등 기본 정보만. 십신·지장간은 Spring에서 계산)
+- **FR-004**: Service에서 십신(十神) 및 지장간(地藏干) 계산 및 관운 분석. 일간 기준 정관/편관 판정. (자세한 계산 방식은 Clarifications 참고)
 - **FR-004-1**: 관운 강도와 현재 연도의 대운 주기를 분석하여 H1(상반기) vs H2(하반기) 중 취업 유리 시기 판정
 - **FR-005**: Service에서 SajuResult를 MySQL에 저장 (Entity로 영속화)
 - **FR-006**: Service에서 사주 데이터(천간, 지지, 오행, 십신, 지장간 분포)를 구조화하여 Spring AI ChatClient + JSON Mode로 OpenAI API 호출. 응답은 `CareerAdviceResponse` Record에 자동 매핑
 - **FR-006-1**: OpenAI 프롬프트는 사주 정보 + 컨텍스트를 명확히 포함 (예: "다음 사주를 분석하여 추천 산업 3~5개, 면접 전략, 강점 분석을 JSON 형식으로 제공하세요")
-- **FR-007**: `CareerAdviceResponse`의 필드(`industries`, `interviewTips`, `strengths`)를 JSON 컬럼에 저장
+- **FR-007**: `CareerAdviceResponse`의 필드(`industries`, `interviewTips`, `strengths`)를 정규화된 엔티티(Industry, InterviewTip, Strength)로 저장
 - **FR-008**: Timeout/API 실패 시 @RestControllerAdvice로 처리 (try-catch 금지)
 - **FR-009**: 기업 설립일을 공공데이터API로 조회. 조회 실패 시 사용자 입력으로 폴백하고, 기업 설립일과 사용자 사주를 비교하여 호환성 점수 계산 (0~100 범위)
 - **FR-010**: 모든 API 응답은 ApiResponse<T> 래퍼 사용 (success, data, error, timestamp)
@@ -289,16 +342,45 @@ SajuException (root)
 - **FR-014**: 사용자 만족도 피드백 수집 API 구현. 요청 시 만족도(SATISFIED/DISSATISFIED) + 관련 분석 타입(CAREER_TIMING/CONSULTATION/COMPATIBILITY) 수신
 - **FR-015**: 피드백 저장 시 UserSatisfactionFeedback 엔티티에 영속화 (SajuResult FK, feedbackType, 만족도 상태, 타임스탐프)
 
-### Key Entities & Database Schema
+### Key Entities & Database Schema (정규화된 구조)
+
+**Core Entities**:
 
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
-| **User** | id, email, phone, createdAt | | PK, UNIQUE(email) |
-| **UserProfile** | id, userId, birthDate, birthTime, createdAt, updatedAt | DATE + TIME | PK, FK to User, UNIQUE(birthDate, birthTime) |
-| **SajuResult** | id, userProfileId, heavenlyStems[], earthlyBranches[], fiveElements, tenGods, hiddenStems(Map), careerFortune, fetchedAt | Enums + JSON | PK, FK to UserProfile, @JdbcTypeCode for JSON. hiddenStems: Map<String, List<String>> (지지명→지장간 리스트) |
-| **CareerConsultation** | id, sajuResultId, industries[], interviewTips, strengths, openaiModelVersion, generatedAt | JSON columns | PK, FK to SajuResult, timestamp |
-| **CompanyCompatibility** | id, userProfileId, companyName, compatibilityScore, recommendedRoles[], createdAt | INT + JSON | PK, FK to UserProfile, composite index on (userProfileId, companyName) |
-| **UserSatisfactionFeedback** | id, sajuResultId, feedbackType, satisfactionStatus, createdAt | FK + Enum + ENUM | PK, FK to SajuResult, index on (sajuResultId, createdAt) |
+| **User** | id, email, phone, createdAt | PK, VARCHAR, VARCHAR, TIMESTAMP | UNIQUE(email) |
+| **UserProfile** | id, userId, birthDate, birthTime, createdAt, updatedAt | PK, FK, DATE, TIME, TIMESTAMP, TIMESTAMP | FK to User, UNIQUE(birthDate, birthTime) |
+| **SajuResult** | id, userProfileId, fullSajuData, fetchedAt | PK, FK, LONGTEXT, TIMESTAMP | FK to UserProfile, 지지별로 정규화된 관계 |
+
+**Saju Analysis Entities**:
+
+| Entity | Fields | Type | Constraints |
+|--------|--------|------|-------------|
+| **TenGodData** | id, sajuResultId, dayMaster, tenGodDistribution (별도 엔티티로) | PK, FK, VARCHAR, | FK to SajuResult (1:1) |
+| **HiddenStemData** | id, sajuResultId, earthlyBranch, hiddenStem | PK, FK, VARCHAR, VARCHAR | FK to SajuResult (1:N), 지지별 지장간 |
+| **CareerFortune** | id, sajuResultId, favoredPeriod, confidenceScore, reasoning | PK, FK, VARCHAR, INT, TEXT | FK to SajuResult (1:1) |
+
+**Career Consultation Entities**:
+
+| Entity | Fields | Type | Constraints |
+|--------|--------|------|-------------|
+| **CareerConsultation** | id, sajuResultId, openaiModelVersion, generatedAt | PK, FK, VARCHAR, TIMESTAMP | FK to SajuResult (1:N) |
+| **Industry** | id, careerConsultationId, name, reason | PK, FK, VARCHAR, TEXT | FK to CareerConsultation (1:N) |
+| **InterviewTip** | id, careerConsultationId, content | PK, FK, TEXT | FK to CareerConsultation (1:N) |
+| **Strength** | id, careerConsultationId, description | PK, FK, TEXT | FK to CareerConsultation (1:N) |
+
+**Company Compatibility Entities**:
+
+| Entity | Fields | Type | Constraints |
+|--------|--------|------|-------------|
+| **CompanyCompatibility** | id, userProfileId, companyName, compatibilityScore, createdAt | PK, FK, VARCHAR, INT, TIMESTAMP | FK to UserProfile (1:N), composite index (userProfileId, companyName) |
+| **RecommendedRole** | id, compatibilityId, roleName | PK, FK, VARCHAR | FK to CompanyCompatibility (1:N) |
+
+**Feedback Entity**:
+
+| Entity | Fields | Type | Constraints |
+|--------|--------|------|-------------|
+| **UserSatisfactionFeedback** | id, sajuResultId, feedbackType, satisfactionStatus, createdAt | PK, FK, ENUM, ENUM, TIMESTAMP | FK to SajuResult (1:N), index (sajuResultId, createdAt) |
 
 ## Success Criteria *(mandatory)*
 

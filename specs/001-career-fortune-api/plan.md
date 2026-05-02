@@ -24,7 +24,7 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 
 **Language/Version**: Java 21, Spring Boot 4.0.5
 **Primary Dependencies**: Spring Data JPA, Spring Web, Spring AI (ChatClient), Lombok, Spring Validation
-**Storage**: MySQL 8.0+ (JSON 컬럼 지원, JPA via application.yaml)
+**Storage**: MySQL 8.0+ (정규화된 엔티티 구조, JPA via application.yaml)
 **Testing**: JUnit 5 + AssertJ (Given-When-Then 패턴)
 **Target Platform**: Backend REST API (HTTP JSON)
 **Project Type**: Web Service / Microservice (Spring Boot)
@@ -34,13 +34,18 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - 기업 궁합: 8초 이내
 - 동시 처리: 5,000명 사용자 (Connection Pool 기본값)
 
-**Key Technical Decisions** (Session 2026-04-30):
+**Key Technical Decisions** (Session 2026-04-30 + Service Layer Optimization):
 - **1-Call API Design**: `/api/career/consultation` 엔드포인트가 내부적으로 모든 외부 API 호출 오케스트레이션 (FastAPI, OpenAI). 클라이언트는 birthDate + birthTime만 제공하고, 모든 계산(십신, 지장간, 관운 분석) 및 16개 필드 그룹의 완전한 AI 조언을 한 번의 요청으로 수신.
 - **Expanded Response (16+ Field Groups)**: ConsultationResponse는 19개 필드 포함: 기본 조언(industries, interviewTips, strengths) + 관운 분석(favoredPeriod, confidenceScore, reasoning) + 사주 프로필(sajuProfile with dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods) + OpenAI 분석(cautions, wealthStyle, longTermRoadmap, personalBranding, powerKeywords, mentalCare, environmentFit, workStyle, relationshipStrategy, careerTimeline). OpenAI 프롬프트에 현재 연도, 12개월 타임라인, 모든 필드 그룹 포함.
 - **Transaction Separation**: ConsultationService에서 @Transactional 제거. FastAPI/OpenAI I/O는 트랜잭션 밖에서 수행. 각 DB 작업은 Repository의 @Transactional에 의해 개별 트랜잭션으로 실행. Network 지연이 Connection Pool을 점유하지 않음.
 - **Jackson 3.x (Spring Boot 4.0.5)**: 패키지명이 `tools.jackson.*`으로 변경됨. `com.fasterxml.jackson.*`은 Jackson 2.x용이므로 사용 금지.
 - **Spring AI ChatClient**: OpenAI JSON Mode로 `CareerAdviceResponse` record에 자동 매핑. 16개 필드 그룹 모두 포함. 타입 안전성 + 에러 처리 자동화.
 - **Race Condition Handling**: `DataIntegrityViolationException` 발생 시 호출 서비스에서 catch하여 다시 find 수행 (이미 생성된 결과 재사용).
+- **Service Layer Lightweight Patterns** (2026-05-02):
+  - **Prompt 외부 분리**: PromptProvider 컴포넌트가 프롬프트 생성 담당. Service는 PromptProvider 호출만 수행.
+  - **Analyzer 분리**: CareerFortuneAnalyzer, TenGodCalculator, HiddenStemCalculator는 분석만 담당. Service는 이들을 조합(Composition)하여 orchestration.
+  - **Mapper 분리**: CareerConsultationMapper, SajuMapper 등이 DTO ↔ Entity 변환 담당. Service는 mapper 호출만 수행.
+  - **Domain Model 캡슐화**: 엔티티는 비즈니스 메서드(validate*, is*, build*)를 제공. Service는 getter로 필드 꺼내 로직을 짜지 말 것.
 
 **Constraints**:
 - Phase 1: Redis/Global 캐싱 금지 (도메인 로직 정확성 우선)
@@ -50,7 +55,13 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - 모든 예외: @RestControllerAdvice 처리 (try-catch 금지)
 
 **Scale/Scope**:
-- 엔티티: 6개 (UserProfile, SajuResult, CareerConsultation, CompanyCompatibility, UserSatisfactionFeedback / User는 Phase 2)
+- **엔티티: 11개** (정규화됨, JSON 저장 제거):
+  - 기본: UserProfile, SajuResult
+  - Saju 분석: TenGodData, HiddenStemData, CareerFortune (3개, 모두 1:N 또는 1:1)
+  - 컨설팅: CareerConsultation, Industry, InterviewTip, Strength (4개)
+  - 호환성: CompanyCompatibility, RecommendedRole (2개)
+  - 피드백: UserSatisfactionFeedback (1개)
+  - User는 Phase 2에서 추가
 - API 엔드포인트: 4개 (`/api/career/timing`, `/api/career/consultation`, `/api/company/compatibility`, `/api/feedback/satisfaction`)
 - 외부 API 통합: 3개 (FastAPI, OpenAI, 공공데이터API)
 - **계산 로직**: TenGodCalculator (십신), HiddenStemCalculator (지장간), CareerFortuneAnalyzer (관운), CompatibilityScoreCalculator (궁합)
@@ -105,8 +116,15 @@ SSAju/
 │   │   ├── entity/
 │   │   │   ├── UserProfile.java
 │   │   │   ├── SajuResult.java
+│   │   │   ├── TenGodData.java (1:1 to SajuResult, 십신 분포)
+│   │   │   ├── HiddenStemData.java (1:N to SajuResult, 지지별 지장간)
+│   │   │   ├── CareerFortune.java (1:1 to SajuResult, 관운 분석)
 │   │   │   ├── CareerConsultation.java
+│   │   │   ├── Industry.java (1:N to CareerConsultation, 추천 산업)
+│   │   │   ├── InterviewTip.java (1:N to CareerConsultation, 면접 팁)
+│   │   │   ├── Strength.java (1:N to CareerConsultation, 강점)
 │   │   │   ├── CompanyCompatibility.java
+│   │   │   ├── RecommendedRole.java (1:N to CompanyCompatibility, 추천 직무)
 │   │   │   ├── UserSatisfactionFeedback.java
 │   │   ├── util/
 │   │   │   ├── TenGodCalculator.java (十神 계산)
@@ -149,8 +167,15 @@ SSAju/
 │   │   ├── UserRepository.java
 │   │   ├── UserProfileRepository.java
 │   │   ├── SajuResultRepository.java
+│   │   ├── TenGodDataRepository.java (new)
+│   │   ├── HiddenStemDataRepository.java (new)
+│   │   ├── CareerFortuneRepository.java (new)
 │   │   ├── CareerConsultationRepository.java
+│   │   ├── IndustryRepository.java (new)
+│   │   ├── InterviewTipRepository.java (new)
+│   │   ├── StrengthRepository.java (new)
 │   │   ├── CompanyCompatibilityRepository.java
+│   │   ├── RecommendedRoleRepository.java (new)
 │   │   └── UserSatisfactionFeedbackRepository.java
 │   │
 │   ├── exception/
@@ -205,7 +230,12 @@ SSAju/
 - **모듈화 전략 (Option C)**: 같은 Spring Boot 애플리케이션 내에서 논리적 패키지 분리
 - **Phase 1** (지금 구현): `career/` 패키지에서 Career Fortune API 구현 (로그인 제외)
   - User 엔티티는 **제외** (추후 auth/ 패키지에서 구현)
-  - UserProfile, SajuResult, CareerConsultation, CompanyCompatibility만 포함
+  - **정규화된 11개 엔티티 포함** (JSON 저장 제거):
+    - 기본: UserProfile, SajuResult
+    - Saju 분석: TenGodData, HiddenStemData, CareerFortune
+    - 컨설팅: CareerConsultation, Industry, InterviewTip, Strength
+    - 호환성: CompanyCompatibility, RecommendedRole
+    - 피드백: UserSatisfactionFeedback
 - **Phase 2+** (나중): `auth/` 패키지 추가 시 User 엔티티 추가 및 통합
 - **계층형 아키텍처**: Controller → Service → Repository 준수
 - **기능 분리**: 각 핵심 기능마다 전용 Service (CareerFortuneService, ConsultationService, CompanyMatchingService)
@@ -219,7 +249,7 @@ SSAju/
 
 | 설계 결정 | 필요 이유 | 더 단순한 대안과 거절 이유 |
 |---------|---------|------------------------|
-| **6개 엔티티** (Phase 1) | UserProfile ↔ SajuResult (1:1, 사주 조회 캐싱), SajuResult ↔ CareerConsultation (1:N, 같은 사주에서 여러 컨설팅), UserProfile ↔ CompanyCompatibility (1:N, 여러 기업과 비교), SajuResult ↔ UserSatisfactionFeedback (1:N, 분석마다 피드백 수집) | 모든 데이터를 하나에 통합 → N+1 쿼리, 데이터 정규화 부족, 재사용성 저하 |
+| **11개 정규화된 엔티티** (Phase 1, JSON 저장 제거) | UserProfile ↔ SajuResult (1:1), SajuResult ↔ TenGodData (1:1, 십신), SajuResult ↔ CareerFortune (1:1, 관운), SajuResult ↔ HiddenStemData (1:N, 지장간), SajuResult ↔ CareerConsultation (1:N), CareerConsultation ↔ Industry/InterviewTip/Strength (1:N), UserProfile ↔ CompanyCompatibility (1:N), CompanyCompatibility ↔ RecommendedRole (1:N), SajuResult ↔ UserSatisfactionFeedback (1:N) | JSON 저장 방식 → N+1 쿼리, 데이터 정규화 부족, 재사용성 저하, 타입 안전성 낮음, 쿼리 최적화 어려움 |
 | **4개 독립 Service** | 각 기능(관운, 컨설팅, 궁합, 피드백)이 독립적으로 테스트/배포 가능해야 함. P1/P2 우선순위 구분으로 점진적 개발 필요 | 단일 Service → 테스트 복잡도 증가, 변경 파급 범위 확대, 리팩토링 위험 |
 | **TenGodCalculator + HiddenStemCalculator 분리** | 십신(十神)과 지장간(地藏干)은 별개의 계산 로직. 분리하면 각각 독립 테스트 가능, 재사용성 향상. 더 정확한 오행 분포 계산 가능 | 통합 Calculator → 로직 혼재, 테스트 복잡도 증대, 유지보수 어려움. 지장간 미포함 시 사주 분석 정확도 저하 |
 | **Spring에서 십신+지장간 계산** | FastAPI는 기본 데이터(천간/지지/오행)만 제공 → Spring 단에서 모든 계산 담당하므로 FastAPI 변경에 영향받지 않음. 도메인 로직 통제 가능 | FastAPI에서 십신/지장간까지 계산 → FastAPI 변경 시 Spring도 영향, 통제 불가. 지장간 미포함 시 정확도 저하 |
@@ -259,9 +289,9 @@ SSAju/
    - Task: Spring AI `ChatClient`로 OpenAI JSON Mode 구현, `CareerAdviceResponse` record 스키마
    - Output: ChatClient 빈 설정 (`ChatClientConfig.java`), JSON 스키마 정의
 
-6. **MySQL JSON 컬럼 + JPA @JdbcTypeCode 사용법**
-   - Task: Spring Data JPA에서 JSON 컬럼 매핑 (십신 배치, 추천 산업 목록)
-   - Output: 엔티티 필드 타입 정의 (List<String>, Map<String, Object> 등)
+6. **JPA 정규화 엔티티 설계 및 관계 매핑**
+   - Task: 정규화된 엔티티(TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength, RecommendedRole) 간의 관계 매핑 및 FetchType.LAZY 설정
+   - Output: 엔티티 간 1:1, 1:N 관계 정의, 모든 관계에 FetchType.LAZY 명시
 
 ### Output: `research.md`
 
@@ -273,10 +303,10 @@ SSAju/
 
 ### 1.1 Data Model Definition (`data-model.md`)
 
-**Entities & Fields**:
+**정규화된 11개 엔티티 및 관계**:
 
 ```
-[Phase 1: 현재 구현 - 로그인 로직 제외]
+[Phase 1: 현재 구현 - 11개 정규화된 엔티티 (JSON 저장 제거)]
 
 UserProfile
 ├── id: Long (PK)
@@ -285,7 +315,9 @@ UserProfile
 ├── createdAt: LocalDateTime
 ├── updatedAt: LocalDateTime
 ├── UNIQUE(birthDate, birthTime): 같은 생년월일시를 가진 사용자는 동일한 사주 분석 결과 공유
-├── Note: Phase 2에서 User.id (FK) 추가 예정
+├── (1:1) → SajuResult
+├── (1:N) → CompanyCompatibility
+└── Note: Phase 2에서 User.id (FK) 추가 예정
 
 [Phase 2+: 추후 auth/ 패키지에서 구현]
 User (로그인 정보 포함)
@@ -296,60 +328,101 @@ User (로그인 정보 포함)
 ├── role: String (enum, Phase 2 추가)
 └── createdAt, updatedAt: LocalDateTime
 
-SajuResult
+SajuResult (1:1 to UserProfile)
 ├── id: Long (PK)
-├── userProfileId: Long (FK to UserProfile)
-├── fullSajuData: Map<String, Object> (JSON, FastAPI 전체 응답 저장 - camelCase)
-│   ├── heavenlyStems: List<String> (e.g., ["庚", "丙", "己", "辛"] 年月日時)
-│   ├── earthlyBranches: List<String> (e.g., ["午", "戌", "未", "寅"] 年月日時)
-│   ├── fiveElements: Map<String, Integer> (e.g., {木:1, 火:2, 土:1, 金:2, 水:2})
-│   ├── yearPillar, monthPillar, dayPillar, hourPillar: String (e.g., "庚午", "丙戌")
-│   ├── birthTime: String (시간, HH:mm 형식, e.g., "14:30")
-│   ├── birthDate: String (생년월일, YYYY-MM-DD)
-│   └── solarCorrection: Map<String, Object> (도시, 경도, UTC offset, 수정 시간 등)
-├── hiddenStems: Map<String, List<String>> (JSON, 지지별 지장간 저장)
-│   ├── 구조: Map<String, List<String>>
-│   ├── 예: {"子": ["癸"], "丑": ["癸", "辛", "己"], "寅": ["甲", "丙", "戊"], ...}
-│   ├── 용도: TenGodCalculator와 함께 사용하여 더 정확한 오행 분포 계산
-├── tenGodDistribution: Map<String, Integer> (JSON, 십신 분포: {正官: 1, 偏官: 1, ...})
-├── careerFortune: Map<String, Object> (JSON, 관운 분석: {favoredPeriod:"H1", confidenceScore:75, reasoning:"..."})
+├── userProfileId: Long (FK to UserProfile, NOT NULL)
+├── fullSajuData: LONGTEXT (FastAPI 원본 JSON 응답 저장 - 직렬화용)
 ├── fetchedAt: LocalDateTime
+├── (1:1) → TenGodData (십신 분포)
+├── (1:1) → CareerFortune (관운 분석)
+├── (1:N) → HiddenStemData (지지별 지장간)
+├── (1:N) → CareerConsultation (AI 컨설팅 기록)
+└── (1:N) → UserSatisfactionFeedback (만족도 피드백)
 
-CareerConsultation
+TenGodData (1:1 to SajuResult, 십신 분포)
 ├── id: Long (PK)
-├── sajuResultId: Long (FK to SajuResult)
-├── industries: List<Map<String, String>> (JSON, [{name:"...", reason:"..."}])
-├── interviewTips: List<String> (JSON)
-├── strengths: List<String> (JSON)
+├── sajuResultId: Long (FK to SajuResult, NOT NULL, UNIQUE)
+├── dayMaster: String (일간, e.g., "庚")
+├── tenGodDistribution: JSON 컬럼 (Map<String, Integer>, e.g., {正官: 1, 偏官: 1, ...})
+│   └── 또는 별도 필드들로 정규화 가능 (운영 선택)
+
+HiddenStemData (1:N to SajuResult, 지지별 지장간)
+├── id: Long (PK)
+├── sajuResultId: Long (FK to SajuResult, NOT NULL)
+├── earthlyBranch: String (지지, e.g., "午", "戌", "未", "寅")
+├── hiddenStem: String (해당 지지의 지장간, e.g., "丁" 또는 리스트)
+├── (복합 인덱스: sajuResultId + earthlyBranch)
+
+CareerFortune (1:1 to SajuResult, 관운 분석)
+├── id: Long (PK)
+├── sajuResultId: Long (FK to SajuResult, NOT NULL, UNIQUE)
+├── favoredPeriod: String (NOT NULL, "H1" or "H2")
+├── confidenceScore: Integer (0-100, NOT NULL)
+└── reasoning: TEXT (분석 근거)
+
+CareerConsultation (1:N to SajuResult, AI 컨설팅 기록)
+├── id: Long (PK)
+├── sajuResultId: Long (FK to SajuResult, NOT NULL)
 ├── openaiModelVersion: String (e.g., "gpt-4-turbo")
 ├── generatedAt: LocalDateTime
+├── (1:N) → Industry (추천 산업)
+├── (1:N) → InterviewTip (면접 팁)
+└── (1:N) → Strength (강점 분석)
 
-CompanyCompatibility
+Industry (1:N to CareerConsultation, 추천 산업)
 ├── id: Long (PK)
-├── userProfileId: Long (FK to UserProfile)
+├── careerConsultationId: Long (FK to CareerConsultation, NOT NULL)
+├── name: String (산업명, e.g., "금융/핀테크")
+└── reason: TEXT (추천 이유)
+
+InterviewTip (1:N to CareerConsultation, 면접 팁)
+├── id: Long (PK)
+├── careerConsultationId: Long (FK to CareerConsultation, NOT NULL)
+└── content: TEXT (팁 내용)
+
+Strength (1:N to CareerConsultation, 강점 분석)
+├── id: Long (PK)
+├── careerConsultationId: Long (FK to CareerConsultation, NOT NULL)
+└── description: TEXT (강점 설명)
+
+CompanyCompatibility (1:N to UserProfile, 기업 궁합)
+├── id: Long (PK)
+├── userProfileId: Long (FK to UserProfile, NOT NULL)
 ├── companyName: String (NOT NULL)
 ├── compatibilityScore: Integer (0-100, NOT NULL)
-├── recommendedRoles: List<String> (JSON)
 ├── createdAt: LocalDateTime
-├── (composite index on userProfileId + companyName)
+├── (1:N) → RecommendedRole (추천 직무)
+└── (복합 인덱스: userProfileId + companyName)
 
-UserSatisfactionFeedback
+RecommendedRole (1:N to CompanyCompatibility, 추천 직무)
 ├── id: Long (PK)
-├── sajuResultId: Long (FK to SajuResult)
-├── feedbackType: String (Enum, CAREER_TIMING/CONSULTATION/COMPATIBILITY)
-├── satisfactionStatus: String (Enum, SATISFIED/DISSATISFIED)
+├── compatibilityId: Long (FK to CompanyCompatibility, NOT NULL)
+└── roleName: String (직무명)
+
+UserSatisfactionFeedback (1:N to SajuResult, 만족도 피드백)
+├── id: Long (PK)
+├── sajuResultId: Long (FK to SajuResult, NOT NULL)
+├── feedbackType: Enum (CAREER_TIMING/CONSULTATION/COMPATIBILITY)
+├── satisfactionStatus: Enum (SATISFIED/DISSATISFIED)
 ├── createdAt: LocalDateTime
-├── (index on sajuResultId + createdAt)
+└── (인덱스: sajuResultId + createdAt)
 ```
 
-**Relationships**:
-- **Phase 1** (현재):
-  - UserProfile (1) ↔ SajuResult (1) via userProfileId, FetchType.LAZY
-  - SajuResult (1) ↔ CareerConsultation (N) via sajuResultId, FetchType.LAZY
-  - UserProfile (1) ↔ CompanyCompatibility (N) via userProfileId, FetchType.LAZY
-  - SajuResult (1) ↔ UserSatisfactionFeedback (N) via sajuResultId, FetchType.LAZY
+**Relationships & FetchType**:
+- **Phase 1** (현재, 모든 관계에 FetchType.LAZY 명시):
+  - UserProfile (1) ↔ SajuResult (1:1) via userProfileId, FetchType.LAZY
+  - SajuResult (1) ↔ TenGodData (1:1) via sajuResultId, FetchType.LAZY
+  - SajuResult (1) ↔ CareerFortune (1:1) via sajuResultId, FetchType.LAZY
+  - SajuResult (1) ↔ HiddenStemData (1:N) via sajuResultId, FetchType.LAZY
+  - SajuResult (1) ↔ CareerConsultation (1:N) via sajuResultId, FetchType.LAZY
+  - CareerConsultation (1) ↔ Industry (1:N) via careerConsultationId, FetchType.LAZY
+  - CareerConsultation (1) ↔ InterviewTip (1:N) via careerConsultationId, FetchType.LAZY
+  - CareerConsultation (1) ↔ Strength (1:N) via careerConsultationId, FetchType.LAZY
+  - UserProfile (1) ↔ CompanyCompatibility (1:N) via userProfileId, FetchType.LAZY
+  - CompanyCompatibility (1) ↔ RecommendedRole (1:N) via compatibilityId, FetchType.LAZY
+  - SajuResult (1) ↔ UserSatisfactionFeedback (1:N) via sajuResultId, FetchType.LAZY
 - **Phase 2+** (추후):
-  - User (1) ↔ UserProfile (1) via userId, FetchType.LAZY (auth/ 패키지에서 추가)
+  - User (1) ↔ UserProfile (1:1) via userId, FetchType.LAZY (auth/ 패키지에서 추가)
 
 **Validation Rules** (Phase 1):
 - `birthDate`: 과거 날짜, 현실적 범위 (1900-01-01 ~ 오늘)

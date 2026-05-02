@@ -387,47 +387,129 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ---
 
+## Phase 3-Refactor: Entity Normalization (JSON → Entities)
+
+**Goal**: T030까지 구현된 JSON 저장 방식을 plan.md의 정규화된 엔티티 구조로 리팩토링.
+**Scope**: 7개 새 엔티티 생성 (TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength)
+**Strategy**: 기존 기능 유지 후 점진적 마이그레이션, 각 엔티티 생성 후 관련 Service/Repository 수정
+
+### New Entities (JSON → Normalized Entities)
+
+- [ ] T031 [Refactor] Create `TenGodData` entity for normalizing SajuResult.tenGodDistribution
+  - Fields: id, sajuResultId (FK, 1:1), tenGodName (String), score (Integer), createdAt
+  - Purpose: SajuResult의 Map<String, Integer> tenGodDistribution을 엔티티로 저장
+  - Link: 1:1 to SajuResult, FetchType.LAZY
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/TenGodData.java`
+
+- [ ] T032 [Refactor] [P] Create `HiddenStemData` entity for normalizing SajuResult.hiddenStems
+  - Fields: id, sajuResultId (FK, 1:N), earthlyBranch (String, e.g., "子"), hiddenStem (String, e.g., "癸"), createdAt
+  - Purpose: SajuResult의 Map<String, List<String>> hiddenStems를 정규화된 행으로 저장 (한 행 = 한 지지와 한 지장간)
+  - Link: N:1 to SajuResult (multiple rows per SajuResult), FetchType.LAZY
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/HiddenStemData.java`
+
+- [ ] T033 [Refactor] Create `CareerFortune` entity for normalizing SajuResult.careerFortune
+  - Fields: id, sajuResultId (FK, 1:1), favoredPeriod (String: "H1"/"H2"), confidenceScore (Integer, 0-100), reasoning (Text), createdAt
+  - Purpose: SajuResult의 Map<String, Object> careerFortune을 엔티티로 저장
+  - Link: 1:1 to SajuResult, FetchType.LAZY
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/CareerFortune.java`
+
+- [ ] T034 [Refactor] [P] Create `Industry` entity for normalizing CareerConsultation.industries
+  - Fields: id, careerConsultationId (FK, 1:N), industryName (String), reason (Text), createdAt
+  - Purpose: CareerConsultation의 JSON 리스트 industries를 엔티티로 저장
+  - Link: N:1 to CareerConsultation, FetchType.LAZY
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/Industry.java`
+
+- [ ] T035 [Refactor] [P] Create `InterviewTip` entity for normalizing CareerConsultation.interviewTips
+  - Fields: id, careerConsultationId (FK, 1:N), tipText (Text), createdAt
+  - Purpose: CareerConsultation의 JSON 리스트 interviewTips를 엔티티로 저장
+  - Link: N:1 to CareerConsultation, FetchType.LAZY
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/InterviewTip.java`
+
+- [ ] T036 [Refactor] [P] Create `Strength` entity for normalizing CareerConsultation.strengths
+  - Fields: id, careerConsultationId (FK, 1:N), strengthText (Text), createdAt
+  - Purpose: CareerConsultation의 JSON 리스트 strengths를 엔티티로 저장
+  - Link: N:1 to CareerConsultation, FetchType.LAZY
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/Strength.java`
+
+### New Repositories
+
+- [ ] T037 [Refactor] [P] Create repositories for new entities
+  - Create: `TenGodDataRepository`, `HiddenStemDataRepository`, `CareerFortuneRepository`, `IndustryRepository`, `InterviewTipRepository`, `StrengthRepository`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/TenGodDataRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/HiddenStemDataRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/CareerFortuneRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/IndustryRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/InterviewTipRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/StrengthRepository.java`
+
+### Service Updates for Entity-Based Storage
+
+- [ ] T038 [Refactor] Update `CareerFortuneService` to use TenGodData, HiddenStemData, CareerFortune entities
+  - Modify: Save tenGodDistribution, hiddenStems, careerFortune as entities instead of JSON in SajuResult
+  - Logic: After analyzing H1/H2, create TenGodData, HiddenStemData, CareerFortune entities and link to SajuResult
+  - File: `SSAju/src/main/java/ssafy/SSAju/service/CareerFortuneService.java`
+
+- [ ] T039 [Refactor] Update `ConsultationService` to use Industry, InterviewTip, Strength entities
+  - Modify: Save industries, interviewTips, strengths as entities instead of JSON in CareerConsultation
+  - Logic: After OpenAI response, create Industry, InterviewTip, Strength entities and link to CareerConsultation
+  - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
+
+### Test Updates
+
+- [ ] T040 [Refactor] Update unit tests for entity normalization
+  - Update `CareerFortuneServiceTest`: Verify TenGodData, HiddenStemData, CareerFortune entities created and linked
+  - Update `ConsultationServiceTest`: Verify Industry, InterviewTip, Strength entities created and linked
+  - File: `SSAju/src/test/java/ssafy/SSAju/service/CareerFortuneServiceTest.java`
+  - File: `SSAju/src/test/java/ssafy/SSAju/service/ConsultationServiceTest.java`
+
+- [ ] T041 [Refactor] Run all refactored tests
+  - Command: `./gradlew test`
+  - Verify: All tests pass with normalized entity structure, no JSON storage in tables
+  - Verify: Data persistence correctly links parent→child entities
+
+---
+
 ### User Story 4: User Satisfaction Feedback (Priority P1)
 
 **Goal**: After any saju analysis, users can provide simple binary satisfaction feedback (satisfied/dissatisfied).
 **Independent Test**: Feedback submission → Stored in DB → Returns success response (runs parallel with US2)
 **Expected Outcome**: Feedback collection API working, UserSatisfactionFeedback entity populated for Phase 2 dashboards
 
-- [ ] T031 [US4] Create `UserSatisfactionFeedback` entity in `career/entity/`
+- [ ] T042 [US4] Create `UserSatisfactionFeedback` entity in `career/entity/`
   - Fields: id, sajuResultId (FK), feedbackType (ENUM: CAREER_TIMING/CONSULTATION/COMPATIBILITY), satisfactionStatus (ENUM: SATISFIED/DISSATISFIED), createdAt
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/UserSatisfactionFeedback.java`
 
-- [ ] T032 [US4] [P] Create `UserSatisfactionFeedbackRepository` in `repository/`
+- [ ] T043 [US4] [P] Create `UserSatisfactionFeedbackRepository` in `repository/`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/UserSatisfactionFeedbackRepository.java`
 
-- [ ] T033 [US4] [P] Create `SatisfactionFeedbackRequest` DTO in `dto/request/`
+- [ ] T044 [US4] [P] Create `SatisfactionFeedbackRequest` DTO in `dto/request/`
   - Fields: sajuResultId, feedbackType (ENUM), satisfactionStatus (ENUM)
   - Validation: @NotNull on all fields
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/SatisfactionFeedbackRequest.java`
 
-- [ ] T034 [US4] [P] Create `SatisfactionFeedbackResponse` DTO in `dto/response/`
+- [ ] T045 [US4] [P] Create `SatisfactionFeedbackResponse` DTO in `dto/response/`
   - Fields: feedbackId, createdAt
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/SatisfactionFeedbackResponse.java`
 
-- [ ] T035 [US4] Create `FeedbackService` in `service/`
+- [ ] T046 [US4] Create `FeedbackService` in `service/`
   - Method: `saveFeedback(SatisfactionFeedbackRequest)` → validates SajuResult exists, stores feedback
   - Handles: SajuResult not found → throw custom exception, enum validation
   - File: `SSAju/src/main/java/ssafy/SSAju/service/FeedbackService.java`
 
-- [ ] T036 [US4] Create `FeedbackController` in `controller/`
+- [ ] T047 [US4] Create `FeedbackController` in `controller/`
   - Endpoint: `POST /api/feedback/satisfaction`
   - Handles: Request validation, calls `FeedbackService`, returns `ApiResponse<SatisfactionFeedbackResponse>`
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/FeedbackController.java`
 
-- [ ] T037 [US4] Write unit tests for `FeedbackService` in `src/test/`
+- [ ] T048 [US4] Write unit tests for `FeedbackService` in `src/test/`
   - Test: Valid feedback saved, SajuResult not found → 404, invalid enum → 400, null handling
   - File: `SSAju/src/test/java/ssafy/SSAju/service/FeedbackServiceTest.java`
 
-- [ ] T038 [US4] Write unit tests for `FeedbackController` in `src/test/`
+- [ ] T049 [US4] Write unit tests for `FeedbackController` in `src/test/`
   - Test: Valid feedback → 200 OK, invalid type → 400, missing SajuResult → 404
   - File: `SSAju/src/test/java/ssafy/SSAju/controller/FeedbackControllerTest.java`
 
-- [ ] T039 [US4] Run all tests for US4 features
+- [ ] T050 [US4] Run all tests for US4 features
   - Command: `./gradlew test --tests "ssafy.SSAju.service.FeedbackServiceTest OR ssafy.SSAju.controller.FeedbackControllerTest"`
   - Verify: BUILD SUCCESSFUL before committing
 
@@ -437,41 +519,44 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 **Goal**: Users can analyze compatibility between their saju and target company founding date, receiving a score (0-100) and recommended roles.
 **Independent Test**: User saju + company date → Compatibility calculation → Score + roles response (depends on core structures)
-**Expected Outcome**: Compatibility endpoint working, CompanyCompatibility stored in DB
+**Expected Outcome**: Compatibility endpoint working, CompanyCompatibility + RecommendedRole entities stored in DB
 
-- [ ] T040 [US3] Create `CompanyCompatibility` entity in `career/entity/`
-  - Fields: id, userProfileId (FK), companyName, compatibilityScore (0-100), recommendedRoles (JSON list), createdAt
+- [ ] T051 [US3] Create `CompanyCompatibility` and `RecommendedRole` entities in `career/entity/`
+  - **CompanyCompatibility**: id, userProfileId (FK), companyName, compatibilityScore (0-100), createdAt. **No JSON 저장** — recommendedRoles는 별도 RecommendedRole 엔티티에 1:N 관계로 저장
+  - **RecommendedRole**: id, companyCompatibilityId (FK), roleName (String), createdAt. **N:1 관계** to CompanyCompatibility
+  - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for relationships
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/CompanyCompatibility.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/RecommendedRole.java`
 
-- [ ] T041 [US3] [P] Create `CompanyCompatibilityRepository` in `repository/`
+- [ ] T052 [US3] [P] Create `CompanyCompatibilityRepository` and `RecommendedRoleRepository` in `repository/`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/CompanyCompatibilityRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/RecommendedRoleRepository.java`
 
-- [ ] T042 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs
+- [ ] T053 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs
   - Request fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), companyName (@NotNull), companyFoundingDate (LocalDate, optional), companyFoundingTime (LocalTime, optional, **defaults to 12:00 if missing**)
-  - Response fields: compatibilityScore (0-100), confidenceLevel (LOW/MEDIUM/HIGH), recommendedRoles, reasoning
-  - Note: companyFoundingTime 미상 시 자동으로 12:00으로 설정하고 지장간 포함 계산. 사용자 사주와 동일 수준의 정확성 유지
+  - Response fields: compatibilityScore (0-100), confidenceLevel (LOW/MEDIUM/HIGH), recommendedRoles (List<String> - 클라이언트에 문자열 리스트로 반환), reasoning
+  - Note: DB 내부에는 RecommendedRole 엔티티로 저장, 응답 시 roleName 리스트로 변환. companyFoundingTime 미상 시 자동으로 12:00으로 설정하고 지장간 포함 계산
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/CompatibilityRequest.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/CompatibilityResponse.java`
 
-- [ ] T043 [US3] Create `CompanyInfoService` in `service/`
+- [ ] T054 [US3] Create `CompanyInfoService` in `service/`
   - Method: `lookupCompanyFoundingDate(companyName)` → calls public data API with fallback to manual input. If time not found, use default 12:00
   - Handles: API timeout → PublicDataApiException, company not found → inform user to provide founding date. If time missing → auto-set to 12:00
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyInfoService.java`
 
-- [ ] T044 [US3] Create `CompanyMatchingService` in `service/`
+- [ ] T055 [US3] Create `CompanyMatchingService` in `service/`
   - Method: `analyzeCompatibility(LocalDate userBirthDate, LocalTime userBirthTime, LocalDate companyFoundingDate, LocalTime companyFoundingTime)` → compatibility score + role recommendations with 지장간 calculation
-  - Logic: Fetch user saju via SajuDataService with birthDate + birthTime → Calculate user HiddenStems + TenGod. Fetch company saju (with time defaulting to 12:00 if missing) → Calculate company HiddenStems + TenGod. Use `CompatibilityScoreCalculator` with both sets of data for accurate scoring
-  - Stores: CompanyCompatibility in DB with both date-time information (company founding time defaults to 12:00 if not provided)
-  - Note: 기업 설립일도 사용자 사주와 동일한 수준으로 지장간 포함 계산. 시간 미상 시 정오(12:00)로 기본 설정
+  - Logic: Fetch user saju via SajuDataService with birthDate + birthTime → Calculate user HiddenStems + TenGod. Fetch company saju (with time defaulting to 12:00 if missing) → Calculate company HiddenStems + TenGod. Use `CompatibilityScoreCalculator` with both sets of data for accurate scoring. Save to CompanyCompatibility + RecommendedRole entities
+  - Note: 기업 설립일도 사용자 사주와 동일한 수준으로 지장간 포함 계산. 시간 미상 시 정오(12:00)로 기본 설정. 추천 직무는 RecommendedRole 엔티티로 저장
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyMatchingService.java`
 
-- [ ] T045 [US3] Create `CompatibilityController` in `controller/`
+- [ ] T056 [US3] Create `CompatibilityController` in `controller/`
   - Endpoint: `POST /api/company/compatibility` with CompatibilityRequest (userBirthDate + userBirthTime required, companyFoundingDate optional, companyFoundingTime optional)
-  - Handles: Request validation (@Valid), validates user birth time required, looks up company (with time fallback to 12:00), calculates compatibility, returns `ApiResponse<CompatibilityResponse>`
+  - Handles: Request validation (@Valid), validates user birth time required, looks up company (with time fallback to 12:00), calculates compatibility, returns `ApiResponse<CompatibilityResponse>` (recommendedRoles는 엔티티에서 추출한 List<String>)
   - Validation: Reject requests with missing userBirthTime (400 Bad Request)
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/CompatibilityController.java`
 
-- [ ] T046 [US3] Write unit & integration tests for Company Compatibility
+- [ ] T057 [US3] Write unit & integration tests for Company Compatibility
   - Test cases (CompanyMatchingService):
     1. Valid compatibility analysis (user birthDate + birthTime, company founding date + time) → compatibility score + roles including 지장간-based analysis
     2. Company founding time missing → auto-default to 12:00 and calculate 지장간
@@ -491,7 +576,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ## Phase 4: Polish & Integration
 
-- [ ] T047 Generate Swagger/OpenAPI documentation
+- [ ] T058 Generate Swagger/OpenAPI documentation
   - Add: `springdoc-openapi-starter-webmvc-ui` dependency to `build.gradle`
   - Configure: `@OpenAPIDefinition`, `@Info`, `@Server` annotations in `SSAjuApplication.java`
   - Add: `@Operation`, `@RequestBody`, `@ApiResponse` annotations to all controllers
@@ -500,19 +585,20 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: All controller classes updated with OpenAPI annotations
   - Verify: Accessible at `http://localhost:8080/swagger-ui.html` after `./gradlew bootRun`
 
-- [ ] T048 Write integration test for full Career API flow (all 4 endpoints)
+- [ ] T059 Write integration test for full Career API flow (all 4 endpoints)
   - Test:
     1. Create UserProfile with birthDate + birthTime
     2. POST /api/career/timing with birthDate + birthTime → Get H1/H2
     3. POST /api/career/consultation with birthDate + birthTime + saju data → Get advice
     4. POST /api/feedback/satisfaction with results → Save feedback
     5. POST /api/company/compatibility with birthDate + birthTime + company → Get compatibility score
-  - Verify: Data persistence (SajuResult with birthTime), response consistency, birthTime required fields validated, error handling across flows
+  - Verify: Data persistence (normalized entities TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength, RecommendedRole), response consistency, birthTime required fields validated, error handling across flows, **no JSON stored in tables**
   - File: `SSAju/src/test/java/ssafy/SSAju/integration/CareerApiIntegrationTest.java`
 
-- [ ] T049 Final verification: Run full test suite and validate coverage
+- [ ] T060 Final verification: Run full test suite and validate coverage
   - Command: `./gradlew clean test`
-  - Verify: 100% of Phase 1 tests pass, no warnings, coverage >80%
+  - Verify: 100% of Phase 1-3 tests pass, no warnings, coverage >80%
+  - Verify: **All entities use normalized structure (no JSON columns)**
   - Document: Test summary in [tasks.md](./tasks.md) completion section
 
 ---
@@ -626,13 +712,15 @@ And:   Missing user birthTime → 400 Bad Request
 | Phase 2 (Foundational) | 10 | WebClient, ChatClient, base entities, repos, Enum definitions, TenGod + HiddenStem calculators | Yes (most) |
 | Phase 3.1 (US1) | 8 | Career timing feature with 지장간 calculation | Independent |
 | Phase 3.2 (US2) | 9 | Consultation feature with TenGod + HiddenStem analysis | Parallel with US4 |
+| Phase 3-Refactor | 11 | **Entity Normalization**: 6 new entities (TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength) + 6 repositories + 2 service updates + 2 test updates. Replaces JSON storage with normalized entities. | Yes (parallel entity creation) |
 | Phase 3.4 (US4) | 9 | Feedback feature | Parallel with US2 |
-| Phase 3.3 (US3) | 7 | Company compatibility (P2) with 지장간 and 12:00 default | After core ready |
+| Phase 3.3 (US3) | 7 | Company compatibility (P2) with RecommendedRole entity, 지장간 and 12:00 default | After core ready |
 | Phase 4 (Polish) | 3 | API documentation (Swagger), integration tests, final validation | After all stories |
-| **TOTAL** | **50** | Full MVP + 지장간 calculation + P2 foundation + API docs | Strategic parallelism |
+| **TOTAL** | **61** | Full MVP + Entity Normalization + 지장간 calculation + P2 foundation + API docs | Strategic parallelism |
 
 ---
 
 **Generated by `/speckit-tasks` on 2026-04-10**
 **Updated**: 2026-04-27 (Added HiddenStemCalculator, 지장간 calculation logic, company founding time 12:00 default)
-**Status**: Ready for implementation team
+**Updated**: 2026-05-02 (Added Phase 3-Refactor: Entity Normalization. Replaced JSON storage with 7 normalized entities. Total tasks: 61. T031~T041 for refactoring, T042~T057 for US4/US3, T058~T060 for Phase 4)
+**Status**: Ready for implementation team with entity normalization workflow
