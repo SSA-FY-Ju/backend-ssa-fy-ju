@@ -345,22 +345,92 @@ try {
 }
 ```
 
-### 2. OpenAI API (커리어 상담)
+### 2. OpenAI API (커리어 상담 - 16 Field Groups)
 
 ```
 모델: gpt-4o-mini
-기능: JSON Mode (구조화된 응답)
-입력: {생년월일, 사주 데이터}
+기능: JSON Mode (구조화된 응답, 16개 필드 그룹)
+입력: {생년월일, 사주 데이터 (십신 + 지장간), 현재 연도, 12개월 타임라인 요청}
 응답: {
-  industries: [추천 산업],
-  interviewTips: [면접 팁],
-  strengths: [강점 분석]
+  // 기본 조언 (3 필드)
+  industries: [{"name": "산업명", "reason": "이유", "recommendedRoles": ["직무1", "직무2"]}],
+  interviewTips: [면접 팁 문자열],
+  strengths: [강점 분석],
+  
+  // 관운 분석 (3 필드)
+  favoredPeriod: "H1" | "H2",
+  confidenceScore: 0-100,
+  reasoning: "상세 근거 (정관 기운 등)",
+  
+  // 사주 데이터 (1 필드)
+  sajuProfile: {
+    dayMaster: "己",
+    dayMasterDescription: "己土(기토) - 수용적이고 꼼꼼한 성향",
+    fiveElements: {"木":1, "火":2, "土":2, "金":2, "水":1},
+    fiveElementsAnalysis: "오행 분석 설명",
+    tenGodDistribution: {"正官":1, "偏官":1, ...},
+    keyTenGods: ["正官", "偏官"]
+  },
+  
+  // OpenAI 분석 결과 (12 필드)
+  cautions: [주의사항],
+  wealthStyle: {incomeSource, financialAdvice, investmentTendency, additionalIncome},
+  longTermRoadmap: {phase0to2years, phase3to5years, ultimateGoal, goalDescription},
+  personalBranding: {suitColor, impression, hairAndMakeup, brandingKeyword, taglineForResume},
+  powerKeywords: {keywords: [{keyword, element, description, usageExample, context}], selectionGuide, usageTips, avoidanceTip},
+  mentalCare: {stressVulnerability, rechargeMethod, mindsetMantra, emergencyTactic},
+  environmentFit: {workVibe, companySize, colleagueType, conflictApproach, physicalEnv, culturalFit},
+  workStyle: {preferredCompanyType, leadershipType, decisionMaking, conflictResolution},
+  relationshipStrategy: {socialStyle, networkingApproach, teamPosition, conflictResolution, careerNetworking},
+  careerTimeline: {year: 2026, months: {"March": {type, description}}, pivotPoints: [{month, type, score, description}], warningMonths, warningDescription}
 }
+
 타임아웃: 8초 (LLM 응답 시간)
-재시도: 1회
+재시도: 1회 (자동)
 ```
 
-**Spring AI 사용 (권장)**:
+**Nested Record Types**:
+```java
+record CareerAdviceResponse(
+    List<IndustryRecommendation> industries,
+    List<String> interviewTips,
+    List<String> strengths,
+    List<String> cautions,
+    WealthStyle wealthStyle,
+    LongTermRoadmap longTermRoadmap,
+    PersonalBranding personalBranding,
+    PowerKeywords powerKeywords,
+    MentalCare mentalCare,
+    EnvironmentFit environmentFit,
+    WorkStyle workStyle,
+    RelationshipStrategy relationshipStrategy,
+    CareerTimeline careerTimeline,
+    List<String> keyTenGods,
+    String dayMasterDescription,
+    String fiveElementsAnalysis
+)
+
+// 14+ nested record types
+record IndustryRecommendation(String name, String reason, List<String> recommendedRoles)
+record WealthStyle(String incomeSource, String financialAdvice, String investmentTendency, String additionalIncome)
+record PhaseAdvice(String goal, String focus, String action)
+record LongTermRoadmap(PhaseAdvice phase0to2years, PhaseAdvice phase3to5years, String ultimateGoal, String goalDescription)
+record PersonalBranding(String suitColor, String impression, String hairAndMakeup, String brandingKeyword, String taglineForResume)
+record PowerKeyword(String keyword, String element, String description, String usageExample, String context)
+record PowerKeywords(List<PowerKeyword> keywords, String selectionGuide, List<String> usageTips, String avoidanceTip)
+record MentalCare(List<String> stressVulnerability, List<String> rechargeMethod, String mindsetMantra, String emergencyTactic)
+record EnvironmentFit(String workVibe, String companySize, String colleagueType, String conflictApproach, String physicalEnv, String culturalFit)
+record WorkStyle(String preferredCompanyType, String leadershipType, String decisionMaking, String conflictResolution)
+record RelationshipStrategy(String socialStyle, String networkingApproach, String teamPosition, String conflictResolution, String careerNetworking)
+record MonthFortune(String type, String description)
+record PivotPoint(String month, String type, int score, String description)
+record CareerTimeline(int year, Map<String, MonthFortune> months, List<PivotPoint> pivotPoints, List<String> warningMonths, String warningDescription)
+
+// ConsultationResponse inner record
+record SajuProfile(String dayMaster, String dayMasterDescription, Map<String, Integer> fiveElements, String fiveElementsAnalysis, Map<String, Integer> tenGodDistribution, List<String> keyTenGods)
+```
+
+**Spring AI 사용 (권장)** - JSON Mode 자동 처리 (16 Field Groups):
 ```java
 @Configuration
 public class ChatClientConfig {
@@ -369,7 +439,155 @@ public class ChatClientConfig {
         return builder.build();
     }
 }
+
+// Service에서 사용
+CareerAdviceResponse response = chatClient.prompt()
+    .user(prompt)  // 십신 + 지장간 + 현재 연도 + 12개월 타임라인 + 모든 16개 필드 그룹 요청
+    .call()
+    .entity(CareerAdviceResponse.class);  // 자동 JSON 매핑 (14+ nested record types)
 ```
+
+**1-Call Design Pattern (Expanded to 16 Field Groups)** (Session 2026-04-30):
+```java
+public ConsultationResponse getCareerConsultation(ConsultationRequest request) {
+    // 1단계: FastAPI로부터 기본 사주 데이터 조회
+    FastAPIResponse sajuData = sajuDataService.fetchSajuFromFastAPI(
+        request.birthDate(), request.birthTime());
+    
+    // 2단계: Spring에서 십신 및 지장간 계산
+    Map<String, Integer> tenGodDistribution = tenGodCalculator.calculate(
+        sajuData.heavenlyStems());
+    Map<String, List<String>> hiddenStems = hiddenStemCalculator.calculate(
+        sajuData.earthlyBranches());
+    String dayMaster = calculateDayMaster(sajuData.heavenlyStems());
+    
+    // 3단계: 관운 분석 (H1/H2 판정)
+    String favoredPeriod = careerFortuneAnalyzer.analyzeFavoredPeriod(
+        tenGodDistribution, hiddenStems, dayMaster, sajuData.earthlyBranches());
+    int confidenceScore = careerFortuneAnalyzer.calculateConfidenceScore(
+        tenGodDistribution, hiddenStems, dayMaster);
+    String reasoning = buildReasoning(favoredPeriod, tenGodDistribution, dayMaster);
+    
+    // 4단계: 사용자 프로필 및 사주 결과 저장
+    UserProfile userProfile = findOrCreateUserProfile(
+        request.birthDate(), request.birthTime());
+    SajuResult sajuResult = findOrCreateSajuResult(
+        userProfile, sajuData, tenGodDistribution, hiddenStems);
+    
+    // 5단계: OpenAI 호출 (십신 + 지장간 + 16개 필드 그룹 포함 프롬프트)
+    CareerAdviceResponse advice = callOpenAI(
+        sajuData, tenGodDistribution, hiddenStems, dayMaster);
+    
+    // 6단계: 컨설팅 결과 저장
+    CareerConsultation consultation = CareerConsultation.builder()
+        .sajuResult(sajuResult)
+        .industries(toIndustriesMap(advice.industries()))  // ✅ 타입 변환
+        .interviewTips(advice.interviewTips())
+        .strengths(advice.strengths())
+        .favoredPeriod(favoredPeriod)  // ✅ 추가됨
+        .confidenceScore(confidenceScore)  // ✅ 추가됨
+        .reasoning(reasoning)  // ✅ 추가됨
+        .openaiModelVersion(modelVersion)
+        .build();
+    careerConsultationRepository.save(consultation);
+    
+    // 7단계: 응답 반환 (19개 필드: 기본 조언 3 + 관운 분석 3 + 사주 프로필 1 + OpenAI 분석 12 필드)
+    return new ConsultationResponse(
+        advice.industries(), advice.interviewTips(), advice.strengths(),
+        modelVersion, favoredPeriod, confidenceScore, reasoning,
+        new ConsultationResponse.SajuProfile(
+            dayMaster, advice.dayMasterDescription(), sajuData.fiveElements(),
+            advice.fiveElementsAnalysis(), tenGodDistribution, advice.keyTenGods()),
+        advice.cautions(),
+        advice.wealthStyle(),
+        advice.longTermRoadmap(),
+        advice.personalBranding(),
+        advice.powerKeywords(),
+        advice.mentalCare(),
+        advice.environmentFit(),
+        advice.workStyle(),
+        advice.relationshipStrategy(),
+        advice.careerTimeline());
+}
+```
+
+**프롬프트 구성** (현재 연도 + 12개월 타임라인 + 십신 + 지장간 + 16개 필드 그룹):
+```java
+private String buildPrompt(FastAPIResponse sajuData,
+                          Map<String, Integer> tenGodDistribution,
+                          Map<String, List<String>> hiddenStems,
+                          String dayMaster) {
+    int currentYear = LocalDate.now().getYear();
+    return """
+        당신은 사주 명리학 전문가이자 취업 커리어 컨설턴트입니다. 아래 사주 데이터를 분석하여 취업 준비생에게 맞춤 커리어 조언을 제공해주세요.
+
+        [사주 데이터]
+        - 일간(日干): %s
+        - 천간(天干): %s
+        - 지지(地支): %s
+        - 오행 분포: %s
+        - 지장간(地藏干): %s
+        - 십신 분포(十神): %s
+
+        [분석 요청]
+        - 현재 연도: %d
+        - 12개월 타임라인별 기운 및 취업 최적 시기 분석
+        - 일간(%s) 기반 성향 분석
+
+        [JSON 응답 형식 - 16개 필드 그룹 포함]
+        {
+          // 기본 조언 (3)
+          "industries": [{"name": "산업명", "reason": "사주 분석 근거", "recommendedRoles": ["직무1", "직무2"]}],
+          "interviewTips": ["면접팁1", "면접팁2", "면접팁3"],
+          "strengths": ["강점1", "강점2", "강점3"],
+          
+          // 사주 데이터 (6)
+          "dayMasterDescription": "일간 설명",
+          "fiveElementsAnalysis": "오행 분석",
+          "keyTenGods": ["십신1", "십신2"],
+          
+          // OpenAI 분석 (7)
+          "cautions": ["주의사항"],
+          "wealthStyle": {"incomeSource": "...", "financialAdvice": "...", "investmentTendency": "...", "additionalIncome": "..."},
+          "longTermRoadmap": {"phase0to2years": {...}, "phase3to5years": {...}, "ultimateGoal": "...", "goalDescription": "..."},
+          "personalBranding": {"suitColor": "...", "impression": "...", "hairAndMakeup": "...", "brandingKeyword": "...", "taglineForResume": "..."},
+          "powerKeywords": {"keywords": [{"keyword": "...", "element": "...", "description": "...", "usageExample": "...", "context": "..."}], "selectionGuide": "...", "usageTips": ["팁1"], "avoidanceTip": "..."},
+          "mentalCare": {"stressVulnerability": ["..."], "rechargeMethod": ["..."], "mindsetMantra": "...", "emergencyTactic": "..."},
+          "environmentFit": {"workVibe": "...", "companySize": "...", "colleagueType": "...", "conflictApproach": "...", "physicalEnv": "...", "culturalFit": "..."},
+          "workStyle": {"preferredCompanyType": "...", "leadershipType": "...", "decisionMaking": "...", "conflictResolution": "..."},
+          "relationshipStrategy": {"socialStyle": "...", "networkingApproach": "...", "teamPosition": "...", "conflictResolution": "...", "careerNetworking": "..."},
+          "careerTimeline": {
+            "year": %d,
+            "months": {
+              "January": {"type": "...", "description": "..."},
+              ...
+              "December": {"type": "...", "description": "..."}
+            },
+            "pivotPoints": [{"month": "March", "type": "적극기", "score": 9, "description": "..."}],
+            "warningMonths": ["May", "July"],
+            "warningDescription": "..."
+          }
+        }
+        """.formatted(
+            dayMaster,
+            sajuData.heavenlyStems(),
+            sajuData.earthlyBranches(),
+            sajuData.fiveElements(),
+            hiddenStems,
+            tenGodDistribution,
+            currentYear,
+            dayMaster,
+            currentYear
+        );
+}
+```
+
+**Transaction Separation** (Session 2026-04-30):
+- ConsultationService에서 @Transactional 제거 (Network I/O 시간 동안 DB 커넥션 점유 방지)
+- FastAPI 호출: 트랜잭션 밖
+- OpenAI 호출 (16개 필드 그룹 포함): 트랜잭션 밖
+- 각 DB 작업: Repository의 @Transactional에 의해 개별 트랜잭션으로 실행
+- Result: Connection Pool 고갈 방지, 응답 시간 15초 이내 달성 (OpenAI 8초 타임아웃 포함)
 
 ### FastAPI-Spring 역할 분담 (Phase 1 중요 결정)
 

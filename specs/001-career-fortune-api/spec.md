@@ -41,6 +41,14 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 - Q: 태어난 시간의 입력 형식은? → A: **HH:mm (24시간 형식)**. 예: 14:30, 09:00. 분(minute) 단위까지 지원하여 정밀도 향상.
 - Q: 관운 분석(User Story 1)에서 birth_time은 어떻게 처리할 것인가? → A: **생년월일시 모두 사용**. FastAPI로 완전한 생년월일시(YYYY-MM-DD HH:mm)를 전송하여 가장 정확한 사주 계산 제공.
 
+### Session 2026-04-30 (1-Call Design & Implementation Validation)
+
+- Q: /consultation 엔드포인트가 2-call 설계(먼저 /timing 호출 필수)인데, 이는 사용자 경험이 나쁘지 않은가? → A: **1-call 설계로 리팩토링 필요**. ConsultationService에서 내부적으로 FastAPI 호출, 십신/지장간 계산, 관운 분석을 모두 수행. 클라이언트는 birthDate + birthTime만 제공하면 완전한 컨설팅 결과(AI 조언 + 관운 분석) 수신 가능.
+- Q: 응답 데이터 완전성: /consultation 응답에 favoredPeriod, confidenceScore, reasoning이 빠져있는데? → A: **응답 확장 필수**. ConsultationResponse에 3개 필드 추가하여 /timing 없이 단독 호출로 전체 정보 제공. 응답: `{industries, interviewTips, strengths, openaiModelVersion, favoredPeriod, confidenceScore, reasoning}`
+- Q: 트랜잭션 관리: FastAPI/OpenAI I/O 동안 DB 커넥션을 점유하면 Connection Pool 고갈 위험이 있지 않은가? → A: **트랜잭션 분리 필수**. ConsultationService에서 @Transactional 제거. FastAPI/OpenAI 호출은 트랜잭션 밖에서 수행. 각 DB 작업(UserProfile find/create, SajuResult find/create, CareerConsultation save)은 Repository의 @Transactional에 의해 개별 트랜잭션으로 실행. 네트워크 지연이 DB 커넥션을 점유하지 않음.
+- Q: Jackson 3.x 호환성: PR 리뷰에서 `tools.jackson.*`을 `com.fasterxml.jackson.*`로 변경하라고 했는데? → A: **Spring Boot 4.0.5는 Jackson 3.x 사용**. 패키지명이 `tools.jackson.*`으로 변경됨. 기존 코드가 정확하며, `com.fasterxml.jackson.*`은 Jackson 2.x용이므로 사용하면 안 됨.
+- Q: DataIntegrityViolationException 처리: 동시 다중 요청 시 같은 생년월일시 사용자가 두 번 생성될 수 있지 않은가? → A: **최적 "create or find" 패턴 적용**. SajuResult를 찾지 못하면 새로 생성 시도. UNIQUE 제약으로 인해 동시 생성 시 DIVE 발생하면, 호출 서비스에서 catch하여 다시 find 수행. 이미 생성된 결과를 재사용. 예외 전파 불필요, 로그만 기록 (warn level).
+
 ### Session 2026-04-27 (Data Uniqueness & Hidden Stem Calculation)
 
 - Q: UserProfile에서 사용자를 식별하는 유니크 키는 무엇인가? → A: **생년월일시 조합 (birthDate + birthTime)이 유니크 키**. 같은 생년월일시를 가진 사용자는 동일한 사주 분석 결과를 공유하므로, 이를 중심으로 데이터를 구성. `UNIQUE(birthDate, birthTime)` 제약 추가.
@@ -70,17 +78,21 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 ### User Story 2 - AI Career Consulting (Priority: P1)
 
-취업 준비생이 사주 데이터(천간/지지)를 제출하고 OpenAI API를 통한 AI 커리어 컨설턴트로부터 개인 맞춤 조언(추천 산업, 면접 전략, 강점)을 받습니다.
+취업 준비생이 사주 데이터(천간/지지)를 제출하고 OpenAI API를 통한 AI 커리어 컨설턴트로부터 개인 맞춤 조언(추천 산업, 면접 전략, 강점, 관운 분석, 재무 스타일, 장기 로드맵, 개인 브랜딩, 파워 키워드, 정신 케어, 업무 환경, 업무 스타일, 인간관계 전략, 커리어 타임라인)을 받습니다.
 
 **Why this priority**: 직접 수익화 가능한 기능. 전문가 수준의 맞춤 조언으로 경쟁 차별화.
 
-**Independent Test**: 사주 데이터 입력 → OpenAI API 호출 → 구조화된 권고사항(산업, 면접팁, 강점) 반환. P1/P3 없이도 완전히 동작합니다.
+**Independent Test**: 사주 데이터 입력 → OpenAI API 호출 → 구조화된 권고사항(16개 필드 그룹 포함) 반환. P1/P3 없이도 완전히 동작합니다.
 
 **Acceptance Scenarios**:
 
-1. **Given** 완전한 사주 데이터(4 천간/지지 + 오행/십신/지장간 분포), **When** AI 커리어 컨설팅 요청, **Then** JSON 형식으로 3~5개 산업 추천 + 면접 전략 + 강점 분석 반환
+1. **Given** 완전한 사주 데이터(4 천간/지지 + 오행/십신/지장간 분포), **When** AI 커리어 컨설팅 요청, **Then** JSON 형식으로 다음 16개 필드 그룹 반환:
+   - 기본 조언: 산업 추천(3~5개) + 면접 전략 + 강점 분석
+   - 관운 분석: favoredPeriod(H1/H2) + confidenceScore(0-100) + reasoning
+   - 사주 베이스 데이터: sajuProfile(dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods)
+   - OpenAI 분석 결과: cautions, wealthStyle, longTermRoadmap, personalBranding, powerKeywords, mentalCare, environmentFit, workStyle, relationshipStrategy, careerTimeline
 2. **Given** 느린 외부 API(OpenAI), **When** Timeout 초과, **Then** 정중한 오류 메시지 + 재시도 안내 반환
-3. **Given** 유효한 사주 데이터, **When** 컨설팅 응답, **Then** 타임스탬프 + AI 모델 버전 메타데이터 포함
+3. **Given** 유효한 사주 데이터, **When** 컨설팅 응답, **Then** 타임스탬프 + AI 모델 버전 메타데이터 + 모든 16개 필드 그룹 포함
 
 ---
 
