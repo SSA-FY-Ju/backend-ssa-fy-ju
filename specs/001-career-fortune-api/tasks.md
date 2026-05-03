@@ -395,37 +395,37 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ### New Entities (JSON → Normalized Entities)
 
-- [ ] T031 [Refactor] Create `TenGodData` entity for normalizing SajuResult.tenGodDistribution
+- [v] T031 [Refactor] Create `TenGodData` entity for normalizing SajuResult.tenGodDistribution
   - Fields: id, sajuResultId (FK, 1:1), tenGodName (String), score (Integer), createdAt
   - Purpose: SajuResult의 Map<String, Integer> tenGodDistribution을 엔티티로 저장
   - Link: 1:1 to SajuResult, FetchType.LAZY
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/TenGodData.java`
 
-- [ ] T032 [Refactor] [P] Create `HiddenStemData` entity for normalizing SajuResult.hiddenStems
+- [v] T032 [Refactor] [P] Create `HiddenStemData` entity for normalizing SajuResult.hiddenStems
   - Fields: id, sajuResultId (FK, 1:N), earthlyBranch (String, e.g., "子"), hiddenStem (String, e.g., "癸"), createdAt
   - Purpose: SajuResult의 Map<String, List<String>> hiddenStems를 정규화된 행으로 저장 (한 행 = 한 지지와 한 지장간)
   - Link: N:1 to SajuResult (multiple rows per SajuResult), FetchType.LAZY
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/HiddenStemData.java`
 
-- [ ] T033 [Refactor] Create `CareerFortune` entity for normalizing SajuResult.careerFortune
+- [v] T033 [Refactor] Create `CareerFortune` entity for normalizing SajuResult.careerFortune
   - Fields: id, sajuResultId (FK, 1:1), favoredPeriod (String: "H1"/"H2"), confidenceScore (Integer, 0-100), reasoning (Text), createdAt
   - Purpose: SajuResult의 Map<String, Object> careerFortune을 엔티티로 저장
   - Link: 1:1 to SajuResult, FetchType.LAZY
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/CareerFortune.java`
 
-- [ ] T034 [Refactor] [P] Create `Industry` entity for normalizing CareerConsultation.industries
+- [v] T034 [Refactor] [P] Create `Industry` entity for normalizing CareerConsultation.industries
   - Fields: id, careerConsultationId (FK, 1:N), industryName (String), reason (Text), createdAt
   - Purpose: CareerConsultation의 JSON 리스트 industries를 엔티티로 저장
   - Link: N:1 to CareerConsultation, FetchType.LAZY
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/Industry.java`
 
-- [ ] T035 [Refactor] [P] Create `InterviewTip` entity for normalizing CareerConsultation.interviewTips
+- [v] T035 [Refactor] [P] Create `InterviewTip` entity for normalizing CareerConsultation.interviewTips
   - Fields: id, careerConsultationId (FK, 1:N), tipText (Text), createdAt
   - Purpose: CareerConsultation의 JSON 리스트 interviewTips를 엔티티로 저장
   - Link: N:1 to CareerConsultation, FetchType.LAZY
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/InterviewTip.java`
 
-- [ ] T036 [Refactor] [P] Create `Strength` entity for normalizing CareerConsultation.strengths
+- [v] T036 [Refactor] [P] Create `Strength` entity for normalizing CareerConsultation.strengths
   - Fields: id, careerConsultationId (FK, 1:N), strengthText (Text), createdAt
   - Purpose: CareerConsultation의 JSON 리스트 strengths를 엔티티로 저장
   - Link: N:1 to CareerConsultation, FetchType.LAZY
@@ -433,7 +433,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ### New Repositories
 
-- [ ] T037 [Refactor] [P] Create repositories for new entities
+- [v] T037 [Refactor] [P] Create repositories for new entities
   - Create: `TenGodDataRepository`, `HiddenStemDataRepository`, `CareerFortuneRepository`, `IndustryRepository`, `InterviewTipRepository`, `StrengthRepository`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/TenGodDataRepository.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/HiddenStemDataRepository.java`
@@ -444,25 +444,25 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ### Service Updates for Entity-Based Storage
 
-- [ ] T038 [Refactor] Update `CareerFortuneService` to use TenGodData, HiddenStemData, CareerFortune entities
+- [v] T038 [Refactor] Update `CareerFortuneService` to use TenGodData, HiddenStemData, CareerFortune entities
   - Modify: Save tenGodDistribution, hiddenStems, careerFortune as entities instead of JSON in SajuResult
   - Logic: After analyzing H1/H2, create TenGodData, HiddenStemData, CareerFortune entities and link to SajuResult
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CareerFortuneService.java`
 
-- [ ] T039 [Refactor] Update `ConsultationService` to use Industry, InterviewTip, Strength entities
+- [v] T039 [Refactor] Update `ConsultationService` to use Industry, InterviewTip, Strength entities
   - Modify: Save industries, interviewTips, strengths as entities instead of JSON in CareerConsultation
   - Logic: After OpenAI response, create Industry, InterviewTip, Strength entities and link to CareerConsultation
   - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
 
 ### Test Updates
 
-- [ ] T040 [Refactor] Update unit tests for entity normalization
+- [v] T040 [Refactor] Update unit tests for entity normalization
   - Update `CareerFortuneServiceTest`: Verify TenGodData, HiddenStemData, CareerFortune entities created and linked
   - Update `ConsultationServiceTest`: Verify Industry, InterviewTip, Strength entities created and linked
   - File: `SSAju/src/test/java/ssafy/SSAju/service/CareerFortuneServiceTest.java`
   - File: `SSAju/src/test/java/ssafy/SSAju/service/ConsultationServiceTest.java`
 
-- [ ] T041 [Refactor] Run all refactored tests
+- [v] T041 [Refactor] Run all refactored tests
   - Command: `./gradlew test`
   - Verify: All tests pass with normalized entity structure, no JSON storage in tables
   - Verify: Data persistence correctly links parent→child entities
