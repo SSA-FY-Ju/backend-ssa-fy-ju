@@ -50,6 +50,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 
 	// Retry
+	// spring-boot-starter-aop는 Spring Boot 4.0.5-M에서 제공되지 않아 spring-aspects 직접 사용
 	implementation 'org.springframework.retry:spring-retry:2.0.11'
 	implementation 'org.springframework:spring-aspects'
 

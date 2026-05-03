@@ -48,11 +48,28 @@ public class ConsultationOpenAICaller {
         if (response.industries() == null || response.industries().isEmpty()) {
             throw new OpenAIApiException("산업 추천 정보가 누락되었습니다");
         }
+        for (var industry : response.industries()) {
+            if (industry == null
+                    || industry.name() == null || industry.name().isBlank()
+                    || industry.reason() == null || industry.reason().isBlank()) {
+                throw new OpenAIApiException("산업 추천 항목에 빈 name 또는 reason이 포함되어 있습니다");
+            }
+        }
         if (response.interviewTips() == null || response.interviewTips().isEmpty()) {
             throw new OpenAIApiException("면접 팁 정보가 누락되었습니다");
         }
+        for (var tip : response.interviewTips()) {
+            if (tip == null || tip.isBlank()) {
+                throw new OpenAIApiException("면접 팁 항목에 빈 값이 포함되어 있습니다");
+            }
+        }
         if (response.strengths() == null || response.strengths().isEmpty()) {
             throw new OpenAIApiException("강점 분석 정보가 누락되었습니다");
+        }
+        for (var strength : response.strengths()) {
+            if (strength == null || strength.isBlank()) {
+                throw new OpenAIApiException("강점 분석 항목에 빈 값이 포함되어 있습니다");
+            }
         }
     }
 

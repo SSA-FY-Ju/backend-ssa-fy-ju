@@ -58,11 +58,26 @@ public class SajuResultWriteService {
 
     /**
      * 재시도 후에도 DIVE 발생 시 실행.
-     * 다른 스레드가 최종 commit에 성공한 상태이므로, 기존 데이터를 그대로 사용.
-     * 예외를 throw하지 않아 caller는 정상 완료로 처리됨.
+     * 중복 키(동시성 경쟁)인 경우에만 무시. 그 외 실제 제약 위반은 재throw.
      */
     @Recover
     public void recover(DataIntegrityViolationException ex, UserProfile userProfile, SajuResult newResult) {
-        log.debug("SajuResult 동시 생성 감지: userProfileId={} - 기존 결과 유지", userProfile.getId());
+        if (isDuplicateKeyViolation(ex)) {
+            log.debug("SajuResult 동시 생성 감지: userProfileId={} - 기존 결과 유지", userProfile.getId());
+            return;
+        }
+        throw ex;
+    }
+
+    private boolean isDuplicateKeyViolation(DataIntegrityViolationException ex) {
+        Throwable cause = ex.getCause();
+        if (cause == null) {
+            return false;
+        }
+        String msg = cause.getMessage();
+        if (msg == null) {
+            return false;
+        }
+        return msg.contains("Duplicate entry") || msg.contains("duplicate key");
     }
 }

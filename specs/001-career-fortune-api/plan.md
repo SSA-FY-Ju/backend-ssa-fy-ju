@@ -39,8 +39,8 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - **Analyzer**: 분석 로직 전담 (TenGodAnalyzer, HiddenStemAnalyzer, CareerFortuneAnalyzer)
 - **Calculator**: 계산 로직 전담 (TenGodCalculator, HiddenStemCalculator, CompatibilityScoreCalculator)
 - **Mapper**: DTO ↔ Entity 변환 (CareerConsultationMapper, SajuResultMapper 등)
-- **Provider**: 설정/프롬프트 관리 (PromptProvider, ConfigProvider 등)
-- **Exception**: @RestControllerAdvice + 커스텀 예외만 사용 (try-catch 금지)
+- **Provider**: 재사용 가능한 데이터 조회/생성 + 설정/프롬프트 관리 (동시성 보정, 경량 데이터 접근 포함). 예: UserProfileProvider, SajuResultProvider, PromptProvider, ConfigProvider
+- **Exception**: @RestControllerAdvice + 커스텀 예외 우선. 경계 어댑터(ConsultationOpenAICaller 등)가 외부 오류를 도메인 예외로 변환하는 제한적 try-catch는 허용. 비즈니스 예외를 무조건 삼키는 것 금지
 
 **Key Technical Decisions** (Session 2026-04-30 + Service Layer Optimization):
 - **1-Call API Design**: `/api/career/consultation` 엔드포인트가 내부적으로 모든 외부 API 호출 오케스트레이션 (FastAPI, OpenAI). 클라이언트는 birthDate + birthTime만 제공하고, 모든 계산(십신, 지장간, 관운 분석) 및 16개 필드 그룹의 완전한 AI 조언을 한 번의 요청으로 수신.
