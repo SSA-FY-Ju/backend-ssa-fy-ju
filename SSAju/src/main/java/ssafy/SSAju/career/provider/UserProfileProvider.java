@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.repository.UserProfileRepository;
 
@@ -29,7 +30,7 @@ public class UserProfileProvider {
                     } catch (DataIntegrityViolationException ex) {
                         return userProfileRepository
                                 .findByBirthDateAndBirthTime(birthDate, birthTime)
-                                .orElseThrow(() -> new DataAccessException("UserProfile 조회/생성 실패", ex));
+                                .orElseThrow(() -> new DataAccessException(ErrorMessageConstants.USER_PROFILE_ACCESS_FAILED.getMessage(), ex));
                     }
                 });
     }

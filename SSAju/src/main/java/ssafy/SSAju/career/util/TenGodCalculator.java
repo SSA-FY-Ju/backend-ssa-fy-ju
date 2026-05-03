@@ -1,6 +1,7 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 
 import java.util.HashMap;
 import java.util.List;
@@ -57,7 +58,7 @@ public class TenGodCalculator {
 
     public Map<String, Integer> calculate(List<String> heavenlyStems) {
         if (heavenlyStems == null || heavenlyStems.size() != 4) {
-            throw new IllegalArgumentException("천간 목록은 정확히 4개(年月日時)여야 합니다.");
+            throw new IllegalArgumentException(ErrorMessageConstants.HEAVENLY_STEMS_COUNT_INVALID.getMessage());
         }
         String dayMaster = heavenlyStems.get(2); // 일간(日干) - 인덱스 2 (年月日時 순서)
         Map<String, Integer> distribution = new HashMap<>();
@@ -73,10 +74,10 @@ public class TenGodCalculator {
 
     public String getTenGod(String dayMaster, String targetStem) {
         if (dayMaster == null || !FIVE_ELEMENT_MAP.containsKey(dayMaster)) {
-            throw new IllegalArgumentException("유효하지 않은 일간: " + dayMaster);
+            throw new IllegalArgumentException(ErrorMessageConstants.INVALID_DAY_MASTER.getMessage() + ": " + dayMaster);
         }
         if (targetStem == null || !FIVE_ELEMENT_MAP.containsKey(targetStem)) {
-            throw new IllegalArgumentException("유효하지 않은 천간: " + targetStem);
+            throw new IllegalArgumentException(ErrorMessageConstants.INVALID_HEAVENLY_STEM.getMessage() + ": " + targetStem);
         }
         String masterElement = FIVE_ELEMENT_MAP.get(dayMaster);
         String targetElement = FIVE_ELEMENT_MAP.get(targetStem);
@@ -103,6 +104,6 @@ public class TenGodCalculator {
             return samePolarity ? "편인" : "정인";
         }
 
-        throw new IllegalArgumentException("알 수 없는 천간 조합: " + dayMaster + " vs " + targetStem);
+        throw new IllegalArgumentException(ErrorMessageConstants.UNKNOWN_STEM_COMBINATION.getMessage() + ": " + dayMaster + " vs " + targetStem);
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import ssafy.SSAju.dto.external.FastAPIResponse;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
@@ -31,10 +32,10 @@ public class SajuDataService {
 
     public FastAPIResponse fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime) {
         if (birthDate == null) {
-            throw new InvalidSajuDataException("생년월일이 필수입니다");
+            throw new InvalidSajuDataException(ErrorMessageConstants.BIRTH_DATE_REQUIRED.getMessage());
         }
         if (birthTime == null) {
-            throw new InvalidSajuDataException("태어난 시간이 필수입니다 (HH:mm 형식)");
+            throw new InvalidSajuDataException(ErrorMessageConstants.BIRTH_TIME_REQUIRED.getMessage());
         }
 
 
@@ -57,7 +58,7 @@ public class SajuDataService {
                     Thread.sleep(delayMs);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new FastAPITimeoutException("FastAPI 호출 중 스레드 중단됨", ie);
+                    throw new FastAPITimeoutException(ErrorMessageConstants.FASTAPI_THREAD_INTERRUPTED.getMessage(), ie);
                 }
                 return executeWithRetry(birthDate, birthTime, attempt + 1);
             }
@@ -67,7 +68,7 @@ public class SajuDataService {
                         "FastAPI 요청 시간 초과 (" + (maxRetries + 1) + "회 시도)", e);
             }
             log.error("FastAPI 호출 실패", e);
-            throw new ExternalApiException("FastAPI 호출 실패", e);
+            throw new ExternalApiException(ErrorMessageConstants.FASTAPI_CALL_FAILED.getMessage(), e);
         }
     }
 

@@ -1,6 +1,7 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.util.List;
@@ -45,16 +46,16 @@ public class CareerFortuneAnalyzer {
                                         String dayMaster,
                                         List<String> earthlyBranches) {
         if (tenGodDistribution == null) {
-            throw new InvalidSajuDataException("십신 분포 데이터가 null입니다.");
+            throw new InvalidSajuDataException(ErrorMessageConstants.TEN_GOD_DISTRIBUTION_NULL.getMessage());
         }
         if (hiddenStems == null) {
-            throw new InvalidSajuDataException("지장간 데이터가 null입니다.");
+            throw new InvalidSajuDataException(ErrorMessageConstants.HIDDEN_STEM_DATA_NULL.getMessage());
         }
         if (dayMaster == null || dayMaster.isBlank()) {
-            throw new InvalidSajuDataException("일간이 null이거나 비어있습니다.");
+            throw new InvalidSajuDataException(ErrorMessageConstants.DAY_MASTER_NULL.getMessage());
         }
         if (earthlyBranches == null || earthlyBranches.size() != 4) {
-            throw new InvalidSajuDataException("지지 목록은 정확히 4개(年月日時)여야 합니다.");
+            throw new InvalidSajuDataException(ErrorMessageConstants.EARTHLY_BRANCHES_4_INVALID.getMessage());
         }
         int officerScore = calculateOfficerScore(tenGodDistribution, hiddenStems, dayMaster);
         String monthBranch = earthlyBranches.get(1);
@@ -129,7 +130,7 @@ public class CareerFortuneAnalyzer {
 
     public String buildReasoning(String favoredPeriod, Map<String, Integer> tenGodDistribution) {
         if (tenGodDistribution == null || tenGodDistribution.isEmpty()) {
-            throw new InvalidSajuDataException("십신 데이터는 null이 아니어야 합니다");
+            throw new InvalidSajuDataException(ErrorMessageConstants.TEN_GOD_DATA_NULL.getMessage());
         }
         if (!"H1".equals(favoredPeriod) && !"H2".equals(favoredPeriod)) {
             throw new InvalidSajuDataException(
