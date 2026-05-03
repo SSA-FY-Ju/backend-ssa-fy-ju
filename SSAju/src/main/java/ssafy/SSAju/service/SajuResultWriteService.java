@@ -3,6 +3,7 @@ package ssafy.SSAju.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
@@ -10,6 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.exception.InvalidSajuDataException;
+
+import java.sql.SQLException;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
@@ -46,6 +50,12 @@ public class SajuResultWriteService {
     )
     @Transactional
     public void replaceForUserProfile(UserProfile userProfile, SajuResult newResult) {
+        // 소유권 일관성: A의 결과를 지운 뒤 B의 결과를 저장하는 실수 방지
+        if (newResult.getUserProfile() != null
+                && !newResult.getUserProfile().equals(userProfile)) {
+            throw new InvalidSajuDataException(
+                "newResult의 userProfile이 전달받은 userProfile과 불일치합니다");
+        }
         sajuResultRepository.findByUserProfile(userProfile).ifPresent(existing -> {
             Long existingId = existing.getId();
             tenGodDataRepository.deleteBySajuResultId(existingId);
@@ -70,14 +80,39 @@ public class SajuResultWriteService {
     }
 
     private boolean isDuplicateKeyViolation(DataIntegrityViolationException ex) {
+        // 1. Spring이 이미 친절하게 '중복 키 에러'라고 번역해준 경우 (가장 깔끔함)
+        if (ex instanceof DuplicateKeyException) {
+            return true;
+        }
+
         Throwable cause = ex.getCause();
-        if (cause == null) {
-            return false;
+        while (cause != null) {
+            String msg = cause.getMessage();
+            if (msg != null) {
+                // MySQL + H2 메시지 포맷 모두 처리
+                if (msg.contains("Duplicate entry") || msg.contains("duplicate key")
+                        || msg.contains("Unique index or primary key violation")) {
+                    return true;
+                }
+            }
+
+            if (cause instanceof SQLException) {
+                SQLException sqlEx = (SQLException) cause;
+                String sqlState = sqlEx.getSQLState();
+                int errorCode = sqlEx.getErrorCode();
+
+                // H2의 중복 키 SQLState (23505)
+                if ("23505".equals(sqlState)) {
+                    return true;
+                }
+                // MySQL의 중복 키 Error Code (1062)
+                // 주의: SQLState "23000"은 Not Null, FK 에러도 포함하므로 사용하면 안 됨!
+                if (errorCode == 1062) {
+                    return true;
+                }
+            }
+            cause = cause.getCause();
         }
-        String msg = cause.getMessage();
-        if (msg == null) {
-            return false;
-        }
-        return msg.contains("Duplicate entry") || msg.contains("duplicate key");
+        return false;
     }
 }
