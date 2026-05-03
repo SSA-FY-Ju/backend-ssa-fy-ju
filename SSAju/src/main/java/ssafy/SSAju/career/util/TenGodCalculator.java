@@ -2,6 +2,7 @@ package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.career.enums.TenGodConstants;
 
 import java.util.HashMap;
 import java.util.List;
@@ -87,21 +88,21 @@ public class TenGodCalculator {
         boolean samePolarity = masterPolarity.equals(targetPolarity);
 
         if (masterElement.equals(targetElement)) {
-            return samePolarity ? "비견" : "겁재";
+            return samePolarity ? TenGodConstants.COMPARING_FRIEND.getName() : TenGodConstants.ROBBING_WEALTH.getName();
         }
         if (GENERATES_MAP.get(masterElement).equals(targetElement)) {
-            return samePolarity ? "식신" : "상관";
+            return samePolarity ? TenGodConstants.FOOD_GOD.getName() : TenGodConstants.INJURING_OFFICER.getName();
         }
         if (CONTROLS_MAP.get(masterElement).equals(targetElement)) {
-            return samePolarity ? "편재" : "정재";
+            return samePolarity ? TenGodConstants.SIDE_WEALTH.getName() : TenGodConstants.CHIEF_WEALTH.getName();
         }
         // 나를 극하는 오행: targetElement가 masterElement를 극함
         if (CONTROLS_MAP.get(targetElement).equals(masterElement)) {
-            return samePolarity ? "편관" : "정관";
+            return samePolarity ? TenGodConstants.SIDE_OFFICER.getName() : TenGodConstants.CHIEF_OFFICER.getName();
         }
         // 나를 생하는 오행: targetElement가 masterElement를 생함
         if (GENERATES_MAP.get(targetElement).equals(masterElement)) {
-            return samePolarity ? "편인" : "정인";
+            return samePolarity ? TenGodConstants.SIDE_SEAL.getName() : TenGodConstants.CHIEF_SEAL.getName();
         }
 
         throw new IllegalArgumentException(ErrorMessageConstants.UNKNOWN_STEM_COMBINATION.getMessage() + ": " + dayMaster + " vs " + targetStem);

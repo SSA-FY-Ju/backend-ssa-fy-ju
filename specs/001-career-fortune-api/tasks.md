@@ -732,8 +732,10 @@ And:   Missing user birthTime → 400 Bad Request
 **1. 관운 분석 상수** (CareerFortuneAnalyzer, HiddenStemCalculator 등)
 
 - [v] T061 Create `TenGodConstants` enum in `career/enums/`
-  - 정관(正官), 편관(偏官), 정재(正財), 편재(偏財), 식신(食神), 상관(傷官), 비겁(比肩), 겹재(劫財) 등 10개 십신
-  - 각 십신별 가점/감점: 정관·편관(×20), 식신·상관(×15), 비겹(×5)
+  - 10개 십신 상수 정의: CHIEF_OFFICER (정관), SIDE_OFFICER (편관), CHIEF_WEALTH (정재), SIDE_WEALTH (편재), FOOD_GOD (식신), INJURING_OFFICER (상관), COMPARING_FRIEND (비견), ROBBING_WEALTH (겁재), CHIEF_SEAL (정인), SIDE_SEAL (편인)
+  - 각 십신별 필드: name (한글명), symbol (기호), scoreModifier (가점/감점: 20, -15, -5, 0), isOfficer (관성 여부)
+  - Helper method: fromName(String) - 십신 이름으로 상수 조회
+  - 관운 분석용 점수 수정자: 정관/편관 +20, 식신/상관 -15, 비견/겁재 -5, 기타 0
   - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/TenGodConstants.java`
 
 - [v] T062 Create `HiddenStemConstants` enum in `career/enums/`
@@ -820,23 +822,29 @@ And:   Missing user birthTime → 400 Bad Request
 ### Code Refactoring (Use Constants)
 
 - [v] T074 Refactor all services and utilities to use extracted constants
-  - Update: CareerFortuneAnalyzer.java (관성 점수 상수 사용)
-  - Update: HiddenStemCalculator.java (지장간 매핑 상수 사용)
-  - Update: TenGodCalculator.java (십신 상수 사용)
-  - Update: CompatibilityScoreCalculator.java (호환성 상수 사용)
-  - Update: SajuDataService.java (API 타임아웃 상수 사용)
-  - Update: ConsultationService.java (OpenAI 타임아웃, 모델명 상수 사용)
-  - Update: CompanyMatchingService.java (기본 설립 시간 상수 사용)
-  - Update: GlobalExceptionHandler.java (에러 메시지 상수 사용)
-  - Update: All Controllers (메시지 상수 사용)
+  - **TenGodConstants 적용**:
+    - TenGodCalculator.java: getTenGod() 메서드에서 십신 문자열 반환 시 TenGodConstants.fromName() 또는 TenGodConstants.ENUM.getName() 사용
+    - CareerFortuneAnalyzer.java: 하드코딩된 "정관", "편관", "식신", "상관", "비견", "겁재" 제거, OFFICER_GODS/WEAKENING_GODS/COMPETING_GODS 리스트를 TenGodConstants 기반으로 재구성, calculateOfficerScore()에서 TenGodConstants.getScoreModifier() 사용
+    - CompatibilityScoreCalculator.java: 하드코딩된 "정관"/"편관" 제거, TenGodConstants.isOfficer() 사용으로 관성 판정
+  - **Error & Success 메시지 상수 적용**:
+    - SajuDataService.java (API 타임아웃, 외부 API 에러 메시지)
+    - ConsultationService.java (OpenAI 타임아웃, 모델명, 프롬프트 템플릿)
+    - CompanyMatchingService.java (기본 설립 시간 "12:00", 호환성 메시지)
+    - GlobalExceptionHandler.java (ErrorMessageConstants 사용)
+    - All Controllers (성공/실패 응답 메시지)
   - File: Multiple service and controller files
 
 - [v] T075 Run all tests and verify constant extraction
   - Command: `./gradlew test`
-  - Verify: All constants properly injected and tests pass
-  - Verify: No hardcoded strings or magic numbers remain (grep for "0-100", "3", "8", "H1"/"H2", etc.)
+  - Verify:
+    1. All TenGodConstants 적용 완료: 십신 문자열 "정관", "편관" 등이 모두 TenGodConstants.ENUM.getName()로 변경됨
+    2. CareerFortuneAnalyzer, TenGodCalculator, CompatibilityScoreCalculator에서 TenGodConstants 사용 확인
+    3. TenGodConstants.fromName() 메서드로 십신 이름 조회 가능 확인
+    4. 관운 점수 계산이 scoreModifier() 사용으로 일관성 있게 수행됨 확인
+    5. 모든 테스트 통과 (특히 CareerFortuneServiceTest, CompatibilityScoreCalculatorTest)
+    6. No hardcoded strings 검증: grep으로 "정관", "편관", "식신", "상관", "비견", "겁재" 등이 util 클래스에서 제거되었는지 확인
   - Verify: Code style follows code-style-guide.md (constants in enums/, all uses via constant names)
-  - Verify: NEW_CONSTANTS_INJECTION footer in commit message
+  - Verify: Commit includes "refactor: TenGodConstants 적용 + 십신 문자열 상수화" 또는 유사 메시지
 
 ---
 
@@ -844,4 +852,5 @@ And:   Missing user birthTime → 400 Bad Request
 **Updated**: 2026-04-27 (Added HiddenStemCalculator, 지장간 calculation logic, company founding time 12:00 default)
 **Updated**: 2026-05-02 (Added Phase 3-Refactor: Entity Normalization. Replaced JSON storage with 7 normalized entities. Total tasks: 61. T031~T041 for refactoring, T042~T057 for US4/US3, T058~T060 for Phase 4)
 **Updated**: 2026-05-03 (Added Phase 3-Refactor-2: Magic Numbers & String Constants Extraction. Total 15 constant classes/enums, 9 groups. T061~T075 for constant extraction and refactoring. Total tasks now: 75)
-**Status**: Ready for implementation team with entity normalization + constant extraction workflow
+**Updated**: 2026-05-04 (Implemented T061 TenGodConstants Enum + Refactored T074 util classes. Created TenGodConstants with 10 十神 + 4 properties (name, symbol, scoreModifier, isOfficer). Refactored TenGodCalculator, CareerFortuneAnalyzer, CompatibilityScoreCalculator to use TenGodConstants instead of hardcoded strings. Removed all hardcoded 十神 names. Updated tasks.md T061, T074, T075 with implementation details and verification procedures.)
+**Status**: T061, T074 Complete. Ready for T075 (test execution & validation)

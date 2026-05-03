@@ -162,9 +162,42 @@ public enum FeedbackType {
     CAREER_TIMING("관운 분석"),
     CONSULTATION("AI 컨설팅"),
     COMPATIBILITY("기업 궁합");
-    
+
     private final String description;
     FeedbackType(String description) { this.description = description; }
+}
+
+// TenGodConstants.java - 십신(十神) 상수: 여러 분석 컴포넌트에서 사용
+public enum TenGodConstants {
+    CHIEF_OFFICER("정관", "官", 20, true),     // 정관: 가점 +20
+    SIDE_OFFICER("편관", "殺", 20, true),      // 편관: 가점 +20
+    FOOD_GOD("식신", "食", -15, false),        // 식신: 감점 -15
+    INJURING_OFFICER("상관", "傷", -15, false), // 상관: 감점 -15
+    COMPARING_FRIEND("비견", "比", -5, false),  // 비견: 감점 -5
+    ROBBING_WEALTH("겁재", "劫", -5, false),   // 겁재: 감점 -5
+    CHIEF_WEALTH("정재", "財", 0, false),
+    SIDE_WEALTH("편재", "利", 0, false),
+    CHIEF_SEAL("정인", "印", 0, false),
+    SIDE_SEAL("편인", "紬", 0, false);
+
+    private final String name;
+    private final String symbol;
+    private final int scoreModifier;    // 관운 분석 시 점수 가중치
+    private final boolean isOfficer;    // 관성(官性) 여부
+
+    TenGodConstants(String name, String symbol, int scoreModifier, boolean isOfficer) {
+        this.name = name;
+        this.symbol = symbol;
+        this.scoreModifier = scoreModifier;
+        this.isOfficer = isOfficer;
+    }
+
+    public static TenGodConstants fromName(String name) {
+        for (TenGodConstants tg : values()) {
+            if (tg.name.equals(name)) return tg;
+        }
+        return null;
+    }
 }
 ```
 
@@ -252,19 +285,42 @@ public class SajuDataService {
 
 @Service
 public class CareerFortuneService {
+    private final CareerFortuneAnalyzer analyzer;
+
     public CareerTimingResponse analyzeCareerTiming(SajuData data) {
         int confidenceScore = calculateConfidence(data);
-        
+
         // Enum 또는 String 상수 사용
         String favoredPeriod = confidenceScore > ValidationConstants.CONFIDENCE_THRESHOLD_HIGH
             ? CareerFortuneConstants.FIRST_HALF
             : CareerFortuneConstants.SECOND_HALF;
-        
-        return new CareerTimingResponse(
-            favoredPeriod,
-            confidenceScore,
-            reasoning
-        );
+
+        return new CareerTimingResponse(favoredPeriod, confidenceScore, reasoning);
+    }
+}
+
+// TenGodConstants 사용 예시 (CareerFortuneAnalyzer)
+@Component
+public class CareerFortuneAnalyzer {
+    // ❌ 나쁨: 하드코딩된 십신 문자열
+    // private static final List<String> OFFICER_GODS = List.of("정관", "편관");
+
+    // ✅ 좋음: TenGodConstants 사용
+    private static final List<String> OFFICER_GODS = List.of(
+        TenGodConstants.CHIEF_OFFICER.getName(),
+        TenGodConstants.SIDE_OFFICER.getName()
+    );
+
+    public int calculateOfficerScore(Map<String, Integer> tenGodDistribution) {
+        int score = 0;
+        for (Map.Entry<String, Integer> entry : tenGodDistribution.entrySet()) {
+            // TenGodConstants로 십신 조회 후 점수 수정자 적용
+            TenGodConstants tenGod = TenGodConstants.fromName(entry.getKey());
+            if (tenGod != null) {
+                score += entry.getValue() * tenGod.getScoreModifier();
+            }
+        }
+        return score;
     }
 }
 ```
