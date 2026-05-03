@@ -1,15 +1,45 @@
 package ssafy.SSAju.career.enums;
 
+/**
+ * 애플리케이션 전역 에러 메시지 상수.
+ *
+ * 예외 발생 시 사용되는 에러 코드와 메시지를 중앙 집중식으로 관리합니다.
+ * {@link ssafy.SSAju.handler.SajuGlobalExceptionHandler}에서 이 상수들을 참조하여
+ * 클라이언트에 일관된 형식의 에러 응답을 반환합니다.
+ *
+ * <p>에러 메시지는 다음 범주로 구분됩니다:
+ * <ul>
+ *   <li>GlobalExceptionHandler 응답 메시지: 최상위 HTTP 상태별 기본 메시지</li>
+ *   <li>입력 검증 예외 메시지: 요청 DTO 필드 유효성 검증 실패</li>
+ *   <li>FastAPI 예외 메시지: 외부 FastAPI 호출 실패</li>
+ *   <li>OpenAI 예외 메시지: OpenAI API 호출 및 응답 유효성 실패</li>
+ *   <li>사주 데이터 검증 예외 메시지: 천간/지지/오행 데이터 유효성 검증</li>
+ *   <li>Null 검증 예외 메시지: 필수 필드 null 검증</li>
+ *   <li>DB 접근 예외 메시지: 데이터베이스 조회/생성 실패</li>
+ * </ul>
+ *
+ * @author SSAju Team
+ * @see ssafy.SSAju.handler.SajuGlobalExceptionHandler
+ * @see ssafy.SSAju.exception.InvalidSajuDataException
+ */
 public enum ErrorMessageConstants {
 
     // === GlobalExceptionHandler 응답 메시지 ===
+    /** 사주 데이터 유효성 검증 실패 시 사용되는 에러 메시지 */
     INVALID_SAJU_DATA("INVALID_SAJU_DATA", "사주 데이터가 유효하지 않습니다."),
+    /** FastAPI 타임아웃 또는 재시도 실패 시 사용되는 에러 메시지 */
     FASTAPI_TIMEOUT("FASTAPI_TIMEOUT", "Failed to fetch saju data after retries. Please try again later."),
+    /** OpenAI API 호출 타임아웃 또는 실패 시 사용되는 에러 메시지 */
     OPENAI_API_TIMEOUT("OPENAI_API_TIMEOUT", "OpenAI API request failed. Please try again."),
+    /** 공공 데이터베이스에서 기업 정보를 찾지 못한 경우의 에러 메시지 */
     COMPANY_NOT_FOUND("COMPANY_NOT_FOUND", "Company not found in public database. Please provide founding date."),
+    /** 외부 API 호출 실패 시 사용되는 일반적인 에러 메시지 */
     EXTERNAL_API_ERROR("EXTERNAL_API_ERROR", "External API call failed. Please try again later."),
+    /** 데이터베이스 접근 실패 시 사용되는 에러 메시지 */
     DATABASE_ERROR("DATABASE_ERROR", "A database error occurred. Please try again."),
+    /** 입력 값 검증 실패 시 사용되는 에러 메시지 */
     VALIDATION_FAILED("VALIDATION_FAILED", "Validation failed."),
+    /** 예상하지 못한 서버 에러 발생 시 사용되는 에러 메시지 */
     INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", "An unexpected error occurred."),
 
     // === 입력 검증 예외 메시지 ===
@@ -60,15 +90,31 @@ public enum ErrorMessageConstants {
     private final String code;
     private final String message;
 
+    /**
+     * 에러 메시지 상수를 생성합니다.
+     *
+     * @param code    에러 코드 (예: INVALID_SAJU_DATA, FASTAPI_TIMEOUT)
+     * @param message 사용자에게 전달할 에러 메시지
+     */
     ErrorMessageConstants(String code, String message) {
         this.code = code;
         this.message = message;
     }
 
+    /**
+     * 에러 코드를 반환합니다.
+     *
+     * @return 에러 코드 문자열
+     */
     public String getCode() {
         return code;
     }
 
+    /**
+     * 에러 메시지를 반환합니다.
+     *
+     * @return 사용자에게 전달할 에러 메시지 문자열
+     */
     public String getMessage() {
         return message;
     }

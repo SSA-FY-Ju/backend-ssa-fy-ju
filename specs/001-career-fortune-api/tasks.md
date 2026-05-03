@@ -3,7 +3,7 @@
 **Feature**: Career Fortune & Consultation API
 **Date Generated**: 2026-04-27
 **Status**: Ready for Implementation (Updated with Hidden Stem Calculation)
-**Total Tasks**: 50 (HiddenStemCalculator added to foundational phase)
+**Total Tasks**: 76 (Entity Normalization + Constants Extraction added)
 **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
 
 ---
@@ -713,10 +713,11 @@ And:   Missing user birthTime → 400 Bad Request
 | Phase 3.1 (US1) | 8 | Career timing feature with 지장간 calculation | Independent |
 | Phase 3.2 (US2) | 9 | Consultation feature with TenGod + HiddenStem analysis | Parallel with US4 |
 | Phase 3-Refactor | 11 | **Entity Normalization**: 6 new entities (TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength) + 6 repositories + 2 service updates + 2 test updates. Replaces JSON storage with normalized entities. | Yes (parallel entity creation) |
+| Phase 3-Refactor-2 | 15 | **Constants Extraction**: 9 constant groups (15 classes/enums) for magic numbers/strings. Includes error/success messages, API timeouts, validation rules, etc. | Yes (parallel constant creation) |
 | Phase 3.4 (US4) | 9 | Feedback feature | Parallel with US2 |
 | Phase 3.3 (US3) | 7 | Company compatibility (P2) with RecommendedRole entity, 지장간 and 12:00 default | After core ready |
 | Phase 4 (Polish) | 3 | API documentation (Swagger), integration tests, final validation | After all stories |
-| **TOTAL** | **61** | Full MVP + Entity Normalization + 지장간 calculation + P2 foundation + API docs | Strategic parallelism |
+| **TOTAL** | **76** | Full MVP + Entity Normalization + Constants Extraction + 지장간 calculation + P2 foundation + API docs | Strategic parallelism |
 
 ---
 
