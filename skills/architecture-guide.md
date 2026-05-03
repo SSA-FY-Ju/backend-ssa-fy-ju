@@ -326,8 +326,8 @@ SSAju는 다음 3개 외부 API와 연동:
   "solarCorrection": {...}
 }
 
-타임아웃: 3초
-재시도: 2회 (지수 백오프)
+타임아웃: ApiTimeoutConstants.FASTAPI_TIMEOUT_SECONDS (3초)
+재시도: ApiTimeoutConstants.FASTAPI_MAX_RETRIES (2회, 지수 백오프)
 
 참고: 
 - 십神은 FastAPI에서 제공하지 않음 (Spring의 TenGodCalculator에서 계산)
@@ -385,8 +385,8 @@ try {
   careerTimeline: {year: 2026, months: {"March": {type, description}}, pivotPoints: [{month, type, score, description}], warningMonths, warningDescription}
 }
 
-타임아웃: 8초 (LLM 응답 시간)
-재시도: 1회 (자동)
+타임아웃: ApiTimeoutConstants.OPENAI_TIMEOUT_SECONDS (8초, LLM 응답 시간)
+재시도: ApiTimeoutConstants.OPENAI_MAX_RETRIES (1회, 자동)
 ```
 
 **Nested Record Types**:
@@ -509,9 +509,10 @@ CareerAdviceResponse response = chatClient.prompt()
 기능: 기업명으로 설립연도 조회
 입력: 회사명
 응답: {foundingYear, companyId}
-타임아웃: 5초
-재시도: 1회
+타임아웃: ApiTimeoutConstants.PUBLIC_DATA_TIMEOUT_SECONDS (5초)
+재시도: ApiTimeoutConstants.PUBLIC_DATA_MAX_RETRIES (1회)
 Fallback: 찾지 못하면 사용자 수동입력 요청 (graceful degradation)
+기본 설립시간: CompatibilityConstants.DEFAULT_FOUNDING_TIME ("12:00")
 ```
 
 ---

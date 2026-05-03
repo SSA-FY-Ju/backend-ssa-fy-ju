@@ -720,7 +720,127 @@ And:   Missing user birthTime → 400 Bad Request
 
 ---
 
+## Phase 3-Refactor-2: Magic Numbers & String Constants Extraction
+
+**Goal**: T041(Entity Normalization 완료) 이후, 코드에 하드코딩된 매직 넘버와 String을 모두 상수/Enum으로 추출
+**Scope**: 9개 상수 그룹 생성 (총 15개 상수 클래스/Enum), 기존 코드 수정
+**Strategy**: 용도별로 상수 관리 (`career/enums/`, `career/constants/`), Enum 우선 사용
+
+### New Constants Groups
+
+**1. 관운 분석 상수** (CareerFortuneAnalyzer, HiddenStemCalculator 등)
+
+- [ ] T061 Create `TenGodConstants` enum in `career/enums/`
+  - 정관(正官), 편관(偏官), 정재(正財), 편재(偏財), 식신(食神), 상관(傷官), 비겁(比肩), 겹재(劫財) 등 10개 십신
+  - 각 십신별 가점/감점: 정관·편관(×20), 식신·상관(×15), 비겹(×5)
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/TenGodConstants.java`
+
+- [ ] T062 Create `HiddenStemConstants` enum in `career/enums/`
+  - 지지별(子, 丑, 寅, ..., 亥) 지장간 정의: Map<String, List<String>>
+  - 지장간 보정 점수: 정관·편관(+5), 식신·상관(-3)
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/HiddenStemConstants.java`
+
+- [ ] T063 Create `CareerFortuneConstants` in `career/constants/`
+  - 관운 신뢰도 임계값: CONFIDENCE_THRESHOLD_HIGH (75), MEDIUM (50), LOW (25) 등
+  - H1/H2 판정 상수: FIRST_HALF ("H1"), SECOND_HALF ("H2")
+  - 관성 점수 범위: MAX_CONFIDENCE (100), MIN_CONFIDENCE (0)
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/CareerFortuneConstants.java`
+
+**2. API 통신 상수** (SajuDataService, ConsultationService, CompanyInfoService)
+
+- [ ] T064 Create `ApiTimeoutConstants` in `career/constants/`
+  - FastAPI 타임아웃: FASTAPI_TIMEOUT_SECONDS (3), MAX_RETRIES (2)
+  - OpenAI 타임아웃: OPENAI_TIMEOUT_SECONDS (8), MAX_RETRIES (1)
+  - 공공데이터API 타임아웃: PUBLIC_DATA_TIMEOUT_SECONDS (5), MAX_RETRIES (1)
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/ApiTimeoutConstants.java`
+
+- [ ] T065 Create `ApiEndpointConstants` in `career/constants/`
+  - FastAPI 엔드포인트: SAJU_CALCULATE_ENDPOINT ("/api/saju/calculate")
+  - OpenAI 모델: OPENAI_MODEL ("gpt-4o-mini")
+  - 응답 형식: JSON_RESPONSE_FORMAT ("JSON_OBJECT")
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/ApiEndpointConstants.java`
+
+**3. 데이터 검증 상수** (validators in Service/Controller)
+
+- [ ] T066 Create `ValidationConstants` in `career/constants/`
+  - 천간/지지 개수: REQUIRED_HEAVENLY_STEMS (4), REQUIRED_EARTHLY_BRANCHES (4)
+  - 생년월일 범위: EARLIEST_BIRTH_DATE ("1900-01-01")
+  - 신뢰도 범위: MIN_SCORE (0), MAX_SCORE (100)
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/ValidationConstants.java`
+
+**4. 응답 메시지 상수** (GlobalExceptionHandler, Service)
+
+- [ ] T067 Create `ErrorMessageConstants` enum in `career/enums/`
+  - 각 예외 타입별 메시지: INVALID_DATE_FORMAT, FASTAPI_TIMEOUT, OPENAI_API_TIMEOUT, COMPANY_NOT_FOUND 등
+  - Error code 정의: "INVALID_SAJU_DATA", "EXTERNAL_API_TIMEOUT" 등
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/ErrorMessageConstants.java`
+
+- [ ] T068 Create `SuccessMessageConstants` enum in `career/enums/`
+  - API 성공 메시지: "관운 분석 완료", "AI 커리어 컨설팅 완료" 등
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/SuccessMessageConstants.java`
+
+**5. 기업 궁합 분석 상수** (CompatibilityScoreCalculator)
+
+- [ ] T069 Create `CompatibilityConstants` in `career/constants/`
+  - 호환성 점수 범위: MIN_COMPATIBILITY (0), MAX_COMPATIBILITY (100)
+  - 신뢰도 수준: CONFIDENCE_HIGH ("HIGH"), MEDIUM ("MEDIUM"), LOW ("LOW")
+  - 기본 설립 시간: DEFAULT_FOUNDING_TIME ("12:00")
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/CompatibilityConstants.java`
+
+**6. 피드백 상수** (FeedbackService, UserSatisfactionFeedback)
+
+- [ ] T070 Create `FeedbackConstants` enum in `career/enums/`
+  - 피드백 타입: CAREER_TIMING, CONSULTATION, COMPATIBILITY (이미 FeedbackType.java에 존재, 유지)
+  - 만족도 상태: SATISFIED, DISSATISFIED (이미 SatisfactionStatus.java에 존재, 유지)
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/FeedbackConstants.java` (또는 기존 enum 참조만)
+
+**7. 프롬프트/설정 상수** (ConsultationService, PromptProvider)
+
+- [ ] T071 Create `PromptTemplateConstants` in `career/constants/`
+  - OpenAI 프롬프트 템플릿 부분 (현재 연도, 타임라인 개월, 16개 필드 그룹 등)
+  - JSON 스키마 필드명 정의 (일관성 유지)
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/PromptTemplateConstants.java`
+
+**8. HTTP 응답 상수** (ApiResponse 형식)
+
+- [ ] T072 Create `ApiResponseConstants` in `career/constants/`
+  - HTTP 상태 코드: OK (200), BAD_REQUEST (400), NOT_FOUND (404), SERVICE_UNAVAILABLE (503) 등
+  - 응답 헤더: CONTENT_TYPE ("application/json")
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/ApiResponseConstants.java`
+
+**9. 데이터베이스 관련 상수** (JPA entity 및 Repository)
+
+- [ ] T073 Create `EntityConstants` in `career/constants/`
+  - 테이블 이름 제약: UNIQUE_CONSTRAINT_NAMES, INDEX_NAMES 등
+  - 기본값: DEFAULT_PAGE_SIZE (10), DEFAULT_OFFSET (0)
+  - 날짜 형식: DATE_PATTERN ("yyyy-MM-dd"), TIME_PATTERN ("HH:mm")
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/EntityConstants.java`
+
+### Code Refactoring (Use Constants)
+
+- [ ] T074 Refactor all services and utilities to use extracted constants
+  - Update: CareerFortuneAnalyzer.java (관성 점수 상수 사용)
+  - Update: HiddenStemCalculator.java (지장간 매핑 상수 사용)
+  - Update: TenGodCalculator.java (십신 상수 사용)
+  - Update: CompatibilityScoreCalculator.java (호환성 상수 사용)
+  - Update: SajuDataService.java (API 타임아웃 상수 사용)
+  - Update: ConsultationService.java (OpenAI 타임아웃, 모델명 상수 사용)
+  - Update: CompanyMatchingService.java (기본 설립 시간 상수 사용)
+  - Update: GlobalExceptionHandler.java (에러 메시지 상수 사용)
+  - Update: All Controllers (메시지 상수 사용)
+  - File: Multiple service and controller files
+
+- [ ] T075 Run all tests and verify constant extraction
+  - Command: `./gradlew test`
+  - Verify: All constants properly injected and tests pass
+  - Verify: No hardcoded strings or magic numbers remain (grep for "0-100", "3", "8", "H1"/"H2", etc.)
+  - Verify: Code style follows code-style-guide.md (constants in enums/, all uses via constant names)
+  - Verify: NEW_CONSTANTS_INJECTION footer in commit message
+
+---
+
 **Generated by `/speckit-tasks` on 2026-04-10**
 **Updated**: 2026-04-27 (Added HiddenStemCalculator, 지장간 calculation logic, company founding time 12:00 default)
 **Updated**: 2026-05-02 (Added Phase 3-Refactor: Entity Normalization. Replaced JSON storage with 7 normalized entities. Total tasks: 61. T031~T041 for refactoring, T042~T057 for US4/US3, T058~T060 for Phase 4)
-**Status**: Ready for implementation team with entity normalization workflow
+**Updated**: 2026-05-03 (Added Phase 3-Refactor-2: Magic Numbers & String Constants Extraction. Total 15 constant classes/enums, 9 groups. T061~T075 for constant extraction and refactoring. Total tasks now: 75)
+**Status**: Ready for implementation team with entity normalization + constant extraction workflow

@@ -120,12 +120,30 @@ throw new InvalidSajuDataException("Invalid date format");
 
 상수는 **용도별로** 다음과 같이 관리합니다:
 
-### Enum: 비즈니스 도메인 상수 (여러 곳에서 사용)
+### Rule 1: 매직 넘버 & String 하드코딩 금지
 
-여러 파일/모듈에서 사용하는 상수 → **별도 클래스로 정의** (career/enums/)
+❌ **금지**:
+```java
+// 타임아웃 하드코딩
+int timeout = 3;  // 3초인지, 3분인지 불명확
+if (confidence > 75) { ... }  // 75가 뭘 의미하는지 불명확
+String period = "H1";  // 하드코딩된 문자열
+```
+
+✅ **필수**:
+```java
+// 상수 사용
+int timeout = ApiTimeoutConstants.FASTAPI_TIMEOUT_SECONDS;
+if (confidence > ValidationConstants.CONFIDENCE_THRESHOLD_HIGH) { ... }
+String period = CareerFortuneConstants.FIRST_HALF;  // "H1"
+```
+
+### Rule 2: Enum: 비즈니스 도메인 상수 (여러 곳에서 사용)
+
+여러 파일/모듈에서 사용하는 상수 → **Enum으로 정의** (career/enums/)
 
 ```java
-// CareerTimingType.java
+// CareerTimingType.java (또는 기존 FeedbackType.java 활용)
 public enum CareerTimingType {
     FIRST_HALF("H1", "상반기"),
     SECOND_HALF("H2", "하반기");
@@ -148,6 +166,116 @@ public enum FeedbackType {
     private final String description;
     FeedbackType(String description) { this.description = description; }
 }
+```
+
+### Rule 3: Static Constants: 기술 및 설정 상수
+
+API 타임아웃, 검증 임계값 등 → **static class 또는 interface** (career/constants/)
+
+```java
+// ApiTimeoutConstants.java
+public class ApiTimeoutConstants {
+    public static final int FASTAPI_TIMEOUT_SECONDS = 3;
+    public static final int FASTAPI_MAX_RETRIES = 2;
+    
+    public static final int OPENAI_TIMEOUT_SECONDS = 8;
+    public static final int OPENAI_MAX_RETRIES = 1;
+    
+    public static final int PUBLIC_DATA_TIMEOUT_SECONDS = 5;
+    public static final int PUBLIC_DATA_MAX_RETRIES = 1;
+    
+    private ApiTimeoutConstants() {}  // 인스턴스 생성 방지
+}
+
+// ValidationConstants.java
+public class ValidationConstants {
+    public static final int REQUIRED_HEAVENLY_STEMS = 4;
+    public static final int REQUIRED_EARTHLY_BRANCHES = 4;
+    
+    public static final int MIN_CONFIDENCE_SCORE = 0;
+    public static final int MAX_CONFIDENCE_SCORE = 100;
+    public static final int CONFIDENCE_THRESHOLD_HIGH = 75;
+    public static final int CONFIDENCE_THRESHOLD_MEDIUM = 50;
+    
+    private ValidationConstants() {}
+}
+
+// CareerFortuneConstants.java
+public class CareerFortuneConstants {
+    public static final String FIRST_HALF = "H1";
+    public static final String SECOND_HALF = "H2";
+    
+    public static final int TENGO_ZHENG_GUAN_WEIGHT = 20;  // 정관 가중치
+    public static final int TENGO_PIAN_GUAN_WEIGHT = 20;   // 편관 가중치
+    public static final int TENGO_FOOD_GOD_WEIGHT = 15;    // 식신 가중치
+    
+    private CareerFortuneConstants() {}
+}
+
+// CompatibilityConstants.java
+public class CompatibilityConstants {
+    public static final String DEFAULT_FOUNDING_TIME = "12:00";
+    public static final int MIN_COMPATIBILITY_SCORE = 0;
+    public static final int MAX_COMPATIBILITY_SCORE = 100;
+    
+    public static final String CONFIDENCE_HIGH = "HIGH";
+    public static final String CONFIDENCE_MEDIUM = "MEDIUM";
+    public static final String CONFIDENCE_LOW = "LOW";
+    
+    private CompatibilityConstants() {}
+}
+```
+
+### 사용 예시
+
+**Service에서의 사용**:
+```java
+@Service
+public class SajuDataService {
+    public FastAPIResponse fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime) {
+        // 타임아웃 상수 사용
+        Duration timeout = Duration.ofSeconds(ApiTimeoutConstants.FASTAPI_TIMEOUT_SECONDS);
+        
+        // 재시도 횟수 상수 사용
+        int maxRetries = ApiTimeoutConstants.FASTAPI_MAX_RETRIES;
+        
+        // Enum 사용
+        return webClient
+            .post()
+            .timeout(timeout)
+            .retrieve()
+            .bodyToMono(FastAPIResponse.class)
+            .retryWhen(...)  // maxRetries 사용
+            .block();
+    }
+}
+
+@Service
+public class CareerFortuneService {
+    public CareerTimingResponse analyzeCareerTiming(SajuData data) {
+        int confidenceScore = calculateConfidence(data);
+        
+        // Enum 또는 String 상수 사용
+        String favoredPeriod = confidenceScore > ValidationConstants.CONFIDENCE_THRESHOLD_HIGH
+            ? CareerFortuneConstants.FIRST_HALF
+            : CareerFortuneConstants.SECOND_HALF;
+        
+        return new CareerTimingResponse(
+            favoredPeriod,
+            confidenceScore,
+            reasoning
+        );
+    }
+}
+```
+
+### 상수 배치 원칙
+
+| 상수 타입 | 위치 | 예시 |
+|----------|------|------|
+| **Enum** (도메인 개념) | `career/enums/` | `FeedbackType.java`, `CareerTimingType.java` |
+| **Static Constants** (기술 설정) | `career/constants/` | `ApiTimeoutConstants.java`, `ValidationConstants.java` |
+| **필드 레벨** (단일 파일 사용) | 클래스 내부 | `private static final int BUFFER_SIZE = 1024;` |
 
 // SatisfactionStatus.java
 public enum SatisfactionStatus {
