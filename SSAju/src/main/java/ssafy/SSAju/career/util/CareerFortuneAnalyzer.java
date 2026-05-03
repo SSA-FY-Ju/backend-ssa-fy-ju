@@ -1,6 +1,7 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.util.List;
 import java.util.Map;
@@ -44,16 +45,16 @@ public class CareerFortuneAnalyzer {
                                         String dayMaster,
                                         List<String> earthlyBranches) {
         if (tenGodDistribution == null) {
-            throw new IllegalArgumentException("십신 분포 데이터가 null입니다.");
+            throw new InvalidSajuDataException("십신 분포 데이터가 null입니다.");
         }
         if (hiddenStems == null) {
-            throw new IllegalArgumentException("지장간 데이터가 null입니다.");
+            throw new InvalidSajuDataException("지장간 데이터가 null입니다.");
         }
         if (dayMaster == null || dayMaster.isBlank()) {
-            throw new IllegalArgumentException("일간이 null이거나 비어있습니다.");
+            throw new InvalidSajuDataException("일간이 null이거나 비어있습니다.");
         }
         if (earthlyBranches == null || earthlyBranches.size() != 4) {
-            throw new IllegalArgumentException("지지 목록은 정확히 4개(年月日時)여야 합니다.");
+            throw new InvalidSajuDataException("지지 목록은 정확히 4개(年月日時)여야 합니다.");
         }
         int officerScore = calculateOfficerScore(tenGodDistribution, hiddenStems, dayMaster);
         String monthBranch = earthlyBranches.get(1);
@@ -124,5 +125,26 @@ public class CareerFortuneAnalyzer {
 
         int rawScore = officerCount * 20 + hiddenOfficerCount * 5;
         return Math.min(rawScore + 40, 100);
+    }
+
+    public String buildReasoning(String favoredPeriod, Map<String, Integer> tenGodDistribution) {
+        if (tenGodDistribution == null || tenGodDistribution.isEmpty()) {
+            throw new InvalidSajuDataException("십신 데이터는 null이 아니어야 합니다");
+        }
+        if (!"H1".equals(favoredPeriod) && !"H2".equals(favoredPeriod)) {
+            throw new InvalidSajuDataException(
+                    "길한 시기는 H1 또는 H2만 가능합니다. 받은 값: " + favoredPeriod);
+        }
+        int officerCount = OFFICER_GODS.stream()
+                .mapToInt(god -> tenGodDistribution.getOrDefault(god, 0))
+                .sum();
+        StringBuilder sb = new StringBuilder(
+                "H1".equals(favoredPeriod) ? "상반기가 취업에 유리합니다. " : "하반기가 취업에 유리합니다. ");
+        if (officerCount > 0) {
+            sb.append("정관(正官)의 운이 ").append("H1".equals(favoredPeriod) ? "상반기" : "하반기")
+              .append("에 집중되어 있어 조직의 부름이 많아지고, 면접에서 호의적인 평가를 받기 쉬운 시기입니다. ");
+        }
+        sb.append("십신·지장간 통합 분석 기준입니다.");
+        return sb.toString();
     }
 }

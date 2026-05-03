@@ -34,6 +34,14 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - 기업 궁합: 8초 이내
 - 동시 처리: 5,000명 사용자 (Connection Pool 기본값)
 
+**아키텍처 원칙 (SRP 준수)**:
+- **Service**: Orchestration only (흐름 제어, 외부 API 호출)
+- **Analyzer**: 분석 로직 전담 (TenGodAnalyzer, HiddenStemAnalyzer, CareerFortuneAnalyzer)
+- **Calculator**: 계산 로직 전담 (TenGodCalculator, HiddenStemCalculator, CompatibilityScoreCalculator)
+- **Mapper**: DTO ↔ Entity 변환 (CareerConsultationMapper, SajuResultMapper 등)
+- **Provider**: 재사용 가능한 데이터 조회/생성 + 설정/프롬프트 관리 (동시성 보정, 경량 데이터 접근 포함). 예: UserProfileProvider, SajuResultProvider, PromptProvider, ConfigProvider
+- **Exception**: @RestControllerAdvice + 커스텀 예외 우선. 경계 어댑터(ConsultationOpenAICaller 등)가 외부 오류를 도메인 예외로 변환하는 제한적 try-catch는 허용. 비즈니스 예외를 무조건 삼키는 것 금지
+
 **Key Technical Decisions** (Session 2026-04-30 + Service Layer Optimization):
 - **1-Call API Design**: `/api/career/consultation` 엔드포인트가 내부적으로 모든 외부 API 호출 오케스트레이션 (FastAPI, OpenAI). 클라이언트는 birthDate + birthTime만 제공하고, 모든 계산(십신, 지장간, 관운 분석) 및 16개 필드 그룹의 완전한 AI 조언을 한 번의 요청으로 수신.
 - **Expanded Response (16+ Field Groups)**: ConsultationResponse는 19개 필드 포함: 기본 조언(industries, interviewTips, strengths) + 관운 분석(favoredPeriod, confidenceScore, reasoning) + 사주 프로필(sajuProfile with dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods) + OpenAI 분석(cautions, wealthStyle, longTermRoadmap, personalBranding, powerKeywords, mentalCare, environmentFit, workStyle, relationshipStrategy, careerTimeline). OpenAI 프롬프트에 현재 연도, 12개월 타임라인, 모든 필드 그룹 포함.
@@ -116,7 +124,7 @@ SSAju/
 │   │   ├── entity/
 │   │   │   ├── UserProfile.java
 │   │   │   ├── SajuResult.java
-│   │   │   ├── TenGodData.java (1:1 to SajuResult, 십신 분포)
+│   │   │   ├── TenGodData.java (1:N to SajuResult, 십신 분포 - 십신별 행 단위)
 │   │   │   ├── HiddenStemData.java (1:N to SajuResult, 지지별 지장간)
 │   │   │   ├── CareerFortune.java (1:1 to SajuResult, 관운 분석)
 │   │   │   ├── CareerConsultation.java
@@ -249,7 +257,7 @@ SSAju/
 
 | 설계 결정 | 필요 이유 | 더 단순한 대안과 거절 이유 |
 |---------|---------|------------------------|
-| **11개 정규화된 엔티티** (Phase 1, JSON 저장 제거) | UserProfile ↔ SajuResult (1:1), SajuResult ↔ TenGodData (1:1, 십신), SajuResult ↔ CareerFortune (1:1, 관운), SajuResult ↔ HiddenStemData (1:N, 지장간), SajuResult ↔ CareerConsultation (1:N), CareerConsultation ↔ Industry/InterviewTip/Strength (1:N), UserProfile ↔ CompanyCompatibility (1:N), CompanyCompatibility ↔ RecommendedRole (1:N), SajuResult ↔ UserSatisfactionFeedback (1:N) | JSON 저장 방식 → N+1 쿼리, 데이터 정규화 부족, 재사용성 저하, 타입 안전성 낮음, 쿼리 최적화 어려움 |
+| **11개 정규화된 엔티티** (Phase 1, JSON 저장 제거) | UserProfile ↔ SajuResult (1:1), SajuResult ↔ TenGodData (1:N, 십신 - 십신별 행 단위), SajuResult ↔ CareerFortune (1:1, 관운), SajuResult ↔ HiddenStemData (1:N, 지장간), SajuResult ↔ CareerConsultation (1:N), CareerConsultation ↔ Industry/InterviewTip/Strength (1:N), UserProfile ↔ CompanyCompatibility (1:N), CompanyCompatibility ↔ RecommendedRole (1:N), SajuResult ↔ UserSatisfactionFeedback (1:N) | JSON 저장 방식 → N+1 쿼리, 데이터 정규화 부족, 재사용성 저하, 타입 안전성 낮음, 쿼리 최적화 어려움 |
 | **4개 독립 Service** | 각 기능(관운, 컨설팅, 궁합, 피드백)이 독립적으로 테스트/배포 가능해야 함. P1/P2 우선순위 구분으로 점진적 개발 필요 | 단일 Service → 테스트 복잡도 증가, 변경 파급 범위 확대, 리팩토링 위험 |
 | **TenGodCalculator + HiddenStemCalculator 분리** | 십신(十神)과 지장간(地藏干)은 별개의 계산 로직. 분리하면 각각 독립 테스트 가능, 재사용성 향상. 더 정확한 오행 분포 계산 가능 | 통합 Calculator → 로직 혼재, 테스트 복잡도 증대, 유지보수 어려움. 지장간 미포함 시 사주 분석 정확도 저하 |
 | **Spring에서 십신+지장간 계산** | FastAPI는 기본 데이터(천간/지지/오행)만 제공 → Spring 단에서 모든 계산 담당하므로 FastAPI 변경에 영향받지 않음. 도메인 로직 통제 가능 | FastAPI에서 십신/지장간까지 계산 → FastAPI 변경 시 Spring도 영향, 통제 불가. 지장간 미포함 시 정확도 저하 |
@@ -333,25 +341,27 @@ SajuResult (1:1 to UserProfile)
 ├── userProfileId: Long (FK to UserProfile, NOT NULL)
 ├── fullSajuData: LONGTEXT (FastAPI 원본 JSON 응답 저장 - 직렬화용)
 ├── fetchedAt: LocalDateTime
-├── (1:1) → TenGodData (십신 분포)
+├── (1:N) → TenGodData (십신 분포 - 각 십신별 행)
 ├── (1:1) → CareerFortune (관운 분석)
-├── (1:N) → HiddenStemData (지지별 지장간)
+├── (1:N) → HiddenStemData (지지별 지장간 - 각 지장간별 행)
 ├── (1:N) → CareerConsultation (AI 컨설팅 기록)
 └── (1:N) → UserSatisfactionFeedback (만족도 피드백)
 
-TenGodData (1:1 to SajuResult, 십신 분포)
-├── id: Long (PK)
-├── sajuResultId: Long (FK to SajuResult, NOT NULL, UNIQUE)
-├── dayMaster: String (일간, e.g., "庚")
-├── tenGodDistribution: JSON 컬럼 (Map<String, Integer>, e.g., {正官: 1, 偏官: 1, ...})
-│   └── 또는 별도 필드들로 정규화 가능 (운영 선택)
-
-HiddenStemData (1:N to SajuResult, 지지별 지장간)
+TenGodData (1:N to SajuResult, 십신 분포 - 행 단위 정규화)
 ├── id: Long (PK)
 ├── sajuResultId: Long (FK to SajuResult, NOT NULL)
-├── earthlyBranch: String (지지, e.g., "午", "戌", "未", "寅")
-├── hiddenStem: String (해당 지지의 지장간, e.g., "丁" 또는 리스트)
-├── (복합 인덱스: sajuResultId + earthlyBranch)
+├── tenGodName: String (십신 이름, e.g., "正官", "偏官", "正财", "偏财" 등)
+├── score: Integer (해당 십신의 점수)
+├── createdAt: LocalDateTime
+└── **설계**: Map<"正官": 1, "偏官": 1> → 2개 행 (각 십신별 행 분리, 완전 정규화)
+
+HiddenStemData (1:N to SajuResult, 지지별 지장간 - 행 단위 정규화)
+├── id: Long (PK)
+├── sajuResultId: Long (FK to SajuResult, NOT NULL)
+├── earthlyBranch: String (지지, e.g., "子", "丑", "午", "戌" 등)
+├── hiddenStem: String (해당 지지의 지장간, e.g., "癸", "辛", "己" 등 - 1개만)
+├── createdAt: LocalDateTime
+└── **설계**: "丑": ["癸", "辛", "己"] → 3개 행 (각 지장간별 행 분리, 완전 정규화)
 
 CareerFortune (1:1 to SajuResult, 관운 분석)
 ├── id: Long (PK)
@@ -411,7 +421,7 @@ UserSatisfactionFeedback (1:N to SajuResult, 만족도 피드백)
 **Relationships & FetchType**:
 - **Phase 1** (현재, 모든 관계에 FetchType.LAZY 명시):
   - UserProfile (1) ↔ SajuResult (1:1) via userProfileId, FetchType.LAZY
-  - SajuResult (1) ↔ TenGodData (1:1) via sajuResultId, FetchType.LAZY
+  - SajuResult (1) ↔ TenGodData (1:N) via sajuResultId, FetchType.LAZY
   - SajuResult (1) ↔ CareerFortune (1:1) via sajuResultId, FetchType.LAZY
   - SajuResult (1) ↔ HiddenStemData (1:N) via sajuResultId, FetchType.LAZY
   - SajuResult (1) ↔ CareerConsultation (1:N) via sajuResultId, FetchType.LAZY

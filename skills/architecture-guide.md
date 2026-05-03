@@ -815,6 +815,149 @@ public class CareerFortuneService {
 
 ---
 
+## Phase 3-Refactor: Entity Normalization 패턴
+
+### JSON → 행 단위 정규화 (TenGodData, HiddenStemData)
+
+**목표**: JSON 컬럼을 완전히 정규화된 엔티티로 변환하여 쿼리 최적화 + 타입 안전성 향상
+
+#### TenGodData (1:N with SajuResult)
+
+**변환 전** (JSON):
+```java
+// SajuResult에 JSON 저장
+Map<String, Integer> tenGodDistribution = Map.of(
+    "正官", 1,
+    "偏官", 1,
+    "正财", 2,
+    "偏财", 1
+);
+sajuResult.setTenGodDistribution(tenGodDistribution);
+```
+
+**변환 후** (정규화 엔티티):
+```java
+// 각 십신별 1행씩 저장
+TenGodData row1 = TenGodData.builder()
+    .sajuResult(sajuResult)
+    .tenGodName("正官")
+    .score(1)
+    .build();
+
+TenGodData row2 = TenGodData.builder()
+    .sajuResult(sajuResult)
+    .tenGodName("偏官")
+    .score(1)
+    .build();
+// ... 4개 행 저장
+```
+
+**Repository 쿼리**:
+```java
+@Repository
+public interface TenGodDataRepository extends JpaRepository<TenGodData, Long> {
+    // 특정 SajuResult의 모든 십신 데이터 조회
+    List<TenGodData> findBySajuResult(SajuResult sajuResult);
+    
+    // 특정 十神으로 검색
+    TenGodData findBySajuResultAndTenGodName(SajuResult sajuResult, String tenGodName);
+}
+```
+
+#### HiddenStemData (1:N with SajuResult)
+
+**변환 전** (JSON):
+```java
+// SajuResult에 JSON 저장
+Map<String, List<String>> hiddenStems = Map.of(
+    "子", List.of("癸"),
+    "丑", List.of("癸", "辛", "己"),
+    "寅", List.of("甲", "丙", "戊")
+);
+sajuResult.setHiddenStems(hiddenStems);
+```
+
+**변환 후** (정규화 엔티티):
+```java
+// 각 지지-지장간 조합별 1행씩 저장
+HiddenStemData row1 = HiddenStemData.builder()
+    .sajuResult(sajuResult)
+    .earthlyBranch("子")
+    .hiddenStem("癸")
+    .build();
+
+HiddenStemData row2 = HiddenStemData.builder()
+    .sajuResult(sajuResult)
+    .earthlyBranch("丑")
+    .hiddenStem("癸")
+    .build();
+
+HiddenStemData row3 = HiddenStemData.builder()
+    .sajuResult(sajuResult)
+    .earthlyBranch("丑")
+    .hiddenStem("辛")
+    .build();
+// ... (지지별 × 지장간별 행수) 저장
+```
+
+**Repository 쿼리**:
+```java
+@Repository
+public interface HiddenStemDataRepository extends JpaRepository<HiddenStemData, Long> {
+    // 특정 SajuResult의 모든 지장간 데이터 조회
+    List<HiddenStemData> findBySajuResult(SajuResult sajuResult);
+    
+    // 특정 지지의 모든 지장간 조회
+    List<HiddenStemData> findBySajuResultAndEarthlyBranch(SajuResult sajuResult, String earthlyBranch);
+    
+    // 특정 지지-지장간 조합 조회
+    HiddenStemData findBySajuResultAndEarthlyBranchAndHiddenStem(
+        SajuResult sajuResult, String earthlyBranch, String hiddenStem);
+}
+```
+
+**Service에서의 변환**:
+```java
+@Service
+public class CareerFortuneService {
+    
+    private final TenGodDataRepository tenGodDataRepository;
+    private final HiddenStemDataRepository hiddenStemDataRepository;
+    
+    // 저장 시: Map → Entity 배치로 변환
+    public void saveTenGodData(SajuResult sajuResult, Map<String, Integer> tenGodDistribution) {
+        tenGodDistribution.forEach((tenGodName, score) -> {
+            TenGodData data = TenGodData.builder()
+                .sajuResult(sajuResult)
+                .tenGodName(tenGodName)
+                .score(score)
+                .build();
+            tenGodDataRepository.save(data);
+        });
+    }
+    
+    // 조회 시: Entity → Map 재조립
+    public Map<String, Integer> getTenGodDistribution(SajuResult sajuResult) {
+        return tenGodDataRepository.findBySajuResult(sajuResult)
+            .stream()
+            .collect(Collectors.toMap(
+                TenGodData::getTenGodName,
+                TenGodData::getScore
+            ));
+    }
+    
+    // 같은 방식으로 HiddenStemData도 처리
+}
+```
+
+**장점**:
+- ✅ JSON 쿼리 제거 (MySQL LIKE 검색 불가능한 JSON 대신 SQL WHERE 절 사용)
+- ✅ 정규화로 인한 데이터 무결성 향상 (예: tenGodName 중복 불가 등)
+- ✅ 인덱싱 가능 (tenGodName, earthlyBranch)
+- ✅ 타입 안전성 (String 대신 Enum 사용 가능하도록 향후 확장)
+
+---
+
 ## Phase 1 제약사항
 
 - **캐싱 금지**: Redis, In-Memory 전역 캐시 사용 금지
@@ -827,4 +970,46 @@ public class CareerFortuneService {
 
 ---
 
-**Last Updated**: 2026-05-02 (Service Layer 경량화 + Domain Model 캡슐화 추가)
+---
+
+## 로깅 정책 (민감정보 보호)
+
+### ❌ 로그에 절대 포함 금지
+
+| 분류 | 금지 항목 |
+|------|-----------|
+| **개인정보** | `birthDate`, `birthTime`, `email`, `phone`, `name` |
+| **인증 정보** | API Key, Bearer 토큰, Authorization 헤더값 |
+| **외부 API 원문** | FastAPI 요청 body 전문, OpenAI 프롬프트 전문 |
+| **예외 메시지 직접 출력** | `e.getMessage()` — 내부 정보 노출 가능 |
+
+### ✅ 로그에 허용하는 식별자
+
+- 숫자 ID만: `userId`, `userProfileId`, `sajuResultId`
+- 추적 ID: `requestId`, `traceId`
+- 상태 정보: 성공/실패 여부, HTTP 상태코드, 지연시간(ms)
+
+### 📌 예시
+
+```java
+// ❌ 잘못된 예
+log.warn("동시 경합 발생 (birthDate={})", birthDate);
+log.error("OpenAI 호출 실패: {}", e.getMessage());
+
+// ✅ 올바른 예
+log.warn("동시 경합 발생 (userId={})", userProfile.getId());
+log.error("OpenAI 호출 실패", e);  // 스택트레이스만 로깅
+```
+
+### 로그 레벨 기준
+
+| 레벨 | 용도 |
+|------|------|
+| `DEBUG` | 개발 환경 상세 정보 (프로덕션에서 비활성화) |
+| `INFO` | 주요 비즈니스 이벤트 (요청 시작/완료) |
+| `WARN` | 예상 가능한 예외 (동시성 경합, 재시도) |
+| `ERROR` | 예상 불가능한 예외 + 스택트레이스 |
+
+---
+
+**Last Updated**: 2026-05-03 (CodeRabbit 리뷰 반영 — 로깅 정책 + try-catch 규칙 명확화)

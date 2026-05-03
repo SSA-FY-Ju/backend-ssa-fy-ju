@@ -2,26 +2,31 @@ package ssafy.SSAju.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
-import ssafy.SSAju.dto.external.FastAPIResponse;
-import ssafy.SSAju.repository.SajuResultRepository;
+import ssafy.SSAju.exception.InvalidSajuDataException;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.sql.SQLException;
+import ssafy.SSAju.repository.CareerFortuneRepository;
+import ssafy.SSAju.repository.HiddenStemDataRepository;
+import ssafy.SSAju.repository.SajuResultRepository;
+import ssafy.SSAju.repository.TenGodDataRepository;
 
 /**
- * SajuResult의 DB 쓰기 작업을 별도 Service로 분리.
+ * SajuResult의 replace(삭제+저장) 작업을 단일 트랜잭션으로 보호.
  *
- * 목적: delete + insert의 원자성 보장.
- * - Spring AOP 프록시를 통해 @Transactional이 제대로 작동
- * - delete 커밋 후 insert가 실패해도 transaction이 rollback되지는 않음
- *   (각각 별도 TX이므로)
- * - 하지만 delete + insert 사이 동시 insert 충돌은 catch로 처리
- * - insert 외 다른 오류 발생 시에도 명확한 로그로 추적 가능
+ * JPQL 직접 삭제로 JPA cascade delete 락 충돌 방지.
+ * @Retryable로 첫 생성 시 race condition(DIVE) 1회 재시도 처리.
+ *
+ * ⚠️ 로그 작성 규칙:
+ * - userId만 사용 (birthDate, birthTime 등 개인정보 절대 금지)
  */
 @Slf4j
 @Service
@@ -29,65 +34,85 @@ import java.util.Map;
 public class SajuResultWriteService {
 
     private final SajuResultRepository sajuResultRepository;
+    private final TenGodDataRepository tenGodDataRepository;
+    private final HiddenStemDataRepository hiddenStemDataRepository;
+    private final CareerFortuneRepository careerFortuneRepository;
 
     /**
-     * UserProfile에 대한 SajuResult를 delete + insert로 갱신.
-     *
-     * 단일 @Transactional 메서드로 delete, insert 구간을 보호.
-     * (self-call 아님 → Spring 프록시 경유 → @Transactional 유효)
-     *
-     * @param userProfile UserProfile 엔티티 (id 포함)
-     * @param sajuData FastAPI로부터 받은 원본 데이터
-     * @param tenGodDistribution 십신 분포
-     * @param hiddenStems 지장간 분포
-     * @param favoredPeriod H1 또는 H2
-     * @param confidenceScore 신뢰도
-     * @param reasoning 분석 근거
+     * 기존 SajuResult 삭제 후 새 SajuResult 저장.
+     * 첫 생성 시 race condition: 두 스레드가 동시에 findByUserProfile() → 없음 → save() → DIVE
+     * @Retryable: DIVE 발생 시 100ms 대기 후 1회 재시도 (재시도 시 기존 row 발견 후 삭제+재저장)
      */
+    @Retryable(
+            retryFor = DataIntegrityViolationException.class,
+            maxAttempts = 2,
+            backoff = @Backoff(delay = 100)
+    )
     @Transactional
-    public void replaceForUserProfile(
-            UserProfile userProfile,
-            FastAPIResponse sajuData,
-            Map<String, Integer> tenGodDistribution,
-            Map<String, List<String>> hiddenStems,
-            String favoredPeriod,
-            int confidenceScore,
-            String reasoning) {
-
-        // 기존 결과 삭제 (JPQL 직접 실행 → 엔티티 로드/컨버터 미경유)
-        sajuResultRepository.deleteByUserProfileJpql(userProfile);
-
-        // 새 결과 생성
-        Map<String, Object> careerFortune = new HashMap<>();
-        careerFortune.put("favoredPeriod", favoredPeriod);
-        careerFortune.put("confidenceScore", confidenceScore);
-        careerFortune.put("reasoning", reasoning);
-
-        SajuResult newResult = SajuResult.builder()
-                .userProfile(userProfile)
-                .fullSajuData(convertToObjectMap(sajuData))
-                .hiddenStems(hiddenStems)
-                .tenGodDistribution(tenGodDistribution)
-                .careerFortune(careerFortune)
-                .build();
-
+    public void replaceForUserProfile(UserProfile userProfile, SajuResult newResult) {
+        // 소유권 일관성: A의 결과를 지운 뒤 B의 결과를 저장하는 실수 방지
+        if (newResult.getUserProfile() != null
+                && !newResult.getUserProfile().equals(userProfile)) {
+            throw new InvalidSajuDataException(
+                "newResult의 userProfile이 전달받은 userProfile과 불일치합니다");
+        }
+        sajuResultRepository.findByUserProfile(userProfile).ifPresent(existing -> {
+            Long existingId = existing.getId();
+            tenGodDataRepository.deleteBySajuResultId(existingId);
+            hiddenStemDataRepository.deleteBySajuResultId(existingId);
+            careerFortuneRepository.deleteBySajuResultId(existingId);
+            sajuResultRepository.deleteByUserProfileJpql(userProfile);
+        });
         sajuResultRepository.save(newResult);
-        // DataIntegrityViolationException 은 여기서 catch하지 않음.
-        // → Spring이 트랜잭션을 rollback (delete 포함)하여 데이터 불일치 방지.
-        // → 호출자(CareerFortuneService)가 DIVE를 받아 "선착순 결과 유지"로 처리.
     }
 
-    private Map<String, Object> convertToObjectMap(FastAPIResponse r) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("heavenlyStems", r.heavenlyStems());
-        map.put("earthlyBranches", r.earthlyBranches());
-        map.put("fiveElements", r.fiveElements());
-        map.put("yearPillar", r.yearPillar());
-        map.put("monthPillar", r.monthPillar());
-        map.put("dayPillar", r.dayPillar());
-        map.put("hourPillar", r.hourPillar());
-        map.put("birthTime", r.birthTime());
-        map.put("birthDate", r.birthDate());
-        return map;
+    /**
+     * 재시도 후에도 DIVE 발생 시 실행.
+     * 중복 키(동시성 경쟁)인 경우에만 무시. 그 외 실제 제약 위반은 재throw.
+     */
+    @Recover
+    public void recover(DataIntegrityViolationException ex, UserProfile userProfile, SajuResult newResult) {
+        if (isDuplicateKeyViolation(ex)) {
+            log.debug("SajuResult 동시 생성 감지: userProfileId={} - 기존 결과 유지", userProfile.getId());
+            return;
+        }
+        throw ex;
+    }
+
+    private boolean isDuplicateKeyViolation(DataIntegrityViolationException ex) {
+        // 1. Spring이 이미 친절하게 '중복 키 에러'라고 번역해준 경우 (가장 깔끔함)
+        if (ex instanceof DuplicateKeyException) {
+            return true;
+        }
+
+        Throwable cause = ex.getCause();
+        while (cause != null) {
+            String msg = cause.getMessage();
+            if (msg != null) {
+                // MySQL + H2 메시지 포맷 모두 처리
+                if (msg.contains("Duplicate entry") || msg.contains("duplicate key")
+                        || msg.contains("Unique index or primary key violation")) {
+                    return true;
+                }
+            }
+
+            if (cause instanceof SQLException) {
+                SQLException sqlEx = (SQLException) cause;
+                String sqlState = sqlEx.getSQLState();
+                int errorCode = sqlEx.getErrorCode();
+
+                // H2의 중복 키 SQLState (23505)
+                if ("23505".equals(sqlState)) {
+                    return true;
+                }
+                // MySQL의 중복 키 Error Code (1062)
+                // 주의: SQLState "23000"은 Not Null, FK 에러도 포함하므로 사용하면 안 됨!
+                if (errorCode == 1062) {
+                    return true;
+                }
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 }

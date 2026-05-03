@@ -12,7 +12,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import ssafy.SSAju.dto.external.FastAPIResponse;
+import ssafy.SSAju.repository.CareerFortuneRepository;
+import ssafy.SSAju.repository.HiddenStemDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
+import ssafy.SSAju.repository.TenGodDataRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 
 import java.time.LocalDate;
@@ -58,6 +61,9 @@ class CareerFortuneConcurrencyTest {
     @MockitoBean  private SajuDataService sajuDataService;
     @Autowired private UserProfileRepository userProfileRepository;
     @Autowired private SajuResultRepository sajuResultRepository;
+    @Autowired private TenGodDataRepository tenGodDataRepository;
+    @Autowired private HiddenStemDataRepository hiddenStemDataRepository;
+    @Autowired private CareerFortuneRepository careerFortuneRepository;
 
     private static final LocalDate BASE_DATE = LocalDate.of(1990, 1, 1);
     private static final LocalTime BASE_TIME = LocalTime.of(12, 0);
@@ -72,7 +78,10 @@ class CareerFortuneConcurrencyTest {
 
     @BeforeEach
     void cleanDb() {
-        // deleteAll() → findAll() → AttributeConverter 경유로 실패 가능 → 직접 DELETE 사용
+        // 자식 엔티티를 FK 순서에 따라 먼저 일괄 삭제 후 부모 삭제
+        tenGodDataRepository.deleteAllInBatch();
+        hiddenStemDataRepository.deleteAllInBatch();
+        careerFortuneRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
         userProfileRepository.deleteAllInBatch();
     }

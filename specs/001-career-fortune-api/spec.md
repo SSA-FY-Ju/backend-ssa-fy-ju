@@ -170,7 +170,7 @@ UserProfile (생년월일시)
   ↓ 1:1
 SajuResult (사주 기본 데이터)
   ├─ 1:1 → CareerFortune (관운 분석: H1/H2, 신뢰도, 근거)
-  ├─ 1:1 → TenGodData (십신 분포)
+  ├─ 1:N → TenGodData (십신 분포 - 십신별 행 단위)
   ├─ 1:N → HiddenStemData (지지별 지장간)
   ├─ 1:N → CareerConsultation (AI 컨설팅 기록)
   │         ├─ 1:N → Industry (추천 산업)
@@ -192,13 +192,21 @@ CompanyCompatibility (기업 궁합)
   - fullSajuData (String): FastAPI JSON 원시 응답 (직렬화)
   - fetchedAt (LocalDateTime): 조회 시간
 
-- **TenGodData** (1:1 to SajuResult): 십신 분포
-  - tenGodDistribution (Map<String, Integer> → 정규화된 필드들)
-  - dayMaster (String): 일간
+- **TenGodData** (1:N to SajuResult): 십신 분포 (행 단위 정규화)
+  - id (Long, PK)
+  - sajuResultId (Long, FK to SajuResult, NOT NULL)
+  - tenGodName (String): 십신 이름 (예: "正官", "偏官", "正财" 등)
+  - score (Integer): 해당 십신의 점수
+  - createdAt (LocalDateTime)
+  - **설계**: Map<"正官", 1> → 1개 행, Map<"偏官", 1> → 1개 행 (각 십신별 행 분리)
 
-- **HiddenStemData** (1:N to SajuResult): 지지별 지장간
-  - earthlyBranch (String): 지지 (年/月/日/時)
-  - hiddenStems (List<String>): 해당 지지의 지장간
+- **HiddenStemData** (1:N to SajuResult): 지지별 지장간 (행 단위 정규화)
+  - id (Long, PK)
+  - sajuResultId (Long, FK to SajuResult, NOT NULL)
+  - earthlyBranch (String): 지지 (예: "子", "丑", "寅", "卯", ..., "亥")
+  - hiddenStem (String): 해당 지지에 숨겨진 천간 (예: "癸", "辛" 등)
+  - createdAt (LocalDateTime)
+  - **설계**: "丑": ["癸", "辛", "己"] → 3개 행 (지지별 지장간이 여러 개면 각각 행으로 저장)
 
 - **CareerFortune** (1:1 to SajuResult): 관운 분석
   - favoredPeriod (String): "H1" or "H2"
@@ -298,25 +306,57 @@ public record ErrorInfo(
 
 | Layer | Responsibility | Examples |
 |-------|----------------|----------|
-| **Controller** | HTTP 요청/응답 처리, DTO↔Entity 변환 | CareerTimingController, ConsultationController |
-| **Service** | 모든 비즈니스 로직 (데이터 변환, 외부 API 조율, 계산) | CareerFortuneService, ConsultationService, CompanyMatchingService |
-| **Repository** | DB 접근만 담당 (Spring Data JPA) | UserRepository, SajuResultRepository, CompanyCompatibilityRepository |
+| **Controller** | HTTP 요청/응답 처리, @Valid 검증 | CareerTimingController, ConsultationController |
+| **Service** | Orchestration 전담: 외부 API 호출, 비즈니스 흐름 제어 | CareerFortuneService, ConsultationService, CompanyMatchingService |
+| **Analyzer/Calculator** | 분석/계산 로직 전담 (비즈니스 규칙) | TenGodAnalyzer, HiddenStemAnalyzer, CareerFortuneAnalyzer, CompatibilityScoreCalculator |
+| **Mapper** | DTO ↔ Entity 변환 (데이터 구조 변환만) | CareerConsultationMapper, SajuResultMapper |
+| **Provider** | 데이터 조회/생성 + 설정/프롬프트 관리 (동시성 보정, 재사용 로직 포함) | UserProfileProvider, SajuResultProvider, PromptProvider, ConfigProvider |
+| **Repository** | DB 접근만 담당 (Spring Data JPA) | UserRepository, SajuResultRepository, TenGodDataRepository, HiddenStemDataRepository 등 |
 | **Global Exception Handler** | @RestControllerAdvice로 모든 예외 처리 (try-catch 금지) | SajuGlobalExceptionHandler |
+
+**Service 경량화 패턴**:
+- Service는 Analyzer, Calculator, Mapper를 **조합(Composition)**하여 흐름만 제어
+- 복잡한 분석 로직 → Analyzer로 분리
+- 수학 계산 → Calculator로 분리
+- DTO ↔ Entity 변환 → Mapper로 분리
+- 프롬프트/설정 → Provider로 분리
+- Service는 각 컴포넌트의 메서드를 호출하여 orchestration만 수행
 
 ### Exception Handling Strategy
 
-@RestControllerAdvice + 커스텀 예외 계층:
-
-```
+**예외 계층**:
+```text
 SajuException (root)
-├── InvalidSajuDataException (입력 유효성)
-├── FastAPITimeoutException (외부 API 지연)
-├── OpenAIApiException (LLM 호출 실패)
+├── InvalidSajuDataException (입력 유효성 / 데이터 검증)
+├── FastAPITimeoutException (FastAPI 외부 API 지연)
+├── OpenAIApiException (OpenAI LLM 호출 실패)
+├── PublicDataApiException (공공데이터API 호출 실패)
 └── DataAccessException (DB 오류)
-
-→ GlobalExceptionHandler에서 catch
-→ ApiResponse<T> with ErrorInfo 반환
 ```
+
+**사용 규칙**:
+- ✅ 기본: 조건 검사 후 커스텀 예외 throw → @RestControllerAdvice 위임
+- ⚠️ 예외 허용: 동시성 보정(DIVE, CannotAcquireLockException 등) 또는 명확한 재시도 로직이 필요한 경우에만 try-catch 허용
+- ❌ 비즈니스 예외를 무조건 삼키는 것 금지 (반드시 로깅 또는 재throw)
+- 예: `if (heavenlyStems == null || heavenlyStems.size() != 4) throw new InvalidSajuDataException("천간은 정확히 4개여야 합니다")`
+- 동시성 try-catch 예: UserProfileProvider.findOrCreate(), SajuResultProvider.findOrCreate() — DIVE 잡아서 재조회
+
+**GlobalExceptionHandler 처리**:
+- 모든 SajuException 및 하위 클래스 → @ExceptionHandler로 catch
+- ApiResponse<T>로 통일된 형식 반환
+  ```java
+  {
+    "success": false,
+    "data": null,
+    "error": {
+      "code": "INVALID_SAJU_DATA",
+      "message": "천간은 정확히 4개여야 합니다",
+      "requestId": "req-uuid-1234"
+    },
+    "timestamp": 1712700000000
+  }
+  ```
+- 로깅: warn/error 레벨로 상세 기록 (스택 트레이스 포함)
 
 ## Requirements *(mandatory)*
 
@@ -356,7 +396,7 @@ SajuException (root)
 
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
-| **TenGodData** | id, sajuResultId, dayMaster, tenGodDistribution (별도 엔티티로) | PK, FK, VARCHAR, | FK to SajuResult (1:1) |
+| **TenGodData** | id, sajuResultId, tenGodName, score | PK, FK, VARCHAR, INT | FK to SajuResult (1:N) - 십신별 행 단위 정규화 |
 | **HiddenStemData** | id, sajuResultId, earthlyBranch, hiddenStem | PK, FK, VARCHAR, VARCHAR | FK to SajuResult (1:N), 지지별 지장간 |
 | **CareerFortune** | id, sajuResultId, favoredPeriod, confidenceScore, reasoning | PK, FK, VARCHAR, INT, TEXT | FK to SajuResult (1:1) |
 
