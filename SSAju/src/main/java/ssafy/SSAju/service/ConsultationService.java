@@ -8,6 +8,7 @@ import ssafy.SSAju.career.caller.ConsultationOpenAICaller;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.mapper.ConsultationMapper;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
 import ssafy.SSAju.career.provider.SajuResultProvider;
@@ -115,20 +116,20 @@ public class ConsultationService {
 
     private void validateSajuData(FastAPIResponse sajuData) {
         if (sajuData == null) {
-            throw new InvalidSajuDataException("사주 데이터는 null이 아니어야 합니다");
+            throw new InvalidSajuDataException(ErrorMessageConstants.SAJU_DATA_NULL.getMessage());
         }
         List<String> heavenlyStems = sajuData.heavenlyStems();
         if (heavenlyStems == null || heavenlyStems.size() != 4) {
-            throw new InvalidSajuDataException("천간은 정확히 4개여야 합니다");
+            throw new InvalidSajuDataException(ErrorMessageConstants.HEAVENLY_STEMS_COUNT_INVALID.getMessage());
         }
         List<String> earthlyBranches = sajuData.earthlyBranches();
         if (earthlyBranches == null || earthlyBranches.size() != 4) {
-            throw new InvalidSajuDataException("지지는 정확히 4개여야 합니다");
+            throw new InvalidSajuDataException(ErrorMessageConstants.EARTHLY_BRANCHES_COUNT_INVALID.getMessage());
         }
         // fiveElements: ConsultationResponse.SajuProfile 생성 시 sajuData.fiveElements() 사용됨
         Map<String, Integer> fiveElements = sajuData.fiveElements();
         if (fiveElements == null || fiveElements.isEmpty()) {
-            throw new InvalidSajuDataException("오행(목화토금수) 데이터는 필수입니다");
+            throw new InvalidSajuDataException(ErrorMessageConstants.FIVE_ELEMENTS_REQUIRED.getMessage());
         }
     }
 }

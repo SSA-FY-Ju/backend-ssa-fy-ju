@@ -1,6 +1,8 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.career.enums.TenGodConstants;
 
 import java.util.HashMap;
 import java.util.List;
@@ -48,16 +50,16 @@ public class CompatibilityScoreCalculator {
                          Map<String, List<String>> companyHiddenStems,
                          String companyDayMaster) {
         if (userHiddenStems == null) {
-            throw new IllegalArgumentException("사용자 지장간 데이터가 null입니다.");
+            throw new IllegalArgumentException(ErrorMessageConstants.USER_HIDDEN_STEM_NULL.getMessage());
         }
         if (userDayMaster == null || userDayMaster.isBlank()) {
-            throw new IllegalArgumentException("사용자 일간이 null이거나 비어있습니다.");
+            throw new IllegalArgumentException(ErrorMessageConstants.USER_DAY_MASTER_NULL.getMessage());
         }
         if (companyHiddenStems == null) {
-            throw new IllegalArgumentException("기업 지장간 데이터가 null입니다.");
+            throw new IllegalArgumentException(ErrorMessageConstants.COMPANY_HIDDEN_STEM_NULL.getMessage());
         }
         if (companyDayMaster == null || companyDayMaster.isBlank()) {
-            throw new IllegalArgumentException("기업 일간이 null이거나 비어있습니다.");
+            throw new IllegalArgumentException(ErrorMessageConstants.COMPANY_DAY_MASTER_NULL.getMessage());
         }
 
         int officerHarmonyScore = calculateOfficerHarmony(userHiddenStems,
@@ -74,7 +76,8 @@ public class CompatibilityScoreCalculator {
                                          String companyDayMaster) {
         // 기업 일간이 사용자 일간의 관성(정관/편관)에 해당하는지 확인
         String tenGodOfCompany = tenGodCalculator.getTenGod(userDayMaster, companyDayMaster);
-        boolean isOfficer = tenGodOfCompany.equals("정관") || tenGodOfCompany.equals("편관");
+        TenGodConstants tenGod = TenGodConstants.fromName(tenGodOfCompany);
+        boolean isOfficer = tenGod != null && tenGod.isOfficer();
 
         int baseScore = isOfficer ? 70 : 40;
 
@@ -82,8 +85,9 @@ public class CompatibilityScoreCalculator {
         int userOfficerCount = 0;
         for (List<String> stems : userHiddenStems.values()) {
             for (String stem : stems) {
-                String god = tenGodCalculator.getTenGod(userDayMaster, stem);
-                if (god.equals("정관") || god.equals("편관")) {
+                String godName = tenGodCalculator.getTenGod(userDayMaster, stem);
+                TenGodConstants god = TenGodConstants.fromName(godName);
+                if (god != null && god.isOfficer()) {
                     userOfficerCount++;
                 }
             }

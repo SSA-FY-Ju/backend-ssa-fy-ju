@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
@@ -76,10 +77,10 @@ public class CareerFortuneService {
         List<String> heavenlyStems = sajuData.heavenlyStems();
         List<String> earthlyBranches = sajuData.earthlyBranches();
         if (heavenlyStems == null || heavenlyStems.size() != 4) {
-            throw new InvalidSajuDataException("천간은 정확히 4개여야 합니다");
+            throw new InvalidSajuDataException(ErrorMessageConstants.HEAVENLY_STEMS_COUNT_INVALID.getMessage());
         }
         if (earthlyBranches == null || earthlyBranches.size() != 4) {
-            throw new InvalidSajuDataException("지지는 정확히 4개여야 합니다");
+            throw new InvalidSajuDataException(ErrorMessageConstants.EARTHLY_BRANCHES_COUNT_INVALID.getMessage());
         }
     }
 }

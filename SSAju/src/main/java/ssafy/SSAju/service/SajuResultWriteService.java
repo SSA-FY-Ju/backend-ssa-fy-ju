@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.sql.SQLException;
@@ -53,8 +54,7 @@ public class SajuResultWriteService {
         // 소유권 일관성: A의 결과를 지운 뒤 B의 결과를 저장하는 실수 방지
         if (newResult.getUserProfile() != null
                 && !newResult.getUserProfile().equals(userProfile)) {
-            throw new InvalidSajuDataException(
-                "newResult의 userProfile이 전달받은 userProfile과 불일치합니다");
+            throw new InvalidSajuDataException(ErrorMessageConstants.USER_PROFILE_MISMATCH.getMessage());
         }
         sajuResultRepository.findByUserProfile(userProfile).ifPresent(existing -> {
             Long existingId = existing.getId();

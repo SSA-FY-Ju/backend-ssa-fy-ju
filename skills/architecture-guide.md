@@ -55,6 +55,67 @@ Spring Boot 프로젝트는 다음 4개 계층으로 분리합니다:
 | **검증** | Spring Validation | 수동 if 체크 |
 | **트랜잭션** | @Transactional | 수동 트랜잭션 관리 |
 
+## 상수 관리 및 도메인 모델
+
+### 원칙: 매직 넘버 & 하드코딩된 String 제거
+
+**도메인 비즈니스 상수는 Enum으로 정의** (예: 십신, 피드백 타입)
+**기술 설정 상수는 Static Class로 정의** (예: 타임아웃, 임계값)
+
+#### 예시: TenGodConstants Enum (십신 관리)
+
+```java
+// ❌ 나쁜 패턴: 여러 파일에서 하드코딩
+public class CareerFortuneAnalyzer {
+    private static final List<String> OFFICER_GODS = List.of("정관", "편관");
+    public int calculateScore(String tenGodName) {
+        if (tenGodName.equals("정관") || tenGodName.equals("편관")) {
+            return 20;  // 매직 넘버
+        }
+    }
+}
+
+// ✅ 좋은 패턴: Enum으로 중앙 관리
+public enum TenGodConstants {
+    CHIEF_OFFICER("정관", "官", 20, true),
+    SIDE_OFFICER("편관", "殺", 20, true),
+    FOOD_GOD("식신", "食", -15, false),
+    INJURING_OFFICER("상관", "傷", -15, false),
+    COMPARING_FRIEND("비견", "比", -5, false),
+    ROBBING_WEALTH("겁재", "劫", -5, false),
+    // ... 기타 십신
+
+    private final String name;
+    private final int scoreModifier;
+    private final boolean isOfficer;
+
+    public static TenGodConstants fromName(String name) {
+        for (TenGodConstants tg : values()) {
+            if (tg.name.equals(name)) return tg;
+        }
+        return null;
+    }
+}
+
+// 사용: 모든 분석 클래스에서 일관되게 사용
+public int calculateOfficerScore(Map<String, Integer> distribution) {
+    int score = 0;
+    for (var entry : distribution.entrySet()) {
+        TenGodConstants tenGod = TenGodConstants.fromName(entry.getKey());
+        if (tenGod != null) {
+            score += entry.getValue() * tenGod.getScoreModifier();
+        }
+    }
+    return score;
+}
+```
+
+**이점**:
+- **일관성**: 모든 십신 정보를 한 곳에서 관리
+- **타입 안전**: String 비교 대신 Enum 사용
+- **확장성**: 새 십신 추가 시 한 곳만 수정
+- **유지보수성**: 점수 변경 시 Enum만 수정
+
 ## 예외 처리 원칙
 
 ### Rule 1: try-catch로 예외를 삼키지 말 것
@@ -326,8 +387,8 @@ SSAju는 다음 3개 외부 API와 연동:
   "solarCorrection": {...}
 }
 
-타임아웃: 3초
-재시도: 2회 (지수 백오프)
+타임아웃: `saju.fastapi.timeout-seconds` (기본값: 3초)
+재시도: `saju.fastapi.max-retries` (기본값: 2회, 지수 백오프)
 
 참고: 
 - 십神은 FastAPI에서 제공하지 않음 (Spring의 TenGodCalculator에서 계산)
@@ -385,8 +446,8 @@ try {
   careerTimeline: {year: 2026, months: {"March": {type, description}}, pivotPoints: [{month, type, score, description}], warningMonths, warningDescription}
 }
 
-타임아웃: 8초 (LLM 응답 시간)
-재시도: 1회 (자동)
+타임아웃: `saju.openai.timeout-seconds` (기본값: 8초, LLM 응답 시간)
+재시도: `saju.openai.max-retries` (기본값: 1회, 자동)
 ```
 
 **Nested Record Types**:
@@ -509,9 +570,10 @@ CareerAdviceResponse response = chatClient.prompt()
 기능: 기업명으로 설립연도 조회
 입력: 회사명
 응답: {foundingYear, companyId}
-타임아웃: 5초
-재시도: 1회
+타임아웃: ApiTimeoutConstants.PUBLIC_DATA_TIMEOUT_SECONDS (5초)
+재시도: ApiTimeoutConstants.PUBLIC_DATA_MAX_RETRIES (1회)
 Fallback: 찾지 못하면 사용자 수동입력 요청 (graceful degradation)
+기본 설립시간: CompatibilityConstants.DEFAULT_FOUNDING_TIME ("12:00")
 ```
 
 ---

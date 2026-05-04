@@ -1,6 +1,8 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.career.enums.TenGodConstants;
 
 import java.util.HashMap;
 import java.util.List;
@@ -57,7 +59,7 @@ public class TenGodCalculator {
 
     public Map<String, Integer> calculate(List<String> heavenlyStems) {
         if (heavenlyStems == null || heavenlyStems.size() != 4) {
-            throw new IllegalArgumentException("천간 목록은 정확히 4개(年月日時)여야 합니다.");
+            throw new IllegalArgumentException(ErrorMessageConstants.HEAVENLY_STEMS_COUNT_INVALID.getMessage());
         }
         String dayMaster = heavenlyStems.get(2); // 일간(日干) - 인덱스 2 (年月日時 순서)
         Map<String, Integer> distribution = new HashMap<>();
@@ -73,10 +75,10 @@ public class TenGodCalculator {
 
     public String getTenGod(String dayMaster, String targetStem) {
         if (dayMaster == null || !FIVE_ELEMENT_MAP.containsKey(dayMaster)) {
-            throw new IllegalArgumentException("유효하지 않은 일간: " + dayMaster);
+            throw new IllegalArgumentException(ErrorMessageConstants.INVALID_DAY_MASTER.getMessage() + ": " + dayMaster);
         }
         if (targetStem == null || !FIVE_ELEMENT_MAP.containsKey(targetStem)) {
-            throw new IllegalArgumentException("유효하지 않은 천간: " + targetStem);
+            throw new IllegalArgumentException(ErrorMessageConstants.INVALID_HEAVENLY_STEM.getMessage() + ": " + targetStem);
         }
         String masterElement = FIVE_ELEMENT_MAP.get(dayMaster);
         String targetElement = FIVE_ELEMENT_MAP.get(targetStem);
@@ -86,23 +88,23 @@ public class TenGodCalculator {
         boolean samePolarity = masterPolarity.equals(targetPolarity);
 
         if (masterElement.equals(targetElement)) {
-            return samePolarity ? "비견" : "겁재";
+            return samePolarity ? TenGodConstants.COMPARING_FRIEND.getName() : TenGodConstants.ROBBING_WEALTH.getName();
         }
         if (GENERATES_MAP.get(masterElement).equals(targetElement)) {
-            return samePolarity ? "식신" : "상관";
+            return samePolarity ? TenGodConstants.FOOD_GOD.getName() : TenGodConstants.INJURING_OFFICER.getName();
         }
         if (CONTROLS_MAP.get(masterElement).equals(targetElement)) {
-            return samePolarity ? "편재" : "정재";
+            return samePolarity ? TenGodConstants.SIDE_WEALTH.getName() : TenGodConstants.CHIEF_WEALTH.getName();
         }
         // 나를 극하는 오행: targetElement가 masterElement를 극함
         if (CONTROLS_MAP.get(targetElement).equals(masterElement)) {
-            return samePolarity ? "편관" : "정관";
+            return samePolarity ? TenGodConstants.SIDE_OFFICER.getName() : TenGodConstants.CHIEF_OFFICER.getName();
         }
         // 나를 생하는 오행: targetElement가 masterElement를 생함
         if (GENERATES_MAP.get(targetElement).equals(masterElement)) {
-            return samePolarity ? "편인" : "정인";
+            return samePolarity ? TenGodConstants.SIDE_SEAL.getName() : TenGodConstants.CHIEF_SEAL.getName();
         }
 
-        throw new IllegalArgumentException("알 수 없는 천간 조합: " + dayMaster + " vs " + targetStem);
+        throw new IllegalArgumentException(ErrorMessageConstants.UNKNOWN_STEM_COMBINATION.getMessage() + ": " + dayMaster + " vs " + targetStem);
     }
 }

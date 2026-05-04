@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.exception.OpenAIApiException;
@@ -37,38 +38,38 @@ public class ConsultationOpenAICaller {
         } catch (Exception e) {
             // 스택트레이스만 로깅 (e.getMessage()는 민감 내부 정보 포함 가능)
             log.error("OpenAI API 호출 실패", e);
-            throw new OpenAIApiException("OpenAI API 호출 실패", e);
+            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
         }
     }
 
     private void validate(CareerAdviceResponse response) {
         if (response == null) {
-            throw new OpenAIApiException("OpenAI 응답이 비어있습니다");
+            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_EMPTY_RESPONSE.getMessage());
         }
         if (response.industries() == null || response.industries().isEmpty()) {
-            throw new OpenAIApiException("산업 추천 정보가 누락되었습니다");
+            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_MISSING_INDUSTRIES.getMessage());
         }
         for (var industry : response.industries()) {
             if (industry == null
                     || industry.name() == null || industry.name().isBlank()
                     || industry.reason() == null || industry.reason().isBlank()) {
-                throw new OpenAIApiException("산업 추천 항목에 빈 name 또는 reason이 포함되어 있습니다");
+                throw new OpenAIApiException(ErrorMessageConstants.OPENAI_INVALID_INDUSTRY_ITEM.getMessage());
             }
         }
         if (response.interviewTips() == null || response.interviewTips().isEmpty()) {
-            throw new OpenAIApiException("면접 팁 정보가 누락되었습니다");
+            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_MISSING_INTERVIEW_TIPS.getMessage());
         }
         for (var tip : response.interviewTips()) {
             if (tip == null || tip.isBlank()) {
-                throw new OpenAIApiException("면접 팁 항목에 빈 값이 포함되어 있습니다");
+                throw new OpenAIApiException(ErrorMessageConstants.OPENAI_INVALID_INTERVIEW_ITEM.getMessage());
             }
         }
         if (response.strengths() == null || response.strengths().isEmpty()) {
-            throw new OpenAIApiException("강점 분석 정보가 누락되었습니다");
+            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_MISSING_STRENGTHS.getMessage());
         }
         for (var strength : response.strengths()) {
             if (strength == null || strength.isBlank()) {
-                throw new OpenAIApiException("강점 분석 항목에 빈 값이 포함되어 있습니다");
+                throw new OpenAIApiException(ErrorMessageConstants.OPENAI_INVALID_STRENGTH_ITEM.getMessage());
             }
         }
     }

@@ -120,34 +120,208 @@ throw new InvalidSajuDataException("Invalid date format");
 
 상수는 **용도별로** 다음과 같이 관리합니다:
 
-### Enum: 비즈니스 도메인 상수 (여러 곳에서 사용)
+### Rule 1: 매직 넘버 & String 하드코딩 금지
 
-여러 파일/모듈에서 사용하는 상수 → **별도 클래스로 정의** (career/enums/)
+❌ **금지**:
+```java
+// 타임아웃 하드코딩
+int timeout = 3;  // 3초인지, 3분인지 불명확
+if (confidence > 75) { ... }  // 75가 뭘 의미하는지 불명확
+String period = "H1";  // 하드코딩된 문자열
+```
+
+✅ **필수**:
+```java
+// 상수 사용
+int timeout = ApiTimeoutConstants.FASTAPI_TIMEOUT_SECONDS;
+if (confidence > ValidationConstants.CONFIDENCE_THRESHOLD_HIGH) { ... }
+String period = CareerFortuneConstants.FIRST_HALF;  // "H1"
+```
+
+### Rule 2: Enum: 비즈니스 도메인 상수 (여러 곳에서 사용)
+
+여러 파일/모듈에서 사용하는 상수 → **Enum으로 정의** (career/enums/)
 
 ```java
-// CareerTimingType.java
-public enum CareerTimingType {
-    FIRST_HALF("H1", "상반기"),
-    SECOND_HALF("H2", "하반기");
-    
-    private final String code;
-    private final String description;
-    
-    CareerTimingType(String code, String description) {
-        this.code = code;
-        this.description = description;
-    }
-}
-
-// FeedbackType.java
+// FeedbackType.java - 피드백 분류: 여러 모듈에서 참조
 public enum FeedbackType {
     CAREER_TIMING("관운 분석"),
     CONSULTATION("AI 컨설팅"),
     COMPATIBILITY("기업 궁합");
-    
+
     private final String description;
     FeedbackType(String description) { this.description = description; }
+    
+    public String getDescription() {
+        return description;
+    }
 }
+
+// TenGodConstants.java - 십신(十神) 상수: 여러 분석 컴포넌트에서 사용
+public enum TenGodConstants {
+    CHIEF_OFFICER("정관", "官", 20, true),     // 정관: 가점 +20
+    SIDE_OFFICER("편관", "殺", 20, true),      // 편관: 가점 +20
+    FOOD_GOD("식신", "食", -15, false),        // 식신: 감점 -15
+    INJURING_OFFICER("상관", "傷", -15, false), // 상관: 감점 -15
+    COMPARING_FRIEND("비견", "比", -5, false),  // 비견: 감점 -5
+    ROBBING_WEALTH("겁재", "劫", -5, false),   // 겁재: 감점 -5
+    CHIEF_WEALTH("정재", "財", 0, false),
+    SIDE_WEALTH("편재", "利", 0, false),
+    CHIEF_SEAL("정인", "印", 0, false),
+    SIDE_SEAL("편인", "紬", 0, false);
+
+    private final String name;
+    private final String symbol;
+    private final int scoreModifier;    // 관운 분석 시 점수 가중치
+    private final boolean isOfficer;    // 관성(官性) 여부
+
+    TenGodConstants(String name, String symbol, int scoreModifier, boolean isOfficer) {
+        this.name = name;
+        this.symbol = symbol;
+        this.scoreModifier = scoreModifier;
+        this.isOfficer = isOfficer;
+    }
+
+    public static TenGodConstants fromName(String name) {
+        for (TenGodConstants tg : values()) {
+            if (tg.name.equals(name)) return tg;
+        }
+        return null;
+    }
+}
+```
+
+### Rule 3: Static Constants: 기술 및 설정 상수
+
+API 타임아웃, 검증 임계값 등 → **static class 또는 interface** (career/constants/)
+
+```java
+// ApiTimeoutConstants.java
+public class ApiTimeoutConstants {
+    public static final int FASTAPI_TIMEOUT_SECONDS = 3;
+    public static final int FASTAPI_MAX_RETRIES = 2;
+    
+    public static final int OPENAI_TIMEOUT_SECONDS = 8;
+    public static final int OPENAI_MAX_RETRIES = 1;
+    
+    public static final int PUBLIC_DATA_TIMEOUT_SECONDS = 5;
+    public static final int PUBLIC_DATA_MAX_RETRIES = 1;
+    
+    private ApiTimeoutConstants() {}  // 인스턴스 생성 방지
+}
+
+// ValidationConstants.java
+public class ValidationConstants {
+    public static final int REQUIRED_HEAVENLY_STEMS = 4;
+    public static final int REQUIRED_EARTHLY_BRANCHES = 4;
+    
+    public static final int MIN_CONFIDENCE_SCORE = 0;
+    public static final int MAX_CONFIDENCE_SCORE = 100;
+    public static final int CONFIDENCE_THRESHOLD_HIGH = 75;
+    public static final int CONFIDENCE_THRESHOLD_MEDIUM = 50;
+    
+    private ValidationConstants() {}
+}
+
+// CareerFortuneConstants.java
+public class CareerFortuneConstants {
+    public static final String FIRST_HALF = "H1";
+    public static final String SECOND_HALF = "H2";
+    
+    public static final int TENGO_ZHENG_GUAN_WEIGHT = 20;  // 정관 가중치
+    public static final int TENGO_PIAN_GUAN_WEIGHT = 20;   // 편관 가중치
+    public static final int TENGO_FOOD_GOD_WEIGHT = 15;    // 식신 가중치
+    
+    private CareerFortuneConstants() {}
+}
+
+// CompatibilityConstants.java
+public class CompatibilityConstants {
+    public static final String DEFAULT_FOUNDING_TIME = "12:00";
+    public static final int MIN_COMPATIBILITY_SCORE = 0;
+    public static final int MAX_COMPATIBILITY_SCORE = 100;
+    
+    public static final String CONFIDENCE_HIGH = "HIGH";
+    public static final String CONFIDENCE_MEDIUM = "MEDIUM";
+    public static final String CONFIDENCE_LOW = "LOW";
+    
+    private CompatibilityConstants() {}
+}
+```
+
+### 사용 예시
+
+**Service에서의 사용**:
+```java
+@Service
+public class SajuDataService {
+    public FastAPIResponse fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime) {
+        // 타임아웃 상수 사용
+        Duration timeout = Duration.ofSeconds(ApiTimeoutConstants.FASTAPI_TIMEOUT_SECONDS);
+        
+        // 재시도 횟수 상수 사용
+        int maxRetries = ApiTimeoutConstants.FASTAPI_MAX_RETRIES;
+        
+        // Enum 사용
+        return webClient
+            .post()
+            .timeout(timeout)
+            .retrieve()
+            .bodyToMono(FastAPIResponse.class)
+            .retryWhen(...)  // maxRetries 사용
+            .block();
+    }
+}
+
+@Service
+public class CareerFortuneService {
+    private final CareerFortuneAnalyzer analyzer;
+
+    public CareerTimingResponse analyzeCareerTiming(SajuData data) {
+        int confidenceScore = calculateConfidence(data);
+
+        // Enum 또는 String 상수 사용
+        String favoredPeriod = confidenceScore > ValidationConstants.CONFIDENCE_THRESHOLD_HIGH
+            ? CareerFortuneConstants.FIRST_HALF
+            : CareerFortuneConstants.SECOND_HALF;
+
+        return new CareerTimingResponse(favoredPeriod, confidenceScore, reasoning);
+    }
+}
+
+// TenGodConstants 사용 예시 (CareerFortuneAnalyzer)
+@Component
+public class CareerFortuneAnalyzer {
+    // ❌ 나쁨: 하드코딩된 십신 문자열
+    // private static final List<String> OFFICER_GODS = List.of("정관", "편관");
+
+    // ✅ 좋음: TenGodConstants 사용
+    private static final List<String> OFFICER_GODS = List.of(
+        TenGodConstants.CHIEF_OFFICER.getName(),
+        TenGodConstants.SIDE_OFFICER.getName()
+    );
+
+    public int calculateOfficerScore(Map<String, Integer> tenGodDistribution) {
+        int score = 0;
+        for (Map.Entry<String, Integer> entry : tenGodDistribution.entrySet()) {
+            // TenGodConstants로 십신 조회 후 점수 수정자 적용
+            TenGodConstants tenGod = TenGodConstants.fromName(entry.getKey());
+            if (tenGod != null) {
+                score += entry.getValue() * tenGod.getScoreModifier();
+            }
+        }
+        return score;
+    }
+}
+```
+
+### 상수 배치 원칙
+
+| 상수 타입 | 위치 | 예시 |
+|----------|------|------|
+| **Enum** (도메인 개념) | `career/enums/` | `FeedbackType.java`, `CareerTimingType.java` |
+| **Static Constants** (기술 설정) | `career/constants/` | `ApiTimeoutConstants.java`, `ValidationConstants.java` |
+| **필드 레벨** (단일 파일 사용) | 클래스 내부 | `private static final int BUFFER_SIZE = 1024;` |
 
 // SatisfactionStatus.java
 public enum SatisfactionStatus {

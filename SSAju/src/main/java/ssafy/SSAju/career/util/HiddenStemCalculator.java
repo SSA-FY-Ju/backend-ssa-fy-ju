@@ -1,6 +1,7 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 
 import java.util.HashMap;
 import java.util.List;
@@ -38,13 +39,13 @@ public class HiddenStemCalculator {
      */
     public Map<String, List<String>> calculate(List<String> earthlyBranches) {
         if (earthlyBranches == null || earthlyBranches.size() != 4) {
-            throw new IllegalArgumentException("지지 목록은 정확히 4개여야 합니다.");
+            throw new IllegalArgumentException(ErrorMessageConstants.EARTHLY_BRANCHES_COUNT_INVALID.getMessage());
         }
         Map<String, List<String>> hiddenStems = new HashMap<>();
         for (String branch : earthlyBranches) {
             List<String> stems = HIDDEN_STEMS_TABLE.get(branch);
             if (stems == null) {
-                throw new IllegalArgumentException("알 수 없는 지지: " + branch);
+                throw new IllegalArgumentException(ErrorMessageConstants.UNKNOWN_EARTHLY_BRANCH.getMessage() + ": " + branch);
             }
             hiddenStems.put(branch, stems);
         }
@@ -54,7 +55,7 @@ public class HiddenStemCalculator {
     public List<String> getHiddenStems(String earthlyBranch) {
         List<String> stems = HIDDEN_STEMS_TABLE.get(earthlyBranch);
         if (stems == null) {
-            throw new IllegalArgumentException("알 수 없는 지지: " + earthlyBranch);
+            throw new IllegalArgumentException(ErrorMessageConstants.UNKNOWN_EARTHLY_BRANCH.getMessage() + ": " + earthlyBranch);
         }
         return stems;
     }
