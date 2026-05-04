@@ -152,8 +152,7 @@ public class CareerFortuneAnalyzer {
         String period = "H1".equals(favoredPeriod) ? "상반기" : "하반기";
         StringBuilder sb = new StringBuilder(period + "가 취업에 유리합니다. ");
         if (officerCount > 0) {
-            sb.append(TenGodConstants.CHIEF_OFFICER.getName())
-              .append("의 운이 ").append(period)
+            sb.append("관성의 운이 ").append(period)
               .append("에 집중되어 있어 조직의 부름이 많아지고, 면접에서 호의적인 평가를 받기 쉬운 시기입니다. ");
         }
         sb.append("십신·지장간 통합 분석 기준입니다.");

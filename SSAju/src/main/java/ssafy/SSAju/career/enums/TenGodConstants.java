@@ -30,7 +30,7 @@ public enum TenGodConstants {
     /** 정재(正財): 내가 극하는 오행, 다른 음양 - 정당한 수익 */
     CHIEF_WEALTH("정재", "財", 0, false),
     /** 편재(偏財): 내가 극하는 오행, 같은 음양 - 예상 외의 이익 */
-    SIDE_WEALTH("편재", "利", 0, false),
+    SIDE_WEALTH("편재", "才", 0, false),
 
     // === 식상 (食傷) - 표현, 창의 ===
     /** 식신(食神): 내가 생하는 오행, 같은 음양 - 온화하고 표현적인 창의 */
@@ -48,7 +48,7 @@ public enum TenGodConstants {
     /** 정인(正印): 나를 생하는 오행, 다른 음양 - 정통 학문과 지혜 */
     CHIEF_SEAL("정인", "印", 0, false),
     /** 편인(偏印): 나를 생하는 오행, 같은 음양 - 특수 기술과 창의 */
-    SIDE_SEAL("편인", "紬", 0, false);
+    SIDE_SEAL("편인", "梭", 0, false);
 
     private final String name;          // 십신 이름 (예: "정관")
     private final String symbol;        // 십신 기호 (예: "官")

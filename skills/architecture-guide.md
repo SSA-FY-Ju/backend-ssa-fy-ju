@@ -387,8 +387,8 @@ SSAju는 다음 3개 외부 API와 연동:
   "solarCorrection": {...}
 }
 
-타임아웃: ApiTimeoutConstants.FASTAPI_TIMEOUT_SECONDS (3초)
-재시도: ApiTimeoutConstants.FASTAPI_MAX_RETRIES (2회, 지수 백오프)
+타임아웃: `saju.fastapi.timeout-seconds` (기본값: 3초)
+재시도: `saju.fastapi.max-retries` (기본값: 2회, 지수 백오프)
 
 참고: 
 - 십神은 FastAPI에서 제공하지 않음 (Spring의 TenGodCalculator에서 계산)
@@ -446,8 +446,8 @@ try {
   careerTimeline: {year: 2026, months: {"March": {type, description}}, pivotPoints: [{month, type, score, description}], warningMonths, warningDescription}
 }
 
-타임아웃: ApiTimeoutConstants.OPENAI_TIMEOUT_SECONDS (8초, LLM 응답 시간)
-재시도: ApiTimeoutConstants.OPENAI_MAX_RETRIES (1회, 자동)
+타임아웃: `saju.openai.timeout-seconds` (기본값: 8초, LLM 응답 시간)
+재시도: `saju.openai.max-retries` (기본값: 1회, 자동)
 ```
 
 **Nested Record Types**:

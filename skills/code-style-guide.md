@@ -143,21 +143,7 @@ String period = CareerFortuneConstants.FIRST_HALF;  // "H1"
 여러 파일/모듈에서 사용하는 상수 → **Enum으로 정의** (career/enums/)
 
 ```java
-// CareerTimingType.java (또는 기존 FeedbackType.java 활용)
-public enum CareerTimingType {
-    FIRST_HALF("H1", "상반기"),
-    SECOND_HALF("H2", "하반기");
-    
-    private final String code;
-    private final String description;
-    
-    CareerTimingType(String code, String description) {
-        this.code = code;
-        this.description = description;
-    }
-}
-
-// FeedbackType.java
+// FeedbackType.java - 피드백 분류: 여러 모듈에서 참조
 public enum FeedbackType {
     CAREER_TIMING("관운 분석"),
     CONSULTATION("AI 컨설팅"),
@@ -165,6 +151,10 @@ public enum FeedbackType {
 
     private final String description;
     FeedbackType(String description) { this.description = description; }
+    
+    public String getDescription() {
+        return description;
+    }
 }
 
 // TenGodConstants.java - 십신(十神) 상수: 여러 분석 컴포넌트에서 사용
