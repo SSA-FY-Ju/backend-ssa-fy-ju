@@ -35,6 +35,59 @@ Spring Boot 프로젝트는 다음 4개 계층으로 분리합니다:
 | **Repository** | DB 접근만 담당 (Spring Data JPA) | 순수 데이터 접근, 쿼리만 담당 |
 | **Global Exception Handler** | @RestControllerAdvice로 모든 예외 처리 | try-catch 금지 |
 
+## Service 계층의 DTO 변환 및 계산 로직
+
+### 데이터베이스 저장 vs API 응답 분리
+
+일부 API 응답은 **계산/파생 필드**를 포함합니다. 이들은 DB에 저장하지 않고 Service 계층에서 생성합니다:
+
+**예: CompatibilityResponse (US3)**
+
+| 필드 | 저장? | 계산 위치 | 설명 |
+|------|------|---------|------|
+| compatibilityScore | ✅ | Repository | CompanyCompatibility 엔티티에 저장 |
+| confidenceLevel | ✅ | Repository | CompanyCompatibility 엔티티에 저장 |
+| **scoreBreakdown** | ❌ | Service | tenGodCompatibility, fiveElementsMatch, hiddenStemAlignment, leadershipFit 계산 |
+| **roleCompatibility[]** | 부분 | Service | DB: RecommendedRole(roleName만) → API: roleCompatibility(score, reason, recommendation 추가 계산) |
+| **synergies[]** | ❌ | Service | 사주 분석 결과 기반 텍스트 생성 |
+| **cautions[]** | ❌ | Service | 위험 요소 분석 기반 생성 |
+| **monthlyForecast[]** | ❌ | Service | 5개월 예측 점수/조언 계산 |
+| **careerMilestones** | ❌ | Service | 경력 발전 단계 기반 생성 |
+
+**코드 패턴**:
+```java
+// Service 메서드
+public CompatibilityResponse analyzeCompatibility(LocalDate userBirthDate, ...) {
+    // 1. DB에서 엔티티 로드
+    Saju userSaju = getSajuData(userBirthDate);
+    Saju companySaju = getCompanySaju(companyFoundingDate);
+    
+    // 2. 복합 계산 (CompatibilityScoreCalculator 등 활용)
+    int score = calculator.calculateScore(userSaju, companySaju);
+    Map<String, Integer> breakdown = calculator.getScoreBreakdown();
+    List<RoleMatch> roleMatches = analyzer.analyzeRoles(userSaju, companySaju);
+    
+    // 3. 계산 결과를 DB 저장 (필요시)
+    CompanyCompatibility entity = compRepo.save(
+        new CompanyCompatibility(userBirthDate, companyName, score)
+    );
+    roleMatches.forEach(role -> 
+        recRoleRepo.save(new RecommendedRole(entity, role.name))
+    );
+    
+    // 4. DTO로 변환하여 반환 (API는 엔티티보다 많은 필드 포함 가능)
+    return CompatibilityResponse.of(
+        score, 
+        breakdown,           // 계산값
+        roleMatches,         // 계산값: score, reason 추가
+        synergiesText,       // 계산값
+        cautionsText,        // 계산값
+        monthlyForecasts,    // 계산값
+        careerPlan           // 계산값
+    );
+}
+```
+
 ## 의존성 관리 원칙
 
 ### 핵심 Spring 의존성

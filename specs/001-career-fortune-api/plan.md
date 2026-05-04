@@ -412,8 +412,9 @@ RecommendedRole (1:N to CompanyCompatibility, 추천 직무)
 UserSatisfactionFeedback (1:N to SajuResult, 만족도 피드백)
 ├── id: Long (PK)
 ├── sajuResultId: Long (FK to SajuResult, NOT NULL)
-├── feedbackType: Enum (CAREER_TIMING/CONSULTATION/COMPATIBILITY)
-├── satisfactionStatus: Enum (SATISFIED/DISSATISFIED)
+├── feedbackType: Enum (CAREER_TIMING/CONSULTATION/COMPATIBILITY, NOT NULL)
+├── satisfactionStatus: Enum (SATISFIED/DISSATISFIED, NOT NULL)
+├── feedbackContent: TEXT (nullable, 최대 500자) - 사용자 상세 의견
 ├── createdAt: LocalDateTime
 └── (인덱스: sajuResultId + createdAt)
 ```
@@ -531,6 +532,7 @@ Response (200 OK):
 {
   "success": true,
   "data": {
+    // 기본 조언 (3개 필드 그룹)
     "industries": [
       {"name": "금융/핀테크", "reason": "오행 金 강세로 재무 관련 산업 적성"},
       {"name": "IT/소프트웨어", "reason": "오행 水 분포로 논리력 강함"},
@@ -546,6 +548,37 @@ Response (200 OK):
       "책임감 있는 업무 추진",
       "원칙 준수"
     ],
+    
+    // 관운 분석 (3개 필드 그룹)
+    "favoredPeriod": "H2",
+    "confidenceScore": 85,
+    "reasoning": "정관 기운과 오행 균형이 안정적이어서 신뢰도 높음",
+    
+    // 사주 베이스 데이터 (1개 필드 그룹, 내부 6개 필드)
+    "sajuProfile": {
+      "dayMaster": "丙",
+      "dayMasterDescription": "리더십과 추진력 강함, 창의적 사고",
+      "fiveElements": {"木": 2, "火": 3, "土": 1, "金": 2, "水": 2},
+      "fiveElementsAnalysis": "火가 과도하면 성급할 수 있음. 水 보충 필요",
+      "tenGodDistribution": {"正官": 1, "偏官": 1, "正財": 2, "偏財": 1, "正印": 1},
+      "keyTenGods": ["正官", "正財"]
+    },
+    
+    // OpenAI 분석 결과 (10개 필드 그룹)
+    "cautions": [
+      "상반기 급격한 결정 지양",
+      "인간관계 신중함 필요"
+    ],
+    "wealthStyle": "안정적 자산 운용. 장기 투자에 강함",
+    "longTermRoadmap": "3년 내 리더십 포지션 획득 목표. 중간 관리자로 경력 발전",
+    "personalBranding": "신뢰와 책임감으로 포지셔닝. 전문성 강조",
+    "powerKeywords": ["조직력", "추진력", "신뢰", "책임감"],
+    "mentalCare": "스트레스 관리: 명상, 산책 권장. 주기적 휴식 필수",
+    "environmentFit": "체계적이고 안정적인 조직 문화에 최적",
+    "workStyle": "계획 기반 일처리. 팀 중심의 협업 선호",
+    "relationshipStrategy": "신뢰 기반의 인간관계 형성. 멘토-멘티 관계 활성화",
+    "careerTimeline": "25-35세 경력 성장기. 30대 초반 리더십 전환점",
+    
     "openaiModelVersion": "gpt-4-turbo"
   },
   "error": null,
@@ -598,14 +631,118 @@ Response (200 OK):
 {
   "success": true,
   "data": {
+    // 핵심 점수
     "compatibilityScore": 78,                    // 0-100
     "confidenceLevel": "HIGH",                   // LOW, MEDIUM, HIGH
-    "recommendedRoles": [
-      "제조 관리자",
-      "공급망 담당자",
-      "품질 보증팀"
+    
+    // 분석 근거
+    "reasoning": "사용자의 정관(正官) 기운과 기업 설립일의 오행(金/水)이 강한 상호보완적 시너지를 냅니다. 특히 체계적인 시스템 안에서 능력을 발휘하는 데 유리한 명식입니다.",
+    
+    // 점수 투명성
+    "scoreBreakdown": {
+      "tenGodCompatibility": 82,                 // 십신 기반 궁합
+      "fiveElementsMatch": 75,                   // 오행 기반 궁합
+      "hiddenStemAlignment": 76,                 // 지장간 기반 궁합
+      "leadershipFit": 80                        // 리더십 매칭도
+    },
+    
+    // 직무별 맞춤 정보 (Array of Objects)
+    "roleCompatibility": [
+      {
+        "roleName": "제조 관리자",
+        "score": 85,
+        "reason": "조직력 강점과 정확히 매치",
+        "recommendation": "즉시 지원 권장"
+      },
+      {
+        "roleName": "공급망 담당자",
+        "score": 78,
+        "reason": "체계성 우수하나 유연성 보완 필요",
+        "recommendation": "관련 경험 어필 시 유리"
+      },
+      {
+        "roleName": "R&D 리더",
+        "score": 72,
+        "reason": "기술력은 있으나 창의적 발산보다 관리형 리더십에 가까움",
+        "recommendation": "실무 경력 축적 후 매니징 롤 지원 추천"
+      }
     ],
-    "reasoning": "사용자의 정관과 기업 설립일의 오행 궁합이 78점..."
+    
+    // 핵심 강점
+    "synergies": [
+      "정관 기운이 회사의 체계적 조직 문화와 부합",
+      "오행 金 분포가 제조 및 IT 산업 특성과 일치",
+      "지장간 분석 결과 장기 근속 시 안정성 매우 높음"
+    ],
+    
+    // 주의 사항
+    "cautions": [
+      "회사의 급격한 조직 개편 시 적응 스트레스 예상",
+      "상반기보다 하반기에 뚜렷한 성과 기대"
+    ],
+    
+    // 월별 운세: 핵심 달 5개월만 (month는 정수형 1-12)
+    "monthlyForecast": [
+      {
+        "month": 1,
+        "score": 35,
+        "type": "CAUTION",
+        "label": "주의",
+        "advice": "신입 채용 지원 자제, 이직 지양",
+        "details": "기운 전환기, 현재 역량 강화에 집중할 시기"
+      },
+      {
+        "month": 2,
+        "score": 50,
+        "type": "NORMAL",
+        "label": "보통",
+        "advice": "이력서 및 포트폴리오 정비",
+        "details": "서서히 기운이 풀리는 시기, 실무 면접 대비 적기"
+      },
+      {
+        "month": 3,
+        "score": 95,
+        "type": "LUCKY",
+        "label": "최고조",
+        "advice": "이 시기에 집중적으로 지원 권장",
+        "details": "정관 기운이 정점, 면접관의 평가가 매우 호의적으로 작용함"
+      },
+      {
+        "month": 6,
+        "score": 88,
+        "type": "LUCKY",
+        "label": "매우 높음",
+        "advice": "중요 면접 일정 잡기 좋음",
+        "details": "오행의 균형이 가장 잘 맞는 시기"
+      },
+      {
+        "month": 7,
+        "score": 42,
+        "type": "CAUTION",
+        "label": "주의",
+        "advice": "충분한 사전 준비 후 지원 필수",
+        "details": "회사와의 에너지 충돌 가능성, 압박 면접 주의"
+      }
+    ],
+    
+    // 경력 발전 마일스톤
+    "careerMilestones": {
+      "immediate": {
+        "period": "1-3개월",
+        "action": "집중 채용 기간 대비 지원",
+        "expectedOutcome": "서류 및 1차 면접 통과 가능성 80% 이상"
+      },
+      "shortTerm": {
+        "period": "3-12개월",
+        "action": "신규 팀 적응 및 업무 프로세스 파악",
+        "expectedOutcome": "조기 적응 및 팀 내 핵심 실무자로 신뢰 구축"
+      },
+      "mediumTerm": {
+        "period": "1-3년",
+        "action": "주요 프로젝트 주도 및 성과 창출",
+        "expectedOutcome": "빠른 인사 고과 인정 및 조기 진급 기회 확보"
+      }
+    }
   },
   "error": null,
   "timestamp": 1712700000000
@@ -646,7 +783,8 @@ Request:
 {
   "sajuResultId": 123,                                    // SajuResult 엔티티 ID
   "feedbackType": "CAREER_TIMING",                       // CAREER_TIMING / CONSULTATION / COMPATIBILITY
-  "satisfactionStatus": "SATISFIED"                      // SATISFIED / DISSATISFIED
+  "satisfactionStatus": "SATISFIED",                     // SATISFIED / DISSATISFIED
+  "feedbackContent": "분석 결과가 매우 정확했습니다. 다만 면접 팁이 좀 더 자세하면 좋을 것 같습니다."  // 선택사항, 최대 500자
 }
 
 Response (200 OK):
@@ -654,7 +792,8 @@ Response (200 OK):
   "success": true,
   "data": {
     "feedbackId": 456,
-    "createdAt": 1712700000000
+    "createdAt": 1712700000000,
+    "feedbackContent": "분석 결과가 매우 정확했습니다. 다만 면접 팁이 좀 더 자세하면 좋을 것 같습니다."
   },
   "error": null,
   "timestamp": 1712700000000

@@ -29,8 +29,8 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 - Q: OpenAI 호출 빈도 제어 정책은? → A: Phase 1에서는 제한 없음. Phase 2에서 사용자당 일일 한도 도입 예정.
 - Q: 사주 결과 및 컨설팅 기록 보관 정책은? → A: Phase 1에서는 무제한 보관. Phase 2에서 보관 정책 수립 예정.
 - Q: 서비스 신뢰도(Uptime SLA) 목표는? → A: Phase 1에서는 Best Effort 운영. Phase 2에서 SLA 수립 예정.
-- Q: 사용자 만족도 피드백 방식은? → A: 간단한 이진 평가(만족함/만족하지 않음)만 수집. Phase 2에서 통계 시각화.
-- Q: UserSatisfactionFeedback의 분석 결과 추적 방식은? → A: SajuResultId FK만 저장. feedbackType(ENUM)으로 분석 타입 명시.
+- Q: 사용자 만족도 피드백 방식은? → A: 이진 평가(만족함/만족하지 않음) + 선택적 상세 의견(최대 500자) 수집. Phase 2에서 의견 기반 통계 시각화.
+- Q: UserSatisfactionFeedback의 분석 결과 추적 방식은? → A: SajuResultId FK + feedbackType(ENUM) + satisfactionStatus(ENUM) + feedbackContent(TEXT, 선택사항) 저장. 상세 의견으로 피드백 분석 가능.
 
 ### Session 2026-04-24 (Birth Time Clarification)
 
@@ -103,9 +103,19 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 **Acceptance Scenarios**:
 
-1. **Given** 사용자 사주(YYYY-MM-DD HH:mm) + 기업 설립일(YYYY-MM-DD, 선택사항으로 시간 HH:mm 추가 가능), **When** 호환성 분석, **Then** 호환성 점수(0~100) + 추천 직무 + 정렬 이유 반환. (기본값 및 지장간 계산은 Clarifications 참고)
-2. **Given** 유효한 두 사주 데이터, **When** 매칭 실행, **Then** 응답에 신뢰도 수준 포함
-3. **Given** 기업 설립일시가 불완전할 경우(시간 정보 미상), **When** 요청 제출, **Then** 계속 진행 (기본값 12:00 적용, Clarifications 참고)
+1. **Given** 사용자 사주(YYYY-MM-DD HH:mm) + 기업 설립일(YYYY-MM-DD, 선택사항으로 시간 HH:mm 추가 가능), **When** 호환성 분석, **Then** 다음 8개 필드 포함 JSON 반환:
+   - compatibilityScore: 0-100 정수
+   - confidenceLevel: "LOW", "MEDIUM", "HIGH"
+   - reasoning: 호환성 분석 근거 텍스트
+   - scoreBreakdown: {tenGodCompatibility, fiveElementsMatch, hiddenStemAlignment, leadershipFit} (Service 계층에서 계산된 값)
+   - roleCompatibility[]: [{roleName, score, reason, recommendation}] (추천 직무 Array, score/reason/recommendation은 Service에서 계산)
+   - synergies[]: 핵심 강점 배열
+   - cautions[]: 주의사항 배열
+   - monthlyForecast[]: [{month(1-12), score, type, label, advice, details}] (5개월만 포함)
+   - careerMilestones: {immediate, shortTerm, mediumTerm} (기대 진로 로드맵)
+   (기본값 및 지장간 계산은 Clarifications 참고)
+2. **Given** 유효한 두 사주 데이터, **When** 매칭 실행, **Then** 응답에 신뢰도 수준(confidenceLevel) 포함. scoreBreakdown으로 점수 투명성 제공
+3. **Given** 기업 설립일시가 불완전할 경우(시간 정보 미상), **When** 요청 제출, **Then** 계속 진행 (기본값 12:00 적용, Clarifications 참고). 지장간은 완전 데이터로 계산
 
 ---
 
@@ -238,6 +248,7 @@ CompanyCompatibility (기업 궁합)
 - **UserSatisfactionFeedback** (1:N to SajuResult): 만족도 피드백
   - feedbackType (Enum): CAREER_TIMING, CONSULTATION, COMPATIBILITY
   - satisfactionStatus (Enum): SATISFIED, DISSATISFIED
+  - feedbackContent (TEXT, nullable): 사용자 상세 의견 (최대 500자, 선택사항)
   - createdAt (LocalDateTime)
 
 **설계 원칙**:
@@ -379,8 +390,8 @@ SajuException (root)
 - **FR-011**: 모든 엔티티는 @Getter + @NoArgsConstructor(access=PROTECTED) + @Builder 사용 (@Data/@ToString 금지)
 - **FR-012**: 모든 연관관계는 FetchType.LAZY 명시 (N+1 문제 방지)
 - **FR-013**: 외부 API 호출(FastAPI, OpenAI)을 모두 로깅 (요청, 응답, 지연시간, 에러)
-- **FR-014**: 사용자 만족도 피드백 수집 API 구현. 요청 시 만족도(SATISFIED/DISSATISFIED) + 관련 분석 타입(CAREER_TIMING/CONSULTATION/COMPATIBILITY) 수신
-- **FR-015**: 피드백 저장 시 UserSatisfactionFeedback 엔티티에 영속화 (SajuResult FK, feedbackType, 만족도 상태, 타임스탐프)
+- **FR-014**: 사용자 만족도 피드백 수집 API 구현. 요청 시 만족도(SATISFIED/DISSATISFIED) + 관련 분석 타입(CAREER_TIMING/CONSULTATION/COMPATIBILITY) + 선택적 상세 의견(최대 500자) 수신
+- **FR-015**: 피드백 저장 시 UserSatisfactionFeedback 엔티티에 영속화 (SajuResult FK, feedbackType, 만족도 상태, 상세 의견, 타임스탐프)
 
 ### Key Entities & Database Schema (정규화된 구조)
 
@@ -420,7 +431,7 @@ SajuException (root)
 
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
-| **UserSatisfactionFeedback** | id, sajuResultId, feedbackType, satisfactionStatus, createdAt | PK, FK, ENUM, ENUM, TIMESTAMP | FK to SajuResult (1:N), index (sajuResultId, createdAt) |
+| **UserSatisfactionFeedback** | id, sajuResultId, feedbackType, satisfactionStatus, feedbackContent, createdAt | PK, FK, ENUM, ENUM, TEXT, TIMESTAMP | FK to SajuResult (1:N), feedbackContent nullable, index (sajuResultId, createdAt) |
 
 ## Success Criteria *(mandatory)*
 

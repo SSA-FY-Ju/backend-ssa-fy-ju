@@ -476,19 +476,33 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 **Expected Outcome**: Feedback collection API working, UserSatisfactionFeedback entity populated for Phase 2 dashboards
 
 - [ ] T042 [US4] Create `UserSatisfactionFeedback` entity in `career/entity/`
-  - Fields: id, sajuResultId (FK), feedbackType (ENUM: CAREER_TIMING/CONSULTATION/COMPATIBILITY), satisfactionStatus (ENUM: SATISFIED/DISSATISFIED), createdAt
+  - Fields: 
+    - id (Long, PK)
+    - sajuResultId (Long, FK to SajuResult, NOT NULL)
+    - feedbackType (ENUM: CAREER_TIMING/CONSULTATION/COMPATIBILITY, NOT NULL)
+    - satisfactionStatus (ENUM: SATISFIED/DISSATISFIED, NOT NULL)
+    - feedbackContent (TEXT, nullable) - 사용자 상세 의견 (최대 500자)
+    - createdAt (LocalDateTime)
+  - Constraints: FK(sajuResultId), index(sajuResultId, createdAt)
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/UserSatisfactionFeedback.java`
 
 - [ ] T043 [US4] [P] Create `UserSatisfactionFeedbackRepository` in `repository/`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/UserSatisfactionFeedbackRepository.java`
 
 - [ ] T044 [US4] [P] Create `SatisfactionFeedbackRequest` DTO in `dto/request/`
-  - Fields: sajuResultId, feedbackType (ENUM), satisfactionStatus (ENUM)
-  - Validation: @NotNull on all fields
+  - Fields: 
+    - sajuResultId (Long, @NotNull)
+    - feedbackType (ENUM: CAREER_TIMING/CONSULTATION/COMPATIBILITY, @NotNull)
+    - satisfactionStatus (ENUM: SATISFIED/DISSATISFIED, @NotNull)
+    - feedbackContent (String, @Size(max=500), Optional) - 상세 의견 (최대 500자)
+  - Validation: @NotNull on required fields, @Size on feedbackContent
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/SatisfactionFeedbackRequest.java`
 
 - [ ] T045 [US4] [P] Create `SatisfactionFeedbackResponse` DTO in `dto/response/`
-  - Fields: feedbackId, createdAt
+  - Fields: 
+    - feedbackId (Long)
+    - createdAt (LocalDateTime)
+    - feedbackContent (String, 제출한 상세 의견 에코백)
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/SatisfactionFeedbackResponse.java`
 
 - [ ] T046 [US4] Create `FeedbackService` in `service/`
@@ -534,8 +548,17 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 - [ ] T053 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs
   - Request fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), companyName (@NotNull), companyFoundingDate (LocalDate, optional), companyFoundingTime (LocalTime, optional, **defaults to 12:00 if missing**)
-  - Response fields: compatibilityScore (0-100), confidenceLevel (LOW/MEDIUM/HIGH), recommendedRoles (List<String> - 클라이언트에 문자열 리스트로 반환), reasoning
-  - Note: DB 내부에는 RecommendedRole 엔티티로 저장, 응답 시 roleName 리스트로 변환. companyFoundingTime 미상 시 자동으로 12:00으로 설정하고 지장간 포함 계산
+  - Response fields (8 fields):
+    - compatibilityScore: 0-100 정수
+    - confidenceLevel: "LOW", "MEDIUM", "HIGH"
+    - reasoning: 호환성 분석 텍스트
+    - scoreBreakdown: {tenGodCompatibility, fiveElementsMatch, hiddenStemAlignment, leadershipFit} (모두 계산값)
+    - roleCompatibility[]: [{roleName, score, reason, recommendation}] (Array of Objects, score/reason/recommendation은 Service에서 계산)
+    - synergies[]: 핵심 강점 문자열 배열
+    - cautions[]: 주의사항 문자열 배열
+    - monthlyForecast[]: [{month(1-12), score, type, label, advice, details}] - 5개 월만 포함
+    - careerMilestones: {immediate, shortTerm, mediumTerm} (각 period, action, expectedOutcome)
+  - Note: 모든 계산 필드(scoreBreakdown, synergies, cautions, monthlyForecast, careerMilestones)는 Service 계층에서 생성. DB에는 CompatibilityScore, RecommendedRole만 저장. companyFoundingTime 미상 시 자동으로 12:00으로 설정하고 지장간 포함 계산.
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/CompatibilityRequest.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/CompatibilityResponse.java`
 
