@@ -48,7 +48,7 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - **1-Call API Design**: `/api/career/consultation` 엔드포인트가 내부적으로 모든 외부 API 호출 오케스트레이션 (FastAPI, OpenAI). 클라이언트는 birthDate + birthTime만 제공하고, 모든 계산(십신, 지장간, 관운 분석) 및 16개 필드 그룹의 완전한 AI 조언을 한 번의 요청으로 수신.
 - **Expanded Response (16+ Field Groups)**: ConsultationResponse는 19개 필드 포함: 기본 조언(industries, interviewTips, strengths) + 관운 분석(favoredPeriod, confidenceScore, reasoning) + 사주 프로필(sajuProfile with dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods) + OpenAI 분석(cautions, wealthStyle, longTermRoadmap, personalBranding, powerKeywords, mentalCare, environmentFit, workStyle, relationshipStrategy, careerTimeline). OpenAI 프롬프트에 현재 연도, 12개월 타임라인, 모든 필드 그룹 포함.
 - **Spring AI ChatClient**: OpenAI JSON Mode로 `CareerAdviceResponse` record에 자동 매핑. 16개 필드 그룹 모두 포함. 타입 안전성 + 에러 처리 자동화.
-- **Jackson 3.x (Spring Boot 4.0.5)**: 패키지명이 `tools.jackson.*`으로 변경됨. `com.fasterxml.jackson.*`은 Jackson 2.x용이므로 사용 금지.
+- **Jackson (Spring Boot 4.0.5)**: 프로젝트는 `com.fasterxml.jackson.*` 패키지를 사용. `@JsonProperty`, `@JsonFormat` 등 불필요한 어노테이션은 추가하지 말 것 (FastAPI 응답이 이미 camelCase이므로 Jackson 자동 매핑 동작).
 
 **성능 및 동시성 최적화**:
 - **Transaction Separation**: ConsultationService에서 @Transactional 제거. FastAPI/OpenAI I/O는 트랜잭션 밖에서 수행. 각 DB 작업은 Repository의 @Transactional에 의해 개별 트랜잭션으로 실행. Network 지연이 Connection Pool을 점유하지 않음.
@@ -359,18 +359,17 @@ User (로그인 정보 포함)
 ├── role: String (enum, Phase 2 추가)
 └── createdAt, updatedAt: LocalDateTime
 
-SajuResult (1:1 to UserProfile)
+SajuResult (1:1 to UserProfile) ← **현재 Phase 1 스키마**
 ├── id: Long (PK)
 ├── userProfileId: Long (FK to UserProfile, NOT NULL)
-├── fullSajuData: LONGTEXT (FastAPI 원본 JSON 응답 저장 - **Phase 1에서만 유지**, 직렬화용)
-│   [→ Phase 3-Refactor-3: SajuFullData 엔티티로 마이그레이션 예정]
+├── fullSajuData: LONGTEXT (FastAPI 원본 JSON - **현재 Phase 1 기준**, 정규화 전 임시 보관)
 ├── fetchedAt: LocalDateTime
-├── (1:1) → SajuFullData (**Phase 3-Refactor-3에서 추가**, FastAPI 데이터 정규화)
 ├── (1:N) → TenGodData (십신 분포 - 각 십신별 행)
 ├── (1:1) → CareerFortune (관운 분석)
 ├── (1:N) → HiddenStemData (지지별 지장간 - 각 지장간별 행)
 ├── (1:N) → CareerConsultation (AI 컨설팅 기록)
 └── (1:N) → UserSatisfactionFeedback (만족도 피드백)
+※ **Phase 3-Refactor-3 변경 예정**: fullSajuData 필드 제거 + (1:1) → SajuFullData 관계 추가 (완전 정규화)
 
 TenGodData (1:N to SajuResult, 십신 분포 - 행 단위 정규화)
 ├── id: Long (PK)

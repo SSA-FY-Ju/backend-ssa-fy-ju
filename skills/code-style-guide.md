@@ -48,6 +48,7 @@ ssafy.SSAju/
 ```java
 // 좋음
 @Entity
+@EntityListeners(AuditingEntityListener.class)  // 필수: 없으면 @CreatedDate/@LastModifiedDate 동작 안 함
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
@@ -55,13 +56,13 @@ public class UserProfile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     private LocalDate birthDate;
-    
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
-    
+
     @LastModifiedDate
     @Column(nullable = false)
     private LocalDateTime updatedAt;
@@ -399,6 +400,15 @@ public enum TenGodConstants {
         return null;
     }
 }
+
+// SatisfactionStatus.java - 만족도 상태: 여러 모듈에서 참조
+public enum SatisfactionStatus {
+    SATISFIED("만족함"),
+    DISSATISFIED("만족하지 않음");
+
+    private final String description;
+    SatisfactionStatus(String description) { this.description = description; }
+}
 ```
 
 ### Rule 3: Static Constants: 기술 및 설정 상수
@@ -472,14 +482,14 @@ public class SajuDataService {
         // 재시도 횟수 상수 사용
         int maxRetries = ApiTimeoutConstants.FASTAPI_MAX_RETRIES;
         
-        // Enum 사용
-        return webClient
+        // RestClient 사용 (WebClient 대신 경량 동기 클라이언트)
+        return restClient
             .post()
-            .timeout(timeout)
+            .uri("http://fastapi:8000/api/saju/calculate")
+            .body(new SajuRequest(birthDate, birthTime))
             .retrieve()
-            .bodyToMono(FastAPIResponse.class)
-            .retryWhen(...)  // maxRetries 사용
-            .block();
+            .toEntity(FastAPIResponse.class)
+            .getBody();  // @Retryable이 maxRetries 기준으로 재시도 처리
     }
 }
 
@@ -532,16 +542,6 @@ public class CareerFortuneAnalyzer {
 | **Enum** (도메인 개념) | `career/enums/` | `FeedbackType.java`, `CareerTimingType.java` |
 | **Static Constants** (기술 설정) | `career/constants/` | `ApiTimeoutConstants.java`, `ValidationConstants.java` |
 | **필드 레벨** (단일 파일 사용) | 클래스 내부 | `private static final int BUFFER_SIZE = 1024;` |
-
-// SatisfactionStatus.java
-public enum SatisfactionStatus {
-    SATISFIED("만족함"),
-    DISSATISFIED("만족하지 않음");
-    
-    private final String description;
-    SatisfactionStatus(String description) { this.description = description; }
-}
-```
 
 ### final static: 파일 내부용 상수 (특정 파일에서만 사용)
 
@@ -666,6 +666,15 @@ public class ConsultationService {
 - ✅ Repository 계층에서 개별 트랜잭션으로 관리 (일관성 유지)
 - ✅ 네트워크 지연이 DB 성능에 영향을 주지 않음
 
+**⚠️ 트레이드오프 - 원자성 포기**:
+@Transactional 제거 시 각 Repository 호출이 별도 트랜잭션으로 실행됨:
+- `userProfileRepository.findOrCreate()` → 커밋
+- `sajuResultRepository.findOrCreate()` → 커밋
+- `consultationRepository.save()` → 실패 시 롤백 안 됨 (이전 2개는 이미 커밋)
+
+→ **데이터 불완전 저장 가능성** 존재. 이 패턴은 Connection Pool 고갈(5000명 동시)이 원자성보다 더 심각한 문제이기 때문에 의도적으로 선택한 트레이드오프.
+→ 실패 시 재시도 가능한 구조이거나 미완성 데이터가 허용되는 경우에만 사용할 것.
+
 ## 로깅
 
 `slf4j` 인터페이스 활용. 적절한 로그 레벨 사용:
@@ -681,6 +690,7 @@ log.debug("Saju calculation details: {}", result);
 ### 🔒 로깅 보안 정책 (민감 정보 보호)
 
 #### ❌ 로그에 절대 포함 금지
+
 | 분류 | 금지 항목 | 이유 |
 |------|---------|------|
 | **개인정보** | `birthDate`, `birthTime`, `email`, `phone` | GDPR/법적 규제 |
@@ -688,6 +698,7 @@ log.debug("Saju calculation details: {}", result);
 | **외부 API 원문** | FastAPI 요청 body 전문, OpenAI 프롬프트 | 민감한 사주 데이터 노출 |
 
 #### ✅ 레벨별 올바른 로깅
+
 | 레벨 | 로그 내용 | 예시 |
 |------|---------|------|
 | **INFO** | 사용자 ID, API 상태코드, 지연시간(ms), 성공/실패만 | `log.info("Career timing analysis completed: userId={}, duration={}ms", userId, duration);` |

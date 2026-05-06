@@ -1385,14 +1385,15 @@ public class SajuResultJdbcRepository {
     private final JdbcTemplate jdbcTemplate;
     
     public int insertOrIgnore(SajuResult result) {
+        // saju_result 스키마: (user_profile_id FK, fetched_at)
+        // birth_date/birth_time은 UserProfile에 있으며 saju_result에는 없음
+        // UNIQUE 제약: user_profile_id (1:1 관계)
         String sql = "INSERT IGNORE INTO saju_result " +
-            "(user_profile_id, birth_date, birth_time, created_at) " +
-            "VALUES (?, ?, ?, ?)";
-        
+            "(user_profile_id, fetched_at) " +
+            "VALUES (?, ?)";
+
         return jdbcTemplate.update(sql,
             result.getUserProfile().getId(),
-            result.getBirthDate(),
-            result.getBirthTime(),
             LocalDateTime.now()
         );
     }
@@ -1426,8 +1427,8 @@ public class SajuDataService {
             .fiveElements(response.getFiveElements())
             .solarCorrection(response.getSolarCorrection())
             .build();
-        sajuFullDataRepo.save(fullData);  // cascade=ALL로 자동 저장
-        
+        sajuFullDataRepo.save(fullData);  // SajuFullData는 별도 repository로 명시적 저장
+
         return result;
     }
 }
@@ -1435,9 +1436,9 @@ public class SajuDataService {
 
 **UNIQUE 제약**:
 ```sql
--- schema.sql
-ALTER TABLE saju_result 
-ADD UNIQUE KEY unique_user_saju (user_profile_id, birth_date, birth_time);
+-- schema.sql: saju_result는 userProfileId에 UNIQUE (1:1 관계)
+ALTER TABLE saju_result
+ADD UNIQUE KEY unique_user_saju (user_profile_id);
 ```
 
 **이점**:

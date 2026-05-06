@@ -181,7 +181,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Method: `fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime)` → calls FastAPI with complete birth date-time in request body ({"birthDate": "YYYY-MM-DD", "birthTime": "HH:mm"}) with retry logic
   - FastAPI URI: `POST /api/saju/calculate`
   - Response: `FastAPIResponse` (camelCase: heavenlyStems, earthlyBranches, fiveElements, yearPillar, monthPillar, dayPillar, hourPillar, birthTime, birthDate, solarCorrection)
-  - Handles: TimeoutException → FastAPITimeoutException, invalid response (heavenlyStems/earthlyBranches < 4 items) → InvalidSajuDataException, missing birthTime → InvalidSajuDataException
+  - Handles: ResourceAccessException (타임아웃/연결 실패) → FastAPITimeoutException, invalid response (heavenlyStems/earthlyBranches < 4 items) → InvalidSajuDataException, missing birthTime → InvalidSajuDataException
   - File: `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
 
 - [v] T017 [US1] Create `CareerFortuneService` in `service/`
@@ -538,6 +538,17 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 2. **동시성 제어 및 DB 최적화**: SajuResult 동시 Insert 경합 해결, H2 MySQL 모드 적용
 3. **JPA 엔티티 설계 최적화**: @CreatedDate/@LastModifiedDate, equals&hashCode, 엔티티 상태 명확화
 4. **객체 지향 및 아키텍처 개선**: 컬렉션 객체화, 검증 로직 분리
+
+### 0. 📦 Cleanup & Optimization
+
+- [ ] T030-1 [Refactor] Remove unnecessary Jackson @JsonProperty/@JsonFormat annotations from DTOs
+  - **Rationale**: FastAPI 응답이 이미 camelCase이고, Java 필드명도 camelCase이므로 @JsonProperty 불필요. Jackson이 자동으로 매칭함.
+  - Remove: FastAPIResponse.java의 모든 @JsonProperty 어노테이션
+  - Remove: SajuDataService.java FastApiRequest의 @JsonFormat 어노테이션
+  - Result: DTO 간결화, Jackson import 제거 (의존성 불필요)
+  - Files:
+    - `SSAju/src/main/java/ssafy/SSAju/dto/external/FastAPIResponse.java`
+    - `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
 
 ### 1. ⚡ 외부 API 통신 최적화 (WebClient → RestClient) - Phase 1 핵심
 
