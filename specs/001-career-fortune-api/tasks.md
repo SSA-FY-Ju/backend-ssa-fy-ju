@@ -3,7 +3,7 @@
 **Feature**: Career Fortune & Consultation API
 **Date Generated**: 2026-04-27
 **Status**: Ready for Implementation (Phase 3-Enhancement Added)
-**Total Tasks**: 106 (Phase 1~2: 18 tasks + Phase 3.1-3.2: 17 tasks + Phase 3-Refactor: 20 tasks + Phase 3-Enhancement: 18 tasks + Phase 3-Refactor-3: 12 tasks + Phase 3.3-3.4: 14 tasks + Phase 4: 3 tasks)
+**Total Tasks**: 91 (Phase 1~2: 14 tasks + Phase 3.1-3.2: 17 tasks + Phase 3-Refactor: 11 tasks + Phase 3-Enhancement: 27 tasks + Phase 3-Refactor-3: 12 tasks + Phase 3.3: 7 tasks + Phase 4: 3 tasks)
 **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
 
 ---
@@ -1115,154 +1115,137 @@ And:   Missing user birthTime → 400 Bad Request
 
 ## Task Summary
 
-| Phase | Task Count | Focus | Parallel? |
-|-------|-----------|-------|-----------|
-| Phase 1 (Setup) | 5 | Project structure, config, exception handling | Yes (all) |
-| Phase 2 (Foundational) | 10 | WebClient, ChatClient, base entities, repos, Enum definitions, TenGod + HiddenStem calculators | Yes (most) |
-| Phase 3.1 (US1) | 8 | Career timing feature with 지장간 calculation | Independent |
-| Phase 3.2 (US2) | 9 | Consultation feature with TenGod + HiddenStem analysis | Parallel with US4 |
-| Phase 3-Refactor | 11 | **Entity Normalization**: 6 new entities (TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength) + 6 repositories + 2 service updates + 2 test updates. Replaces JSON storage with normalized entities. | Yes (parallel entity creation) |
-| Phase 3-Refactor-2 | 15 | **Constants Extraction**: 9 constant groups (15 classes/enums) for magic numbers/strings. Includes error/success messages, API timeouts, validation rules, etc. | Yes (parallel constant creation) |
-| Phase 3-Refactor-3 | 12 | **Advanced Normalization & Service Optimization**: (1) fullSajuData 완전 정규화 (SajuFullData 엔티티), (2) PromptProvider 분리, (3) 남은 모든 상수 추출 (T069~T080) | Yes (parallel) |
-| Phase 3.3 (US3) | 7 | Company compatibility (P2) with RecommendedRole entity, 지장간 and 12:00 default (T081~T087) | After core ready |
-| Phase 3.4 (US4) | 9 | Feedback feature (T081~T089) | Parallel with US2 |
-| Phase 4 (Polish) | 3 | API documentation (Swagger), integration tests, final validation (T088~T090) | After all stories |
-| **TOTAL** | **90** | Full MVP + Entity Normalization + Constants Extraction + PromptProvider + fullSajuData Normalization + 지장간 calculation + P2 foundation + API docs | Strategic parallelism |
+| Phase | Task Count | Task ID Range | Focus | Parallel? |
+|-------|-----------|-------|-------|-----------|
+| Phase 1 (Setup) | 5 | T001~T005 | Project structure, config, exception handling | Yes (all) |
+| Phase 2 (Foundational) | 9 | T006~T013, T013-2 | WebClient, ChatClient, base entities, repos, Enum definitions, TenGod + HiddenStem calculators | Yes (most) |
+| Phase 3.1 (US1) | 8 | T014~T021 | Career timing feature with 지장간 calculation | Independent |
+| Phase 3.2 (US2) | 9 | T022~T030 | Consultation feature with TenGod + HiddenStem analysis | Parallel with US4 |
+| Phase 3-Refactor | 11 | T031~T041 | **Entity Normalization**: 6 new entities (TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength) + 6 repositories + 2 service updates + 2 test updates. Replaces JSON storage with normalized entities. | Yes (parallel entity creation) |
+| Phase 3-Enhancement | 27 | T042~T050, T051~T068 | **(1) US4 Feedback (T042~T050)**: UserSatisfactionFeedback entity + repo + DTOs + service. **(2) Communication & Concurrency (T051~T068)**: RestClient, INSERT IGNORE, JPA Auditing, value objects, validators | Yes (T042~T050 and T051~T068 independent) |
+| Phase 3-Refactor-3 | 12 | T069~T080 | **Advanced Normalization & Service Optimization**: (1) fullSajuData 완전 정규화 (SajuFullData 엔티티), (2) PromptProvider 분리, (3) 남은 모든 상수 추출 | Yes (parallel) |
+| Phase 3.3 (US3) | 7 | T081~T087 | Company compatibility (P2) with RecommendedRole entity, 지장간 and 12:00 default | After core ready |
+| Phase 4 (Polish) | 3 | T088~T090 | API documentation (Swagger), integration tests, final validation | After all stories |
+| **TOTAL** | **91** | T001~T090 (+ T013-2) | Full MVP + Entity Normalization + Constants Extraction + PromptProvider + fullSajuData Normalization + 지장간 calculation + P2 foundation + Communication optimization + API docs | Strategic parallelism |
 
 ---
 
-## Phase 3-Refactor-2: Magic Numbers & String Constants Extraction
+## REFERENCE: Constants Extraction & Code Refactoring Guide
 
-**Goal**: T041(Entity Normalization 완료) 이후, 코드에 하드코딩된 매직 넘버와 String을 모두 상수/Enum으로 추출
-**Scope**: 9개 상수 그룹 생성 (총 15개 상수 클래스/Enum), 기존 코드 수정
-**Strategy**: 용도별로 상수 관리 (`career/enums/`, `career/constants/`), Enum 우선 사용
+> **Note**: This section provides implementation guidance for constant extraction and code refactoring. Constants are included in Phase 3-Refactor-3 (T069~T080) and Phase 3-Enhancement (T051~T068). No new Task IDs are defined below.
 
-### New Constants Groups
+**Goal**: After completing Phase 3-Refactor, Phase 3-Enhancement, and Phase 3-Refactor-3, extract all hardcoded magic numbers and strings into constants/enums
+**Scope**: 9 constant groups (15 total constant classes/enums)
+**Strategy**: Organize constants by purpose (`career/enums/`, `career/constants/`), prioritize enums
 
-**1. 관운 분석 상수** (CareerFortuneAnalyzer, HiddenStemCalculator 등)
+### Constant Extraction Guide
 
-- [v] T079 Create `TenGodConstants` enum in `career/enums/`
+**1. Career Fortune Analysis Constants** (CareerFortuneAnalyzer, HiddenStemCalculator)
+
+**Implementation during T069~T080 (Phase 3-Refactor-3)**:
+
+- Create `TenGodConstants` enum in `career/enums/`
   - 10개 십신 상수 정의: CHIEF_OFFICER (정관), SIDE_OFFICER (편관), CHIEF_WEALTH (정재), SIDE_WEALTH (편재), FOOD_GOD (식신), INJURING_OFFICER (상관), COMPARING_FRIEND (비견), ROBBING_WEALTH (겁재), CHIEF_SEAL (정인), SIDE_SEAL (편인)
   - 각 십신별 필드: name (한글명), symbol (기호), scoreModifier (가점/감점: 20, -15, -5, 0), isOfficer (관성 여부)
   - Helper method: fromName(String) - 십신 이름으로 상수 조회
   - 관운 분석용 점수 수정자: 정관/편관 +20, 식신/상관 -15, 비견/겁재 -5, 기타 0
   - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/TenGodConstants.java`
 
-- [v] T080 Create `HiddenStemConstants` enum in `career/enums/`
+- Create `HiddenStemConstants` enum in `career/enums/`
   - 지지별(子, 丑, 寅, ..., 亥) 지장간 정의: Map<String, List<String>>
   - 지장간 보정 점수: 정관·편관(+5), 식신·상관(-3)
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/HiddenStemConstants.java`
 
-- [v] T081 Create `CareerFortuneConstants` in `career/constants/`
+- Create `CareerFortuneConstants` in `career/constants/`
   - 관운 신뢰도 임계값: CONFIDENCE_THRESHOLD_HIGH (75), MEDIUM (50), LOW (25) 등
   - H1/H2 판정 상수: FIRST_HALF ("H1"), SECOND_HALF ("H2")
   - 관성 점수 범위: MAX_CONFIDENCE (100), MIN_CONFIDENCE (0)
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/CareerFortuneConstants.java`
 
 **2. API 통신 상수** (SajuDataService, ConsultationService, CompanyInfoService)
 
-- [v] T082 Create `ApiTimeoutConstants` in `career/constants/`
+- Create `ApiTimeoutConstants` in `career/constants/`
   - FastAPI 타임아웃: FASTAPI_TIMEOUT_SECONDS (3), MAX_RETRIES (2)
   - OpenAI 타임아웃: OPENAI_TIMEOUT_SECONDS (8), MAX_RETRIES (1)
   - 공공데이터API 타임아웃: PUBLIC_DATA_TIMEOUT_SECONDS (5), MAX_RETRIES (1)
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/ApiTimeoutConstants.java`
 
-- [v] T083 Create `ApiEndpointConstants` in `career/constants/`
+- Create `ApiEndpointConstants` in `career/constants/`
   - FastAPI 엔드포인트: SAJU_CALCULATE_ENDPOINT ("/api/saju/calculate")
   - OpenAI 모델: OPENAI_MODEL ("gpt-4o-mini")
   - 응답 형식: JSON_RESPONSE_FORMAT ("JSON_OBJECT")
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/ApiEndpointConstants.java`
 
 **3. 데이터 검증 상수** (validators in Service/Controller)
 
-- [v] T084 Create `ValidationConstants` in `career/constants/`
+- Create `ValidationConstants` in `career/constants/`
   - 천간/지지 개수: REQUIRED_HEAVENLY_STEMS (4), REQUIRED_EARTHLY_BRANCHES (4)
   - 생년월일 범위: EARLIEST_BIRTH_DATE ("1900-01-01")
   - 신뢰도 범위: MIN_SCORE (0), MAX_SCORE (100)
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/ValidationConstants.java`
 
 **4. 응답 메시지 상수** (GlobalExceptionHandler, Service)
 
-- [v] T085 Create `ErrorMessageConstants` enum in `career/enums/`
+- Create `ErrorMessageConstants` enum in `career/enums/`
   - 각 예외 타입별 메시지: INVALID_DATE_FORMAT, FASTAPI_TIMEOUT, OPENAI_API_TIMEOUT, COMPANY_NOT_FOUND 등
   - Error code 정의: "INVALID_SAJU_DATA", "EXTERNAL_API_TIMEOUT" 등
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/ErrorMessageConstants.java`
 
-- [v] T086 Create `SuccessMessageConstants` enum in `career/enums/`
+- Create `SuccessMessageConstants` enum in `career/enums/`
   - API 성공 메시지: "관운 분석 완료", "AI 커리어 컨설팅 완료" 등
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/SuccessMessageConstants.java`
 
 **5. 기업 궁합 분석 상수** (CompatibilityScoreCalculator)
 
-- [v] T087 Create `CompatibilityConstants` in `career/constants/`
+- Create `CompatibilityConstants` in `career/constants/`
   - 호환성 점수 범위: MIN_COMPATIBILITY (0), MAX_COMPATIBILITY (100)
   - 신뢰도 수준: CONFIDENCE_HIGH ("HIGH"), MEDIUM ("MEDIUM"), LOW ("LOW")
   - 기본 설립 시간: DEFAULT_FOUNDING_TIME ("12:00")
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/CompatibilityConstants.java`
 
 **6. 피드백 상수** (FeedbackService, UserSatisfactionFeedback)
 
-- [v] T088 Create `FeedbackConstants` enum in `career/enums/`
-  - 피드백 타입: CAREER_TIMING, CONSULTATION, COMPATIBILITY (이미 FeedbackType.java에 존재, 유지)
-  - 만족도 상태: SATISFIED, DISSATISFIED (이미 SatisfactionStatus.java에 존재, 유지)
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/FeedbackConstants.java` (또는 기존 enum 참조만)
+- Create `FeedbackConstants` enum in `career/enums/` (optional: reference existing enums)
+  - 피드백 타입: CAREER_TIMING, CONSULTATION, COMPATIBILITY (이미 FeedbackType.java에 존재)
+  - 만족도 상태: SATISFIED, DISSATISFIED (이미 SatisfactionStatus.java에 존재)
 
 **7. 프롬프트/설정 상수** (ConsultationService, PromptProvider)
 
-- [v] T089 Create `PromptTemplateConstants` in `career/constants/`
+- Create `PromptTemplateConstants` in `career/constants/`
   - OpenAI 프롬프트 템플릿 부분 (현재 연도, 타임라인 개월, 16개 필드 그룹 등)
   - JSON 스키마 필드명 정의 (일관성 유지)
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/PromptTemplateConstants.java`
 
 **8. HTTP 응답 상수** (ApiResponse 형식)
 
-- [v] T090 Create `ApiResponseConstants` in `career/constants/`
+- Create `ApiResponseConstants` in `career/constants/`
   - HTTP 상태 코드: OK (200), BAD_REQUEST (400), NOT_FOUND (404), SERVICE_UNAVAILABLE (503) 등
   - 응답 헤더: CONTENT_TYPE ("application/json")
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/ApiResponseConstants.java`
 
 **9. 데이터베이스 관련 상수** (JPA entity 및 Repository)
 
-- [v] T073 Create `EntityConstants` in `career/constants/`
+- Create `EntityConstants` in `career/constants/`
   - 테이블 이름 제약: UNIQUE_CONSTRAINT_NAMES, INDEX_NAMES 등
   - 기본값: DEFAULT_PAGE_SIZE (10), DEFAULT_OFFSET (0)
   - 날짜 형식: DATE_PATTERN ("yyyy-MM-dd"), TIME_PATTERN ("HH:mm")
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/EntityConstants.java`
 
-### Code Refactoring (Use Constants)
+### Code Refactoring Guidance
 
-- [v] T074 Refactor all services and utilities to use extracted constants
-  - **TenGodConstants 적용**:
-    - TenGodCalculator.java: getTenGod() 메서드에서 십신 문자열 반환 시 TenGodConstants.fromName() 또는 TenGodConstants.ENUM.getName() 사용
-    - CareerFortuneAnalyzer.java: 하드코딩된 "정관", "편관", "식신", "상관", "비견", "겁재" 제거, OFFICER_GODS/WEAKENING_GODS/COMPETING_GODS 리스트를 TenGodConstants 기반으로 재구성, calculateOfficerScore()에서 TenGodConstants.getScoreModifier() 사용
-    - CompatibilityScoreCalculator.java: 하드코딩된 "정관"/"편관" 제거, TenGodConstants.isOfficer() 사용으로 관성 판정
-  - **Error & Success 메시지 상수 적용**:
-    - SajuDataService.java (API 타임아웃, 외부 API 에러 메시지)
-    - ConsultationService.java (OpenAI 타임아웃, 모델명, 프롬프트 템플릿)
-    - CompanyMatchingService.java (기본 설립 시간 "12:00", 호환성 메시지)
-    - GlobalExceptionHandler.java (ErrorMessageConstants 사용)
-    - All Controllers (성공/실패 응답 메시지)
-  - File: Multiple service and controller files
-
-- [v] T075 Run all tests and verify constant extraction
-  - Command: `./gradlew test`
-  - Verify:
-    1. All TenGodConstants 적용 완료: 십신 문자열 "정관", "편관" 등이 모두 TenGodConstants.ENUM.getName()로 변경됨
-    2. CareerFortuneAnalyzer, TenGodCalculator, CompatibilityScoreCalculator에서 TenGodConstants 사용 확인
-    3. TenGodConstants.fromName() 메서드로 십신 이름 조회 가능 확인
-    4. 관운 점수 계산이 scoreModifier() 사용으로 일관성 있게 수행됨 확인
-    5. 모든 테스트 통과 (특히 CareerFortuneServiceTest, CompatibilityScoreCalculatorTest)
-    6. No hardcoded strings 검증: grep으로 "정관", "편관", "식신", "상관", "비견", "겁재" 등이 util 클래스에서 제거되었는지 확인
+**During T069~T080 (Phase 3-Refactor-3):**
+- Refactor all services and utilities to use extracted constants
+  - **TenGodConstants 적용**: TenGodCalculator, CareerFortuneAnalyzer, CompatibilityScoreCalculator 등에서 십신 문자열 상수화
+  - **Error & Success 메시지 적용**: SajuDataService, ConsultationService, CompanyMatchingService, GlobalExceptionHandler, Controllers 등에서 메시지 상수 사용
+  - Verify constant extraction: `./gradlew test` 통과 확인
   - Verify: Code style follows code-style-guide.md (constants in enums/, all uses via constant names)
-  - Verify: Commit includes "refactor: TenGodConstants 적용 + 십신 문자열 상수화" 또는 유사 메시지
 
 ---
 
 **Generated by `/speckit-tasks` on 2026-04-10**
-**Updated**: 2026-04-27 (Added HiddenStemCalculator, 지장간 calculation logic, company founding time 12:00 default)
-**Updated**: 2026-05-02 (Added Phase 3-Refactor: Entity Normalization. Replaced JSON storage with 7 normalized entities. Total tasks: 61. T031~T041 for refactoring, T042~T075 for US4/US3, T076~T078 for Phase 4)
-**Updated**: 2026-05-03 (Added Phase 3-Refactor-2: Magic Numbers & String Constants Extraction. Total 15 constant classes/enums, 9 groups. T079~T075 for constant extraction and refactoring. Total tasks now: 75)
-**Updated**: 2026-05-04 (Implemented T079 TenGodConstants Enum + Refactored T074 util classes. Created TenGodConstants with 10 十神 + 4 properties (name, symbol, scoreModifier, isOfficer). Refactored TenGodCalculator, CareerFortuneAnalyzer, CompatibilityScoreCalculator to use TenGodConstants instead of hardcoded strings. Removed all hardcoded 十神 names. Updated tasks.md T079, T074, T075 with implementation details and verification procedures.)
-**Updated**: 2026-05-06 (Added Phase 3-Refactor-3: JSON Normalization, Prompt Separation, Constants Extraction. Added T069-T080 (12 new tasks). Renumbered US3 tasks to T081-T087 and Phase 4 tasks to T088-T090. Total tasks: 88.)
-**Updated**: 2026-05-06 (Added Phase 3-Enhancement: REST Communication, Concurrency Control, JPA Entity Design, Architecture Improvement. Added T051-T068 (18 new tasks). Shifted Phase 3-Refactor-3 to T069-T080, US3 to T081-T087, Phase 4 to T088-T090. Total tasks now: 106. Focus: RestClient+Spring Retry, JdbcTemplate INSERT IGNORE, @CreatedDate/@LastModifiedDate, Entity equals/hashCode, Value Objects, Validators.)
-**Status**: Phase 3-Enhancement Planning Complete. Ready for T051 (RestClient implementation)
+
+**Version History & Task Count Correction:**
+- 2026-04-27: Initial Phase 1~3.2 + Refactor structure (45 core tasks)
+- 2026-05-02: Added Phase 3-Refactor (Entity Normalization, T031~T041, 11 tasks)
+- 2026-05-03: Added US4 Feedback (T042~T050, 9 tasks). Total: 65
+- 2026-05-04: Added Phase 3-Refactor-3 foundation planning (T069~T080, 12 tasks reserved)
+- 2026-05-06: Added Phase 3-Enhancement (REST Communication, Concurrency, T051~T068, 18 tasks). Finalized task numbering: T001~T090 + T013-2
+  - **Phase 1~2**: 14 tasks (T001~T005, T006~T013, T013-2)
+  - **Phase 3.1~3.2**: 17 tasks (T014~T030)
+  - **Phase 3-Refactor**: 11 tasks (T031~T041)
+  - **Phase 3-Enhancement**: 27 tasks (T042~T050 US4 + T051~T068 REST/Concurrency)
+  - **Phase 3-Refactor-3**: 12 tasks (T069~T080)
+  - **Phase 3.3**: 7 tasks (T081~T087 US3)
+  - **Phase 4**: 3 tasks (T088~T090)
+  - **TOTAL**: 91 tasks (T001~T090 + T013-2)
+
+**Status**: Task numbering finalized and corrected (2026-05-06). All Phase/Story/Task ID ranges now consistent and non-overlapping. Ready for implementation starting from Phase 1.
