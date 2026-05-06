@@ -55,6 +55,15 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 - Q: hiddenStems[] 필드의 정확한 데이터 구조는? → A: **`hiddenStems`는 `Map<String, List<String>>`** (JSON으로 저장). 예: `{"子": ["癸"], "丑": ["癸", "辛", "己"], "寅": ["甲", "丙", "戊"], ...}`. 각 지지(年月日時)별로 포함된 지장간들을 매핑하여 저장.
 - Q: 기업 설립일시의 지장간 계산 필요성은? → A: **기업 설립일도 지장간 포함하여 계산**. 기업 설립시간이 미상일 경우 12:00으로 기본 설정하고, 해당 시주의 지장간도 계산. 사용자 궁합 분석과 동일한 수준의 정확성 유지.
 
+### Session 2026-05-06 (REST 통신 최적화, 동시성 제어, 엔티티 설계)
+
+- Q: FastAPI 호출 시 Reactive 의존성(WebClient)이 필수인가? → A: **아니오, RestClient 사용**. 동기식 호출에 WebClient의 무거운 Reactive 오버헤드 불필요. RestClient + Spring Retry로 간결하고 직관적인 구현 가능.
+- Q: SajuResult 동시 Insert 경합(Race Condition) 처리는? → A: **JdbcTemplate INSERT IGNORE 활용**. DataIntegrityViolationException 대신 native query로 안전하게 처리. UNIQUE 제약 조건 활용으로 신뢰도 높음.
+- Q: H2 테스트 DB는 MySQL과 호환 가능한가? → A: **H2 MySQL 모드 설정 필수**: `jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE`. 이를 통해 INSERT IGNORE, UNIQUE constraint 등 MySQL 문법 호환성 확보.
+- Q: JPA 엔티티에서 equals/hashCode는 어떻게 구현할 것인가? → A: **ID 기준으로 직접 구현 필수**. Lombok @EqualsAndHashCode 사용 금지. 지연 로딩(Lazy Loading) 중 Proxy 객체 비교 시 정확성 보장. `@CreatedDate`/`@LastModifiedDate`로 timestamp 자동 관리.
+- Q: Map<String, Integer> tenGodDistribution을 어떻게 관리할 것인가? → A: **TenGodDistribution 일급 컬렉션 객체로 래핑**. 의미가 명확해지고 비즈니스 로직을 객체 내부로 응집 가능. 마찬가지로 HiddenStems, FiveElements도 value object 생성.
+- Q: Service 계층의 검증 로직이 비대화되면? → A: **전용 Validator 클래스 분리**. SajuValidator, RequestValidator, CompatibilityValidator 등으로 책임 분리. Service는 Validator 호출만 담당.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Career Timing Analysis (Priority: P1)
@@ -148,113 +157,19 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 ## Technical Architecture
 
-### System Communication Flow (Synchronous JSON)
+**⚠️ 상세한 기술 아키텍처 설계는 [`plan.md`](./plan.md)에서 관리합니다.**
 
-```
-┌─ Job Seeker ─┐
-│   (Client)   │
-└──────┬────────┘
-       │ HTTP JSON
-       ▼
-┌─────────────────────────────────────┐
-│     Spring Boot Backend (SSAju)     │
-│  - 비즈니스 로직, 데이터 저장, API  │
-│  - MySQL via Spring Data JPA       │
-└──┬────────────────┬─────────────┬───┘
-   │ WebClient      │ OpenAI      │ Public Data API
-   │ (JSON)         │ API Key     │ (Company Info)
-   ▼                ▼             ▼
-┌──────────────┐  ┌────────────┐  ┌──────────────────────┐
-│ FastAPI      │  │ OpenAI     │  │ Public Data Service  │
-│ (Saju Calc)  │  │ (ChatGPT)  │  │ (Company Founding    │
-│              │  │            │  │  Date Lookup)        │
-└──────────────┘  └────────────┘  └──────────────────────┘
-```
+### 개요
 
-### Data Modeling & Entity Relationship
+- **시스템**: REST API (Spring Boot) ↔ MySQL + 외부 API (FastAPI, OpenAI, 공공데이터)
+- **데이터 모델**: 정규화된 엔티티 구조 (phase별로 진화)
+- **아키텍처**: 계층형 (Controller → Service → Repository)
+- **예외 처리**: @RestControllerAdvice 중앙화
 
-**Entity Structure** (완전 정규화):
-
-```
-UserProfile (생년월일시)
-  ↓ 1:1
-SajuResult (사주 기본 데이터)
-  ├─ 1:1 → CareerFortune (관운 분석: H1/H2, 신뢰도, 근거)
-  ├─ 1:N → TenGodData (십신 분포 - 십신별 행 단위)
-  ├─ 1:N → HiddenStemData (지지별 지장간)
-  ├─ 1:N → CareerConsultation (AI 컨설팅 기록)
-  │         ├─ 1:N → Industry (추천 산업)
-  │         ├─ 1:N → InterviewTip (면접 팁)
-  │         └─ 1:N → Strength (강점 분석)
-  └─ 1:N → UserSatisfactionFeedback (만족도 피드백)
-
-UserProfile
-  ↓ 1:N
-CompanyCompatibility (기업 궁합)
-  └─ 1:N → RecommendedRole (추천 직무)
-```
-
-**Key Entities**:
-- **User**: 사용자 신원 및 연락처 (Phase 2)
-- **UserProfile**: 생년월일(DATE), 생시(TIME), UNIQUE(birthDate, birthTime)
-
-- **SajuResult**: FastAPI 응답 + Spring 계산 결과 저장
-  - fullSajuData (String): FastAPI JSON 원시 응답 (직렬화)
-  - fetchedAt (LocalDateTime): 조회 시간
-
-- **TenGodData** (1:N to SajuResult): 십신 분포 (행 단위 정규화)
-  - id (Long, PK)
-  - sajuResultId (Long, FK to SajuResult, NOT NULL)
-  - tenGodName (String): 십신 이름 (예: "正官", "偏官", "正财" 등)
-  - score (Integer): 해당 십신의 점수
-  - createdAt (LocalDateTime)
-  - **설계**: Map<"正官", 1> → 1개 행, Map<"偏官", 1> → 1개 행 (각 십신별 행 분리)
-
-- **HiddenStemData** (1:N to SajuResult): 지지별 지장간 (행 단위 정규화)
-  - id (Long, PK)
-  - sajuResultId (Long, FK to SajuResult, NOT NULL)
-  - earthlyBranch (String): 지지 (예: "子", "丑", "寅", "卯", ..., "亥")
-  - hiddenStem (String): 해당 지지에 숨겨진 천간 (예: "癸", "辛" 등)
-  - createdAt (LocalDateTime)
-  - **설계**: "丑": ["癸", "辛", "己"] → 3개 행 (지지별 지장간이 여러 개면 각각 행으로 저장)
-
-- **CareerFortune** (1:1 to SajuResult): 관운 분석
-  - favoredPeriod (String): "H1" or "H2"
-  - confidenceScore (Integer): 0-100
-  - reasoning (String): 분석 근거
-
-- **CareerConsultation** (1:N to SajuResult): AI 생성 권고사항
-  - openaiModelVersion (String): 사용 모델
-  - generatedAt (LocalDateTime): 생성 시간
-
-- **Industry** (1:N to CareerConsultation): 추천 산업
-  - name (String): 산업명
-  - reason (String): 추천 이유
-
-- **InterviewTip** (1:N to CareerConsultation): 면접 팁
-  - content (String): 팁 내용
-
-- **Strength** (1:N to CareerConsultation): 강점 분석
-  - description (String): 강점 설명
-
-- **CompanyCompatibility** (1:N to UserProfile): 기업 궁합
-  - companyName (String): 회사명
-  - compatibilityScore (Integer): 0-100
-  - createdAt (LocalDateTime)
-
-- **RecommendedRole** (1:N to CompanyCompatibility): 추천 직무
-  - roleName (String): 직무명
-
-- **UserSatisfactionFeedback** (1:N to SajuResult): 만족도 피드백
-  - feedbackType (Enum): CAREER_TIMING, CONSULTATION, COMPATIBILITY
-  - satisfactionStatus (Enum): SATISFIED, DISSATISFIED
-  - feedbackContent (TEXT, nullable): 사용자 상세 의견 (최대 500자, 선택사항)
-  - createdAt (LocalDateTime)
-
-**설계 원칙**:
-- ✅ **JSON 저장 금지**: 모든 복잡 데이터를 정규화된 엔티티로 구성
-- ✅ **불변 도메인 → Enum**: HeavenlyStem, EarthlyStem, FiveElement, TenGod
-- ✅ **모든 관계 → FetchType.LAZY**: N+1 문제 방지
+상세 내용은 다음을 참고하세요:
+- **설계 결정 및 구현 전략**: [`plan.md#technical-context`](./plan.md) 참고
+- **엔티티 설계 및 정규화**: [`plan.md#11-data-model-definition`](./plan.md) 참고
+- **아키텍처 패턴**: [`../../../skills/architecture-guide.md`](../../../skills/architecture-guide.md) 참고
 
 ### API Design & Response Format
 
@@ -309,65 +224,25 @@ public record ErrorInfo(
 | `/api/feedback/satisfaction` | POST | 사용자 만족도 피드백 제출 | `SatisfactionFeedbackRequest` | `ApiResponse<SatisfactionFeedbackResponse>` |
 
 **External Communication**:
-- **FastAPI 호출** (사주 계산): WebClient with 3-second timeout, exponential backoff retry (max 2 retries)
+- **FastAPI 호출** (사주 계산): RestClient + Spring Retry with 3-second timeout, exponential backoff (1s, 2s, 4s... max 2 retries)
 - **OpenAI API 호출** (커리어 컨설팅): Spring AI ChatClient + JSON Mode. 응답은 구조화된 JSON으로 자동 매핑 (Record 기반), 8-second timeout, exponential backoff retry (max 1 retry)
-- **공공데이터API 호출** (기업 설립일 조회): WebClient with 5-second timeout, exponential backoff retry (max 1 retry). 조회 실패 시 사용자에게 기업 설립일을 직접 입력하도록 요청
+- **공공데이터API 호출** (기업 설립일 조회): RestClient with 5-second timeout, exponential backoff retry (max 1 retry). 조회 실패 시 사용자에게 기업 설립일을 직접 입력하도록 요청
 
-### Layered Architecture (CLAUDE.md 준수)
+**참고**: RestClient + Spring Retry 상세 구현은 [`architecture-guide.md#restclient--spring-retry-패턴`](../../../skills/architecture-guide.md) 참고
 
-| Layer | Responsibility | Examples |
-|-------|----------------|----------|
-| **Controller** | HTTP 요청/응답 처리, @Valid 검증 | CareerTimingController, ConsultationController |
-| **Service** | Orchestration 전담: 외부 API 호출, 비즈니스 흐름 제어 | CareerFortuneService, ConsultationService, CompanyMatchingService |
-| **Analyzer/Calculator** | 분석/계산 로직 전담 (비즈니스 규칙) | TenGodAnalyzer, HiddenStemAnalyzer, CareerFortuneAnalyzer, CompatibilityScoreCalculator |
-| **Mapper** | DTO ↔ Entity 변환 (데이터 구조 변환만) | CareerConsultationMapper, SajuResultMapper |
-| **Provider** | 데이터 조회/생성 + 설정/프롬프트 관리 (동시성 보정, 재사용 로직 포함) | UserProfileProvider, SajuResultProvider, PromptProvider, ConfigProvider |
-| **Repository** | DB 접근만 담당 (Spring Data JPA) | UserRepository, SajuResultRepository, TenGodDataRepository, HiddenStemDataRepository 등 |
-| **Global Exception Handler** | @RestControllerAdvice로 모든 예외 처리 (try-catch 금지) | SajuGlobalExceptionHandler |
+### Layered Architecture
 
-**Service 경량화 패턴**:
-- Service는 Analyzer, Calculator, Mapper를 **조합(Composition)**하여 흐름만 제어
-- 복잡한 분석 로직 → Analyzer로 분리
-- 수학 계산 → Calculator로 분리
-- DTO ↔ Entity 변환 → Mapper로 분리
-- 프롬프트/설정 → Provider로 분리
-- Service는 각 컴포넌트의 메서드를 호출하여 orchestration만 수행
+**⚠️ 계층형 아키텍처 설계는 [`architecture-guide.md#계층형-아키텍처-패턴`](../../../skills/architecture-guide.md)에서 관리합니다.**
+
+본 spec에서는 기능 요구사항만 정의합니다. 아키텍처 패턴(Service 경량화, Analyzer 분리, Mapper 패턴 등)은 공용 가이드를 참고하세요.
 
 ### Exception Handling Strategy
 
-**예외 계층**:
-```text
-SajuException (root)
-├── InvalidSajuDataException (입력 유효성 / 데이터 검증)
-├── FastAPITimeoutException (FastAPI 외부 API 지연)
-├── OpenAIApiException (OpenAI LLM 호출 실패)
-├── PublicDataApiException (공공데이터API 호출 실패)
-└── DataAccessException (DB 오류)
-```
+**⚠️ 예외 처리 전략은 [`architecture-guide.md#예외-처리-원칙`](../../../skills/architecture-guide.md)에서 관리합니다.**
 
-**사용 규칙**:
-- ✅ 기본: 조건 검사 후 커스텀 예외 throw → @RestControllerAdvice 위임
-- ⚠️ 예외 허용: 동시성 보정(DIVE, CannotAcquireLockException 등) 또는 명확한 재시도 로직이 필요한 경우에만 try-catch 허용
-- ❌ 비즈니스 예외를 무조건 삼키는 것 금지 (반드시 로깅 또는 재throw)
-- 예: `if (heavenlyStems == null || heavenlyStems.size() != 4) throw new InvalidSajuDataException("천간은 정확히 4개여야 합니다")`
-- 동시성 try-catch 예: UserProfileProvider.findOrCreate(), SajuResultProvider.findOrCreate() — DIVE 잡아서 재조회
-
-**GlobalExceptionHandler 처리**:
-- 모든 SajuException 및 하위 클래스 → @ExceptionHandler로 catch
-- ApiResponse<T>로 통일된 형식 반환
-  ```java
-  {
-    "success": false,
-    "data": null,
-    "error": {
-      "code": "INVALID_SAJU_DATA",
-      "message": "천간은 정확히 4개여야 합니다",
-      "requestId": "req-uuid-1234"
-    },
-    "timestamp": 1712700000000
-  }
-  ```
-- 로깅: warn/error 레벨로 상세 기록 (스택 트레이스 포함)
+본 spec에서는 API 응답 형식만 정의합니다:
+- 모든 에러는 `ApiResponse<Void>` + `ErrorInfo` (code, message, requestId) 형식으로 반환
+- 구체적인 예외 계층, 처리 로직, GlobalExceptionHandler 구현은 공용 가이드를 참고하세요.
 
 ## Requirements *(mandatory)*
 

@@ -41,6 +41,213 @@ ssafy.SSAju/
 - `@Data`: 모든 필드 접근 + toString() 자동화 (순환 참조 위험)
 - `@ToString`: 양방향 관계에서 무한 재귀 위험
 
+## JPA 타임스탐프 관리 (@CreatedDate/@LastModifiedDate)
+
+모든 엔티티의 생성/수정 시간은 **Spring Data JPA 어노테이션** 사용 (수동 `@PreUpdate` 금지):
+
+```java
+// 좋음
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Builder
+public class UserProfile {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private LocalDate birthDate;
+    
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+    
+    @LastModifiedDate
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+}
+
+// 필수 설정: @Configuration에서 @EnableJpaAuditing 활성화
+@Configuration
+@EnableJpaAuditing
+public class JpaConfig {
+}
+
+// 나쁨
+@Entity
+public class UserProfile {
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    
+    @PreUpdate
+    public void updateTimestamp() {
+        this.updatedAt = LocalDateTime.now();  // 수동 관리 (금지)
+    }
+}
+```
+
+**이점**:
+- ✅ 타임스탐프 자동 관리 (개발자 개입 최소화)
+- ✅ createdAt은 업데이트 불가 (`updatable=false`)
+- ✅ 모든 엔티티에서 일관된 방식
+
+## 엔티티 equals & hashCode (ID 기준 구현)
+
+**필수**: 모든 엔티티는 ID를 기준으로 직접 구현. Lombok @EqualsAndHashCode 금지.
+
+**이유**: 지연 로딩(Lazy Loading)으로 인한 Proxy 객체 비교 시 안전성 보장. Proxy 객체는 실제 객체와 다른 hashCode를 가질 수 있으므로 Lombok이 생성한 equals/hashCode가 정확하지 않을 수 있음.
+
+```java
+// 좋음: ID 기준
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Builder
+public class SajuResult {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private LocalDate birthDate;
+    // ... 기타 필드
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null) return false;
+        if (!(o instanceof SajuResult)) return false;
+        SajuResult that = (SajuResult) o;
+        return Objects.equals(id, that.id);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+}
+
+// 나쁨: Lombok @EqualsAndHashCode (Proxy 비교 시 위험)
+@Entity
+@EqualsAndHashCode
+public class SajuResult {
+    @Id
+    private Long id;
+    private LocalDate birthDate;
+    // ... 기타 필드 모두 포함 (Proxy 로딩 시 문제)
+}
+```
+
+**HashSet/HashMap 안전성**:
+```java
+// Proxy 객체 비교 테스트
+SajuResult proxy = sessionFactory.openSession()
+    .getReference(SajuResult.class, 1L);  // Proxy 객체 (실제 데이터 로드 안 됨)
+
+Set<SajuResult> set = new HashSet<>();
+set.add(proxy);
+assertTrue(set.contains(proxy));  // ID 기준이면 true, 다른 필드 기준이면 false
+```
+
+## Value Objects (컬렉션 객체화)
+
+Map, List 같은 원시 컬렉션을 전용 객체로 래핑하여 의미를 명확히 합니다.
+
+```java
+// 나쁨: 원시 컬렉션 반환
+public Map<String, Integer> calculateTenGodDistribution(List<String> heavenlyStems) {
+    Map<String, Integer> result = new HashMap<>();
+    // ... 계산
+    return result;  // 의미가 불명확
+}
+
+// 좋음: Value Object로 래핑
+public TenGodDistribution calculateTenGodDistribution(List<String> heavenlyStems) {
+    Map<String, Integer> data = new HashMap<>();
+    // ... 계산
+    return new TenGodDistribution(data);  // 의미 명확
+}
+
+// TenGodDistribution.java (일급 컬렉션)
+public class TenGodDistribution {
+    private final Map<String, Integer> distribution;
+    
+    public TenGodDistribution(Map<String, Integer> data) {
+        this.distribution = Collections.unmodifiableMap(new HashMap<>(data));
+    }
+    
+    public Integer getScore(String tenGodName) {
+        return distribution.getOrDefault(tenGodName, 0);
+    }
+    
+    public boolean hasHighConfidence(int threshold) {
+        return distribution.values().stream()
+            .mapToInt(Integer::intValue)
+            .sum() >= threshold;
+    }
+    
+    public Map<String, Integer> asMap() {
+        return distribution;
+    }
+}
+```
+
+**이점**:
+- ✅ 데이터의 의미가 명확해짐 (Map<String, Integer> vs TenGodDistribution)
+- ✅ 비즈니스 로직을 객체 내부로 응집 (getScore, hasHighConfidence 등)
+- ✅ 컬렉션 불변성 보장 (unmodifiableMap)
+- ✅ 타입 안전성 향상
+
+## Validator 분리 (검증 로직 전문화)
+
+Service 계층의 책임을 줄이기 위해 검증 로직을 전용 Validator 클래스로 분리합니다.
+
+```java
+// 나쁨: Service 내부에서 검증
+@Service
+public class ConsultationService {
+    public ConsultationResponse getConsultation(ConsultationRequest req) {
+        // 검증 로직 (Service 책임 비대화)
+        if (req.birthDate() == null) {
+            throw new InvalidArgumentException("birthDate required");
+        }
+        if (req.birthTime() == null) {
+            throw new InvalidArgumentException("birthTime required");
+        }
+        // ... 추가 검증
+        // ... 실제 비즈니스 로직 (뒤로 밀려남)
+    }
+}
+
+// 좋음: Validator 분리
+@Component
+public class RequestValidator {
+    public void validateConsultationRequest(ConsultationRequest req) {
+        if (req.birthDate() == null) {
+            throw new InvalidArgumentException("birthDate required");
+        }
+        if (req.birthTime() == null) {
+            throw new InvalidArgumentException("birthTime required");
+        }
+        // ... 추가 검증
+    }
+}
+
+@Service
+public class ConsultationService {
+    private final RequestValidator validator;
+    
+    public ConsultationResponse getConsultation(ConsultationRequest req) {
+        validator.validateConsultationRequest(req);  // 검증 위임
+        // ... 실제 비즈니스 로직만 집중
+    }
+}
+```
+
+**분리 대상**:
+- **SajuValidator**: `validateSajuData(heavenlyStems, earthlyBranches)` - FastAPI 응답 검증
+- **RequestValidator**: `validateBirthDate(LocalDate)`, `validateBirthTime(LocalTime)` - 요청 DTO 검증
+- **CompatibilityValidator**: `validateCompatibilityRequest(CompatibilityRequest)` - 호환성 분석 요청 검증
+
 ## DTO (Data Transfer Object)
 
 Java 21 환경에서는 Request/Response DTO를 반드시 **`record` 타입**으로 작성합니다.
@@ -116,9 +323,12 @@ throw new InvalidSajuDataException("Invalid date format");
 | 상수 | UPPER_SNAKE_CASE | `CAREER_TIMING_API_TIMEOUT` |
 | REST API URI | 소문자 kebab-case | `/api/users/profile-images` |
 
-## 상수 및 열거형 관리
+## 상수 및 열거형 관리 (Phase 3-Refactor-3 최종)
 
-상수는 **용도별로** 다음과 같이 관리합니다:
+상수는 **용도별로**, **완벽하게** 다음과 같이 관리합니다:
+- ✅ **모든 매직 넘버 제거**: 0, 1, 2, 3, 4, 5, 8, 12, 25, 30, 35, 50, 75, 100 등 모두 상수화
+- ✅ **모든 하드코딩 문자열 제거**: "H1", "H2", "정관", "편관", 월 이름 등 모두 상수화
+- ✅ **날짜/시간 포맷 상수화**: "YYYY-MM-DD", "HH:mm", "12:00" 등
 
 ### Rule 1: 매직 넘버 & String 하드코딩 금지
 

@@ -2,8 +2,8 @@
 
 **Feature**: Career Fortune & Consultation API
 **Date Generated**: 2026-04-27
-**Status**: Ready for Implementation (Updated with Hidden Stem Calculation)
-**Total Tasks**: 76 (Entity Normalization + Constants Extraction added)
+**Status**: Ready for Implementation (Phase 3-Enhancement Added)
+**Total Tasks**: 106 (Phase 1~2: 18 tasks + Phase 3.1-3.2: 17 tasks + Phase 3-Refactor: 20 tasks + Phase 3-Enhancement: 18 tasks + Phase 3-Refactor-3: 12 tasks + Phase 3.3-3.4: 14 tasks + Phase 4: 3 tasks)
 **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
 
 ---
@@ -96,14 +96,16 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/handler/SajuGlobalExceptionHandler.java`
 
 - [v] T009 [P] Create base entities: `UserProfile` and `SajuResult` in `career/entity/`
-  - Implement UserProfile: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull, HH:mm format), timestamps (createdAt, updatedAt). **Add UNIQUE(birthDate, birthTime) constraint**
-  - Implement SajuResult: fullSajuData (JSON from FastAPI), hiddenStems (Map<String, List<String>>, 지지별 지장간 저장), tenGodDistribution (JSON), careerFortune (JSON), timestamps. Link to UserProfile (1:1)
+  - Implement UserProfile: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull, HH:mm format), createdAt (@CreatedDate, LocalDateTime), updatedAt (@LastModifiedDate, LocalDateTime). **Add UNIQUE(birthDate, birthTime) constraint**
+  - Implement SajuResult: fullSajuData (Map<String, Object>, FastAPI 응답 저장 - Phase 3-Refactor-3에서 SajuFullData 엔티티로 정규화), hiddenStems (Map<String, List<String>>, 지지별 지장간 저장 - Phase 3-Refactor에서 HiddenStemData 엔티티로 정규화), tenGodDistribution (Map<String, Integer> - Phase 3-Refactor에서 TenGodData 엔티티로 정규화), careerFortune (Map<String, Object> - Phase 3-Refactor에서 CareerFortune 엔티티로 정규화), createdAt (@CreatedDate), updatedAt (@LastModifiedDate). Link to UserProfile (1:1, FetchType.LAZY)
   - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for relationships
+  - **Timestamp 처리**: `@CreatedDate` (@Column(nullable=false, updatable=false)) + `@LastModifiedDate` 사용. @PreUpdate 사용 금지. JPA Auditing 활성화 필수 (@EnableJpaAuditing in @Configuration).
   - **JSON 컬럼 처리 (Spring Boot 4.x Hibernate 7.2.7)**: @JdbcTypeCode 대신 @Convert + custom AttributeConverter 사용 (Jackson 3.x 호환성)
-    - ObjectMapConverter: Map<String, Object> 직렬화/역직렬화
-    - StringListMapConverter: Map<String, List<String>> 직렬화/역직렬화
-    - IntegerMapConverter: Map<String, Integer> 직렬화/역직렬화
-  - Note: hiddenStems 구조 예시: `{"子": ["癸"], "丑": ["癸", "辛", "己"], ...}`
+    - ObjectMapConverter: Map<String, Object> 직렬화/역직렬화 (fullSajuData, careerFortune용)
+    - StringListMapConverter: Map<String, List<String>> 직렬화/역직렬화 (hiddenStems용 - Phase 3-Refactor까지만 사용)
+    - IntegerMapConverter: Map<String, Integer> 직렬화/역직렬화 (tenGodDistribution용 - Phase 3-Refactor까지만 사용)
+  - Note: JSON 저장은 임시. Phase 3-Refactor에서 TenGodData, HiddenStemData, CareerFortune 엔티티로 정규화. Phase 3-Refactor-3에서 fullSajuData → SajuFullData 엔티티로 최종 정규화.
+  - Note: hiddenStems 구조 예시: `{"子": ["癸"], "丑": ["癸", "辛", "己"], ...}` (임시 저장 형식, Phase 3-Refactor에서 HiddenStemData 엔티티로 변환)
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/UserProfile.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/SajuResult.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/converter/ObjectMapConverter.java`
@@ -529,24 +531,406 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ---
 
+## Phase 3-Enhancement: 통신, 동시성, 엔티티, 아키텍처 개선
+
+**Goal**: T041(상수화) 완료 후, 4가지 핵심 리팩토링 수행
+1. **외부 API 통신 최적화**: WebClient → RestClient로 전환, Spring Retry 도입
+2. **동시성 제어 및 DB 최적화**: SajuResult 동시 Insert 경합 해결, H2 MySQL 모드 적용
+3. **JPA 엔티티 설계 최적화**: @CreatedDate/@LastModifiedDate, equals&hashCode, 엔티티 상태 명확화
+4. **객체 지향 및 아키텍처 개선**: 컬렉션 객체화, 검증 로직 분리
+
+### 1. 외부 API 통신 최적화 (WebClient → RestClient)
+
+**Rationale**: 동기식 호출에 Reactive 의존성 불필요. RestClient가 더 가볍고 직관적.
+
+- [ ] T051 [Enhancement] 의존성 추가: Spring Retry, RestClient
+  - `build.gradle`에 다음 추가:
+    ```gradle
+    implementation 'org.springframework:spring-retry'
+    implementation 'org.springframework.boot:spring-boot-starter-web'  // RestClient 포함
+    ```
+  - Remove: WebClient 기반 설정 (WebClientConfig.java 제거 또는 RestClient 설정으로 전환)
+  - File: `SSAju/build.gradle`
+
+- [ ] T052 [Enhancement] Create `FastApiRestClientConfig` in `config/`
+  - RestClient bean 생성 (default timeout, SSL 설정 등)
+  - Spring Retry 설정 (@RetryConfiguration 또는 application.yaml 설정)
+  - Exponential backoff 정책: 1초, 2초, 4초 (최대 3회)
+  - File: `SSAju/src/main/java/ssafy/SSAju/config/FastApiRestClientConfig.java`
+
+- [ ] T053 [Enhancement] Refactor `SajuDataService` to use RestClient
+  - **Before**: WebClient + .block() 동기 처리
+  - **After**: RestClient + Spring Retry (@Retryable)
+  - Method: `fetchSajuFromFastAPI(LocalDate, LocalTime)` → RestClient 호출, 자동 재시도
+  - Handle: TimeoutException → FastAPITimeoutException, invalid response → InvalidSajuDataException
+  - File: `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
+
+- [ ] T054 [Enhancement] Refactor `ConsultationService` OpenAI RestClient 호출
+  - **Option**: ChatClient 유지 vs. RestClient로 전환 (프롬프트 유연성 필요 시)
+  - Spring Retry 적용: OpenAI 타임아웃 시 재시도 (최대 2회)
+  - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
+
+- [ ] T055 [Enhancement] 통신 테스트 업데이트
+  - Update: SajuDataServiceTest (RestClient mock 대응)
+  - Update: ConsultationServiceTest (RestClient mock 대응)
+  - Verify: Spring Retry 동작 확인 (재시도 로그 검증)
+  - File: `SSAju/src/test/java/ssafy/SSAju/service/SajuDataServiceTest.java`
+  - File: `SSAju/src/test/java/ssafy/SSAju/service/ConsultationServiceTest.java`
+
+### 2. 동시성 제어 및 DB 최적화
+
+**Rationale**: DataIntegrityViolationException 대신 JdbcTemplate INSERT IGNORE 활용. H2 MySQL 모드로 프로덕션 환경 근접.
+
+- [ ] T056 [Enhancement] Create `SajuResultJdbcRepository` (JdbcTemplate 기반)
+  - Method: `insertOrIgnore(SajuResult)` - INSERT IGNORE 네이티브 쿼리
+  - Returns: 1 (신규 삽입) 또는 0 (이미 존재)
+  - UNIQUE constraint: (userProfileId, birthDate, birthTime) 활용
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/SajuResultJdbcRepository.java`
+
+- [ ] T057 [Enhancement] Update `SajuDataService` to use INSERT IGNORE
+  - **Before**: try-catch with DataIntegrityViolationException
+  - **After**: `SajuResultJdbcRepository.insertOrIgnore()` 호출
+  - Logic: SajuResult 존재 확인 → 없으면 insertOrIgnore → 엔티티 반환
+  - File: `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
+
+- [ ] T058 [Enhancement] Configure H2 MySQL mode in test
+  - `application-test.properties` (또는 `application-test.yaml`)에:
+    ```
+    spring.datasource.url=jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE
+    spring.datasource.driver-class-name=org.h2.Driver
+    spring.h2.console.enabled=true
+    spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+    ```
+  - Verify: MySQL 문법 호환성 테스트 (예: INSERT IGNORE, UNIQUE constraint)
+  - File: `SSAju/src/test/resources/application-test.yaml`
+
+- [ ] T059 [Enhancement] Test race condition handling
+  - Test: 동시에 동일한 (birthDate, birthTime) SajuResult 생성 → insertOrIgnore 검증
+  - Verify: 한 번만 INSERT, 나머지는 무시
+  - Tool: @ParameterizedTest + concurrent threads
+  - File: `SSAju/src/test/java/ssafy/SSAju/repository/SajuResultJdbcRepositoryTest.java`
+
+### 3. JPA 엔티티 설계 최적화
+
+**Rationale**: @CreatedDate/@LastModifiedDate 자동 관리, equals&hashCode는 ID 기준 구현 (Proxy 안전성), 엔티티 상태 명확화.
+
+- [ ] T060 [Enhancement] Enable JPA Auditing & implement equals/hashCode
+  - **@EnableJpaAuditing** 추가: `SSAjuApplication.java` 또는 @Configuration 클래스
+  - **모든 엔티티에 적용**:
+    - Remove: `@PreUpdate` 어노테이션
+    - Add: `@CreatedDate`, `@LastModifiedDate` (이미 T009에서 명시했으므로 구현만)
+    - Implement: `equals(Object)`, `hashCode()` (ID 기준, Lombok @EqualsAndHashCode 제거)
+  - **ID 기준 equals/hashCode 패턴**:
+    ```java
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null) return false;
+        if (!(o instanceof SajuResult)) return false;
+        SajuResult that = (SajuResult) o;
+        return Objects.equals(id, that.id);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+    ```
+  - Files: 
+    - `SSAju/src/main/java/ssafy/SSAju/SSAjuApplication.java` (@EnableJpaAuditing 추가)
+    - `SSAju/src/main/java/ssafy/SSAju/career/entity/*.java` (모든 엔티티 equals/hashCode 구현)
+
+- [ ] T061 [Enhancement] Clarify entity state lifecycle
+  - Document: 영속(Persistent), 준영속(Detached), 비영속(Transient) 상태 정확히 이해
+  - Service 계층에서 엔티티 상태 명확히 (예: `repository.save()` 전/후 상태 변화)
+  - **패턴**:
+    ```java
+    // Transient → Persistent
+    SajuResult result = SajuResult.builder().birthDate(...).build();  // transient
+    SajuResult saved = repository.save(result);  // persistent
+    
+    // Persistent → Detached (트랜잭션 종료 후)
+    // Detached 상태에서 lazy loading 불가 → LazyInitializationException 위험
+    ```
+  - Document: `SSAju/src/main/java/ssafy/SSAju/career/entity/README.md` (엔티티 상태 가이드)
+
+- [ ] T062 [Enhancement] Test equals/hashCode & lazy loading safety
+  - Test: equals/hashCode가 Proxy 객체에서도 정상 동작하는지 검증
+  - Test: equals(null), equals(different type) 엣지 케이스
+  - Test: HashSet/HashMap에 엔티티 저장 후 조회 가능한지 확인
+  - File: `SSAju/src/test/java/ssafy/SSAju/career/entity/EntityEqualsHashCodeTest.java`
+
+### 4. 객체 지향 및 아키텍처 개선
+
+**Rationale**: 컬렉션 객체화 (TenGodDistribution 같은 일급 객체), 검증 로직 분리 (서비스 책임 단순화).
+
+- [ ] T063 [Enhancement] Create value objects for collections
+  - **TenGodDistribution**: `Map<String, Integer>` → 일급 컬렉션
+    ```java
+    public class TenGodDistribution {
+        private final Map<String, Integer> distribution;
+        
+        public TenGodDistribution(Map<String, Integer> data) { ... }
+        public Integer getScore(String tenGodName) { ... }
+        public boolean hasHighConfidence(int threshold) { ... }
+    }
+    ```
+  - **HiddenStems**: `Map<String, List<String>>` → 일급 컬렉션
+    ```java
+    public class HiddenStems {
+        private final Map<String, List<String>> stems;
+        
+        public List<String> getByBranch(String branch) { ... }
+        public boolean containsStem(String stem) { ... }
+    }
+    ```
+  - **FiveElements**: `Map<String, Integer>` → 일급 컬렉션
+  - File:
+    - `SSAju/src/main/java/ssafy/SSAju/career/domain/TenGodDistribution.java`
+    - `SSAju/src/main/java/ssafy/SSAju/career/domain/HiddenStems.java`
+    - `SSAju/src/main/java/ssafy/SSAju/career/domain/FiveElements.java`
+
+- [ ] T064 [Enhancement] Refactor services to use value objects
+  - **CareerFortuneAnalyzer**: `Map<String, Integer>` → `TenGodDistribution` 사용
+  - **HiddenStemCalculator**: `Map<String, List<String>>` → `HiddenStems` 사용
+  - **CompatibilityScoreCalculator**: 두 객체 모두 사용
+  - File:
+    - `SSAju/src/main/java/ssafy/SSAju/career/util/CareerFortuneAnalyzer.java`
+    - `SSAju/src/main/java/ssafy/SSAju/career/util/HiddenStemCalculator.java`
+    - `SSAju/src/main/java/ssafy/SSAju/career/util/CompatibilityScoreCalculator.java`
+
+- [ ] T065 [Enhancement] Create validation utility classes
+  - **SajuValidator**: 사주 데이터 검증 (heavenlyStems, earthlyBranches 개수, 형식 등)
+  - **RequestValidator**: DTO 검증 로직 (birthDate 범위, birthTime 형식 등)
+  - **CompatibilityValidator**: 호환성 분석 입력 검증
+  - Service에서는 이들 Validator 호출만 수행
+  - File:
+    - `SSAju/src/main/java/ssafy/SSAju/career/validator/SajuValidator.java`
+    - `SSAju/src/main/java/ssafy/SSAju/career/validator/RequestValidator.java`
+    - `SSAju/src/main/java/ssafy/SSAju/career/validator/CompatibilityValidator.java`
+
+- [ ] T066 [Enhancement] Refactor services to use validators
+  - **SajuDataService**: SajuValidator 사용 (FastAPI 응답 검증)
+  - **CareerFortuneService**: RequestValidator 사용 (요청 검증)
+  - **ConsultationService**: 두 validator 모두 사용
+  - **CompanyMatchingService**: CompatibilityValidator 사용
+  - File: 위 Service 파일들
+
+- [ ] T067 [Enhancement] Update tests for value objects & validators
+  - Test: TenGodDistribution, HiddenStems, FiveElements 객체 기능
+  - Test: Validator 정상 동작 (valid/invalid 경우)
+  - Test: Service가 Validator 호출하는지 검증
+  - File:
+    - `SSAju/src/test/java/ssafy/SSAju/career/domain/*Test.java`
+    - `SSAju/src/test/java/ssafy/SSAju/career/validator/*Test.java`
+    - Updated service tests
+
+- [ ] T068 [Enhancement] Run full test suite and verify refactoring
+  - Command: `./gradlew clean test`
+  - Verify:
+    1. ✅ RestClient 모든 통신 정상
+    2. ✅ Race condition 처리 확인 (insertOrIgnore)
+    3. ✅ H2 MySQL 모드 테스트 통과
+    4. ✅ equals/hashCode Proxy 안전성
+    5. ✅ 모든 검증 로직 분리 완료
+    6. ✅ 컬렉션 객체화 완료
+  - Coverage: >85% 목표
+
+---
+
+## Phase 3-Refactor-3: Advanced Normalization & Service Optimization
+
+**Goal**: Phase 3-Enhancement 완료 후, 3가지 최적화 작업 수행
+1. **fullSajuData 완전 정규화**: Map → SajuFullData 엔티티
+2. **PromptProvider 분리**: ConsultationService의 buildPrompt 메서드 외부화
+3. **모든 하드코딩 상수 제거**: 남은 magic number/string 추출
+
+### SajuFullData Normalization
+
+- [ ] T069 [Refactor] Create `SajuFullData` entity for normalizing SajuResult.fullSajuData
+  - **Purpose**: SajuResult.fullSajuData (Map<String, Object>) 완전 정규화 → 객체 저장으로 타입 안전성 및 쿼리 성능 향상
+  - **Fields**: 
+    - id: Long (PK)
+    - sajuResultId: Long (FK to SajuResult, NOT NULL, UNIQUE) 
+    - yearPillar, monthPillar, dayPillar, hourPillar: String (天干地支 조합 문자열)
+    - dayMaster: String (일간, 천간 1글자)
+    - dayMasterElement: String (일간의 오행: 木火土金水 중 1개)
+    - fiveElements: Map<String, Integer> (오행 분포, JSON 컬럼 유지 가능 또는 FiveElementData 1:N로 정규화 - 현재는 JSON 유지)
+    - solarCorrection: Map<String, Object> (선택사항, JSON 컬럼 - 현재는 JSON 유지)
+    - createdAt: LocalDateTime (@CreatedDate)
+  - **관계**: 1:1 to SajuResult (mappedBy="sajuFullData"), FetchType.LAZY
+  - **정규화 선택지**:
+    - **Option A** (현재 선택): fiveElements, solarCorrection은 JSON 유지 (Map으로 저장, 변경 빈도 낮음)
+    - **Option B** (완전 정규화): FiveElementData (1:N), SolarCorrectionData (1:N) 생성
+  - **설계 원칙**: 변경 빈도 낮은 필드(fiveElements, solarCorrection)는 JSON 유지하여 쿼리 단순화. 자주 조회/필터링되는 필드(yearPillar, dayMaster 등)는 엔티티 필드로 저장
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/SajuFullData.java`
+
+- [ ] T070 [Refactor] Create `SajuFullDataRepository` in `repository/`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/SajuFullDataRepository.java`
+
+- [ ] T071 [Refactor] Update `SajuResult` to use normalized entities (SajuFullData, TenGodData, HiddenStemData, CareerFortune)
+  - **Phase 3-Refactor 진행 상황**:
+    - ✅ Phase 3.1-3.2: SajuResult.fullSajuData, tenGodDistribution, hiddenStems, careerFortune을 JSON (Map)으로 임시 저장
+    - ⏭ Phase 3-Refactor: 다음 4가지를 엔티티로 정규화 (이 작업 이후):
+      1. TenGodData: tenGodDistribution (Map<String, Integer>) → 1:N 엔티티 (각 십신별 1행)
+      2. HiddenStemData: hiddenStems (Map<String, List<String>>) → 1:N 엔티티 (각 지지별 지장간 1행)
+      3. CareerFortune: careerFortune (Map) → 1:1 엔티티 (favoredPeriod, confidenceScore, reasoning)
+      4. SajuFullData: fullSajuData (Map) → 1:1 엔티티 (yearPillar, dayMaster 등)
+  - **Modify SajuResult**:
+    - Remove: fullSajuData (Map<String, Object> with @Convert)
+    - Remove: tenGodDistribution (Map<String, Integer> with @Convert)
+    - Remove: hiddenStems (Map<String, List<String>> with @Convert)
+    - Remove: careerFortune (Map<String, Object> with @Convert)
+    - Add: `@OneToOne(fetch = FetchType.LAZY) SajuFullData sajuFullData` (1:1, mappedBy="sajuResult")
+    - Add: `@OneToOne(fetch = FetchType.LAZY) CareerFortune careerFortune` (1:1, mappedBy="sajuResult")
+    - Add: `@OneToMany(fetch = FetchType.LAZY, mappedBy = "sajuResult") List<TenGodData> tenGodDataList` (1:N)
+    - Add: `@OneToMany(fetch = FetchType.LAZY, mappedBy = "sajuResult") List<HiddenStemData> hiddenStemDataList` (1:N)
+  - **Mapper 업데이트**: SajuResultMapper에서 FastAPIResponse → SajuFullData, TenGodData, HiddenStemData, CareerFortune 변환 로직 추가
+    - `toSajuFullData(FastAPIResponse)`: yearPillar, dayMaster, fiveElements 등을 SajuFullData 엔티티로 매핑
+    - `toTenGodDataList(Map<String, Integer>)`: tenGodDistribution을 List<TenGodData>로 변환 (각 십신별 1행)
+    - `toHiddenStemDataList(Map<String, List<String>>)`: hiddenStems를 List<HiddenStemData>로 변환 (각 지지별 지장간별 행)
+    - `toCareerFortune(Map)`: careerFortune 맵을 CareerFortune 엔티티로 변환
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/SajuResult.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/mapper/SajuResultMapper.java`
+
+- [ ] T072 [Refactor] Update Service layer to save all normalized entities (TenGodData, HiddenStemData, CareerFortune, SajuFullData)
+  - **Modify CareerFortuneService**:
+    1. SajuDataService에서 FastAPI 응답 받음 (FastAPIResponse)
+    2. SajuResultMapper를 이용하여 다음 4가지 변환:
+       - `mapper.toSajuFullData(fastAPIResponse)` → SajuFullData 엔티티
+       - `mapper.toTenGodDataList(tenGodDistribution)` → List<TenGodData>
+       - `mapper.toHiddenStemDataList(hiddenStems)` → List<HiddenStemData>
+       - `mapper.toCareerFortune(careerFortuneMap)` → CareerFortune 엔티티
+    3. SajuResult 생성 시 이들 엔티티 함께 저장 (Repository.save(sajuResult) 호출하면 cascade=ALL이므로 자동 저장)
+    4. 트랜잭션: FastAPI/OpenAI I/O는 트랜잭션 밖, 각 Repository.save는 개별 @Transactional
+  - **Modify ConsultationService**:
+    1. CareerFortuneService와 동일하게 SajuResultMapper 사용
+    2. SajuResult 저장 시 SajuFullData, TenGodData, HiddenStemData, CareerFortune 모두 함께 저장
+    3. CareerConsultation 저장 시 Industry, InterviewTip, Strength도 함께 저장
+  - **Mapper 호출 패턴**:
+    ```
+    SajuResult sajuResult = SajuResultMapper.toSajuResult(fastAPIResponse, userProfile);
+    // 내부에서:
+    // - sajuResult.fullSajuData = mapper.toSajuFullData(fastAPIResponse)
+    // - sajuResult.tenGodDataList = mapper.toTenGodDataList(...)
+    // - sajuResult.hiddenStemDataList = mapper.toHiddenStemDataList(...)
+    // - sajuResult.careerFortune = mapper.toCareerFortune(...)
+    sajuResultRepository.save(sajuResult);  // cascade=ALL로 자식도 저장
+    ```
+  - File: `SSAju/src/main/java/ssafy/SSAju/service/CareerFortuneService.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
+
+- [ ] T073 [Refactor] Update tests for SajuFullData normalization
+  - **Update**: CareerFortuneServiceTest, ConsultationServiceTest에서 SajuFullData 검증 추가
+  - Test: SajuFullData 엔티티가 올바르게 생성되고 저장되는지 확인
+  - File: `SSAju/src/test/java/ssafy/SSAju/service/CareerFortuneServiceTest.java`
+  - File: `SSAju/src/test/java/ssafy/SSAju/service/ConsultationServiceTest.java`
+
+- [ ] T074 [Refactor] Run all tests for SajuFullData refactoring
+  - Command: `./gradlew test`
+  - Verify: BUILD SUCCESSFUL, no SQL errors, SajuFullData 저장 확인
+
+### PromptProvider Separation
+
+- [ ] T075 [Refactor] Create `PromptProvider` component in `service/`
+  - **Purpose**: ConsultationService의 buildPrompt 메서드 외부화
+  - **Methods**:
+    - `getCareerConsultationPrompt(SajuData sajuData, int currentYear, LocalDate birthDate, LocalTime birthTime)`: 
+      - 사주 데이터(일간, 천간, 지지, 오행, 지장간, 십신) 포함
+      - 현재 연도, 12개월 타임라인 포함
+      - 16개 필드 그룹(기본 조언, 관운, 사주 프로필, OpenAI 분석 12가지) 포함한 상세 프롬프트
+      - JSON 스키마 정의 (careerTimeline.months 객체 형식 예시 포함)
+    - `getCompanyCompatibilityPrompt(...)`: (Phase 3 추가 가능) 기업 궁합 분석용 프롬프트
+  - **Properties**: 
+    - `@Autowired private ConfigurationProperties` 또는 프로퍼티 파일에서 로드 가능
+    - 또는 하드코딩하되, 프롬프트 변경 시 이 클래스만 수정하도록 캡슐화
+  - **Test**: PromptProvider에 대한 단위 테스트 작성 (프롬프트 포함 필드 검증)
+  - File: `SSAju/src/main/java/ssafy/SSAju/service/PromptProvider.java`
+  - File: `SSAju/src/test/java/ssafy/SSAju/service/PromptProviderTest.java`
+
+- [ ] T076 [Refactor] Update `ConsultationService` to use PromptProvider
+  - **Modify**: `callOpenAI()` 또는 `getCareerConsultation()` 메서드에서 PromptProvider 호출
+  - **Before**:
+    ```java
+    String prompt = buildPrompt(sajuData, currentYear);  // 서비스 내부
+    CareerAdviceResponse response = chatClient.prompt().user(prompt).call().entity(...);
+    ```
+  - **After**:
+    ```java
+    String prompt = promptProvider.getCareerConsultationPrompt(sajuData, currentYear, ...);
+    CareerAdviceResponse response = chatClient.prompt().user(prompt).call().entity(...);
+    ```
+  - **Remove**: ConsultationService.buildPrompt() 메서드 삭제 (PromptProvider로 이동)
+  - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
+
+- [ ] T077 [Refactor] Verify PromptProvider integration
+  - Test: ConsultationServiceTest에서 PromptProvider mock 확인
+  - Verify: 프롬프트 변경이 PromptProvider에만 영향을 미치는지 확인
+  - File: `SSAju/src/test/java/ssafy/SSAju/service/ConsultationServiceTest.java`
+
+### Final Constants Extraction & Cleanup
+
+- [ ] T078 [Refactor] Extract remaining magic numbers and strings
+  - **Scope**: 이전 T079~T075에서 놓친 모든 하드코딩된 값
+  - **검색 대상**:
+    - 숫자 리터럴: 0, 1, 2, 3, 4, 5, 8, 12, 25, 30, 35, 50, 75, 100, 1000, etc.
+    - 문자열 리터럴: "H1", "H2", "정관", "편관", 월 이름 등
+    - 날짜/시간: "12:00", "YYYY-MM-DD", "HH:mm"
+  - **조치**:
+    - 기존 상수 클래스에 추가 (ValidationConstants, CareerFortuneConstants 등)
+    - 또는 새 상수 클래스 생성 (DateFormatConstants, DefaultTimeConstants)
+  - **Verification**: grep으로 '숫자'와 '따옴표 문자열'의 직접 사용 검색
+    ```bash
+    grep -rn '[^a-zA-Z_]"[A-Z]' career/service/ | grep -v "ApiResponse\|ErrorInfo" | head -20
+    grep -rn '[^a-zA-Z_][0-9]\+[^a-zA-Z_]' career/ | grep -v "LocalDate\|LocalTime\|Duration" | head -20
+    ```
+  - File: career/constants/*.java (기존 또는 신규)
+
+- [ ] T079 [Refactor] Refactor all services and utilities to use final extracted constants
+  - **Targets**:
+    - SajuDataService.java: API 타임아웃, 엔드포인트 URL
+    - ConsultationService.java: 현재 연도 기본값, 12개월, JSON 모드
+    - CompanyMatchingService.java: 기본 설립 시간 "12:00", 호환성 범위
+    - CareerFortuneAnalyzer.java: 신뢰도 임계값, H1/H2 판정 로직
+    - GlobalExceptionHandler.java: HTTP 상태코드, 에러 메시지 (ErrorMessageConstants 사용)
+    - All Calculators: 점수 계산 기준값 (TenGodConstants, HiddenStemConstants 사용)
+  - Verification: 모든 magic number/string 제거 확인
+  - File: Multiple service and util files
+
+- [ ] T080 [Refactor] Run final test suite and verify constant extraction
+  - Command: `./gradlew test`
+  - Verify:
+    1. 모든 테스트 통과
+    2. 상수 미사용 코드 없음 (grep 재확인)
+    3. 코드 스타일 준수 (Lombok, record, FetchType.LAZY 등)
+    4. No JSON columns (fullSajuData 포함 모든 JSON 정규화됨)
+  - **Final Checklist**:
+    - ✅ SajuFullData 엔티티 저장 확인
+    - ✅ PromptProvider 호출 확인
+    - ✅ 모든 상수 사용 확인
+    - ✅ 테스트 100% 통과
+  - File: Multiple test files
+
+---
+
 ### User Story 3: Company & Job Fit Analysis (Priority P2)
 
 **Goal**: Users can analyze compatibility between their saju and target company founding date, receiving a score (0-100) and recommended roles.
 **Independent Test**: User saju + company date → Compatibility calculation → Score + roles response (depends on core structures)
 **Expected Outcome**: Compatibility endpoint working, CompanyCompatibility + RecommendedRole entities stored in DB
 
-- [ ] T051 [US3] Create `CompanyCompatibility` and `RecommendedRole` entities in `career/entity/`
+- [ ] T081 [US3] Create `CompanyCompatibility` and `RecommendedRole` entities in `career/entity/`
   - **CompanyCompatibility**: id, userProfileId (FK), companyName, compatibilityScore (0-100), createdAt. **No JSON 저장** — recommendedRoles는 별도 RecommendedRole 엔티티에 1:N 관계로 저장
   - **RecommendedRole**: id, companyCompatibilityId (FK), roleName (String), createdAt. **N:1 관계** to CompanyCompatibility
   - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for relationships
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/CompanyCompatibility.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/RecommendedRole.java`
 
-- [ ] T052 [US3] [P] Create `CompanyCompatibilityRepository` and `RecommendedRoleRepository` in `repository/`
+- [ ] T082 [US3] [P] Create `CompanyCompatibilityRepository` and `RecommendedRoleRepository` in `repository/`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/CompanyCompatibilityRepository.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/RecommendedRoleRepository.java`
 
-- [ ] T053 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs
+- [ ] T083 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs
   - Request fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), companyName (@NotNull), companyFoundingDate (LocalDate, optional), companyFoundingTime (LocalTime, optional, **defaults to 12:00 if missing**)
   - Response fields (8 fields):
     - compatibilityScore: 0-100 정수
@@ -562,24 +946,24 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/CompatibilityRequest.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/CompatibilityResponse.java`
 
-- [ ] T054 [US3] Create `CompanyInfoService` in `service/`
+- [ ] T084 [US3] Create `CompanyInfoService` in `service/`
   - Method: `lookupCompanyFoundingDate(companyName)` → calls public data API with fallback to manual input. If time not found, use default 12:00
   - Handles: API timeout → PublicDataApiException, company not found → inform user to provide founding date. If time missing → auto-set to 12:00
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyInfoService.java`
 
-- [ ] T055 [US3] Create `CompanyMatchingService` in `service/`
+- [ ] T085 [US3] Create `CompanyMatchingService` in `service/`
   - Method: `analyzeCompatibility(LocalDate userBirthDate, LocalTime userBirthTime, LocalDate companyFoundingDate, LocalTime companyFoundingTime)` → compatibility score + role recommendations with 지장간 calculation
   - Logic: Fetch user saju via SajuDataService with birthDate + birthTime → Calculate user HiddenStems + TenGod. Fetch company saju (with time defaulting to 12:00 if missing) → Calculate company HiddenStems + TenGod. Use `CompatibilityScoreCalculator` with both sets of data for accurate scoring. Save to CompanyCompatibility + RecommendedRole entities
   - Note: 기업 설립일도 사용자 사주와 동일한 수준으로 지장간 포함 계산. 시간 미상 시 정오(12:00)로 기본 설정. 추천 직무는 RecommendedRole 엔티티로 저장
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyMatchingService.java`
 
-- [ ] T056 [US3] Create `CompatibilityController` in `controller/`
+- [ ] T086 [US3] Create `CompatibilityController` in `controller/`
   - Endpoint: `POST /api/company/compatibility` with CompatibilityRequest (userBirthDate + userBirthTime required, companyFoundingDate optional, companyFoundingTime optional)
   - Handles: Request validation (@Valid), validates user birth time required, looks up company (with time fallback to 12:00), calculates compatibility, returns `ApiResponse<CompatibilityResponse>` (recommendedRoles는 엔티티에서 추출한 List<String>)
   - Validation: Reject requests with missing userBirthTime (400 Bad Request)
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/CompatibilityController.java`
 
-- [ ] T057 [US3] Write unit & integration tests for Company Compatibility
+- [ ] T087 [US3] Write unit & integration tests for Company Compatibility
   - Test cases (CompanyMatchingService):
     1. Valid compatibility analysis (user birthDate + birthTime, company founding date + time) → compatibility score + roles including 지장간-based analysis
     2. Company founding time missing → auto-default to 12:00 and calculate 지장간
@@ -599,7 +983,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ## Phase 4: Polish & Integration
 
-- [ ] T058 Generate Swagger/OpenAPI documentation
+- [ ] T088 Generate Swagger/OpenAPI documentation
   - Add: `springdoc-openapi-starter-webmvc-ui` dependency to `build.gradle`
   - Configure: `@OpenAPIDefinition`, `@Info`, `@Server` annotations in `SSAjuApplication.java`
   - Add: `@Operation`, `@RequestBody`, `@ApiResponse` annotations to all controllers
@@ -608,7 +992,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: All controller classes updated with OpenAPI annotations
   - Verify: Accessible at `http://localhost:8080/swagger-ui.html` after `./gradlew bootRun`
 
-- [ ] T059 Write integration test for full Career API flow (all 4 endpoints)
+- [ ] T089 Write integration test for full Career API flow (all 4 endpoints)
   - Test:
     1. Create UserProfile with birthDate + birthTime
     2. POST /api/career/timing with birthDate + birthTime → Get H1/H2
@@ -618,7 +1002,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Verify: Data persistence (normalized entities TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength, RecommendedRole), response consistency, birthTime required fields validated, error handling across flows, **no JSON stored in tables**
   - File: `SSAju/src/test/java/ssafy/SSAju/integration/CareerApiIntegrationTest.java`
 
-- [ ] T060 Final verification: Run full test suite and validate coverage
+- [ ] T090 Final verification: Run full test suite and validate coverage
   - Command: `./gradlew clean test`
   - Verify: 100% of Phase 1-3 tests pass, no warnings, coverage >80%
   - Verify: **All entities use normalized structure (no JSON columns)**
@@ -737,10 +1121,11 @@ And:   Missing user birthTime → 400 Bad Request
 | Phase 3.2 (US2) | 9 | Consultation feature with TenGod + HiddenStem analysis | Parallel with US4 |
 | Phase 3-Refactor | 11 | **Entity Normalization**: 6 new entities (TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength) + 6 repositories + 2 service updates + 2 test updates. Replaces JSON storage with normalized entities. | Yes (parallel entity creation) |
 | Phase 3-Refactor-2 | 15 | **Constants Extraction**: 9 constant groups (15 classes/enums) for magic numbers/strings. Includes error/success messages, API timeouts, validation rules, etc. | Yes (parallel constant creation) |
-| Phase 3.4 (US4) | 9 | Feedback feature | Parallel with US2 |
-| Phase 3.3 (US3) | 7 | Company compatibility (P2) with RecommendedRole entity, 지장간 and 12:00 default | After core ready |
-| Phase 4 (Polish) | 3 | API documentation (Swagger), integration tests, final validation | After all stories |
-| **TOTAL** | **76** | Full MVP + Entity Normalization + Constants Extraction + 지장간 calculation + P2 foundation + API docs | Strategic parallelism |
+| Phase 3-Refactor-3 | 12 | **Advanced Normalization & Service Optimization**: (1) fullSajuData 완전 정규화 (SajuFullData 엔티티, T087~T074), (2) PromptProvider 분리 (T075~T077), (3) 남은 모든 상수 추출 (T078~T080) | Yes (parallel) |
+| Phase 3.4 (US4) | 9 | Feedback feature (T081~T089 재번호화) | Parallel with US2 |
+| Phase 3.3 (US3) | 7 | Company compatibility (P2) with RecommendedRole entity, 지장간 and 12:00 default (T081~T087 재번호화) | After core ready |
+| Phase 4 (Polish) | 3 | API documentation (Swagger), integration tests, final validation (T088~T090 재번호화) | After all stories |
+| **TOTAL** | **88** | Full MVP + Entity Normalization + Constants Extraction + PromptProvider + fullSajuData Normalization + 지장간 calculation + P2 foundation + API docs | Strategic parallelism |
 
 ---
 
@@ -754,19 +1139,19 @@ And:   Missing user birthTime → 400 Bad Request
 
 **1. 관운 분석 상수** (CareerFortuneAnalyzer, HiddenStemCalculator 등)
 
-- [v] T061 Create `TenGodConstants` enum in `career/enums/`
+- [v] T079 Create `TenGodConstants` enum in `career/enums/`
   - 10개 십신 상수 정의: CHIEF_OFFICER (정관), SIDE_OFFICER (편관), CHIEF_WEALTH (정재), SIDE_WEALTH (편재), FOOD_GOD (식신), INJURING_OFFICER (상관), COMPARING_FRIEND (비견), ROBBING_WEALTH (겁재), CHIEF_SEAL (정인), SIDE_SEAL (편인)
   - 각 십신별 필드: name (한글명), symbol (기호), scoreModifier (가점/감점: 20, -15, -5, 0), isOfficer (관성 여부)
   - Helper method: fromName(String) - 십신 이름으로 상수 조회
   - 관운 분석용 점수 수정자: 정관/편관 +20, 식신/상관 -15, 비견/겁재 -5, 기타 0
   - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/TenGodConstants.java`
 
-- [v] T062 Create `HiddenStemConstants` enum in `career/enums/`
+- [v] T080 Create `HiddenStemConstants` enum in `career/enums/`
   - 지지별(子, 丑, 寅, ..., 亥) 지장간 정의: Map<String, List<String>>
   - 지장간 보정 점수: 정관·편관(+5), 식신·상관(-3)
   - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/HiddenStemConstants.java`
 
-- [v] T063 Create `CareerFortuneConstants` in `career/constants/`
+- [v] T081 Create `CareerFortuneConstants` in `career/constants/`
   - 관운 신뢰도 임계값: CONFIDENCE_THRESHOLD_HIGH (75), MEDIUM (50), LOW (25) 등
   - H1/H2 판정 상수: FIRST_HALF ("H1"), SECOND_HALF ("H2")
   - 관성 점수 범위: MAX_CONFIDENCE (100), MIN_CONFIDENCE (0)
@@ -774,13 +1159,13 @@ And:   Missing user birthTime → 400 Bad Request
 
 **2. API 통신 상수** (SajuDataService, ConsultationService, CompanyInfoService)
 
-- [v] T064 Create `ApiTimeoutConstants` in `career/constants/`
+- [v] T082 Create `ApiTimeoutConstants` in `career/constants/`
   - FastAPI 타임아웃: FASTAPI_TIMEOUT_SECONDS (3), MAX_RETRIES (2)
   - OpenAI 타임아웃: OPENAI_TIMEOUT_SECONDS (8), MAX_RETRIES (1)
   - 공공데이터API 타임아웃: PUBLIC_DATA_TIMEOUT_SECONDS (5), MAX_RETRIES (1)
   - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/ApiTimeoutConstants.java`
 
-- [v] T065 Create `ApiEndpointConstants` in `career/constants/`
+- [v] T083 Create `ApiEndpointConstants` in `career/constants/`
   - FastAPI 엔드포인트: SAJU_CALCULATE_ENDPOINT ("/api/saju/calculate")
   - OpenAI 모델: OPENAI_MODEL ("gpt-4o-mini")
   - 응답 형식: JSON_RESPONSE_FORMAT ("JSON_OBJECT")
@@ -788,7 +1173,7 @@ And:   Missing user birthTime → 400 Bad Request
 
 **3. 데이터 검증 상수** (validators in Service/Controller)
 
-- [v] T066 Create `ValidationConstants` in `career/constants/`
+- [v] T084 Create `ValidationConstants` in `career/constants/`
   - 천간/지지 개수: REQUIRED_HEAVENLY_STEMS (4), REQUIRED_EARTHLY_BRANCHES (4)
   - 생년월일 범위: EARLIEST_BIRTH_DATE ("1900-01-01")
   - 신뢰도 범위: MIN_SCORE (0), MAX_SCORE (100)
@@ -796,18 +1181,18 @@ And:   Missing user birthTime → 400 Bad Request
 
 **4. 응답 메시지 상수** (GlobalExceptionHandler, Service)
 
-- [v] T067 Create `ErrorMessageConstants` enum in `career/enums/`
+- [v] T085 Create `ErrorMessageConstants` enum in `career/enums/`
   - 각 예외 타입별 메시지: INVALID_DATE_FORMAT, FASTAPI_TIMEOUT, OPENAI_API_TIMEOUT, COMPANY_NOT_FOUND 등
   - Error code 정의: "INVALID_SAJU_DATA", "EXTERNAL_API_TIMEOUT" 등
   - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/ErrorMessageConstants.java`
 
-- [v] T068 Create `SuccessMessageConstants` enum in `career/enums/`
+- [v] T086 Create `SuccessMessageConstants` enum in `career/enums/`
   - API 성공 메시지: "관운 분석 완료", "AI 커리어 컨설팅 완료" 등
   - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/SuccessMessageConstants.java`
 
 **5. 기업 궁합 분석 상수** (CompatibilityScoreCalculator)
 
-- [v] T069 Create `CompatibilityConstants` in `career/constants/`
+- [v] T087 Create `CompatibilityConstants` in `career/constants/`
   - 호환성 점수 범위: MIN_COMPATIBILITY (0), MAX_COMPATIBILITY (100)
   - 신뢰도 수준: CONFIDENCE_HIGH ("HIGH"), MEDIUM ("MEDIUM"), LOW ("LOW")
   - 기본 설립 시간: DEFAULT_FOUNDING_TIME ("12:00")
@@ -815,21 +1200,21 @@ And:   Missing user birthTime → 400 Bad Request
 
 **6. 피드백 상수** (FeedbackService, UserSatisfactionFeedback)
 
-- [v] T070 Create `FeedbackConstants` enum in `career/enums/`
+- [v] T088 Create `FeedbackConstants` enum in `career/enums/`
   - 피드백 타입: CAREER_TIMING, CONSULTATION, COMPATIBILITY (이미 FeedbackType.java에 존재, 유지)
   - 만족도 상태: SATISFIED, DISSATISFIED (이미 SatisfactionStatus.java에 존재, 유지)
   - File: `SSAju/src/main/java/ssafy/SSAju/career/enums/FeedbackConstants.java` (또는 기존 enum 참조만)
 
 **7. 프롬프트/설정 상수** (ConsultationService, PromptProvider)
 
-- [v] T071 Create `PromptTemplateConstants` in `career/constants/`
+- [v] T089 Create `PromptTemplateConstants` in `career/constants/`
   - OpenAI 프롬프트 템플릿 부분 (현재 연도, 타임라인 개월, 16개 필드 그룹 등)
   - JSON 스키마 필드명 정의 (일관성 유지)
   - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/PromptTemplateConstants.java`
 
 **8. HTTP 응답 상수** (ApiResponse 형식)
 
-- [v] T072 Create `ApiResponseConstants` in `career/constants/`
+- [v] T090 Create `ApiResponseConstants` in `career/constants/`
   - HTTP 상태 코드: OK (200), BAD_REQUEST (400), NOT_FOUND (404), SERVICE_UNAVAILABLE (503) 등
   - 응답 헤더: CONTENT_TYPE ("application/json")
   - File: `SSAju/src/main/java/ssafy/SSAju/career/constants/ApiResponseConstants.java`
@@ -873,7 +1258,9 @@ And:   Missing user birthTime → 400 Bad Request
 
 **Generated by `/speckit-tasks` on 2026-04-10**
 **Updated**: 2026-04-27 (Added HiddenStemCalculator, 지장간 calculation logic, company founding time 12:00 default)
-**Updated**: 2026-05-02 (Added Phase 3-Refactor: Entity Normalization. Replaced JSON storage with 7 normalized entities. Total tasks: 61. T031~T041 for refactoring, T042~T057 for US4/US3, T058~T060 for Phase 4)
-**Updated**: 2026-05-03 (Added Phase 3-Refactor-2: Magic Numbers & String Constants Extraction. Total 15 constant classes/enums, 9 groups. T061~T075 for constant extraction and refactoring. Total tasks now: 75)
-**Updated**: 2026-05-04 (Implemented T061 TenGodConstants Enum + Refactored T074 util classes. Created TenGodConstants with 10 十神 + 4 properties (name, symbol, scoreModifier, isOfficer). Refactored TenGodCalculator, CareerFortuneAnalyzer, CompatibilityScoreCalculator to use TenGodConstants instead of hardcoded strings. Removed all hardcoded 十神 names. Updated tasks.md T061, T074, T075 with implementation details and verification procedures.)
-**Status**: T061, T074 Complete. Ready for T075 (test execution & validation)
+**Updated**: 2026-05-02 (Added Phase 3-Refactor: Entity Normalization. Replaced JSON storage with 7 normalized entities. Total tasks: 61. T031~T041 for refactoring, T042~T075 for US4/US3, T076~T078 for Phase 4)
+**Updated**: 2026-05-03 (Added Phase 3-Refactor-2: Magic Numbers & String Constants Extraction. Total 15 constant classes/enums, 9 groups. T079~T075 for constant extraction and refactoring. Total tasks now: 75)
+**Updated**: 2026-05-04 (Implemented T079 TenGodConstants Enum + Refactored T074 util classes. Created TenGodConstants with 10 十神 + 4 properties (name, symbol, scoreModifier, isOfficer). Refactored TenGodCalculator, CareerFortuneAnalyzer, CompatibilityScoreCalculator to use TenGodConstants instead of hardcoded strings. Removed all hardcoded 十神 names. Updated tasks.md T079, T074, T075 with implementation details and verification procedures.)
+**Updated**: 2026-05-06 (Added Phase 3-Refactor-3: JSON Normalization, Prompt Separation, Constants Extraction. Added T069-T080 (12 new tasks). Renumbered US3 tasks to T081-T087 and Phase 4 tasks to T088-T090. Total tasks: 88.)
+**Updated**: 2026-05-06 (Added Phase 3-Enhancement: REST Communication, Concurrency Control, JPA Entity Design, Architecture Improvement. Added T051-T068 (18 new tasks). Shifted Phase 3-Refactor-3 to T069-T080, US3 to T081-T087, Phase 4 to T088-T090. Total tasks now: 106. Focus: RestClient+Spring Retry, JdbcTemplate INSERT IGNORE, @CreatedDate/@LastModifiedDate, Entity equals/hashCode, Value Objects, Validators.)
+**Status**: Phase 3-Enhancement Planning Complete. Ready for T051 (RestClient implementation)

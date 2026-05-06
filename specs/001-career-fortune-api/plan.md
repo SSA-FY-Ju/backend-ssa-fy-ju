@@ -42,18 +42,41 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - **Provider**: 재사용 가능한 데이터 조회/생성 + 설정/프롬프트 관리 (동시성 보정, 경량 데이터 접근 포함). 예: UserProfileProvider, SajuResultProvider, PromptProvider, ConfigProvider
 - **Exception**: @RestControllerAdvice + 커스텀 예외 우선. 경계 어댑터(ConsultationOpenAICaller 등)가 외부 오류를 도메인 예외로 변환하는 제한적 try-catch는 허용. 비즈니스 예외를 무조건 삼키는 것 금지
 
-**Key Technical Decisions** (Session 2026-04-30 + Service Layer Optimization):
+**Key Technical Decisions** (Session 2026-04-30 + Service Layer Optimization + Phase 3-Enhancement + Phase 3-Refactor-3):
+
+**핵심 기능 설계**:
 - **1-Call API Design**: `/api/career/consultation` 엔드포인트가 내부적으로 모든 외부 API 호출 오케스트레이션 (FastAPI, OpenAI). 클라이언트는 birthDate + birthTime만 제공하고, 모든 계산(십신, 지장간, 관운 분석) 및 16개 필드 그룹의 완전한 AI 조언을 한 번의 요청으로 수신.
 - **Expanded Response (16+ Field Groups)**: ConsultationResponse는 19개 필드 포함: 기본 조언(industries, interviewTips, strengths) + 관운 분석(favoredPeriod, confidenceScore, reasoning) + 사주 프로필(sajuProfile with dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods) + OpenAI 분석(cautions, wealthStyle, longTermRoadmap, personalBranding, powerKeywords, mentalCare, environmentFit, workStyle, relationshipStrategy, careerTimeline). OpenAI 프롬프트에 현재 연도, 12개월 타임라인, 모든 필드 그룹 포함.
-- **Transaction Separation**: ConsultationService에서 @Transactional 제거. FastAPI/OpenAI I/O는 트랜잭션 밖에서 수행. 각 DB 작업은 Repository의 @Transactional에 의해 개별 트랜잭션으로 실행. Network 지연이 Connection Pool을 점유하지 않음.
-- **Jackson 3.x (Spring Boot 4.0.5)**: 패키지명이 `tools.jackson.*`으로 변경됨. `com.fasterxml.jackson.*`은 Jackson 2.x용이므로 사용 금지.
 - **Spring AI ChatClient**: OpenAI JSON Mode로 `CareerAdviceResponse` record에 자동 매핑. 16개 필드 그룹 모두 포함. 타입 안전성 + 에러 처리 자동화.
-- **Race Condition Handling**: `DataIntegrityViolationException` 발생 시 호출 서비스에서 catch하여 다시 find 수행 (이미 생성된 결과 재사용).
-- **Service Layer Lightweight Patterns** (2026-05-02):
-  - **Prompt 외부 분리**: PromptProvider 컴포넌트가 프롬프트 생성 담당. Service는 PromptProvider 호출만 수행.
-  - **Analyzer 분리**: CareerFortuneAnalyzer, TenGodCalculator, HiddenStemCalculator는 분석만 담당. Service는 이들을 조합(Composition)하여 orchestration.
-  - **Mapper 분리**: CareerConsultationMapper, SajuMapper 등이 DTO ↔ Entity 변환 담당. Service는 mapper 호출만 수행.
-  - **Domain Model 캡슐화**: 엔티티는 비즈니스 메서드(validate*, is*, build*)를 제공. Service는 getter로 필드 꺼내 로직을 짜지 말 것.
+- **Jackson 3.x (Spring Boot 4.0.5)**: 패키지명이 `tools.jackson.*`으로 변경됨. `com.fasterxml.jackson.*`은 Jackson 2.x용이므로 사용 금지.
+
+**성능 및 동시성 최적화**:
+- **Transaction Separation**: ConsultationService에서 @Transactional 제거. FastAPI/OpenAI I/O는 트랜잭션 밖에서 수행. 각 DB 작업은 Repository의 @Transactional에 의해 개별 트랜잭션으로 실행. Network 지연이 Connection Pool을 점유하지 않음.
+  - 목표: 5000명 동시 사용자 처리 (기본 Connection Pool로)
+  - 결과: Connection Pool 고갈 방지, 응답 시간 15초 이내 달성 (OpenAI 8초 타임아웃 포함)
+
+- **RestClient + Spring Retry** (Phase 3-Enhancement): WebClient의 무거운 Reactive 의존성 제거. 동기식 호출에 적합한 경량 RestClient 도입. Spring Retry로 지수 백오프 재시도 (1초, 2초, 4초).
+  - 적용 대상: FastAPI (3초 타임아웃, 2회 재시도), 공공데이터API (5초 타임아웃, 1회 재시도)
+  - 이점: Reactive 오버헤드 제거, 코드 간결성, Spring Retry와 자연스러운 결합
+
+- **Race Condition 처리** (Phase 3-Enhancement): JdbcTemplate INSERT IGNORE 활용으로 안전한 동시 insert
+  - 문제: 동일한 생년월일시를 가진 사용자 2명 이상 동시 요청 시 SajuResult 중복 insert 위험
+  - 해결: UNIQUE 제약 조건 + INSERT IGNORE native query로 원자적 처리
+  - 코드 위치: `SajuResultJdbcRepository.insertOrIgnore()`
+  - 테스트: H2 MySQL 모드 (`jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE`)에서 검증
+
+**데이터 모델링**:
+- **JPA Auditing (@CreatedDate/@LastModifiedDate)**: 수동 @PreUpdate 제거. Spring Data JPA 자동 타임스탐프 관리로 일관성 보장.
+- **Entity equals&hashCode ID 기준 구현**: Lombok @EqualsAndHashCode 금지. 지연 로딩(Lazy Loading) 중 Proxy 객체 비교 시 정확성 보장.
+- **Value Objects (TenGodDistribution, HiddenStems, FiveElements)**: Map<String, Integer> 같은 원시 컬렉션 대신 일급 컬렉션으로 래핑. 데이터 의미 명확화, 비즈니스 로직 응집.
+- **완전 정규화**: SajuResult.fullSajuData (Map) → SajuFullData (1:1 엔티티) 이동. JSON 컬럼 제거. Phase 3-Refactor-3에서 완료.
+
+**Service 계층 최적화**:
+- **PromptProvider 분리**: ConsultationService의 buildPrompt 메서드를 별도 PromptProvider 컴포넌트로 외부화. 프롬프트 수정이 서비스 로직에 영향을 주지 않도록 캡슐화.
+- **Analyzer 분리**: CareerFortuneAnalyzer, TenGodCalculator, HiddenStemCalculator는 분석만 담당. Service는 이들을 조합(Composition)하여 orchestration.
+- **Mapper 분리**: CareerConsultationMapper, SajuMapper, SajuResultMapper 등이 DTO ↔ Entity 변환 담당. SajuResultMapper는 SajuFullData 변환 추가.
+- **Domain Model 캡슐화**: 엔티티는 비즈니스 메서드(validate*, is*, build*)를 제공. Service는 getter로 필드 꺼내 로직을 짜지 말 것.
+- **Validator 분리**: SajuValidator, RequestValidator, CompatibilityValidator 등으로 검증 로직 전문화. Service 책임 분리로 재사용성/테스트성 향상.
 
 **Constraints**:
 - Phase 1: Redis/Global 캐싱 금지 (도메인 로직 정확성 우선)
@@ -339,8 +362,10 @@ User (로그인 정보 포함)
 SajuResult (1:1 to UserProfile)
 ├── id: Long (PK)
 ├── userProfileId: Long (FK to UserProfile, NOT NULL)
-├── fullSajuData: LONGTEXT (FastAPI 원본 JSON 응답 저장 - 직렬화용)
+├── fullSajuData: LONGTEXT (FastAPI 원본 JSON 응답 저장 - Phase 1, 직렬화용)
+│   [Phase 3-Refactor-3: SajuFullData 엔티티로 이동]
 ├── fetchedAt: LocalDateTime
+├── (1:1) → SajuFullData (FastAPI 데이터 정규화, Phase 3-Refactor-3 추가)
 ├── (1:N) → TenGodData (십신 분포 - 각 십신별 행)
 ├── (1:1) → CareerFortune (관운 분석)
 ├── (1:N) → HiddenStemData (지지별 지장간 - 각 지장간별 행)
@@ -362,6 +387,16 @@ HiddenStemData (1:N to SajuResult, 지지별 지장간 - 행 단위 정규화)
 ├── hiddenStem: String (해당 지지의 지장간, e.g., "癸", "辛", "己" 등 - 1개만)
 ├── createdAt: LocalDateTime
 └── **설계**: "丑": ["癸", "辛", "己"] → 3개 행 (각 지장간별 행 분리, 완전 정규화)
+
+SajuFullData (1:1 to SajuResult, Phase 3-Refactor-3 추가, FastAPI 원본 데이터 정규화)
+├── id: Long (PK)
+├── sajuResultId: Long (FK to SajuResult, NOT NULL, UNIQUE)
+├── yearPillar, monthPillar, dayPillar, hourPillar: String (天干地支 조합)
+├── dayMaster: String (일간)
+├── dayMasterElement: String (일간의 오행)
+├── fiveElements: JSON 또는 1:N (오행 분포)
+├── solarCorrection: JSON (선택사항)
+└── createdAt: LocalDateTime
 
 CareerFortune (1:1 to SajuResult, 관운 분석)
 ├── id: Long (PK)

@@ -35,6 +35,57 @@ Spring Boot 프로젝트는 다음 4개 계층으로 분리합니다:
 | **Repository** | DB 접근만 담당 (Spring Data JPA) | 순수 데이터 접근, 쿼리만 담당 |
 | **Global Exception Handler** | @RestControllerAdvice로 모든 예외 처리 | try-catch 금지 |
 
+## Service 계층 설계 패턴 (Phase 3-Refactor-3 최종)
+
+### 1. PromptProvider 분리 (프롬프트 외부화)
+
+**패턴**: Service는 비즈니스 로직(orchestration)만, PromptProvider는 프롬프트 생성 담당
+
+```java
+// PromptProvider.java (Phase 3-Refactor-3)
+@Component
+public class PromptProvider {
+    public String getCareerConsultationPrompt(SajuData sajuData, int currentYear, 
+                                               LocalDate birthDate, LocalTime birthTime) {
+        // 16개 필드 그룹, 12개월 타임라인, 십신 + 지장간 포함
+        // 완전히 정의된 JSON 스키마 포함
+        return String.format(
+            "사주 분석 시스템 프롬프트\n" +
+            "일간: %s\n" +
+            "오행: %s\n" +
+            "십신: %s\n" +
+            "지장간: %s\n" +
+            "현재 연도: %d\n" +
+            "응답 형식: [16개 필드 그룹 완전 정의]",
+            sajuData.dayMaster(), ...
+        );
+    }
+}
+
+// ConsultationService.java (Phase 3-Refactor-3 수정)
+@Service
+public class ConsultationService {
+    private final PromptProvider promptProvider;
+    
+    public ConsultationResponse getConsultation(ConsultationRequest req) {
+        // 1. 프롬프트 생성 (PromptProvider 위임)
+        String prompt = promptProvider.getCareerConsultationPrompt(
+            sajuData, LocalDate.now().getYear(), req.birthDate(), req.birthTime());
+        
+        // 2. OpenAI 호출
+        CareerAdviceResponse response = chatClient.prompt().user(prompt).call().entity(...);
+        
+        // 3. 응답 반환
+        return toResponse(response);
+    }
+}
+```
+
+**이점**:
+- ✅ 프롬프트 변경이 Service 로직에 영향 없음
+- ✅ 프롬프트 버전 관리 용이 (PromptProvider에서만)
+- ✅ 테스트 시 PromptProvider mock 가능
+
 ## Service 계층의 DTO 변환 및 계산 로직
 
 ### 데이터베이스 저장 vs API 응답 분리
@@ -110,64 +161,14 @@ public CompatibilityResponse analyzeCompatibility(LocalDate userBirthDate, ...) 
 
 ## 상수 관리 및 도메인 모델
 
-### 원칙: 매직 넘버 & 하드코딩된 String 제거
+**⚠️ 상수 관리의 상세 규칙 및 예제는 [`code-style-guide.md#상수-및-열거형-관리`](./code-style-guide.md)를 참고하세요.**
 
-**도메인 비즈니스 상수는 Enum으로 정의** (예: 십신, 피드백 타입)
-**기술 설정 상수는 Static Class로 정의** (예: 타임아웃, 임계값)
+### 핵심 원칙 (요약)
 
-#### 예시: TenGodConstants Enum (십신 관리)
-
-```java
-// ❌ 나쁜 패턴: 여러 파일에서 하드코딩
-public class CareerFortuneAnalyzer {
-    private static final List<String> OFFICER_GODS = List.of("정관", "편관");
-    public int calculateScore(String tenGodName) {
-        if (tenGodName.equals("정관") || tenGodName.equals("편관")) {
-            return 20;  // 매직 넘버
-        }
-    }
-}
-
-// ✅ 좋은 패턴: Enum으로 중앙 관리
-public enum TenGodConstants {
-    CHIEF_OFFICER("정관", "官", 20, true),
-    SIDE_OFFICER("편관", "殺", 20, true),
-    FOOD_GOD("식신", "食", -15, false),
-    INJURING_OFFICER("상관", "傷", -15, false),
-    COMPARING_FRIEND("비견", "比", -5, false),
-    ROBBING_WEALTH("겁재", "劫", -5, false),
-    // ... 기타 십신
-
-    private final String name;
-    private final int scoreModifier;
-    private final boolean isOfficer;
-
-    public static TenGodConstants fromName(String name) {
-        for (TenGodConstants tg : values()) {
-            if (tg.name.equals(name)) return tg;
-        }
-        return null;
-    }
-}
-
-// 사용: 모든 분석 클래스에서 일관되게 사용
-public int calculateOfficerScore(Map<String, Integer> distribution) {
-    int score = 0;
-    for (var entry : distribution.entrySet()) {
-        TenGodConstants tenGod = TenGodConstants.fromName(entry.getKey());
-        if (tenGod != null) {
-            score += entry.getValue() * tenGod.getScoreModifier();
-        }
-    }
-    return score;
-}
-```
-
-**이점**:
-- **일관성**: 모든 십신 정보를 한 곳에서 관리
-- **타입 안전**: String 비교 대신 Enum 사용
-- **확장성**: 새 십신 추가 시 한 곳만 수정
-- **유지보수성**: 점수 변경 시 Enum만 수정
+- **도메인 상수**: Enum으로 정의 (TenGodConstants, FeedbackType 등)
+- **기술 상수**: Static Class로 정의 (ApiTimeoutConstants, ValidationConstants 등)
+- **일관성**: 모든 매직 넘버와 하드코딩된 String 제거
+- **중앙화**: 여러 곳에서 사용하는 상수는 한 곳에서만 정의
 
 ## 예외 처리 원칙
 
@@ -216,6 +217,75 @@ public class GlobalExceptionHandler {
 - 모든 예외가 일관된 형식으로 응답
 - 컨트롤러 코드 간결
 - 에러 로깅 중앙화
+
+## RestClient + Spring Retry 패턴 (Phase 3-Enhancement)
+
+### RestClient의 이점 (WebClient 대비)
+
+**As-Is (WebClient)**:
+- Reactive 의존성 무거움
+- block() 호출로 동기 처리 → Reactive의 이점 상실
+- 복잡한 설정, 높은 학습곡선
+
+**To-Be (RestClient)**:
+- 경량 동기 HTTP 클라이언트
+- Spring Retry와 자연스럽게 결합
+- 직관적인 API
+
+### 구현 패턴
+
+```java
+// RestClient bean 설정
+@Configuration
+public class FastApiRestClientConfig {
+    @Bean
+    public RestClient fastApiRestClient() {
+        return RestClient.create();
+    }
+}
+
+// Service에서 RestClient + @Retryable 사용
+@Service
+public class SajuDataService {
+    private final RestClient restClient;
+    private final SajuResultJdbcRepository sajuResultJdbc;
+    
+    @Retryable(
+        retryFor = {TimeoutException.class},
+        maxAttempts = 3,
+        backoff = @Backoff(
+            delay = 1000,  // 1초
+            multiplier = 2.0  // 2배씩 증가 (1초, 2초, 4초)
+        )
+    )
+    public FastAPIResponse fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime) {
+        try {
+            return restClient
+                .post()
+                .uri("http://fastapi:8000/api/saju/calculate")
+                .body(new SajuRequest(birthDate, birthTime))
+                .retrieve()
+                .toEntity(FastAPIResponse.class)
+                .getBody();
+        } catch (HttpClientErrorException e) {
+            throw new InvalidSajuDataException("Invalid input", e);
+        } catch (HttpServerErrorException e) {
+            throw new FastAPITimeoutException("FastAPI error", e);
+        }
+    }
+}
+
+// 설정: application.yaml
+spring:
+  task:
+    retry:
+      max-attempts: 3
+```
+
+**이점**:
+- ✅ 경량 의존성 (Reactive 불필요)
+- ✅ Spring Retry로 지수 백오프 자동화
+- ✅ 명확한 예외 처리
 
 ## 외부 API 호출 패턴
 
@@ -932,6 +1002,65 @@ public class CareerFortuneService {
 
 ## Phase 3-Refactor: Entity Normalization 패턴
 
+### SajuFullData 완전 정규화 (Phase 3-Refactor-3)
+
+**목표**: SajuResult.fullSajuData (Map<String, Object>, JSON) → SajuFullData (1:1 엔티티)로 완전 정규화
+
+**변환 전**:
+```java
+// SajuResult에 JSON 저장
+Map<String, Object> fullSajuData = Map.of(
+    "yearPillar", "庚午",
+    "monthPillar", "丙戌",
+    "dayPillar", "己未",
+    "hourPillar", "辛寅",
+    "dayMaster", "己",
+    "dayMasterElement", "土",
+    "fiveElements", Map.of("木", 1, "火", 2, ...),
+    "solarCorrection", Map.of(...)
+);
+sajuResult.setFullSajuData(fullSajuData);  // JSON 컬럼
+```
+
+**변환 후**:
+```java
+// SajuFullData 엔티티 저장
+SajuFullData data = SajuFullData.builder()
+    .sajuResult(sajuResult)
+    .yearPillar("庚午")
+    .monthPillar("丙戌")
+    .dayPillar("己未")
+    .hourPillar("辛寅")
+    .dayMaster("己")
+    .dayMasterElement("土")
+    .fiveElements(Map.of("木", 1, "火", 2, ...))  // JSON 또는 1:N 엔티티
+    .solarCorrection(Map.of(...))
+    .build();
+sajuFullDataRepository.save(data);  // 정규화된 엔티티
+```
+
+**설계 트레이드오프**:
+- **완전 정규화**: fiveElements도 1:N 엔티티로 → 가장 많은 쿼리 유연성
+- **선택적 JSON 유지**: dayMaster/dayMasterElement는 엔티티, fiveElements는 JSON → 균형잡힌 정규화 (권장)
+
+**Mapper 업데이트**:
+```java
+// SajuResultMapper.java
+public SajuFullData toSajuFullData(FastAPIResponse apiResponse, SajuResult sajuResult) {
+    return SajuFullData.builder()
+        .sajuResult(sajuResult)
+        .yearPillar(apiResponse.yearPillar())
+        .monthPillar(apiResponse.monthPillar())
+        .dayPillar(apiResponse.dayPillar())
+        .hourPillar(apiResponse.hourPillar())
+        .dayMaster(extractDayMaster(apiResponse))  // 일간 추출 로직
+        .dayMasterElement(extractDayMasterElement(apiResponse))
+        .fiveElements(apiResponse.fiveElements())
+        .solarCorrection(apiResponse.solarCorrection())
+        .build();
+}
+```
+
 ### JSON → 행 단위 정규화 (TenGodData, HiddenStemData)
 
 **목표**: JSON 컬럼을 완전히 정규화된 엔티티로 변환하여 쿼리 최적화 + 타입 안전성 향상
@@ -1083,9 +1212,229 @@ public class CareerFortuneService {
   - CQRS, Event Sourcing 등은 나중에 검토
   - 기본 CRUD 패턴으로 시작
 
+## 엔티티 정규화 패턴 (Phase 3-Refactor-3)
+
+### Map → Entity 변환: tenGodDistribution, hiddenStems, fullSajuData
+
+**문제**: Phase 3.1-3.2에서 Saju 데이터를 JSON (Map)으로 임시 저장하면:
+- ❌ 타입 안전성 부족 (Map<String, Object> = 모든 type 가능)
+- ❌ 쿼리 성능 저하 (JSON 컬럼은 인덱스 불가, 부분 검색 어려움)
+- ❌ 일관성 관리 어려움 (여러 곳에서 Map 구조 다를 수 있음)
+
+**해결책**: 정규화된 엔티티로 변환
+
+#### Pattern 1: tenGodDistribution (Map<String, Integer> → TenGodData 엔티티)
+
+```
+Phase 3.1-3.2 (임시):
+SajuResult { 
+    tenGodDistribution: { "정관": 20, "식신": 15, ... } ← JSON 저장
+}
+
+Phase 3-Refactor (정규화):
+SajuResult {
+    @OneToMany(mappedBy="sajuResult", fetch=LAZY, cascade=ALL)
+    List<TenGodData> tenGodDataList
+}
+
+TenGodData {
+    id, sajuResultId (FK), tenGodName, score, createdAt
+}
+
+// 데이터 예시:
+TenGodData(id=1, sajuResultId=100, tenGodName="정관", score=20)
+TenGodData(id=2, sajuResultId=100, tenGodName="식신", score=15)
+```
+
+**이점**:
+- ✅ 각 십신이 별도 행 → 신뢰도 높음, 타입 안전
+- ✅ tenGodName에 인덱스 가능 → "정관" 포함 분석 빠름
+- ✅ Mapper: `List<TenGodData> toTenGodDataList(Map<String, Integer> map)` 로직 명확
+
+#### Pattern 2: hiddenStems (Map<String, List<String>> → HiddenStemData 엔티티)
+
+```
+Phase 3.1-3.2 (임시):
+SajuResult { 
+    hiddenStems: { "子": ["癸"], "丑": ["癸", "辛", "己"], ... } ← JSON 저장
+}
+
+Phase 3-Refactor (정규화):
+SajuResult {
+    @OneToMany(mappedBy="sajuResult", fetch=LAZY, cascade=ALL)
+    List<HiddenStemData> hiddenStemDataList
+}
+
+HiddenStemData {
+    id, sajuResultId (FK), earthlyBranch, hiddenStem, createdAt
+}
+
+// 데이터 예시:
+HiddenStemData(id=1, sajuResultId=100, earthlyBranch="子", hiddenStem="癸")
+HiddenStemData(id=2, sajuResultId=100, earthlyBranch="丑", hiddenStem="癸")
+HiddenStemData(id=3, sajuResultId=100, earthlyBranch="丑", hiddenStem="辛")
+HiddenStemData(id=4, sajuResultId=100, earthlyBranch="丑", hiddenStem="己")
+```
+
+**이점**:
+- ✅ 지지별 지장간 1행 = 1개 관계 → 명확성 높음
+- ✅ earthlyBranch + hiddenStem에 복합 인덱스 가능
+- ✅ Mapper: 네스트된 Map을 flat list로 변환 용이
+
+```java
+// Mapper 예시
+public List<HiddenStemData> toHiddenStemDataList(Map<String, List<String>> hiddenStems) {
+    return hiddenStems.entrySet().stream()
+        .flatMap(branch -> 
+            branch.getValue().stream()
+                .map(stem -> new HiddenStemData(branch.getKey(), stem))
+        )
+        .collect(Collectors.toList());
+}
+```
+
+#### Pattern 3: fullSajuData (Map<String, Object> → SajuFullData 엔티티)
+
+```
+Phase 3.1-3.2 (임시):
+SajuResult { 
+    fullSajuData: { 
+        "yearPillar": "甲子", "dayMaster": "甲", 
+        "fiveElements": { "木": 2, "火": 1, ... },
+        "solarCorrection": { ... }
+    } ← JSON 저장
+}
+
+Phase 3-Refactor-3 (정규화):
+SajuResult {
+    @OneToOne(fetch=LAZY, cascade=ALL)
+    @JoinColumn(name="saju_full_data_id", unique=true)
+    SajuFullData sajuFullData
+}
+
+SajuFullData {
+    id, sajuResultId (FK, unique), 
+    yearPillar, monthPillar, dayPillar, hourPillar (String),
+    dayMaster, dayMasterElement (String),
+    fiveElements (Map, JSON 유지 가능),
+    solarCorrection (Map, JSON 유지 가능),
+    createdAt (@CreatedDate)
+}
+
+// 데이터 예시:
+SajuFullData(id=1, sajuResultId=100, yearPillar="甲子", dayMaster="甲", 
+    dayMasterElement="木", fiveElements={"木":2, "火":1}, ...)
+```
+
+**설계 결정** (완전 정규화 vs. 선택적 JSON 유지):
+- yearPillar, dayMaster, dayMasterElement: 엔티티 필드 (자주 조회/필터링)
+- fiveElements, solarCorrection: JSON 유지 (변경 빈도 낮음, 복합 구조)
+
+**이점**:
+- ✅ yearPillar, dayMaster에 인덱스 가능
+- ✅ 1:1 관계로 조인 성능 우수
+- ✅ JSON 컬럼 개수 최소화 → DB 성능 향상
+
 ---
 
 ---
+
+## Race Condition 안전 처리 (JdbcTemplate INSERT IGNORE)
+
+### 문제: SajuResult 동시 Insert
+
+**As-Is**:
+```java
+// DataIntegrityViolationException 발생 → 로깅만 하거나 재시도
+try {
+    repository.save(sajuResult);
+} catch (DataIntegrityViolationException e) {
+    log.warn("Race condition: {}", e);
+    // 문제: 예외 발생 후 처리 로직 불명확
+}
+```
+
+**To-Be**: JdbcTemplate INSERT IGNORE
+
+```java
+// SajuResultJdbcRepository.java
+@Repository
+public class SajuResultJdbcRepository {
+    private final JdbcTemplate jdbcTemplate;
+    
+    public int insertOrIgnore(SajuResult result) {
+        String sql = "INSERT IGNORE INTO saju_result " +
+            "(user_profile_id, birth_date, birth_time, full_saju_data, created_at) " +
+            "VALUES (?, ?, ?, ?, ?)";
+        
+        return jdbcTemplate.update(sql,
+            result.getUserProfile().getId(),
+            result.getBirthDate(),
+            result.getBirthTime(),
+            serializeMap(result.getFullSajuData()),
+            LocalDateTime.now()
+        );
+    }
+}
+
+// Service에서 사용
+@Service
+public class SajuDataService {
+    private final SajuResultJdbcRepository sajuResultJdbc;
+    private final SajuResultRepository sajuResultRepo;
+    
+    public SajuResult fetchOrCreateSajuResult(UserProfile userProfile, FastAPIResponse response) {
+        // 1. JdbcTemplate INSERT IGNORE 시도
+        int inserted = sajuResultJdbc.insertOrIgnore(
+            new SajuResult(userProfile, response, ...)
+        );
+        
+        // 2. inserted=1 (새로 삽입) 또는 0 (이미 존재)
+        if (inserted == 1) {
+            return sajuResultRepo.findLatestByUserProfileId(userProfile.getId())
+                .orElseThrow();
+        } else {
+            // 이미 존재 → 기존 데이터 반환
+            return sajuResultRepo.findLatestByUserProfileId(userProfile.getId())
+                .orElseThrow();
+        }
+    }
+}
+```
+
+**UNIQUE 제약**:
+```sql
+-- schema.sql
+ALTER TABLE saju_result 
+ADD UNIQUE KEY unique_user_saju (user_profile_id, birth_date, birth_time);
+```
+
+**이점**:
+- ✅ Race condition 안전: UNIQUE 제약으로 중복 insert 방지
+- ✅ 명확한 반환값: inserted=1/0 구분
+- ✅ 예외 처리 불필요: INSERT IGNORE는 예외 발생 안 함
+- ✅ 성능: 네이티브 SQL로 최적화
+
+### H2 MySQL 모드 테스트
+
+**프로덕션 환경과의 호환성 보장**:
+
+```yaml
+# application-test.yaml
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+```
+
+**이점**:
+- ✅ INSERT IGNORE 테스트 가능
+- ✅ UNIQUE constraint 동작 검증
+- ✅ 프로덕션과 동일한 문법 (MySQL)
 
 ## 로깅 정책 (민감정보 보호)
 
