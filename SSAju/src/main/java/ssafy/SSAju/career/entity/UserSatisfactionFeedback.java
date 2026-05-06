@@ -27,6 +27,17 @@ public class UserSatisfactionFeedback {
     @JoinColumn(name = "saju_result_id", nullable = false)
     private SajuResult sajuResult;
 
+    // TODO: Phase 2 인증 추가 시 User 필드 추가 필요
+    // @ManyToOne(fetch = FetchType.LAZY)
+    // @JoinColumn(name = "user_id", nullable = false)
+    // private User user;
+    //
+    // 또한 @Table의 uniqueConstraints 추가:
+    // uniqueConstraints = {
+    //     @UniqueConstraint(name = "uk_feedback_saju_user", columnNames = {"saju_result_id", "user_id"})
+    // }
+    // → 사용자당 SajuResult당 피드백 1개만 가능
+
     @Enumerated(EnumType.STRING)
     @Column(name = "feedback_type", nullable = false)
     private FeedbackType feedbackType;

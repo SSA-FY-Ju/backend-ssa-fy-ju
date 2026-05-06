@@ -24,8 +24,12 @@ public class FeedbackController {
     @PostMapping("/satisfaction")
     public ResponseEntity<ApiResponse<SatisfactionFeedbackResponse>> submitFeedback(
             @Valid @RequestBody SatisfactionFeedbackRequest request
+            // TODO: Phase 2 로그인 추가 시 @AuthenticationPrincipal UserPrincipal user 추가
+            // - 현재는 인증 없음 (SecurityConfig.permitAll)
+            // - Phase 2에서 인증 컨텍스트 추가 후 현재 사용자 정보 받기
     ) {
         log.info("만족도 피드백 요청 수신");
+        // TODO: Phase 2에서 user 정보를 FeedbackService에 전달
         SatisfactionFeedbackResponse response = feedbackService.saveFeedback(request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }

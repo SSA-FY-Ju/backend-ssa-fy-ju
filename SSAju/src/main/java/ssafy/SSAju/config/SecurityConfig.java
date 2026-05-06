@@ -25,6 +25,11 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth ->
+                // TODO: Phase 2 인증 추가 시 다음과 같이 수정 필요
+                // auth
+                //     .requestMatchers("/api/feedback/**").authenticated()  // 피드백 엔드포인트는 인증 필수
+                //     .requestMatchers("/api/auth/**", "/api/saju/**").permitAll()  // 공개 엔드포인트
+                //     .anyRequest().authenticated();
                 auth.anyRequest().permitAll());
 
         return http.build();
