@@ -251,7 +251,7 @@ public class SajuDataService {
     private final SajuResultJdbcRepository sajuResultJdbc;
     
     @Retryable(
-        retryFor = {TimeoutException.class},
+        retryFor = {ResourceAccessException.class, RestClientResponseException.class},
         maxAttempts = 3,
         backoff = @Backoff(
             delay = 1000,  // 1초
@@ -267,19 +267,23 @@ public class SajuDataService {
                 .retrieve()
                 .toEntity(FastAPIResponse.class)
                 .getBody();
-        } catch (HttpClientErrorException e) {
-            throw new InvalidSajuDataException("Invalid input", e);
-        } catch (HttpServerErrorException e) {
-            throw new FastAPITimeoutException("FastAPI error", e);
+        } catch (ResourceAccessException e) {
+            // 네트워크/타임아웃 오류 → 재시도 대상 (@Retryable이 처리)
+            throw e;
+        } catch (RestClientResponseException e) {
+            // HTTP 4xx/5xx 응답 → 재시도 대상
+            if (e.getStatusCode().is4xxClientError()) {
+                throw new InvalidSajuDataException("Invalid input", e);
+            } else {
+                throw new FastAPITimeoutException("FastAPI error", e);
+            }
         }
     }
 }
 
-// 설정: application.yaml
-spring:
-  task:
-    retry:
-      max-attempts: 3
+// 주의: @Retryable은 annotation 속성으로만 제어됨
+// spring.task.retry.* 프로퍼티는 ThreadPoolTask* 설정용이므로
+// 여기서는 @Retryable의 maxAttempts, backoff로 직접 제어
 ```
 
 **이점**:
