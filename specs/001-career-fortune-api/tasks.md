@@ -595,7 +595,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 - [ ] T058 [Enhancement] Configure H2 MySQL mode in test
   - `application-test.properties` (또는 `application-test.yaml`)에:
-    ```
+    ```properties
     spring.datasource.url=jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE
     spring.datasource.driver-class-name=org.h2.Driver
     spring.h2.console.enabled=true
@@ -808,7 +808,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
     2. SajuResult 저장 시 SajuFullData, TenGodData, HiddenStemData, CareerFortune 모두 함께 저장
     3. CareerConsultation 저장 시 Industry, InterviewTip, Strength도 함께 저장
   - **Mapper 호출 패턴**:
-    ```
+    ```java
     SajuResult sajuResult = SajuResultMapper.toSajuResult(fastAPIResponse, userProfile);
     // 내부에서:
     // - sajuResult.fullSajuData = mapper.toSajuFullData(fastAPIResponse)
@@ -1121,11 +1121,11 @@ And:   Missing user birthTime → 400 Bad Request
 | Phase 3.2 (US2) | 9 | Consultation feature with TenGod + HiddenStem analysis | Parallel with US4 |
 | Phase 3-Refactor | 11 | **Entity Normalization**: 6 new entities (TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength) + 6 repositories + 2 service updates + 2 test updates. Replaces JSON storage with normalized entities. | Yes (parallel entity creation) |
 | Phase 3-Refactor-2 | 15 | **Constants Extraction**: 9 constant groups (15 classes/enums) for magic numbers/strings. Includes error/success messages, API timeouts, validation rules, etc. | Yes (parallel constant creation) |
-| Phase 3-Refactor-3 | 12 | **Advanced Normalization & Service Optimization**: (1) fullSajuData 완전 정규화 (SajuFullData 엔티티, T087~T074), (2) PromptProvider 분리 (T075~T077), (3) 남은 모든 상수 추출 (T078~T080) | Yes (parallel) |
-| Phase 3.4 (US4) | 9 | Feedback feature (T081~T089 재번호화) | Parallel with US2 |
-| Phase 3.3 (US3) | 7 | Company compatibility (P2) with RecommendedRole entity, 지장간 and 12:00 default (T081~T087 재번호화) | After core ready |
-| Phase 4 (Polish) | 3 | API documentation (Swagger), integration tests, final validation (T088~T090 재번호화) | After all stories |
-| **TOTAL** | **88** | Full MVP + Entity Normalization + Constants Extraction + PromptProvider + fullSajuData Normalization + 지장간 calculation + P2 foundation + API docs | Strategic parallelism |
+| Phase 3-Refactor-3 | 12 | **Advanced Normalization & Service Optimization**: (1) fullSajuData 완전 정규화 (SajuFullData 엔티티), (2) PromptProvider 분리, (3) 남은 모든 상수 추출 (T069~T080) | Yes (parallel) |
+| Phase 3.3 (US3) | 7 | Company compatibility (P2) with RecommendedRole entity, 지장간 and 12:00 default (T081~T087) | After core ready |
+| Phase 3.4 (US4) | 9 | Feedback feature (T081~T089) | Parallel with US2 |
+| Phase 4 (Polish) | 3 | API documentation (Swagger), integration tests, final validation (T088~T090) | After all stories |
+| **TOTAL** | **90** | Full MVP + Entity Normalization + Constants Extraction + PromptProvider + fullSajuData Normalization + 지장간 calculation + P2 foundation + API docs | Strategic parallelism |
 
 ---
 

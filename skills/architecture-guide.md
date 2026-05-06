@@ -1225,7 +1225,7 @@ public class CareerFortuneService {
 
 #### Pattern 1: tenGodDistribution (Map<String, Integer> → TenGodData 엔티티)
 
-```
+```text
 Phase 3.1-3.2 (임시):
 SajuResult { 
     tenGodDistribution: { "정관": 20, "식신": 15, ... } ← JSON 저장
@@ -1253,7 +1253,7 @@ TenGodData(id=2, sajuResultId=100, tenGodName="식신", score=15)
 
 #### Pattern 2: hiddenStems (Map<String, List<String>> → HiddenStemData 엔티티)
 
-```
+```text
 Phase 3.1-3.2 (임시):
 SajuResult { 
     hiddenStems: { "子": ["癸"], "丑": ["癸", "辛", "己"], ... } ← JSON 저장
@@ -1295,7 +1295,7 @@ public List<HiddenStemData> toHiddenStemDataList(Map<String, List<String>> hidde
 
 #### Pattern 3: fullSajuData (Map<String, Object> → SajuFullData 엔티티)
 
-```
+```text
 Phase 3.1-3.2 (임시):
 SajuResult { 
     fullSajuData: { 
