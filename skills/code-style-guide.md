@@ -740,7 +740,7 @@ public class SajuDataService {
     private final RestClient restClient;
 
     @Retryable(
-        retryFor = {ResourceAccessException.class, RestClientResponseException.class},
+        retryFor = {ResourceAccessException.class, HttpServerErrorException.class},  // 5xx만 재시도 (4xx 제외)
         maxAttempts = 3,
         backoff = @Backoff(delay = 1000, multiplier = 2.0)  // 1초, 2초, 4초
     )

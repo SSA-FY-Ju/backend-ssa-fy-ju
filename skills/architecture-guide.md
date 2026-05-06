@@ -1329,13 +1329,16 @@ SajuResult {
 
 Phase 3-Refactor-3 (정규화):
 SajuResult {
-    @OneToOne(fetch=LAZY, cascade=ALL)
-    @JoinColumn(name="saju_full_data_id", unique=true)
+    @OneToOne(fetch=LAZY, mappedBy="sajuResult")  // FK 소유 안 함 (inverse side)
     SajuFullData sajuFullData
 }
 
 SajuFullData {
-    id, sajuResultId (FK, unique), 
+    @OneToOne(fetch=LAZY)
+    @JoinColumn(name="saju_result_id", unique=true)  // FK 소유 (owning side)
+    SajuResult sajuResult;
+
+    id,
     yearPillar, monthPillar, dayPillar, hourPillar (String),
     dayMaster, dayMasterElement (String),
     fiveElements (Map, JSON 유지 가능),
@@ -1408,11 +1411,12 @@ public class SajuDataService {
     
     public SajuResult fetchOrCreateSajuResult(UserProfile userProfile, FastAPIResponse response) {
         // 1. JdbcTemplate INSERT IGNORE로 SajuResult 생성
-        SajuResult sajuResult = new SajuResult(userProfile, response.getBirthDate(), response.getBirthTime());
+        // saju_result 스키마: (user_profile_id, fetched_at), UNIQUE: user_profile_id
+        SajuResult sajuResult = new SajuResult(userProfile);
         int inserted = sajuResultJdbc.insertOrIgnore(sajuResult);
-        
+
         // 2. 조회하거나 새로 생성
-        SajuResult result = sajuResultRepo.findByUserProfileAndBirthDateAndBirthTime(...)
+        SajuResult result = sajuResultRepo.findByUserProfile(userProfile)
             .orElse(sajuResult);
         
         // 3. 정규화된 SajuFullData 저장

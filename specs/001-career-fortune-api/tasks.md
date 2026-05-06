@@ -569,7 +569,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - RestClient bean 생성 (default timeout, SSL 설정 등)
   - @EnableRetry 어노테이션 추가 (Spring Retry 활성화, application.yaml 설정 불필요)
   - Exponential backoff 정책: 1초, 2초, 4초 (최대 3회, @Retryable 어노테이션 속성으로 제어)
-  - Note: spring.task.retry.* 프로퍼티는 ThreadPoolTask* 설정용이므로 사용하지 말 것
+  - Note: `spring.task.retry.*` 프로퍼티는 `ThreadPoolTask*` 설정용이므로 사용하지 말 것
   - File: `SSAju/src/main/java/ssafy/SSAju/config/FastApiRestClientConfig.java`
 
 - [ ] T053 [Enhancement] Refactor `SajuDataService` to use RestClient

@@ -48,12 +48,12 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - **1-Call API Design**: `/api/career/consultation` 엔드포인트가 내부적으로 모든 외부 API 호출 오케스트레이션 (FastAPI, OpenAI). 클라이언트는 birthDate + birthTime만 제공하고, 모든 계산(십신, 지장간, 관운 분석) 및 16개 필드 그룹의 완전한 AI 조언을 한 번의 요청으로 수신.
 - **Expanded Response (16+ Field Groups)**: ConsultationResponse는 19개 필드 포함: 기본 조언(industries, interviewTips, strengths) + 관운 분석(favoredPeriod, confidenceScore, reasoning) + 사주 프로필(sajuProfile with dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods) + OpenAI 분석(cautions, wealthStyle, longTermRoadmap, personalBranding, powerKeywords, mentalCare, environmentFit, workStyle, relationshipStrategy, careerTimeline). OpenAI 프롬프트에 현재 연도, 12개월 타임라인, 모든 필드 그룹 포함.
 - **Spring AI ChatClient**: OpenAI JSON Mode로 `CareerAdviceResponse` record에 자동 매핑. 16개 필드 그룹 모두 포함. 타입 안전성 + 에러 처리 자동화.
-- **Jackson (Spring Boot 4.0.5)**: 프로젝트는 `com.fasterxml.jackson.*` 패키지를 사용. `@JsonProperty`, `@JsonFormat` 등 불필요한 어노테이션은 추가하지 말 것 (FastAPI 응답이 이미 camelCase이므로 Jackson 자동 매핑 동작).
 
 **성능 및 동시성 최적화**:
 - **Transaction Separation**: ConsultationService에서 @Transactional 제거. FastAPI/OpenAI I/O는 트랜잭션 밖에서 수행. 각 DB 작업은 Repository의 @Transactional에 의해 개별 트랜잭션으로 실행. Network 지연이 Connection Pool을 점유하지 않음.
   - 목표: 5000명 동시 사용자 처리 (기본 Connection Pool로)
   - 결과: Connection Pool 고갈 방지, 응답 시간 15초 이내 달성 (OpenAI 8초 타임아웃 포함)
+  - ⚠️ 원자성 조건: 여러 Repository에 걸친 쓰기가 모두 성공/실패해야 하는 경우에는 Service 계층 @Transactional 유지 필요 (단건 또는 독립적 DB 작업만 Repository @Transactional로 충분)
 
 - **RestClient + Spring Retry** (Phase 1): WebClient의 무거운 Reactive 의존성 제거. 동기식 호출에 적합한 경량 RestClient 도입. Spring Retry로 지수 백오프 재시도 (1초, 2초, 4초).
   - 적용 대상: FastAPI (3초 타임아웃, 2회 재시도), 공공데이터API (5초 타임아웃, 1회 재시도)
@@ -448,7 +448,7 @@ UserSatisfactionFeedback (1:N to SajuResult, 만족도 피드백)
 ├── sajuResultId: Long (FK to SajuResult, NOT NULL)
 ├── feedbackType: Enum (CAREER_TIMING/CONSULTATION/COMPATIBILITY, NOT NULL)
 ├── satisfactionStatus: Enum (SATISFIED/DISSATISFIED, NOT NULL)
-├── feedbackContent: TEXT (nullable, 최대 500자) - 사용자 상세 의견
+├── feedbackContent: VARCHAR(500) (nullable) - 사용자 상세 의견, @Size(max=500) 제약
 ├── createdAt: LocalDateTime
 └── (인덱스: sajuResultId + createdAt)
 ```

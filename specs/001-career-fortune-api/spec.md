@@ -30,7 +30,7 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 - Q: 사주 결과 및 컨설팅 기록 보관 정책은? → A: Phase 1에서는 무제한 보관. Phase 2에서 보관 정책 수립 예정.
 - Q: 서비스 신뢰도(Uptime SLA) 목표는? → A: Phase 1에서는 Best Effort 운영. Phase 2에서 SLA 수립 예정.
 - Q: 사용자 만족도 피드백 방식은? → A: 이진 평가(만족함/만족하지 않음) + 선택적 상세 의견(최대 500자) 수집. Phase 2에서 의견 기반 통계 시각화.
-- Q: UserSatisfactionFeedback의 분석 결과 추적 방식은? → A: SajuResultId FK + feedbackType(ENUM) + satisfactionStatus(ENUM) + feedbackContent(TEXT, 선택사항) 저장. 상세 의견으로 피드백 분석 가능.
+- Q: UserSatisfactionFeedback의 분석 결과 추적 방식은? → A: SajuResultId FK + feedbackType(ENUM) + satisfactionStatus(ENUM) + feedbackContent(VARCHAR(500), 선택사항) 저장. 상세 의견으로 피드백 분석 가능.
 
 ### Session 2026-04-24 (Birth Time Clarification)
 
