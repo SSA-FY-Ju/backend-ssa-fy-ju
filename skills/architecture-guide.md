@@ -47,7 +47,7 @@ Spring Boot 프로젝트는 다음 4개 계층으로 분리합니다:
 public class PromptProvider {
     public String getCareerConsultationPrompt(SajuData sajuData, int currentYear, 
                                                LocalDate birthDate, LocalTime birthTime) {
-        // 16개 필드 그룹, 12개월 타임라인, 십신 + 지장간 포함
+        // 23개 필드, 12개월 타임라인, 십신 + 지장간 포함
         // 완전히 정의된 JSON 스키마 포함
         return String.format(
             "사주 분석 시스템 프롬프트\n" +
@@ -56,7 +56,7 @@ public class PromptProvider {
             "십신: %s\n" +
             "지장간: %s\n" +
             "현재 연도: %d\n" +
-            "응답 형식: [16개 필드 그룹 완전 정의]",
+            "응답 형식: [23개 필드 완전 정의]",
             sajuData.dayMaster(), ...
         );
     }
@@ -251,7 +251,7 @@ public class SajuDataService {
     private final SajuResultJdbcRepository sajuResultJdbc;
     
     @Retryable(
-        retryFor = {ResourceAccessException.class, RestClientResponseException.class},
+        retryFor = {ResourceAccessException.class, HttpServerErrorException.class},  // 5xx만 재시도 (4xx 제외)
         maxAttempts = 3,
         backoff = @Backoff(
             delay = 1000,  // 1초
@@ -551,11 +551,11 @@ try {
 }
 ```
 
-### 2. OpenAI API (커리어 상담 - 16 Field Groups)
+### 2. OpenAI API (커리어 상담 - 23개 필드)
 
 ```
 모델: gpt-4o-mini
-기능: JSON Mode (구조화된 응답, 16개 필드 그룹)
+기능: JSON Mode (구조화된 응답, 23개 필드 - 5개 그룹)
 입력: {생년월일, 사주 데이터 (십신 + 지장간), 현재 연도, 12개월 타임라인 요청}
 응답: {
   // 기본 조언 (3 필드)
@@ -578,7 +578,7 @@ try {
     keyTenGods: ["正官", "偏官"]
   },
   
-  // OpenAI 분석 결과 (12 필드)
+  // OpenAI 분석 결과 (10 필드)
   cautions: [주의사항],
   wealthStyle: {incomeSource, financialAdvice, investmentTendency, additionalIncome},
   longTermRoadmap: {phase0to2years, phase3to5years, ultimateGoal, goalDescription},
@@ -636,7 +636,7 @@ record CareerTimeline(int year, Map<String, MonthFortune> months, List<PivotPoin
 record SajuProfile(String dayMaster, String dayMasterDescription, Map<String, Integer> fiveElements, String fiveElementsAnalysis, Map<String, Integer> tenGodDistribution, List<String> keyTenGods)
 ```
 
-**Spring AI 사용 (권장)** - JSON Mode 자동 처리 (16 Field Groups):
+**Spring AI 사용 (권장)** - JSON Mode 자동 처리 (23개 필드):
 ```java
 @Configuration
 public class ChatClientConfig {
@@ -648,19 +648,19 @@ public class ChatClientConfig {
 
 // Service에서 사용
 CareerAdviceResponse response = chatClient.prompt()
-    .user(prompt)  // 십신 + 지장간 + 현재 연도 + 12개월 타임라인 + 모든 16개 필드 그룹 요청
+    .user(prompt)  // 십신 + 지장간 + 현재 연도 + 12개월 타임라인 + 모든 23개 필드 요청
     .call()
     .entity(CareerAdviceResponse.class);  // 자동 JSON 매핑 (14+ nested record types)
 ```
 
-**1-Call Design Pattern (Expanded to 16 Field Groups)** (Session 2026-04-30):
+**1-Call Design Pattern (23개 필드 통합)** (Session 2026-04-30):
 
 ▶️ **실제 구현 참고**: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
 
 - **메서드**: `getCareerConsultation()` (line 53-136)
 - **흐름**: FastAPI 조회 → 십신/지장간 계산 → 관운 분석 → DB 저장 → OpenAI 호출 → 응답 반환
 - **트랜잭션**: @Transactional 제거 (Network I/O 동안 DB 커넥션 점유 방지)
-- **응답**: 19개 필드 (기본 조언 3 + 관운 분석 3 + 사주 프로필 1 + OpenAI 분석 12 필드)
+- **응답**: 23개 필드 (기본 조언 3 + 관운 분석 3 + 사주 프로필 내부 6 + OpenAI 분석 10 + 메타데이터 1)
 
 **프롬프트 구성** (실제 구현):
 
@@ -681,7 +681,7 @@ CareerAdviceResponse response = chatClient.prompt()
 **Transaction Separation** (Session 2026-04-30):
 - ConsultationService에서 @Transactional 제거 (Network I/O 시간 동안 DB 커넥션 점유 방지)
 - FastAPI 호출: 트랜잭션 밖
-- OpenAI 호출 (16개 필드 그룹 포함): 트랜잭션 밖
+- OpenAI 호출 (23개 필드 포함): 트랜잭션 밖
 - 각 DB 작업: Repository의 @Transactional에 의해 개별 트랜잭션으로 실행
 - Result: Connection Pool 고갈 방지, 응답 시간 15초 이내 달성 (OpenAI 8초 타임아웃 포함)
 
@@ -1422,14 +1422,14 @@ public class SajuDataService {
         // 3. 정규화된 SajuFullData 저장
         SajuFullData fullData = SajuFullData.builder()
             .sajuResult(result)
-            .yearPillar(response.getYearPillar())
-            .monthPillar(response.getMonthPillar())
-            .dayPillar(response.getDayPillar())
-            .hourPillar(response.getHourPillar())
-            .dayMaster(response.getDayMaster())
-            .dayMasterElement(response.getDayMasterElement())
-            .fiveElements(response.getFiveElements())
-            .solarCorrection(response.getSolarCorrection())
+            .yearPillar(response.yearPillar())        // record accessor (get 접두사 없음)
+            .monthPillar(response.monthPillar())
+            .dayPillar(response.dayPillar())
+            .hourPillar(response.hourPillar())
+            .dayMaster(response.dayMaster())
+            .dayMasterElement(response.dayMasterElement())
+            .fiveElements(response.fiveElements())
+            .solarCorrection(response.solarCorrection())
             .build();
         sajuFullDataRepo.save(fullData);  // SajuFullData는 별도 repository로 명시적 저장
 

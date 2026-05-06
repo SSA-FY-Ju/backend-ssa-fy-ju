@@ -96,7 +96,7 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 **Why this priority**: 직접 수익화 가능한 기능. 전문가 수준의 맞춤 조언으로 경쟁 차별화.
 
-**Independent Test**: 사주 데이터 입력 → OpenAI API 호출 → 구조화된 권고사항(16개 필드 그룹 포함) 반환. P1/P3 없이도 완전히 동작합니다.
+**Independent Test**: 사주 데이터 입력 → OpenAI API 호출 → 구조화된 권고사항(23개 필드) 반환. P1/P3 없이도 완전히 동작합니다.
 
 **Acceptance Scenarios**:
 
@@ -135,7 +135,7 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
    **메타데이터 (1개 필드)**:
    - openaiModelVersion: String
 2. **Given** 느린 외부 API(OpenAI), **When** Timeout 초과, **Then** 정중한 오류 메시지 + 재시도 안내 반환
-3. **Given** 유효한 사주 데이터, **When** 컨설팅 응답, **Then** 타임스탬프 + AI 모델 버전 메타데이터 + 모든 23개 필드 포함
+3. **Given** 유효한 사주 데이터, **When** 컨설팅 응답, **Then** AI 모델 버전 메타데이터(openaiModelVersion) + 모든 23개 필드 포함 (타임스탬프는 ApiResponse wrapper의 `timestamp` 필드로 별도 제공)
 
 ---
 

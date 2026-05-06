@@ -663,7 +663,7 @@ public class ConsultationService {
 **이유**:
 - ✅ Connection Pool 고갈 방지 (외부 API 지연이 커넥션을 점유하지 않음)
 - ✅ 5000명 동시 사용자 처리 가능
-- ✅ Repository 계층에서 개별 트랜잭션으로 관리 (일관성 유지)
+- ✅ Repository 계층에서 개별 트랜잭션으로 관리 (단, 원자성은 보장하지 않음 — 아래 트레이드오프 참고)
 - ✅ 네트워크 지연이 DB 성능에 영향을 주지 않음
 
 **⚠️ 트레이드오프 - 원자성 포기**:
@@ -689,7 +689,7 @@ log.debug("Saju calculation details: {}", result);
 
 ### 🔒 로깅 보안 정책 (민감 정보 보호)
 
-#### ❌ 로그에 절대 포함 금지
+#### ❌ 운영 로그(INFO/WARN/ERROR)에 포함 금지
 
 | 분류 | 금지 항목 | 이유 |
 |------|---------|------|
@@ -697,12 +697,14 @@ log.debug("Saju calculation details: {}", result);
 | **인증 정보** | API Key, Bearer 토큰, Authorization 헤더값 | 보안 누출 위험 |
 | **외부 API 원문** | FastAPI 요청 body 전문, OpenAI 프롬프트 | 민감한 사주 데이터 노출 |
 
+> **참고**: DEBUG 레벨은 개발 환경 전용. 프로덕션에서는 반드시 비활성화. DEBUG에도 API Key/토큰은 절대 포함 금지.
+
 #### ✅ 레벨별 올바른 로깅
 
 | 레벨 | 로그 내용 | 예시 |
 |------|---------|------|
 | **INFO** | 사용자 ID, API 상태코드, 지연시간(ms), 성공/실패만 | `log.info("Career timing analysis completed: userId={}, duration={}ms", userId, duration);` |
-| **DEBUG** | birthDate, API 요청/응답 전문, 상세 계산 정보 (프로덕션에서 비활성화) | `log.debug("Saju data: birthDate={}, response={}", birthDate, apiResponse);` |
+| **DEBUG** | API 요청/응답 전문, 상세 계산 정보 (프로덕션에서 비활성화, 민감정보 포함 가능) | `log.debug("FastAPI response: statusCode={}, body={}", statusCode, responseBody);` |
 | **ERROR** | 스택 트레이스, 민감 정보 제거 후 | `log.error("API call failed after 2 retries", exception);` |
 
 **예시**:
