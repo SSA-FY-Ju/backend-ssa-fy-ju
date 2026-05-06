@@ -704,23 +704,36 @@ log.debug("Saju calculation details: {}", result);
 | 레벨 | 로그 내용 | 예시 |
 |------|---------|------|
 | **INFO** | 사용자 ID, API 상태코드, 지연시간(ms), 성공/실패만 | `log.info("Career timing analysis completed: userId={}, duration={}ms", userId, duration);` |
-| **DEBUG** | API 요청/응답 전문, 상세 계산 정보 (프로덕션에서 비활성화, 민감정보 포함 가능) | `log.debug("FastAPI response: statusCode={}, body={}", statusCode, responseBody);` |
+| **DEBUG** | 상세 계산 정보, 개인정보가 마스킹/제거된 API 요청/응답 | `log.debug("FastAPI response: statusCode={}, body={}", statusCode, maskedBody);` |
 | **ERROR** | 스택 트레이스, 민감 정보 제거 후 | `log.error("API call failed after 2 retries", exception);` |
 
 **예시**:
 ```java
-// ❌ 금지: birthDate 로깅
-log.info("사용자 분석 요청 (birthDate={})", birthDate);
+// 1. 개인정보 (Personal Information)
+// ❌ 금지: 직접적인 개인정보 노출
+log.info("사용자 분석 요청 (birthDate={})", birthDate); 
+log.debug("상세 데이터 확인: email={}, phone={}", email, phone); // DEBUG라도 금지
 
-// ✅ 올바름: ID만 로깅
+// ✅ 올바름: 식별 가능한 내부 ID만 사용
 log.info("사용자 분석 요청 (userId={})", userId);
 
-// ❌ 금지: OpenAI 프롬프트 전문
-log.info("OpenAI 요청: {}", fullPrompt);
 
-// ✅ 올바름: DEBUG 레벨로 분리
-log.debug("OpenAI 요청: {}", fullPrompt);  // 프로덕션에서 비활성화됨
-log.info("OpenAI API 호출 완료: 토큰={}개", tokenCount);  // 운영 로그
+// 2. 외부 API 요청 및 프롬프트 (External API & Prompt)
+// ❌ 금지: 민감 정보가 포함된 원문 그대로 로깅
+log.info("OpenAI 요청: {}", fullPrompt); 
+log.debug("FastAPI 전문: {}", requestBody); // 사주/개인정보가 포함된 경우 DEBUG도 금지
+
+// ✅ 올바름: 민감 필드 마스킹 처리 또는 메타데이터만 기록
+log.debug("OpenAI 요청 (마스킹 완료): {}", mask(fullPrompt)); 
+log.info("OpenAI API 호출 완료: userId={}, usedTokens={}", userId, tokenCount);
+
+
+// 3. 에러 상황 (Error Handling)
+// ❌ 금지: 에러 메시지에 개인정보가 포함된 경우
+log.error("회원가입 실패: email={}", email);
+
+// ✅ 올바름: 에러 원인과 식별자만 기록
+log.error("회원가입 실패: userId={}, reason={}", userId, e.getMessage());
 ```
 
 ## RestClient + @Retryable 예외 처리
