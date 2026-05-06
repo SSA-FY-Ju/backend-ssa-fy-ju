@@ -104,11 +104,13 @@ public class SajuGlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadable(
             HttpMessageNotReadableException e, HttpServletRequest request) {
-        log.warn("JSON 파싱 실패: {}", e.getMessage());
+        String requestId = generateRequestId();
+        log.warn("JSON 파싱 실패: requestId={}, exceptionType={}", requestId, e.getClass().getSimpleName());
+        log.debug("JSON 파싱 상세 예외: requestId={}", requestId, e);
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.VALIDATION_FAILED.getCode(),
-                        "요청 본문을 파싱할 수 없습니다. 필드 값을 확인해주세요.", generateRequestId())));
+                        "요청 본문을 파싱할 수 없습니다. 필드 값을 확인해주세요.", requestId)));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

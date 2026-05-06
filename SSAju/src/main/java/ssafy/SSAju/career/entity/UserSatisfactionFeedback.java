@@ -35,7 +35,7 @@ public class UserSatisfactionFeedback {
     @Column(name = "satisfaction_status", nullable = false)
     private SatisfactionStatus satisfactionStatus;
 
-    @Column(name = "feedback_content", columnDefinition = "TEXT")
+    @Column(name = "feedback_content", length = 500)
     private String feedbackContent;
 
     @Column(name = "created_at", nullable = false)
