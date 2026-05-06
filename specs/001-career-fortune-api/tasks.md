@@ -475,7 +475,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 **Independent Test**: Feedback submission → Stored in DB → Returns success response (runs parallel with US2)
 **Expected Outcome**: Feedback collection API working, UserSatisfactionFeedback entity populated for Phase 2 dashboards
 
-- [ ] T042 [US4] Create `UserSatisfactionFeedback` entity in `career/entity/`
+- [v] T042 [US4] Create `UserSatisfactionFeedback` entity in `career/entity/`
   - Fields: 
     - id (Long, PK)
     - sajuResultId (Long, FK to SajuResult, NOT NULL)
@@ -486,10 +486,10 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Constraints: FK(sajuResultId), index(sajuResultId, createdAt)
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/UserSatisfactionFeedback.java`
 
-- [ ] T043 [US4] [P] Create `UserSatisfactionFeedbackRepository` in `repository/`
+- [v] T043 [US4] [P] Create `UserSatisfactionFeedbackRepository` in `repository/`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/UserSatisfactionFeedbackRepository.java`
 
-- [ ] T044 [US4] [P] Create `SatisfactionFeedbackRequest` DTO in `dto/request/`
+- [v] T044 [US4] [P] Create `SatisfactionFeedbackRequest` DTO in `dto/request/`
   - Fields: 
     - sajuResultId (Long, @NotNull)
     - feedbackType (ENUM: CAREER_TIMING/CONSULTATION/COMPATIBILITY, @NotNull)
@@ -498,32 +498,32 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Validation: @NotNull on required fields, @Size on feedbackContent
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/SatisfactionFeedbackRequest.java`
 
-- [ ] T045 [US4] [P] Create `SatisfactionFeedbackResponse` DTO in `dto/response/`
+- [v] T045 [US4] [P] Create `SatisfactionFeedbackResponse` DTO in `dto/response/`
   - Fields: 
     - feedbackId (Long)
     - createdAt (LocalDateTime)
     - feedbackContent (String, 제출한 상세 의견 에코백)
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/SatisfactionFeedbackResponse.java`
 
-- [ ] T046 [US4] Create `FeedbackService` in `service/`
+- [v] T046 [US4] Create `FeedbackService` in `service/`
   - Method: `saveFeedback(SatisfactionFeedbackRequest)` → validates SajuResult exists, stores feedback
   - Handles: SajuResult not found → throw custom exception, enum validation
   - File: `SSAju/src/main/java/ssafy/SSAju/service/FeedbackService.java`
 
-- [ ] T047 [US4] Create `FeedbackController` in `controller/`
+- [v] T047 [US4] Create `FeedbackController` in `controller/`
   - Endpoint: `POST /api/feedback/satisfaction`
   - Handles: Request validation, calls `FeedbackService`, returns `ApiResponse<SatisfactionFeedbackResponse>`
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/FeedbackController.java`
 
-- [ ] T048 [US4] Write unit tests for `FeedbackService` in `src/test/`
+- [v] T048 [US4] Write unit tests for `FeedbackService` in `src/test/`
   - Test: Valid feedback saved, SajuResult not found → 404, invalid enum → 400, null handling
   - File: `SSAju/src/test/java/ssafy/SSAju/service/FeedbackServiceTest.java`
 
-- [ ] T049 [US4] Write unit tests for `FeedbackController` in `src/test/`
+- [v] T049 [US4] Write unit tests for `FeedbackController` in `src/test/`
   - Test: Valid feedback → 200 OK, invalid type → 400, missing SajuResult → 404
   - File: `SSAju/src/test/java/ssafy/SSAju/controller/FeedbackControllerTest.java`
 
-- [ ] T050 [US4] Run all tests for US4 features
+- [v] T050 [US4] Run all tests for US4 features
   - Command: `./gradlew test --tests "ssafy.SSAju.service.FeedbackServiceTest OR ssafy.SSAju.controller.FeedbackControllerTest"`
   - Verify: BUILD SUCCESSFUL before committing
 
