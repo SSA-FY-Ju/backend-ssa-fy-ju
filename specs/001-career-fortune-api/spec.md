@@ -350,7 +350,7 @@ public record ErrorInfo(
 ## Technology Constraints (Phase 1)
 
 - **캐싱 금지**: Redis, In-Memory 전역 캐시 사용 금지. 도메인 로직 정확성 우선
-- **WebClient vs Spring AI**: OpenAI 호출은 Spring AI ChatClient 사용. 그 외 외부 API(FastAPI, 공공데이터API)는 WebClient 사용
+- **외부 API 호출 방식**: OpenAI 호출은 Spring AI ChatClient 사용. 그 외 외부 API(FastAPI, 공공데이터API)는 RestClient + Spring Retry 사용
 
 ## Future Features (Phase 2+)
 

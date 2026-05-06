@@ -55,7 +55,7 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
   - 목표: 5000명 동시 사용자 처리 (기본 Connection Pool로)
   - 결과: Connection Pool 고갈 방지, 응답 시간 15초 이내 달성 (OpenAI 8초 타임아웃 포함)
 
-- **RestClient + Spring Retry** (Phase 3-Enhancement): WebClient의 무거운 Reactive 의존성 제거. 동기식 호출에 적합한 경량 RestClient 도입. Spring Retry로 지수 백오프 재시도 (1초, 2초, 4초).
+- **RestClient + Spring Retry** (Phase 1): WebClient의 무거운 Reactive 의존성 제거. 동기식 호출에 적합한 경량 RestClient 도입. Spring Retry로 지수 백오프 재시도 (1초, 2초, 4초).
   - 적용 대상: FastAPI (3초 타임아웃, 2회 재시도), 공공데이터API (5초 타임아웃, 1회 재시도)
   - 이점: Reactive 오버헤드 제거, 코드 간결성, Spring Retry와 자연스러운 결합
 

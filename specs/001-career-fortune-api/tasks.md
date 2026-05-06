@@ -539,9 +539,11 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 3. **JPA 엔티티 설계 최적화**: @CreatedDate/@LastModifiedDate, equals&hashCode, 엔티티 상태 명확화
 4. **객체 지향 및 아키텍처 개선**: 컬렉션 객체화, 검증 로직 분리
 
-### 1. 외부 API 통신 최적화 (WebClient → RestClient)
+### 1. ⚡ 외부 API 통신 최적화 (WebClient → RestClient) - Phase 1 핵심
 
 **Rationale**: 동기식 호출에 Reactive 의존성 불필요. RestClient가 더 가볍고 직관적.
+
+**주의**: 이 섹션은 Phase 1에서 즉시 진행해야 합니다. spec.md(L227~230) 및 plan.md에서 RestClient로 확정되었습니다.
 
 - [ ] T051 [Enhancement] 의존성 추가: Spring Retry, RestClient
   - `build.gradle`에 다음 추가:
