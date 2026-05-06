@@ -41,7 +41,7 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 ### Session 2026-04-30 (1-Call Design & Implementation Validation)
 
 - Q: /consultation 엔드포인트가 2-call 설계(먼저 /timing 호출 필수)인데, 이는 사용자 경험이 나쁘지 않은가? → A: **1-call 설계로 리팩토링 필요**. ConsultationService에서 내부적으로 FastAPI 호출, 십신/지장간 계산, 관운 분석을 모두 수행. 클라이언트는 birthDate + birthTime만 제공하면 완전한 컨설팅 결과(AI 조언 + 관운 분석) 수신 가능.
-- Q: 응답 데이터 완전성: /consultation 응답에 favoredPeriod, confidenceScore, reasoning이 빠져있는데? → A: **응답 확장 필수**. ConsultationResponse에 3개 필드 추가하여 /timing 없이 단독 호출로 전체 정보 제공. 응답: `{industries, interviewTips, strengths, openaiModelVersion, favoredPeriod, confidenceScore, reasoning}`
+- Q: 응답 데이터 완전성: /consultation 응답에 favoredPeriod, confidenceScore, reasoning이 빠져있는데? → A: **응답 확장 필수**. ConsultationResponse에 **19개 필드 (기본 조언 3 + 관운 분석 3 + 사주 프로필 6 + OpenAI 분석 12 + 메타데이터 1)** 포함하여 /timing 없이 단독 호출로 전체 정보 제공.
 - Q: 트랜잭션 관리: FastAPI/OpenAI I/O 동안 DB 커넥션을 점유하면 Connection Pool 고갈 위험이 있지 않은가? → A: **트랜잭션 분리 필수**. ConsultationService에서 @Transactional 제거. FastAPI/OpenAI 호출은 트랜잭션 밖에서 수행. 각 DB 작업(UserProfile find/create, SajuResult find/create, CareerConsultation save)은 Repository의 @Transactional에 의해 개별 트랜잭션으로 실행. 네트워크 지연이 DB 커넥션을 점유하지 않음.
 - Q: Jackson 3.x 호환성: PR 리뷰에서 `tools.jackson.*`을 `com.fasterxml.jackson.*`로 변경하라고 했는데? → A: **Spring Boot 4.0.5는 Jackson 3.x 사용**. 패키지명이 `tools.jackson.*`으로 변경됨. 기존 코드가 정확하며, `com.fasterxml.jackson.*`은 Jackson 2.x용이므로 사용하면 안 됨.
 - Q: DataIntegrityViolationException 처리: 동시 다중 요청 시 같은 생년월일시 사용자가 두 번 생성될 수 있지 않은가? → A: **최적 "create or find" 패턴 적용**. SajuResult를 찾지 못하면 새로 생성 시도. UNIQUE 제약으로 인해 동시 생성 시 DIVE 발생하면, 호출 서비스에서 catch하여 다시 find 수행. 이미 생성된 결과를 재사용. 예외 전파 불필요, 로그만 기록 (warn level).
@@ -63,6 +63,14 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 - Q: JPA 엔티티에서 equals/hashCode는 어떻게 구현할 것인가? → A: **ID 기준으로 직접 구현 필수**. Lombok @EqualsAndHashCode 사용 금지. 지연 로딩(Lazy Loading) 중 Proxy 객체 비교 시 정확성 보장. `@CreatedDate`/`@LastModifiedDate`로 timestamp 자동 관리.
 - Q: Map<String, Integer> tenGodDistribution을 어떻게 관리할 것인가? → A: **TenGodDistribution 일급 컬렉션 객체로 래핑**. 의미가 명확해지고 비즈니스 로직을 객체 내부로 응집 가능. 마찬가지로 HiddenStems, FiveElements도 value object 생성.
 - Q: Service 계층의 검증 로직이 비대화되면? → A: **전용 Validator 클래스 분리**. SajuValidator, RequestValidator, CompatibilityValidator 등으로 책임 분리. Service는 Validator 호출만 담당.
+
+### Session 2026-05-06 (CodeRabbit PR #9 리뷰 반영)
+
+- Q: 외부 API 통신 방식을 명확히 구분할 것인가? → A: **OpenAI는 Spring AI ChatClient, FastAPI/공공데이터API는 RestClient + Spring Retry로 명확 구분**. 스펙의 "External Communication" 섹션에서 클라이언트 선택 기준 추가.
+- Q: feedbackContent 필드의 DB 제약은? → A: **VARCHAR(500) 명시**. Java @Size(max=500) 제약과 DB VARCHAR(500) 동기화. TextType이 아닌 VARCHAR로 수정하여 일관성 확보.
+- Q: Phase 1 인증 정책은 어떻게 명시할 것인가? → A: **현재 상태 유지**. Assumptions 섹션에서 "Phase 1에서는 인증 없이 모든 API 공개 제공. 보안 검증 필요 시 Phase 2에서 구현" 명시 (이미 문서화됨).
+- Q: 로깅 보안 정책은? → A: **민감 데이터 로깅 금지**. architecture-guide.md의 "로깅 정책" 섹션 참고. 본 스펙에서는 FR-013 업데이트: "외부 API 호출 로깅 시 전문 정보는 debug 레벨로 분리하고 운영 로그에서 개인정보 제거".
+- Q: RestClient 예외 처리 방식을 명시할 것인가? → A: **@Retryable 대상 명확화**. FR-008 추가: "RestClientResponseException (4xx)는 재시도 안 함, 5xx는 재시도 함. 타임아웃/네트워크 오류(ResourceAccessException)는 지수 백오프로 재시도".
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -92,11 +100,40 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 **Acceptance Scenarios**:
 
-1. **Given** 완전한 사주 데이터(4 천간/지지 + 오행/십신/지장간 분포), **When** AI 커리어 컨설팅 요청, **Then** JSON 형식으로 다음 16개 필드 그룹 반환:
-   - 기본 조언: 산업 추천(3~5개) + 면접 전략 + 강점 분석
-   - 관운 분석: favoredPeriod(H1/H2) + confidenceScore(0-100) + reasoning
-   - 사주 베이스 데이터: sajuProfile(dayMaster, dayMasterDescription, fiveElements, fiveElementsAnalysis, tenGodDistribution, keyTenGods)
-   - OpenAI 분석 결과: cautions, wealthStyle, longTermRoadmap, personalBranding, powerKeywords, mentalCare, environmentFit, workStyle, relationshipStrategy, careerTimeline
+1. **Given** 완전한 사주 데이터 입력, **When** AI 커리어 컨설팅 요청, **Then** ConsultationResponse (19개 필드) 반환:
+
+   **기본 조언 (3개 필드)**:
+   - industries: List<IndustryRecommendation> (3~5개)
+   - interviewTips: List<String> (3~5개)
+   - strengths: List<String> (3~5개)
+
+   **관운 분석 (3개 필드)**:
+   - favoredPeriod: String ("H1" or "H2")
+   - confidenceScore: Integer (0-100)
+   - reasoning: String
+
+   **사주 베이스 데이터 (1개 복합 필드, 6개 내부 필드)**:
+   - sajuProfile.dayMaster: String
+   - sajuProfile.dayMasterDescription: String
+   - sajuProfile.fiveElements: Map<String, Integer>
+   - sajuProfile.fiveElementsAnalysis: String
+   - sajuProfile.tenGodDistribution: Map<String, Integer>
+   - sajuProfile.keyTenGods: List<String>
+
+   **OpenAI 분석 결과 (12개 필드)**:
+   - cautions: List<String>
+   - wealthStyle: WealthStyle (4개 내부 필드)
+   - longTermRoadmap: LongTermRoadmap (4개 내부 필드)
+   - personalBranding: PersonalBranding (5개 내부 필드)
+   - powerKeywords: PowerKeywords (3개 내부 필드)
+   - mentalCare: MentalCare (4개 내부 필드)
+   - environmentFit: EnvironmentFit (6개 내부 필드)
+   - workStyle: WorkStyle (4개 내부 필드)
+   - relationshipStrategy: RelationshipStrategy (5개 내부 필드)
+   - careerTimeline: CareerTimeline (5개 내부 필드)
+
+   **메타데이터 (1개 필드)**:
+   - openaiModelVersion: String
 2. **Given** 느린 외부 API(OpenAI), **When** Timeout 초과, **Then** 정중한 오류 메시지 + 재시도 안내 반환
 3. **Given** 유효한 사주 데이터, **When** 컨설팅 응답, **Then** 타임스탬프 + AI 모델 버전 메타데이터 + 모든 16개 필드 그룹 포함
 
@@ -224,7 +261,13 @@ public record ErrorInfo(
 | `/api/feedback/satisfaction` | POST | 사용자 만족도 피드백 제출 | `SatisfactionFeedbackRequest` | `ApiResponse<SatisfactionFeedbackResponse>` |
 
 **External Communication**:
-- **FastAPI 호출** (사주 계산): RestClient + Spring Retry with 3-second timeout, exponential backoff (1s, 2s, 4s... max 2 retries)
+
+**클라이언트 선택 기준**:
+- **Spring AI ChatClient (OpenAI 전용)**: JSON Mode, 자동 타입 매핑, 응답 구조화. LLM 호출 특화.
+- **RestClient + Spring Retry (나머지 외부 API)**: 동기식 경량 HTTP 클라이언트. Reactive 오버헤드 불필요.
+
+**상세 구성**:
+- **FastAPI 호출** (사주 계산): RestClient + Spring Retry with 3-second timeout, exponential backoff (1s, 2s, 4s... max 2 retries). 예외 처리: ResourceAccessException(네트워크/타임아웃) 재시도, RestClientResponseException(4xx) 재시도 안 함, 5xx 재시도.
 - **OpenAI API 호출** (커리어 컨설팅): Spring AI ChatClient + JSON Mode. 응답은 구조화된 JSON으로 자동 매핑 (Record 기반), 8-second timeout, exponential backoff retry (max 1 retry)
 - **공공데이터API 호출** (기업 설립일 조회): RestClient with 5-second timeout, exponential backoff retry (max 1 retry). 조회 실패 시 사용자에게 기업 설립일을 직접 입력하도록 요청
 
@@ -260,53 +303,60 @@ public record ErrorInfo(
 - **FR-006-1**: OpenAI 프롬프트는 사주 정보 + 컨텍스트를 명확히 포함 (예: "다음 사주를 분석하여 추천 산업 3~5개, 면접 전략, 강점 분석을 JSON 형식으로 제공하세요")
 - **FR-007**: `CareerAdviceResponse`의 필드(`industries`, `interviewTips`, `strengths`)를 정규화된 엔티티(Industry, InterviewTip, Strength)로 저장
 - **FR-008**: Timeout/API 실패 시 @RestControllerAdvice로 처리 (try-catch 금지)
+- **FR-008-1**: RestClient 외부 API 호출 시 @Retryable 적용. 예외 분류: ResourceAccessException(네트워크/타임아웃) 재시도 대상, RestClientResponseException의 4xx(클라이언트 오류) 재시도 안 함, 5xx(서버 오류) 재시도 함. (CodeRabbit PR #9 지적사항)
 - **FR-009**: 기업 설립일을 공공데이터API로 조회. 조회 실패 시 사용자 입력으로 폴백하고, 기업 설립일과 사용자 사주를 비교하여 호환성 점수 계산 (0~100 범위)
 - **FR-010**: 모든 API 응답은 ApiResponse<T> 래퍼 사용 (success, data, error, timestamp)
 - **FR-011**: 모든 엔티티는 @Getter + @NoArgsConstructor(access=PROTECTED) + @Builder 사용 (@Data/@ToString 금지)
 - **FR-012**: 모든 연관관계는 FetchType.LAZY 명시 (N+1 문제 방지)
-- **FR-013**: 외부 API 호출(FastAPI, OpenAI)을 모두 로깅 (요청, 응답, 지연시간, 에러)
+- **FR-013**: 외부 API 호출(FastAPI, OpenAI)을 모두 로깅 (요청, 응답, 지연시간, 에러). 단, 민감 정보(birthDate, 전문 API 응답)는 DEBUG 레벨로 분리하고 운영 로그에서 제거 (CodeRabbit PR #9 보안 권고)
 - **FR-014**: 사용자 만족도 피드백 수집 API 구현. 요청 시 만족도(SATISFIED/DISSATISFIED) + 관련 분석 타입(CAREER_TIMING/CONSULTATION/COMPATIBILITY) + 선택적 상세 의견(최대 500자) 수신
 - **FR-015**: 피드백 저장 시 UserSatisfactionFeedback 엔티티에 영속화 (SajuResult FK, feedbackType, 만족도 상태, 상세 의견, 타임스탐프)
 
 ### Key Entities & Database Schema (정규화된 구조)
 
-**Core Entities**:
+**Phase 1 - Core Entities (현재 구현)**:
 
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
-| **User** | id, email, phone, createdAt | PK, VARCHAR, VARCHAR, TIMESTAMP | UNIQUE(email) |
-| **UserProfile** | id, userId, birthDate, birthTime, createdAt, updatedAt | PK, FK, DATE, TIME, TIMESTAMP, TIMESTAMP | FK to User, UNIQUE(birthDate, birthTime) |
-| **SajuResult** | id, userProfileId, fullSajuData, fetchedAt | PK, FK, LONGTEXT, TIMESTAMP | FK to UserProfile, 지지별로 정규화된 관계 |
+| **UserProfile** | id, birthDate, birthTime, createdAt, updatedAt | Long, LocalDate, LocalTime, LocalDateTime, LocalDateTime | UNIQUE(birthDate, birthTime) |
+| **SajuResult** | id, userProfileId, fullSajuData, fetchedAt | Long, Long (FK), String (JSON), LocalDateTime | FK to UserProfile, 지지별로 정규화된 관계 |
+
+**Phase 2 - Authentication Entities (추가 예정)**:
+
+| Entity | Fields | Type | Constraints |
+|--------|--------|------|-------------|
+| **User** | id, email, phone, password, createdAt, updatedAt | Long, String, String, String (bcrypt), LocalDateTime, LocalDateTime | UNIQUE(email), bcrypt 암호화 |
+| (UserProfile과 User의 1:1 관계 추가 예정) | | | |
 
 **Saju Analysis Entities**:
 
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
-| **TenGodData** | id, sajuResultId, tenGodName, score | PK, FK, VARCHAR, INT | FK to SajuResult (1:N) - 십신별 행 단위 정규화 |
-| **HiddenStemData** | id, sajuResultId, earthlyBranch, hiddenStem | PK, FK, VARCHAR, VARCHAR | FK to SajuResult (1:N), 지지별 지장간 |
-| **CareerFortune** | id, sajuResultId, favoredPeriod, confidenceScore, reasoning | PK, FK, VARCHAR, INT, TEXT | FK to SajuResult (1:1) |
+| **TenGodData** | id, sajuResultId, tenGodName, score, createdAt | Long, Long (FK), String, Integer, LocalDateTime | FK to SajuResult (1:N) - 십신별 행 단위 정규화 |
+| **HiddenStemData** | id, sajuResultId, earthlyBranch, hiddenStem, createdAt | Long, Long (FK), String, String, LocalDateTime | FK to SajuResult (1:N), 지지별 지장간 |
+| **CareerFortune** | id, sajuResultId, favoredPeriod, confidenceScore, reasoning | Long, Long (FK, UNIQUE), String, Integer, String | FK to SajuResult (1:1, UNIQUE) |
 
 **Career Consultation Entities**:
 
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
-| **CareerConsultation** | id, sajuResultId, openaiModelVersion, generatedAt | PK, FK, VARCHAR, TIMESTAMP | FK to SajuResult (1:N) |
-| **Industry** | id, careerConsultationId, name, reason | PK, FK, VARCHAR, TEXT | FK to CareerConsultation (1:N) |
-| **InterviewTip** | id, careerConsultationId, content | PK, FK, TEXT | FK to CareerConsultation (1:N) |
-| **Strength** | id, careerConsultationId, description | PK, FK, TEXT | FK to CareerConsultation (1:N) |
+| **CareerConsultation** | id, sajuResultId, openaiModelVersion, generatedAt | Long, Long (FK), String, LocalDateTime | FK to SajuResult (1:N) |
+| **Industry** | id, careerConsultationId, name, reason | Long, Long (FK), String, String | FK to CareerConsultation (1:N) |
+| **InterviewTip** | id, careerConsultationId, content | Long, Long (FK), String | FK to CareerConsultation (1:N) |
+| **Strength** | id, careerConsultationId, description | Long, Long (FK), String | FK to CareerConsultation (1:N) |
 
 **Company Compatibility Entities**:
 
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
-| **CompanyCompatibility** | id, userProfileId, companyName, compatibilityScore, createdAt | PK, FK, VARCHAR, INT, TIMESTAMP | FK to UserProfile (1:N), composite index (userProfileId, companyName) |
-| **RecommendedRole** | id, compatibilityId, roleName | PK, FK, VARCHAR | FK to CompanyCompatibility (1:N) |
+| **CompanyCompatibility** | id, userProfileId, companyName, compatibilityScore, createdAt | Long, Long (FK), String, Integer, LocalDateTime | FK to UserProfile (1:N), composite index (userProfileId, companyName) |
+| **RecommendedRole** | id, compatibilityId, roleName | Long, Long (FK), String | FK to CompanyCompatibility (1:N) |
 
 **Feedback Entity**:
 
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
-| **UserSatisfactionFeedback** | id, sajuResultId, feedbackType, satisfactionStatus, feedbackContent, createdAt | PK, FK, ENUM, ENUM, TEXT, TIMESTAMP | FK to SajuResult (1:N), feedbackContent nullable, index (sajuResultId, createdAt) |
+| **UserSatisfactionFeedback** | id, sajuResultId, feedbackType, satisfactionStatus, feedbackContent, createdAt | Long, Long (FK), Enum, Enum, String, LocalDateTime | FK to SajuResult (1:N), feedbackContent nullable (VARCHAR 500), index (sajuResultId, createdAt). 제약: feedbackContent @Size(max=500) (CodeRabbit PR #9 반영) |
 
 ## Success Criteria *(mandatory)*
 

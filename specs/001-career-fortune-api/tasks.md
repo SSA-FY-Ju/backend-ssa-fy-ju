@@ -556,15 +556,19 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 - [ ] T052 [Enhancement] Create `FastApiRestClientConfig` in `config/`
   - RestClient bean 생성 (default timeout, SSL 설정 등)
-  - Spring Retry 설정 (@RetryConfiguration 또는 application.yaml 설정)
-  - Exponential backoff 정책: 1초, 2초, 4초 (최대 3회)
+  - @EnableRetry 어노테이션 추가 (Spring Retry 활성화, application.yaml 설정 불필요)
+  - Exponential backoff 정책: 1초, 2초, 4초 (최대 3회, @Retryable 어노테이션 속성으로 제어)
+  - Note: spring.task.retry.* 프로퍼티는 ThreadPoolTask* 설정용이므로 사용하지 말 것
   - File: `SSAju/src/main/java/ssafy/SSAju/config/FastApiRestClientConfig.java`
 
 - [ ] T053 [Enhancement] Refactor `SajuDataService` to use RestClient
   - **Before**: WebClient + .block() 동기 처리
   - **After**: RestClient + Spring Retry (@Retryable)
   - Method: `fetchSajuFromFastAPI(LocalDate, LocalTime)` → RestClient 호출, 자동 재시도
-  - Handle: TimeoutException → FastAPITimeoutException, invalid response → InvalidSajuDataException
+  - Exception Handling (Spring RestClient 공식 문서 기준):
+    - ResourceAccessException (타임아웃/연결 실패) → @Retryable 대상 (그대로 던지기)
+    - RestClientResponseException 4xx (클라이언트 오류) → InvalidSajuDataException (재시도 안 함)
+    - RestClientResponseException 5xx (서버 오류) → 그대로 던지기 (재시도 대상 유지)
   - File: `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
 
 - [ ] T054 [Enhancement] Refactor `ConsultationService` OpenAI RestClient 호출

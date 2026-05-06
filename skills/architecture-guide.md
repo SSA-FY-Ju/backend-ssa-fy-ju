@@ -153,7 +153,7 @@ public CompatibilityResponse analyzeCompatibility(LocalDate userBirthDate, ...) 
 
 | 용도 | 권장 | 피해야 할 것 |
 |------|------|------------|
-| **HTTP 클라이언트** | WebClient, RestTemplate | 라이브러리 추가 금지 |
+| **HTTP 클라이언트** | RestClient (동기식) + Spring Retry | WebClient (Reactive 오버헤드), 커스텀 HTTP 라이브러리 추가 금지. OpenAI는 Spring AI ChatClient 전용 |
 | **LLM 통합** | Spring AI, OpenAI SDK | 직접 HTTP 호출 |
 | **로깅** | slf4j (SLF4J) | System.out.println |
 | **검증** | Spring Validation | 수동 if 체크 |
@@ -271,11 +271,12 @@ public class SajuDataService {
             // 네트워크/타임아웃 오류 → 재시도 대상 (@Retryable이 처리)
             throw e;
         } catch (RestClientResponseException e) {
-            // HTTP 4xx/5xx 응답 → 재시도 대상
+            // HTTP 4xx: 비재시도 (입력 오류), 5xx: 재시도 대상 예외 유지
             if (e.getStatusCode().is4xxClientError()) {
                 throw new InvalidSajuDataException("Invalid input", e);
             } else {
-                throw new FastAPITimeoutException("FastAPI error", e);
+                // 5xx는 @Retryable 대상으로 그대로 던지기 (예외 변환 금지)
+                throw e;
             }
         }
     }
@@ -308,17 +309,34 @@ public class SajuDataService {
 
 ### 예외 변환
 
-외부 API 예외 → 애플리케이션 커스텀 예외로 변환:
+외부 API 예외 → 애플리케이션 커스텀 예외로 변환 (또는 재시도 대상으로 유지):
 
 ```java
 try {
-    return fastApiClient.calculateSaju(birthDate);
-} catch (TimeoutException e) {
-    throw new ExternalApiTimeoutException("FastAPI timeout", e);
+    return restClient
+        .post()
+        .uri("http://fastapi:8000/api/saju/calculate")
+        .body(request)
+        .retrieve()
+        .toEntity(FastAPIResponse.class)
+        .getBody();
+} catch (ResourceAccessException e) {
+    // 타임아웃/연결 실패: @Retryable 대상이므로 그대로 던지기
+    throw e;
+} catch (RestClientResponseException e) {
+    // 4xx: 입력 오류 → 비재시도 예외로 변환
+    if (e.getStatusCode().is4xxClientError()) {
+        throw new InvalidSajuDataException("Invalid input", e);
+    }
+    // 5xx: 서버 오류 → @Retryable 대상이므로 그대로 던지기
+    throw e;
 }
 ```
 
-**이유**: 외부 API의 세부 구현에 의존하지 않음
+**원칙**:
+- 타임아웃/네트워크 오류: @Retryable 대상이므로 원본 예외 유지
+- 4xx 클라이언트 오류: 비재시도 도메인 예외로 변환
+- 5xx 서버 오류: @Retryable 대상이므로 원본 예외 유지
 
 ## 로깅 전략
 

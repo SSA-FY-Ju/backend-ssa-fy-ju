@@ -69,7 +69,7 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - **JPA Auditing (@CreatedDate/@LastModifiedDate)**: 수동 @PreUpdate 제거. Spring Data JPA 자동 타임스탐프 관리로 일관성 보장.
 - **Entity equals&hashCode ID 기준 구현**: Lombok @EqualsAndHashCode 금지. 지연 로딩(Lazy Loading) 중 Proxy 객체 비교 시 정확성 보장.
 - **Value Objects (TenGodDistribution, HiddenStems, FiveElements)**: Map<String, Integer> 같은 원시 컬렉션 대신 일급 컬렉션으로 래핑. 데이터 의미 명확화, 비즈니스 로직 응집.
-- **완전 정규화**: SajuResult.fullSajuData (Map) → SajuFullData (1:1 엔티티) 이동. JSON 컬럼 제거. Phase 3-Refactor-3에서 완료.
+- **완전 정규화** (Phase 3-Refactor-3 예정): SajuResult.fullSajuData (LONGTEXT JSON) → SajuFullData (1:1 엔티티) 마이그레이션. **현재 Phase 1은 JSON 형식 유지**, Phase 3-Refactor-3에서 정규화 완료 예정.
 
 **Service 계층 최적화**:
 - **PromptProvider 분리**: ConsultationService의 buildPrompt 메서드를 별도 PromptProvider 컴포넌트로 외부화. 프롬프트 수정이 서비스 로직에 영향을 주지 않도록 캡슐화.
@@ -86,13 +86,13 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - 모든 예외: @RestControllerAdvice 처리 (try-catch 금지)
 
 **Scale/Scope**:
-- **엔티티: 11개** (정규화됨, JSON 저장 제거):
-  - 기본: UserProfile, SajuResult
+- **엔티티: 11개** (Phase 1 구현 완료):
+  - 기본: UserProfile, SajuResult (**Phase 1: fullSajuData는 JSON 유지**)
   - Saju 분석: TenGodData, HiddenStemData, CareerFortune (3개, 모두 1:N 또는 1:1)
   - 컨설팅: CareerConsultation, Industry, InterviewTip, Strength (4개)
   - 호환성: CompanyCompatibility, RecommendedRole (2개)
   - 피드백: UserSatisfactionFeedback (1개)
-  - User는 Phase 2에서 추가
+  - **미포함**: SajuFullData (Phase 3-Refactor-3에서 추가 예정), User (Phase 2에서 추가)
 - API 엔드포인트: 4개 (`/api/career/timing`, `/api/career/consultation`, `/api/company/compatibility`, `/api/feedback/satisfaction`)
 - 외부 API 통합: 3개 (FastAPI, OpenAI, 공공데이터API)
 - **계산 로직**: TenGodCalculator (십신), HiddenStemCalculator (지장간), CareerFortuneAnalyzer (관운), CompatibilityScoreCalculator (궁합)
@@ -362,10 +362,10 @@ User (로그인 정보 포함)
 SajuResult (1:1 to UserProfile)
 ├── id: Long (PK)
 ├── userProfileId: Long (FK to UserProfile, NOT NULL)
-├── fullSajuData: LONGTEXT (FastAPI 원본 JSON 응답 저장 - Phase 1, 직렬화용)
-│   [Phase 3-Refactor-3: SajuFullData 엔티티로 이동]
+├── fullSajuData: LONGTEXT (FastAPI 원본 JSON 응답 저장 - **Phase 1에서만 유지**, 직렬화용)
+│   [→ Phase 3-Refactor-3: SajuFullData 엔티티로 마이그레이션 예정]
 ├── fetchedAt: LocalDateTime
-├── (1:1) → SajuFullData (FastAPI 데이터 정규화, Phase 3-Refactor-3 추가)
+├── (1:1) → SajuFullData (**Phase 3-Refactor-3에서 추가**, FastAPI 데이터 정규화)
 ├── (1:N) → TenGodData (십신 분포 - 각 십신별 행)
 ├── (1:1) → CareerFortune (관운 분석)
 ├── (1:N) → HiddenStemData (지지별 지장간 - 각 지장간별 행)

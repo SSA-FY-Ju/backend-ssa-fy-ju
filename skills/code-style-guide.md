@@ -612,6 +612,7 @@ User user = userRepository.findById(id).get();  // NPE 위험
 
 ## 트랜잭션
 
+### 기본 규칙
 모든 Service 메서드에는 `@Transactional` 적용, 단순 조회는 `readOnly = true` 명시:
 
 ```java
@@ -625,6 +626,46 @@ public class CareerFortuneService {
 }
 ```
 
+### ⚠️ 예외: 외부 API 호출이 있는 Service
+FastAPI, OpenAI, 공공데이터API 등 **외부 I/O가 있는 메서드는 @Transactional 제거**:
+
+```java
+// ❌ 나쁜 예: 외부 API 호출 시 @Transactional 유지
+@Service
+public class ConsultationService {
+    @Transactional  // ❌ Connection Pool 고갈 위험!
+    public ConsultationResponse getConsultation(ConsultationRequest req) {
+        // FastAPI, OpenAI 호출 중 DB 커넥션 점유
+        // 네트워크 지연 동안 커넥션 낭비 → 5000명 동시 사용자 불가능
+        FastAPIResponse saju = sajuDataService.fetchSajuFromFastAPI(...);
+        CareerAdviceResponse advice = openaiService.callOpenAI(...);
+        // DB 저장
+    }
+}
+
+// ✅ 좋은 예: 외부 API 호출 시 @Transactional 제거
+@Service
+public class ConsultationService {
+    // @Transactional 없음 ✅
+    public ConsultationResponse getConsultation(ConsultationRequest req) {
+        // 1. 외부 API 호출 (트랜잭션 밖)
+        FastAPIResponse saju = sajuDataService.fetchSajuFromFastAPI(...);
+        CareerAdviceResponse advice = openaiService.callOpenAI(...);
+
+        // 2. 각 save/find는 Repository의 @Transactional에서 처리
+        UserProfile profile = userProfileRepository.findOrCreate(...);  // Repository @Transactional
+        SajuResult result = sajuResultRepository.findOrCreate(...);     // Repository @Transactional
+        CareerConsultation consultation = consultationRepository.save(...); // Repository @Transactional
+    }
+}
+```
+
+**이유**:
+- ✅ Connection Pool 고갈 방지 (외부 API 지연이 커넥션을 점유하지 않음)
+- ✅ 5000명 동시 사용자 처리 가능
+- ✅ Repository 계층에서 개별 트랜잭션으로 관리 (일관성 유지)
+- ✅ 네트워크 지연이 DB 성능에 영향을 주지 않음
+
 ## 로깅
 
 `slf4j` 인터페이스 활용. 적절한 로그 레벨 사용:
@@ -636,6 +677,118 @@ log.info("User consultation request: {}", userId);
 log.error("OpenAI API timeout", exception);
 log.debug("Saju calculation details: {}", result);
 ```
+
+### 🔒 로깅 보안 정책 (민감 정보 보호)
+
+#### ❌ 로그에 절대 포함 금지
+| 분류 | 금지 항목 | 이유 |
+|------|---------|------|
+| **개인정보** | `birthDate`, `birthTime`, `email`, `phone` | GDPR/법적 규제 |
+| **인증 정보** | API Key, Bearer 토큰, Authorization 헤더값 | 보안 누출 위험 |
+| **외부 API 원문** | FastAPI 요청 body 전문, OpenAI 프롬프트 | 민감한 사주 데이터 노출 |
+
+#### ✅ 레벨별 올바른 로깅
+| 레벨 | 로그 내용 | 예시 |
+|------|---------|------|
+| **INFO** | 사용자 ID, API 상태코드, 지연시간(ms), 성공/실패만 | `log.info("Career timing analysis completed: userId={}, duration={}ms", userId, duration);` |
+| **DEBUG** | birthDate, API 요청/응답 전문, 상세 계산 정보 (프로덕션에서 비활성화) | `log.debug("Saju data: birthDate={}, response={}", birthDate, apiResponse);` |
+| **ERROR** | 스택 트레이스, 민감 정보 제거 후 | `log.error("API call failed after 2 retries", exception);` |
+
+**예시**:
+```java
+// ❌ 금지: birthDate 로깅
+log.info("사용자 분석 요청 (birthDate={})", birthDate);
+
+// ✅ 올바름: ID만 로깅
+log.info("사용자 분석 요청 (userId={})", userId);
+
+// ❌ 금지: OpenAI 프롬프트 전문
+log.info("OpenAI 요청: {}", fullPrompt);
+
+// ✅ 올바름: DEBUG 레벨로 분리
+log.debug("OpenAI 요청: {}", fullPrompt);  // 프로덕션에서 비활성화됨
+log.info("OpenAI API 호출 완료: 토큰={}개", tokenCount);  // 운영 로그
+```
+
+## RestClient + @Retryable 예외 처리
+
+Spring RestClient를 사용한 외부 API 호출 시 정확한 예외 처리 필수:
+
+### 재시도 대상 (자동 재시도, 지수 백오프)
+- **ResourceAccessException**: 네트워크 오류, 타임아웃, 연결 실패 → 그대로 던지기 (@Retryable이 처리)
+- **RestClientResponseException (5xx)**: 서버 오류 → 그대로 던지기 (@Retryable이 처리)
+
+### 비재시도 대상 (즉시 실패)
+- **RestClientResponseException (4xx)**: 클라이언트 오류 → InvalidSajuDataException 변환 (재시도 금지)
+
+### 올바른 구현 패턴
+
+```java
+@Service
+public class SajuDataService {
+    private final RestClient restClient;
+
+    @Retryable(
+        retryFor = {ResourceAccessException.class, RestClientResponseException.class},
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000, multiplier = 2.0)  // 1초, 2초, 4초
+    )
+    public FastAPIResponse fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime) {
+        try {
+            return restClient
+                .post()
+                .uri("http://fastapi:8000/api/saju/calculate")
+                .body(new SajuRequest(birthDate, birthTime))
+                .retrieve()
+                .toEntity(FastAPIResponse.class)
+                .getBody();
+        } catch (ResourceAccessException e) {
+            // 네트워크/타임아웃 → 재시도 대상 (@Retryable이 처리)
+            throw e;
+        } catch (RestClientResponseException e) {
+            // HTTP 4xx/5xx 응답 처리
+            if (e.getStatusCode().is4xxClientError()) {
+                // 4xx: 클라이언트 오류 → 비재시도
+                throw new InvalidSajuDataException("Invalid input", e);
+            } else {
+                // 5xx: 서버 오류 → 재시도 대상 (원본 예외 유지)
+                throw e;
+            }
+        }
+    }
+}
+```
+
+### ⚠️ 흔한 실수
+
+```java
+// ❌ 나쁜 예: 5xx를 별도 예외로 변환 (재시도 손상)
+catch (RestClientResponseException e) {
+    if (e.getStatusCode().is5xxServerError()) {
+        throw new FastAPITimeoutException("Server error", e);  // ❌ @Retryable 대상 손상!
+    }
+}
+
+// ✅ 올바른 예: 원본 예외 유지
+catch (RestClientResponseException e) {
+    if (e.getStatusCode().is5xxServerError()) {
+        throw e;  // ✅ @Retryable이 정상 작동
+    }
+}
+```
+
+### @EnableRetry 설정
+```java
+@Configuration
+@EnableRetry  // 필수: @Retryable 활성화
+public class RetryConfig {
+    // 추가 설정 없음: @Retryable 속성(maxAttempts, backoff)으로 제어
+}
+```
+
+**주의**: `spring.task.retry.*` 프로퍼티는 ThreadPoolTask* 설정용이므로 @Retryable과는 무관합니다.
+
+---
 
 ## 테스트 스타일
 
