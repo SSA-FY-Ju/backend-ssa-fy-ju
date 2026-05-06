@@ -1,5 +1,6 @@
 package ssafy.SSAju.service;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -77,7 +78,10 @@ public class SajuDataService {
         return msg != null && (msg.contains("timeout") || msg.contains("Timeout") || msg.contains("timed out"));
     }
 
-    private record FastApiRequest(LocalDate birthDate,
+    private record FastApiRequest(@JsonFormat(pattern = "yyyy-MM-dd")
+                                  LocalDate birthDate,
+
+                                  @JsonFormat(pattern = "HH:mm") // :ss를 빼서 5글자(HH:mm)로 고정!
                                   LocalTime birthTime) {
     }
 }
