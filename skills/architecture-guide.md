@@ -1354,7 +1354,7 @@ try {
 }
 ```
 
-**To-Be**: JdbcTemplate INSERT IGNORE
+**To-Be**: JdbcTemplate INSERT IGNORE (정규화 후)
 
 ```java
 // SajuResultJdbcRepository.java
@@ -1364,40 +1364,49 @@ public class SajuResultJdbcRepository {
     
     public int insertOrIgnore(SajuResult result) {
         String sql = "INSERT IGNORE INTO saju_result " +
-            "(user_profile_id, birth_date, birth_time, full_saju_data, created_at) " +
-            "VALUES (?, ?, ?, ?, ?)";
+            "(user_profile_id, birth_date, birth_time, created_at) " +
+            "VALUES (?, ?, ?, ?)";
         
         return jdbcTemplate.update(sql,
             result.getUserProfile().getId(),
             result.getBirthDate(),
             result.getBirthTime(),
-            serializeMap(result.getFullSajuData()),
             LocalDateTime.now()
         );
     }
 }
 
-// Service에서 사용
+// Service에서 사용 (정규화된 엔티티와 함께)
 @Service
 public class SajuDataService {
     private final SajuResultJdbcRepository sajuResultJdbc;
     private final SajuResultRepository sajuResultRepo;
+    private final SajuFullDataRepository sajuFullDataRepo;
     
     public SajuResult fetchOrCreateSajuResult(UserProfile userProfile, FastAPIResponse response) {
-        // 1. JdbcTemplate INSERT IGNORE 시도
-        int inserted = sajuResultJdbc.insertOrIgnore(
-            new SajuResult(userProfile, response, ...)
-        );
+        // 1. JdbcTemplate INSERT IGNORE로 SajuResult 생성
+        SajuResult sajuResult = new SajuResult(userProfile, response.getBirthDate(), response.getBirthTime());
+        int inserted = sajuResultJdbc.insertOrIgnore(sajuResult);
         
-        // 2. inserted=1 (새로 삽입) 또는 0 (이미 존재)
-        if (inserted == 1) {
-            return sajuResultRepo.findLatestByUserProfileId(userProfile.getId())
-                .orElseThrow();
-        } else {
-            // 이미 존재 → 기존 데이터 반환
-            return sajuResultRepo.findLatestByUserProfileId(userProfile.getId())
-                .orElseThrow();
-        }
+        // 2. 조회하거나 새로 생성
+        SajuResult result = sajuResultRepo.findByUserProfileAndBirthDateAndBirthTime(...)
+            .orElse(sajuResult);
+        
+        // 3. 정규화된 SajuFullData 저장
+        SajuFullData fullData = SajuFullData.builder()
+            .sajuResult(result)
+            .yearPillar(response.getYearPillar())
+            .monthPillar(response.getMonthPillar())
+            .dayPillar(response.getDayPillar())
+            .hourPillar(response.getHourPillar())
+            .dayMaster(response.getDayMaster())
+            .dayMasterElement(response.getDayMasterElement())
+            .fiveElements(response.getFiveElements())
+            .solarCorrection(response.getSolarCorrection())
+            .build();
+        sajuFullDataRepo.save(fullData);  // cascade=ALL로 자동 저장
+        
+        return result;
     }
 }
 ```
