@@ -483,7 +483,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
     - sajuResultId (Long, FK to SajuResult, NOT NULL)
     - feedbackType (ENUM: CAREER_TIMING/CONSULTATION/COMPATIBILITY, NOT NULL)
     - satisfactionStatus (ENUM: SATISFIED/DISSATISFIED, NOT NULL)
-    - feedbackContent (TEXT, nullable) - 사용자 상세 의견 (최대 500자)
+    - feedbackContent (VARCHAR(500), nullable) - 사용자 상세 의견 (최대 500자)
     - createdAt (LocalDateTime)
   - Constraints: FK(sajuResultId), index(sajuResultId, createdAt)
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/UserSatisfactionFeedback.java`
@@ -541,14 +541,12 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ### 0. 📦 Cleanup & Optimization
 
-- [ ] T030-1 [Refactor] Remove unnecessary Jackson @JsonProperty/@JsonFormat annotations from DTOs
+- [ ] T030-1 [Refactor] Remove unnecessary Jackson @JsonProperty annotations from DTOs
   - **Rationale**: FastAPI 응답이 이미 camelCase이고, Java 필드명도 camelCase이므로 @JsonProperty 불필요. Jackson이 자동으로 매칭함.
   - Remove: FastAPIResponse.java의 모든 @JsonProperty 어노테이션
-  - Remove: SajuDataService.java FastApiRequest의 @JsonFormat 어노테이션
   - Result: DTO 간결화, Jackson import 제거 (의존성 불필요)
   - Files:
     - `SSAju/src/main/java/ssafy/SSAju/dto/external/FastAPIResponse.java`
-    - `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
 
 ### 1. ⚡ 외부 API 통신 최적화 (WebClient → RestClient) - Phase 1 핵심
 

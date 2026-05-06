@@ -733,7 +733,7 @@ log.info("OpenAI API 호출 완료: userId={}, usedTokens={}", userId, tokenCoun
 log.error("회원가입 실패: email={}", email);
 
 // ✅ 올바름: 에러 원인과 식별자만 기록
-log.error("회원가입 실패: userId={}, reason={}", userId, e.getMessage());
+log.error("회원가입 실패: userId={}, reason={}", userId);
 ```
 
 ## RestClient + @Retryable 예외 처리
