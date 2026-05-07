@@ -3,10 +3,13 @@ package ssafy.SSAju.career.caller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
@@ -27,11 +30,15 @@ public class ConsultationOpenAICaller {
      * OpenAI API를 호출하여 커리어 조언을 받습니다.
      *
      * 재시도 정책 (Spring Retry):
+     * - ResourceAccessException (네트워크/타임아웃): 재시도
+     * - HttpServerErrorException (5xx 서버 오류): 재시도
      * - OpenAIApiException (검증 실패): 재시도 안 함 (noRetryFor)
-     * - 그 외 RuntimeException (네트워크/타임아웃): 최대 2회 재시도 (총 3회 시도)
+     * - HttpMessageConversionException (역직렬화/스키마 불일치): 재시도 안 함 (noRetryFor)
+     * 최대 2회 재시도 (총 3회 시도)
      */
     @Retryable(
-            noRetryFor = {OpenAIApiException.class},
+            retryFor = {ResourceAccessException.class, HttpServerErrorException.class},
+            noRetryFor = {OpenAIApiException.class, HttpMessageConversionException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0)
     )
@@ -48,11 +55,16 @@ public class ConsultationOpenAICaller {
                     .entity(CareerAdviceResponse.class);
         } catch (OpenAIApiException e) {
             throw e;
-        } catch (Exception e) {
-            // 네트워크/타임아웃 → RuntimeException으로 던져 @Retryable 트리거
+        } catch (ResourceAccessException | HttpServerErrorException e) {
+            // 네트워크/타임아웃/5xx → @Retryable 재시도 대상
             // TODO: 문서 정리 시 log.error("...", e) 로 예외 객체 전달하여 스택 트레이스 포함할 것
             log.error("OpenAI API 호출 실패, 재시도 예정");
-            throw new RuntimeException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
+            throw e;
+        } catch (Exception e) {
+            // 역직렬화 실패, 응답 스키마 불일치 등 비일시적 오류 → 재시도 안 함
+            // TODO: 문서 정리 시 log.error("...", e) 로 예외 객체 전달하여 스택 트레이스 포함할 것
+            log.error("OpenAI API 응답 처리 실패 (재시도 불가)");
+            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
         }
         validate(response);
         return response;

@@ -1,6 +1,5 @@
 package ssafy.SSAju.service;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.retry.annotation.Backoff;
@@ -13,6 +12,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.validator.RequestValidator;
+import ssafy.SSAju.dto.external.FastApiRequest;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
@@ -85,8 +85,4 @@ public class SajuDataService {
         throw new InvalidSajuDataException(ErrorMessageConstants.FASTAPI_CALL_FAILED.getMessage(), ex);
     }
 
-    private record FastApiRequest(
-            @JsonFormat(pattern = "yyyy-MM-dd") LocalDate birthDate,
-            @JsonFormat(pattern = "HH:mm") LocalTime birthTime
-    ) {}
 }

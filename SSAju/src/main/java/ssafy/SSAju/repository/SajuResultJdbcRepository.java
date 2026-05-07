@@ -7,6 +7,8 @@ import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.exception.DataAccessException;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Objects;
+
 @Repository
 @RequiredArgsConstructor
 public class SajuResultJdbcRepository {
@@ -15,9 +17,8 @@ public class SajuResultJdbcRepository {
     private final ObjectMapper objectMapper;
 
     public int insertOrIgnore(SajuResult sajuResult) {
-        if (sajuResult.getUserProfile() == null) {
-            throw new IllegalArgumentException("SajuResult의 UserProfile이 null입니다.");
-        }
+        Objects.requireNonNull(sajuResult, "sajuResult는 null일 수 없습니다.");
+        Objects.requireNonNull(sajuResult.getUserProfile(), "SajuResult의 UserProfile은 null일 수 없습니다.");
         String fullSajuDataJson = serializeFullSajuData(sajuResult);
         return jdbcTemplate.update(
                 "INSERT IGNORE INTO saju_result (user_profile_id, full_saju_data, fetched_at) VALUES (?, ?, ?)",
