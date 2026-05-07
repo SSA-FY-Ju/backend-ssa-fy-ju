@@ -41,6 +41,214 @@ ssafy.SSAju/
 - `@Data`: 모든 필드 접근 + toString() 자동화 (순환 참조 위험)
 - `@ToString`: 양방향 관계에서 무한 재귀 위험
 
+## JPA 타임스탐프 관리 (@CreatedDate/@LastModifiedDate)
+
+모든 엔티티의 생성/수정 시간은 **Spring Data JPA 어노테이션** 사용 (수동 `@PreUpdate` 금지):
+
+```java
+// 좋음
+@Entity
+@EntityListeners(AuditingEntityListener.class)  // 필수: 없으면 @CreatedDate/@LastModifiedDate 동작 안 함
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Builder
+public class UserProfile {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private LocalDate birthDate;
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+}
+
+// 필수 설정: @Configuration에서 @EnableJpaAuditing 활성화
+@Configuration
+@EnableJpaAuditing
+public class JpaConfig {
+}
+
+// 나쁨
+@Entity
+public class UserProfile {
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    
+    @PreUpdate
+    public void updateTimestamp() {
+        this.updatedAt = LocalDateTime.now();  // 수동 관리 (금지)
+    }
+}
+```
+
+**이점**:
+- ✅ 타임스탐프 자동 관리 (개발자 개입 최소화)
+- ✅ createdAt은 업데이트 불가 (`updatable=false`)
+- ✅ 모든 엔티티에서 일관된 방식
+
+## 엔티티 equals & hashCode (ID 기준 구현)
+
+**필수**: 모든 엔티티는 ID를 기준으로 직접 구현. Lombok @EqualsAndHashCode 금지.
+
+**이유**: 지연 로딩(Lazy Loading)으로 인한 Proxy 객체 비교 시 안전성 보장. Proxy 객체는 실제 객체와 다른 hashCode를 가질 수 있으므로 Lombok이 생성한 equals/hashCode가 정확하지 않을 수 있음.
+
+```java
+// 좋음: ID 기준
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Builder
+public class SajuResult {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private LocalDate birthDate;
+    // ... 기타 필드
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null) return false;
+        if (!(o instanceof SajuResult)) return false;
+        SajuResult that = (SajuResult) o;
+        return Objects.equals(id, that.id);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+}
+
+// 나쁨: Lombok @EqualsAndHashCode (Proxy 비교 시 위험)
+@Entity
+@EqualsAndHashCode
+public class SajuResult {
+    @Id
+    private Long id;
+    private LocalDate birthDate;
+    // ... 기타 필드 모두 포함 (Proxy 로딩 시 문제)
+}
+```
+
+**HashSet/HashMap 안전성**:
+```java
+// Proxy 객체 비교 테스트
+SajuResult proxy = sessionFactory.openSession()
+    .getReference(SajuResult.class, 1L);  // Proxy 객체 (실제 데이터 로드 안 됨)
+
+Set<SajuResult> set = new HashSet<>();
+set.add(proxy);
+assertTrue(set.contains(proxy));  // ID 기준이면 true, 다른 필드 기준이면 false
+```
+
+## Value Objects (컬렉션 객체화)
+
+Map, List 같은 원시 컬렉션을 전용 객체로 래핑하여 의미를 명확히 합니다.
+
+```java
+// 나쁨: 원시 컬렉션 반환
+public Map<String, Integer> calculateTenGodDistribution(List<String> heavenlyStems) {
+    Map<String, Integer> result = new HashMap<>();
+    // ... 계산
+    return result;  // 의미가 불명확
+}
+
+// 좋음: Value Object로 래핑
+public TenGodDistribution calculateTenGodDistribution(List<String> heavenlyStems) {
+    Map<String, Integer> data = new HashMap<>();
+    // ... 계산
+    return new TenGodDistribution(data);  // 의미 명확
+}
+
+// TenGodDistribution.java (일급 컬렉션)
+public class TenGodDistribution {
+    private final Map<String, Integer> distribution;
+    
+    public TenGodDistribution(Map<String, Integer> data) {
+        this.distribution = Collections.unmodifiableMap(new HashMap<>(data));
+    }
+    
+    public Integer getScore(String tenGodName) {
+        return distribution.getOrDefault(tenGodName, 0);
+    }
+    
+    public boolean hasHighConfidence(int threshold) {
+        return distribution.values().stream()
+            .mapToInt(Integer::intValue)
+            .sum() >= threshold;
+    }
+    
+    public Map<String, Integer> asMap() {
+        return distribution;
+    }
+}
+```
+
+**이점**:
+- ✅ 데이터의 의미가 명확해짐 (Map<String, Integer> vs TenGodDistribution)
+- ✅ 비즈니스 로직을 객체 내부로 응집 (getScore, hasHighConfidence 등)
+- ✅ 컬렉션 불변성 보장 (unmodifiableMap)
+- ✅ 타입 안전성 향상
+
+## Validator 분리 (검증 로직 전문화)
+
+Service 계층의 책임을 줄이기 위해 검증 로직을 전용 Validator 클래스로 분리합니다.
+
+```java
+// 나쁨: Service 내부에서 검증
+@Service
+public class ConsultationService {
+    public ConsultationResponse getConsultation(ConsultationRequest req) {
+        // 검증 로직 (Service 책임 비대화)
+        if (req.birthDate() == null) {
+            throw new InvalidArgumentException("birthDate required");
+        }
+        if (req.birthTime() == null) {
+            throw new InvalidArgumentException("birthTime required");
+        }
+        // ... 추가 검증
+        // ... 실제 비즈니스 로직 (뒤로 밀려남)
+    }
+}
+
+// 좋음: Validator 분리
+@Component
+public class RequestValidator {
+    public void validateConsultationRequest(ConsultationRequest req) {
+        if (req.birthDate() == null) {
+            throw new InvalidArgumentException("birthDate required");
+        }
+        if (req.birthTime() == null) {
+            throw new InvalidArgumentException("birthTime required");
+        }
+        // ... 추가 검증
+    }
+}
+
+@Service
+public class ConsultationService {
+    private final RequestValidator validator;
+    
+    public ConsultationResponse getConsultation(ConsultationRequest req) {
+        validator.validateConsultationRequest(req);  // 검증 위임
+        // ... 실제 비즈니스 로직만 집중
+    }
+}
+```
+
+**분리 대상**:
+- **SajuValidator**: `validateSajuData(heavenlyStems, earthlyBranches)` - FastAPI 응답 검증
+- **RequestValidator**: `validateBirthDate(LocalDate)`, `validateBirthTime(LocalTime)` - 요청 DTO 검증
+- **CompatibilityValidator**: `validateCompatibilityRequest(CompatibilityRequest)` - 호환성 분석 요청 검증
+
 ## DTO (Data Transfer Object)
 
 Java 21 환경에서는 Request/Response DTO를 반드시 **`record` 타입**으로 작성합니다.
@@ -116,9 +324,12 @@ throw new InvalidSajuDataException("Invalid date format");
 | 상수 | UPPER_SNAKE_CASE | `CAREER_TIMING_API_TIMEOUT` |
 | REST API URI | 소문자 kebab-case | `/api/users/profile-images` |
 
-## 상수 및 열거형 관리
+## 상수 및 열거형 관리 (Phase 3-Refactor-3 최종)
 
-상수는 **용도별로** 다음과 같이 관리합니다:
+상수는 **용도별로**, **완벽하게** 다음과 같이 관리합니다:
+- ✅ **모든 매직 넘버 제거**: 0, 1, 2, 3, 4, 5, 8, 12, 25, 30, 35, 50, 75, 100 등 모두 상수화
+- ✅ **모든 하드코딩 문자열 제거**: "H1", "H2", "정관", "편관", 월 이름 등 모두 상수화
+- ✅ **날짜/시간 포맷 상수화**: "YYYY-MM-DD", "HH:mm", "12:00" 등
 
 ### Rule 1: 매직 넘버 & String 하드코딩 금지
 
@@ -188,6 +399,15 @@ public enum TenGodConstants {
         }
         return null;
     }
+}
+
+// SatisfactionStatus.java - 만족도 상태: 여러 모듈에서 참조
+public enum SatisfactionStatus {
+    SATISFIED("만족함"),
+    DISSATISFIED("만족하지 않음");
+
+    private final String description;
+    SatisfactionStatus(String description) { this.description = description; }
 }
 ```
 
@@ -262,14 +482,14 @@ public class SajuDataService {
         // 재시도 횟수 상수 사용
         int maxRetries = ApiTimeoutConstants.FASTAPI_MAX_RETRIES;
         
-        // Enum 사용
-        return webClient
+        // RestClient 사용 (WebClient 대신 경량 동기 클라이언트)
+        return restClient
             .post()
-            .timeout(timeout)
+            .uri("http://fastapi:8000/api/saju/calculate")
+            .body(new SajuRequest(birthDate, birthTime))
             .retrieve()
-            .bodyToMono(FastAPIResponse.class)
-            .retryWhen(...)  // maxRetries 사용
-            .block();
+            .toEntity(FastAPIResponse.class)
+            .getBody();  // @Retryable이 maxRetries 기준으로 재시도 처리
     }
 }
 
@@ -322,16 +542,6 @@ public class CareerFortuneAnalyzer {
 | **Enum** (도메인 개념) | `career/enums/` | `FeedbackType.java`, `CareerTimingType.java` |
 | **Static Constants** (기술 설정) | `career/constants/` | `ApiTimeoutConstants.java`, `ValidationConstants.java` |
 | **필드 레벨** (단일 파일 사용) | 클래스 내부 | `private static final int BUFFER_SIZE = 1024;` |
-
-// SatisfactionStatus.java
-public enum SatisfactionStatus {
-    SATISFIED("만족함"),
-    DISSATISFIED("만족하지 않음");
-    
-    private final String description;
-    SatisfactionStatus(String description) { this.description = description; }
-}
-```
 
 ### final static: 파일 내부용 상수 (특정 파일에서만 사용)
 
@@ -402,6 +612,7 @@ User user = userRepository.findById(id).get();  // NPE 위험
 
 ## 트랜잭션
 
+### 기본 규칙
 모든 Service 메서드에는 `@Transactional` 적용, 단순 조회는 `readOnly = true` 명시:
 
 ```java
@@ -415,6 +626,55 @@ public class CareerFortuneService {
 }
 ```
 
+### ⚠️ 예외: 외부 API 호출이 있는 Service
+FastAPI, OpenAI, 공공데이터API 등 **외부 I/O가 있는 메서드는 @Transactional 제거**:
+
+```java
+// ❌ 나쁜 예: 외부 API 호출 시 @Transactional 유지
+@Service
+public class ConsultationService {
+    @Transactional  // ❌ Connection Pool 고갈 위험!
+    public ConsultationResponse getConsultation(ConsultationRequest req) {
+        // FastAPI, OpenAI 호출 중 DB 커넥션 점유
+        // 네트워크 지연 동안 커넥션 낭비 → 5000명 동시 사용자 불가능
+        FastAPIResponse saju = sajuDataService.fetchSajuFromFastAPI(...);
+        CareerAdviceResponse advice = openaiService.callOpenAI(...);
+        // DB 저장
+    }
+}
+
+// ✅ 좋은 예: 외부 API 호출 시 @Transactional 제거
+@Service
+public class ConsultationService {
+    // @Transactional 없음 ✅
+    public ConsultationResponse getConsultation(ConsultationRequest req) {
+        // 1. 외부 API 호출 (트랜잭션 밖)
+        FastAPIResponse saju = sajuDataService.fetchSajuFromFastAPI(...);
+        CareerAdviceResponse advice = openaiService.callOpenAI(...);
+
+        // 2. 각 save/find는 Repository의 @Transactional에서 처리
+        UserProfile profile = userProfileRepository.findOrCreate(...);  // Repository @Transactional
+        SajuResult result = sajuResultRepository.findOrCreate(...);     // Repository @Transactional
+        CareerConsultation consultation = consultationRepository.save(...); // Repository @Transactional
+    }
+}
+```
+
+**이유**:
+- ✅ Connection Pool 고갈 방지 (외부 API 지연이 커넥션을 점유하지 않음)
+- ✅ 5000명 동시 사용자 처리 가능
+- ✅ Repository 계층에서 개별 트랜잭션으로 관리 (단, 원자성은 보장하지 않음 — 아래 트레이드오프 참고)
+- ✅ 네트워크 지연이 DB 성능에 영향을 주지 않음
+
+**⚠️ 트레이드오프 - 원자성 포기**:
+@Transactional 제거 시 각 Repository 호출이 별도 트랜잭션으로 실행됨:
+- `userProfileRepository.findOrCreate()` → 커밋
+- `sajuResultRepository.findOrCreate()` → 커밋
+- `consultationRepository.save()` → 실패 시 롤백 안 됨 (이전 2개는 이미 커밋)
+
+→ **데이터 불완전 저장 가능성** 존재. 이 패턴은 Connection Pool 고갈(5000명 동시)이 원자성보다 더 심각한 문제이기 때문에 의도적으로 선택한 트레이드오프.
+→ 실패 시 재시도 가능한 구조이거나 미완성 데이터가 허용되는 경우에만 사용할 것.
+
 ## 로깅
 
 `slf4j` 인터페이스 활용. 적절한 로그 레벨 사용:
@@ -426,6 +686,135 @@ log.info("User consultation request: {}", userId);
 log.error("OpenAI API timeout", exception);
 log.debug("Saju calculation details: {}", result);
 ```
+
+### 🔒 로깅 보안 정책 (민감 정보 보호)
+
+#### ❌ 운영 로그(INFO/WARN/ERROR)에 포함 금지
+
+| 분류 | 금지 항목 | 이유 |
+|------|---------|------|
+| **개인정보** | `birthDate`, `birthTime`, `email`, `phone` | GDPR/법적 규제 |
+| **인증 정보** | API Key, Bearer 토큰, Authorization 헤더값 | 보안 누출 위험 |
+| **외부 API 원문** | FastAPI 요청 body 전문, OpenAI 프롬프트 | 민감한 사주 데이터 노출 |
+
+> **참고**: DEBUG 레벨은 개발 환경 전용. 프로덕션에서는 반드시 비활성화. DEBUG에도 API Key/토큰은 절대 포함 금지.
+
+#### ✅ 레벨별 올바른 로깅
+
+| 레벨 | 로그 내용 | 예시 |
+|------|---------|------|
+| **INFO** | 사용자 ID, API 상태코드, 지연시간(ms), 성공/실패만 | `log.info("Career timing analysis completed: userId={}, duration={}ms", userId, duration);` |
+| **DEBUG** | 상세 계산 정보, 개인정보가 마스킹/제거된 API 요청/응답 | `log.debug("FastAPI response: statusCode={}, body={}", statusCode, maskedBody);` |
+| **ERROR** | 스택 트레이스, 민감 정보 제거 후 | `log.error("API call failed after 2 retries", exception);` |
+
+**예시**:
+```java
+// 1. 개인정보 (Personal Information)
+// ❌ 금지: 직접적인 개인정보 노출
+log.info("사용자 분석 요청 (birthDate={})", birthDate); 
+log.debug("상세 데이터 확인: email={}, phone={}", email, phone); // DEBUG라도 금지
+
+// ✅ 올바름: 식별 가능한 내부 ID만 사용
+log.info("사용자 분석 요청 (userId={})", userId);
+
+
+// 2. 외부 API 요청 및 프롬프트 (External API & Prompt)
+// ❌ 금지: 민감 정보가 포함된 원문 그대로 로깅
+log.info("OpenAI 요청: {}", fullPrompt); 
+log.debug("FastAPI 전문: {}", requestBody); // 사주/개인정보가 포함된 경우 DEBUG도 금지
+
+// ✅ 올바름: 민감 필드 마스킹 처리 또는 메타데이터만 기록
+log.debug("OpenAI 요청 (마스킹 완료): {}", mask(fullPrompt)); 
+log.info("OpenAI API 호출 완료: userId={}, usedTokens={}", userId, tokenCount);
+
+
+// 3. 에러 상황 (Error Handling)
+// ❌ 금지: 에러 메시지에 개인정보가 포함된 경우
+log.error("회원가입 실패: email={}", email);
+
+// ✅ 올바름: 에러 원인과 식별자만 기록
+log.error("회원가입 실패: userId={}, reason={}", userId);
+```
+
+## RestClient + @Retryable 예외 처리
+
+Spring RestClient를 사용한 외부 API 호출 시 정확한 예외 처리 필수:
+
+### 재시도 대상 (자동 재시도, 지수 백오프)
+- **ResourceAccessException**: 네트워크 오류, 타임아웃, 연결 실패 → 그대로 던지기 (@Retryable이 처리)
+- **RestClientResponseException (5xx)**: 서버 오류 → 그대로 던지기 (@Retryable이 처리)
+
+### 비재시도 대상 (즉시 실패)
+- **RestClientResponseException (4xx)**: 클라이언트 오류 → InvalidSajuDataException 변환 (재시도 금지)
+
+### 올바른 구현 패턴
+
+```java
+@Service
+public class SajuDataService {
+    private final RestClient restClient;
+
+    @Retryable(
+        retryFor = {ResourceAccessException.class, HttpServerErrorException.class},  // 5xx만 재시도 (4xx 제외)
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000, multiplier = 2.0)  // 1초, 2초, 4초
+    )
+    public FastAPIResponse fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime) {
+        try {
+            return restClient
+                .post()
+                .uri("http://fastapi:8000/api/saju/calculate")
+                .body(new SajuRequest(birthDate, birthTime))
+                .retrieve()
+                .toEntity(FastAPIResponse.class)
+                .getBody();
+        } catch (ResourceAccessException e) {
+            // 네트워크/타임아웃 → 재시도 대상 (@Retryable이 처리)
+            throw e;
+        } catch (RestClientResponseException e) {
+            // HTTP 4xx/5xx 응답 처리
+            if (e.getStatusCode().is4xxClientError()) {
+                // 4xx: 클라이언트 오류 → 비재시도
+                throw new InvalidSajuDataException("Invalid input", e);
+            } else {
+                // 5xx: 서버 오류 → 재시도 대상 (원본 예외 유지)
+                throw e;
+            }
+        }
+    }
+}
+```
+
+### ⚠️ 흔한 실수
+
+```java
+// ❌ 나쁜 예: 5xx를 별도 예외로 변환 (재시도 손상)
+catch (RestClientResponseException e) {
+    if (e.getStatusCode().is5xxServerError()) {
+        throw new FastAPITimeoutException("Server error", e);  // ❌ @Retryable 대상 손상!
+    }
+}
+
+// ✅ 올바른 예: 원본 예외 유지
+catch (RestClientResponseException e) {
+    if (e.getStatusCode().is5xxServerError()) {
+        throw e;  // ✅ @Retryable이 정상 작동
+    }
+}
+```
+
+### @EnableRetry 설정
+```java
+@Configuration
+@EnableRetry  // 필수: @Retryable 활성화
+public class RetryConfig {
+    // 추가 설정 없음: @Retryable 속성(maxAttempts, backoff)으로 제어
+}
+```
+
+**주의**: `spring.task.retry.*` 프로퍼티는 ThreadPoolTask* 설정용이므로 @Retryable과는 무관합니다.
+
+---
 
 ## 테스트 스타일
 

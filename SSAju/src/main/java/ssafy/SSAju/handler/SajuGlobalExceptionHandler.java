@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -16,6 +17,7 @@ import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.exception.PublicDataApiException;
+import ssafy.SSAju.exception.SajuResultNotFoundException;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -24,6 +26,16 @@ import org.springframework.validation.FieldError;
 @Slf4j
 @RestControllerAdvice
 public class SajuGlobalExceptionHandler {
+
+    @ExceptionHandler(SajuResultNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleSajuResultNotFound(
+            SajuResultNotFoundException e, HttpServletRequest request) {
+        log.warn("SajuResult not found: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.SAJU_RESULT_NOT_FOUND.getCode(),
+                        e.getMessage(), generateRequestId())));
+    }
 
     @ExceptionHandler(InvalidSajuDataException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidSajuData(
@@ -87,6 +99,18 @@ public class SajuGlobalExceptionHandler {
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.DATABASE_ERROR.getCode(),
                         ErrorMessageConstants.DATABASE_ERROR.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException e, HttpServletRequest request) {
+        String requestId = generateRequestId();
+        log.warn("JSON 파싱 실패: requestId={}, exceptionType={}", requestId, e.getClass().getSimpleName());
+        log.debug("JSON 파싱 상세 예외: requestId={}", requestId, e);
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.VALIDATION_FAILED.getCode(),
+                        "요청 본문을 파싱할 수 없습니다. 필드 값을 확인해주세요.", requestId)));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

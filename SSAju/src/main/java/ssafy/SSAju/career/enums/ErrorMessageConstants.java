@@ -85,7 +85,11 @@ public enum ErrorMessageConstants {
 
     // === DB 접근 예외 메시지 ===
     SAJU_RESULT_ACCESS_FAILED("DATABASE_ERROR", "SajuResult 조회/생성 실패"),
-    USER_PROFILE_ACCESS_FAILED("DATABASE_ERROR", "UserProfile 조회/생성 실패");
+    USER_PROFILE_ACCESS_FAILED("DATABASE_ERROR", "UserProfile 조회/생성 실패"),
+
+    // === 피드백 예외 메시지 ===
+    SAJU_RESULT_NOT_FOUND("SAJU_RESULT_NOT_FOUND", "해당 SajuResult를 찾을 수 없습니다."),
+    INVALID_FEEDBACK_TYPE("INVALID_FEEDBACK_TYPE", "feedbackType은 CAREER_TIMING, CONSULTATION, COMPATIBILITY 중 하나여야 합니다.");
 
     private final String code;
     private final String message;
