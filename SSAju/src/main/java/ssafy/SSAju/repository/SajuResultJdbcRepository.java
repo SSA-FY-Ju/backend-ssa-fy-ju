@@ -15,6 +15,9 @@ public class SajuResultJdbcRepository {
     private final ObjectMapper objectMapper;
 
     public int insertOrIgnore(SajuResult sajuResult) {
+        if (sajuResult.getUserProfile() == null) {
+            throw new IllegalArgumentException("SajuResult의 UserProfile이 null입니다.");
+        }
         String fullSajuDataJson = serializeFullSajuData(sajuResult);
         return jdbcTemplate.update(
                 "INSERT IGNORE INTO saju_result (user_profile_id, full_saju_data, fetched_at) VALUES (?, ?, ?)",

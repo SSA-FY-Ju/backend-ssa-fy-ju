@@ -95,9 +95,13 @@ class SajuResultProviderInsertOrIgnoreTest {
             });
         }
 
-        startLatch.countDown();
-        doneLatch.await(15, TimeUnit.SECONDS);
-        executor.shutdown();
+        boolean completed;
+        try {
+            startLatch.countDown();
+            completed = doneLatch.await(15, TimeUnit.SECONDS);
+        } finally {
+            executor.shutdownNow();
+        }
 
         long savedCount = sajuResultRepository.count();
 
@@ -107,6 +111,7 @@ class SajuResultProviderInsertOrIgnoreTest {
         if (!errors.isEmpty()) log.warn("  예외 목록: {}", errors);
         log.info("────────────────────────────────────────");
 
+        assertThat(completed).as("15초 내 모든 스레드 완료").isTrue();
         assertThat(successCount.get()).as("모든 스레드가 성공해야 함").isEqualTo(threadCount);
         assertThat(errors).as("예외 없어야 함").isEmpty();
         assertThat(savedCount).as("DB에 SajuResult 1건만 존재").isEqualTo(1);

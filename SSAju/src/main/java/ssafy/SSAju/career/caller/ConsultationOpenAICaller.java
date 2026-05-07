@@ -28,11 +28,11 @@ public class ConsultationOpenAICaller {
      *
      * 재시도 정책 (Spring Retry):
      * - OpenAIApiException (검증 실패): 재시도 안 함 (noRetryFor)
-     * - 그 외 RuntimeException (네트워크/타임아웃): 최대 2회 재시도
+     * - 그 외 RuntimeException (네트워크/타임아웃): 최대 2회 재시도 (총 3회 시도)
      */
     @Retryable(
             noRetryFor = {OpenAIApiException.class},
-            maxAttempts = 2,
+            maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0)
     )
     public CareerAdviceResponse call(FastAPIResponse sajuData,
@@ -50,6 +50,7 @@ public class ConsultationOpenAICaller {
             throw e;
         } catch (Exception e) {
             // 네트워크/타임아웃 → RuntimeException으로 던져 @Retryable 트리거
+            // TODO: 문서 정리 시 log.error("...", e) 로 예외 객체 전달하여 스택 트레이스 포함할 것
             log.error("OpenAI API 호출 실패, 재시도 예정");
             throw new RuntimeException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
         }
@@ -66,6 +67,7 @@ public class ConsultationOpenAICaller {
                                         TenGodDistribution tenGodDistribution,
                                         HiddenStems hiddenStems,
                                         String dayMaster) {
+        // TODO: 문서 정리 시 log.error("...", ex) 로 예외 객체 전달하여 스택 트레이스 포함할 것
         log.error("OpenAI API 재시도 후 최종 실패");
         throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), ex);
     }

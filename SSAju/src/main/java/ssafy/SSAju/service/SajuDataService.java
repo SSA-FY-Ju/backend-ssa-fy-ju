@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpServerErrorException;
@@ -69,6 +70,19 @@ public class SajuDataService {
             log.warn("FastAPI 서버 오류 발생, 재시도 예정");
             throw e;
         }
+    }
+
+    /**
+     * 최대 재시도 횟수 초과 시 실행: 인프라 예외 → InvalidSajuDataException 으로 변환.
+     *
+     * OpenAI Caller와 일관되게 도메인 예외로 래핑하여 호출자가 인프라 예외에 직접 의존하지 않도록 합니다.
+     */
+    @Recover
+    public FastAPIResponse recoverFetchSajuFromFastAPI(RuntimeException ex,
+                                                       LocalDate birthDate,
+                                                       LocalTime birthTime) {
+        log.error("FastAPI 호출 재시도 후 최종 실패: {} {}", birthDate, birthTime, ex);
+        throw new InvalidSajuDataException(ErrorMessageConstants.FASTAPI_CALL_FAILED.getMessage(), ex);
     }
 
     private record FastApiRequest(

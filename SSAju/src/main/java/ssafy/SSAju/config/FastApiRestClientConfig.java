@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
+import ssafy.SSAju.exception.ExternalApiException;
 
 import java.time.Duration;
 
@@ -19,6 +20,10 @@ public class FastApiRestClientConfig {
 
     @Bean(name = "fastApiRestClient")
     public RestClient fastApiRestClient() {
+        if (fastApiTimeoutSeconds <= 0) {
+            throw new ExternalApiException(
+                    "saju.fastapi.timeout-seconds 설정값은 0보다 커야 합니다. 현재 값: " + fastApiTimeoutSeconds);
+        }
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(fastApiTimeoutSeconds));
         factory.setReadTimeout(Duration.ofSeconds(fastApiTimeoutSeconds));

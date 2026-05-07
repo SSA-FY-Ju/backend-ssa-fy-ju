@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("FiveElements 값 객체 테스트")
 class FiveElementsTest {
@@ -33,5 +34,7 @@ class FiveElementsTest {
         var elements = new FiveElements(Map.of("木", 1, "火", 2));
 
         assertThat(elements.asMap()).containsEntry("木", 1).containsEntry("火", 2);
+        assertThatThrownBy(() -> elements.asMap().put("土", 3))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 }
