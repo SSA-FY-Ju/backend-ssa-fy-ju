@@ -3,9 +3,9 @@ package ssafy.SSAju.career.util;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import ssafy.SSAju.career.domain.HiddenStems;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -56,15 +56,15 @@ class HiddenStemCalculatorTest {
         List<String> branches = List.of("午", "戌", "未", "子");
 
         // When
-        Map<String, List<String>> result = calculator.calculate(branches);
+        HiddenStems result = calculator.calculate(branches);
 
         // Then
-        assertThat(result).containsKey("午");
-        assertThat(result).containsKey("戌");
-        assertThat(result).containsKey("未");
-        assertThat(result).containsKey("子");
-        assertThat(result.get("午")).containsExactly("丁", "己");
-        assertThat(result.get("子")).containsExactly("癸");
+        assertThat(result.getByBranch("午")).isNotEmpty();
+        assertThat(result.getByBranch("戌")).isNotEmpty();
+        assertThat(result.getByBranch("未")).isNotEmpty();
+        assertThat(result.getByBranch("子")).isNotEmpty();
+        assertThat(result.getByBranch("午")).containsExactly("丁", "己");
+        assertThat(result.getByBranch("子")).containsExactly("癸");
     }
 
     @Test

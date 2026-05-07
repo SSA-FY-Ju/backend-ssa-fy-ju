@@ -4,22 +4,22 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
-import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.TenGodCalculator;
+import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
-import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -33,6 +33,7 @@ public class CareerFortuneService {
     private final HiddenStemCalculator hiddenStemCalculator;
     private final CareerFortuneAnalyzer careerFortuneAnalyzer;
     private final SajuResultMapper sajuResultMapper;
+    private final SajuValidator sajuValidator;
 
     /**
      * @Transactional 없음: FastAPI I/O 동안 DB 커넥션을 점유하지 않도록 트랜잭션을 분리.
@@ -44,12 +45,12 @@ public class CareerFortuneService {
         UserProfile userProfile = userProfileProvider.findOrCreate(birthDate, birthTime);
 
         FastAPIResponse sajuData = sajuDataService.fetchSajuFromFastAPI(birthDate, birthTime);
-        validateSajuData(sajuData);
+        sajuValidator.validate(sajuData);
 
         List<String> heavenlyStems = sajuData.heavenlyStems();
         List<String> earthlyBranches = sajuData.earthlyBranches();
-        Map<String, Integer> tenGodDistribution = tenGodCalculator.calculate(heavenlyStems);
-        Map<String, List<String>> hiddenStems = hiddenStemCalculator.calculate(earthlyBranches);
+        TenGodDistribution tenGodDistribution = tenGodCalculator.calculate(heavenlyStems);
+        HiddenStems hiddenStems = hiddenStemCalculator.calculate(earthlyBranches);
         log.debug("십신 분포: {}, 지장간: {}", tenGodDistribution, hiddenStems);
 
         String dayMaster = heavenlyStems.get(2);
@@ -73,14 +74,4 @@ public class CareerFortuneService {
         return new CareerTimingResponse(favoredPeriod, confidenceScore, reasoning);
     }
 
-    private void validateSajuData(FastAPIResponse sajuData) {
-        List<String> heavenlyStems = sajuData.heavenlyStems();
-        List<String> earthlyBranches = sajuData.earthlyBranches();
-        if (heavenlyStems == null || heavenlyStems.size() != 4) {
-            throw new InvalidSajuDataException(ErrorMessageConstants.HEAVENLY_STEMS_COUNT_INVALID.getMessage());
-        }
-        if (earthlyBranches == null || earthlyBranches.size() != 4) {
-            throw new InvalidSajuDataException(ErrorMessageConstants.EARTHLY_BRANCHES_COUNT_INVALID.getMessage());
-        }
-    }
 }

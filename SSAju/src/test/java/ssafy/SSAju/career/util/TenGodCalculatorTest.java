@@ -3,9 +3,9 @@ package ssafy.SSAju.career.util;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import ssafy.SSAju.career.domain.TenGodDistribution;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -81,12 +81,12 @@ class TenGodCalculatorTest {
         List<String> stems = List.of("庚", "丙", "甲", "庚"); // 年月日時 (일간=甲)
 
         // When
-        Map<String, Integer> distribution = calculator.calculate(stems);
+        TenGodDistribution distribution = calculator.calculate(stems);
 
         // Then
-        assertThat(distribution).containsEntry("편관", 2);  // 庚(年), 庚(時)
-        assertThat(distribution).containsEntry("식신", 1);  // 丙(月)
-        assertThat(distribution).doesNotContainKey("비견"); // 일간 甲은 제외
+        assertThat(distribution.getScore("편관")).isEqualTo(2);  // 庚(年), 庚(時)
+        assertThat(distribution.getScore("식신")).isEqualTo(1);  // 丙(月)
+        assertThat(distribution.asMap()).doesNotContainKey("비견"); // 일간 甲은 제외
     }
 
     @Test

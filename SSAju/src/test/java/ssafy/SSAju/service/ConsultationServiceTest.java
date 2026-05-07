@@ -7,6 +7,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ssafy.SSAju.career.caller.ConsultationOpenAICaller;
+import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
@@ -17,6 +19,7 @@ import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.TenGodCalculator;
+import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.ConsultationRequest;
@@ -67,10 +70,11 @@ class ConsultationServiceTest {
             "14:30", "1990-10-10", Map.of()
     );
 
-    private static final Map<String, Integer> TEN_GOD = Map.of("정관", 1, "편관", 1);
-    private static final Map<String, List<String>> HIDDEN_STEMS =
-            Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
-                   "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊"));
+    private static final TenGodDistribution TEN_GOD =
+            new TenGodDistribution(Map.of("정관", 1, "편관", 1));
+    private static final HiddenStems HIDDEN_STEMS =
+            new HiddenStems(Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
+                   "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
 
     private static final CareerAdviceResponse MOCK_ADVICE = new CareerAdviceResponse(
             List.of(new CareerAdviceResponse.IndustryRecommendation(
@@ -117,7 +121,7 @@ class ConsultationServiceTest {
         service = new ConsultationService(
                 openAICaller, sajuDataService, tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer,
                 userProfileProvider, sajuResultProvider, sajuResultMapper, consultationMapper,
-                careerConsultationRepository);
+                careerConsultationRepository, new SajuValidator());
         try {
             var field = ConsultationService.class.getDeclaredField("modelVersion");
             field.setAccessible(true);

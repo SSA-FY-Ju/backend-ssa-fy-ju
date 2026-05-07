@@ -5,10 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ssafy.SSAju.career.caller.ConsultationOpenAICaller;
+import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
-import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.mapper.ConsultationMapper;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
 import ssafy.SSAju.career.provider.SajuResultProvider;
@@ -16,11 +17,11 @@ import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.TenGodCalculator;
+import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.ConsultationRequest;
 import ssafy.SSAju.dto.response.ConsultationResponse;
-import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 
 import java.util.List;
@@ -41,6 +42,7 @@ public class ConsultationService {
     private final SajuResultMapper sajuResultMapper;
     private final ConsultationMapper consultationMapper;
     private final CareerConsultationRepository careerConsultationRepository;
+    private final SajuValidator sajuValidator;
 
     @Value("${spring.ai.openai.chat.options.model}")
     private String modelVersion;
@@ -52,12 +54,12 @@ public class ConsultationService {
         log.info("커리어 컨설팅 시작");
 
         FastAPIResponse sajuData = sajuDataService.fetchSajuFromFastAPI(request.birthDate(), request.birthTime());
-        validateSajuData(sajuData);
+        sajuValidator.validateWithFiveElements(sajuData);
 
         List<String> heavenlyStems = sajuData.heavenlyStems();
         List<String> earthlyBranches = sajuData.earthlyBranches();
-        Map<String, Integer> tenGodDistribution = tenGodCalculator.calculate(heavenlyStems);
-        Map<String, List<String>> hiddenStems = hiddenStemCalculator.calculate(earthlyBranches);
+        TenGodDistribution tenGodDistribution = tenGodCalculator.calculate(heavenlyStems);
+        HiddenStems hiddenStems = hiddenStemCalculator.calculate(earthlyBranches);
 
         String dayMaster = heavenlyStems.get(2);
         String favoredPeriod = careerFortuneAnalyzer.analyzeFavoredPeriod(
@@ -83,7 +85,7 @@ public class ConsultationService {
                 advice.dayMasterDescription(),
                 sajuData.fiveElements(),
                 advice.fiveElementsAnalysis(),
-                tenGodDistribution,
+                tenGodDistribution.asMap(),
                 advice.keyTenGods()
         );
 
@@ -114,22 +116,4 @@ public class ConsultationService {
         );
     }
 
-    private void validateSajuData(FastAPIResponse sajuData) {
-        if (sajuData == null) {
-            throw new InvalidSajuDataException(ErrorMessageConstants.SAJU_DATA_NULL.getMessage());
-        }
-        List<String> heavenlyStems = sajuData.heavenlyStems();
-        if (heavenlyStems == null || heavenlyStems.size() != 4) {
-            throw new InvalidSajuDataException(ErrorMessageConstants.HEAVENLY_STEMS_COUNT_INVALID.getMessage());
-        }
-        List<String> earthlyBranches = sajuData.earthlyBranches();
-        if (earthlyBranches == null || earthlyBranches.size() != 4) {
-            throw new InvalidSajuDataException(ErrorMessageConstants.EARTHLY_BRANCHES_COUNT_INVALID.getMessage());
-        }
-        // fiveElements: ConsultationResponse.SajuProfile 생성 시 sajuData.fiveElements() 사용됨
-        Map<String, Integer> fiveElements = sajuData.fiveElements();
-        if (fiveElements == null || fiveElements.isEmpty()) {
-            throw new InvalidSajuDataException(ErrorMessageConstants.FIVE_ELEMENTS_REQUIRED.getMessage());
-        }
-    }
 }

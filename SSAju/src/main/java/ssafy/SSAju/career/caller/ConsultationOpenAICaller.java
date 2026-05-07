@@ -3,15 +3,18 @@ package ssafy.SSAju.career.caller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.exception.OpenAIApiException;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -20,26 +23,51 @@ public class ConsultationOpenAICaller {
 
     private final ChatClient chatClient;
 
+    /**
+     * OpenAI API를 호출하여 커리어 조언을 받습니다.
+     *
+     * 재시도 정책 (Spring Retry):
+     * - OpenAIApiException (검증 실패): 재시도 안 함 (noRetryFor)
+     * - 그 외 RuntimeException (네트워크/타임아웃): 최대 2회 재시도
+     */
+    @Retryable(
+            noRetryFor = {OpenAIApiException.class},
+            maxAttempts = 2,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0)
+    )
     public CareerAdviceResponse call(FastAPIResponse sajuData,
-                                     Map<String, Integer> tenGodDistribution,
-                                     Map<String, List<String>> hiddenStems,
+                                     TenGodDistribution tenGodDistribution,
+                                     HiddenStems hiddenStems,
                                      String dayMaster) {
+        String prompt = buildPrompt(sajuData, tenGodDistribution, hiddenStems, dayMaster);
+        CareerAdviceResponse response;
         try {
-            // buildPrompt를 try 안에서 호출: 내부 NPE도 OpenAIApiException으로 래핑
-            String prompt = buildPrompt(sajuData, tenGodDistribution, hiddenStems, dayMaster);
-            CareerAdviceResponse response = chatClient.prompt()
+            response = chatClient.prompt()
                     .user(prompt)
                     .call()
                     .entity(CareerAdviceResponse.class);
-            validate(response);
-            return response;
         } catch (OpenAIApiException e) {
             throw e;
         } catch (Exception e) {
-            // 스택트레이스만 로깅 (e.getMessage()는 민감 내부 정보 포함 가능)
-            log.error("OpenAI API 호출 실패", e);
-            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
+            // 네트워크/타임아웃 → RuntimeException으로 던져 @Retryable 트리거
+            log.error("OpenAI API 호출 실패, 재시도 예정");
+            throw new RuntimeException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
         }
+        validate(response);
+        return response;
+    }
+
+    /**
+     * 최대 재시도 횟수 초과 시 실행: RuntimeException → OpenAIApiException으로 변환.
+     */
+    @Recover
+    public CareerAdviceResponse recover(RuntimeException ex,
+                                        FastAPIResponse sajuData,
+                                        TenGodDistribution tenGodDistribution,
+                                        HiddenStems hiddenStems,
+                                        String dayMaster) {
+        log.error("OpenAI API 재시도 후 최종 실패");
+        throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), ex);
     }
 
     private void validate(CareerAdviceResponse response) {
@@ -75,8 +103,8 @@ public class ConsultationOpenAICaller {
     }
 
     private String buildPrompt(FastAPIResponse sajuData,
-                                Map<String, Integer> tenGodDistribution,
-                                Map<String, List<String>> hiddenStems,
+                                TenGodDistribution tenGodDistribution,
+                                HiddenStems hiddenStems,
                                 String dayMaster) {
         int currentYear = LocalDate.now().getYear();
         return """

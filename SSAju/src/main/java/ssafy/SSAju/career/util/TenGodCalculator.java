@@ -1,6 +1,7 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.enums.TenGodConstants;
 
@@ -57,7 +58,7 @@ public class TenGodCalculator {
             "土", "水", "金", "木", "水", "火"
     );
 
-    public Map<String, Integer> calculate(List<String> heavenlyStems) {
+    public TenGodDistribution calculate(List<String> heavenlyStems) {
         if (heavenlyStems == null || heavenlyStems.size() != 4) {
             throw new IllegalArgumentException(ErrorMessageConstants.HEAVENLY_STEMS_COUNT_INVALID.getMessage());
         }
@@ -70,7 +71,7 @@ public class TenGodCalculator {
             String tenGod = getTenGod(dayMaster, stem);
             distribution.merge(tenGod, 1, Integer::sum);
         }
-        return distribution;
+        return new TenGodDistribution(distribution);
     }
 
     public String getTenGod(String dayMaster, String targetStem) {

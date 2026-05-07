@@ -3,13 +3,16 @@ package ssafy.SSAju.service;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import ssafy.SSAju.dto.external.FastAPIResponse;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
-import ssafy.SSAju.exception.ExternalApiException;
-import ssafy.SSAju.exception.FastAPITimeoutException;
+import ssafy.SSAju.career.validator.RequestValidator;
+import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.time.LocalDate;
@@ -19,69 +22,57 @@ import java.time.LocalTime;
 @Service
 public class SajuDataService {
 
-    private final WebClient fastApiWebClient;
-    private final int maxRetries;
+    private final RestClient fastApiRestClient;
+    private final RequestValidator requestValidator;
 
-    public SajuDataService(
-            @Qualifier("fastApiWebClient") WebClient fastApiWebClient,
-            @Value("${saju.fastapi.max-retries:2}") int maxRetries
-    ) {
-        this.fastApiWebClient = fastApiWebClient;
-        this.maxRetries = maxRetries;
+    public SajuDataService(@Qualifier("fastApiRestClient") RestClient fastApiRestClient,
+                           RequestValidator requestValidator) {
+        this.fastApiRestClient = fastApiRestClient;
+        this.requestValidator = requestValidator;
     }
 
+    /**
+     * FastAPI에서 사주 데이터를 조회합니다.
+     *
+     * 재시도 정책 (Spring Retry):
+     * - ResourceAccessException: 네트워크 오류/타임아웃 → 재시도
+     * - HttpServerErrorException: 5xx 서버 오류 → 재시도
+     * - 4xx 클라이언트 오류: InvalidSajuDataException으로 변환 → 재시도 안 함
+     */
+    @Retryable(
+            retryFor = {ResourceAccessException.class, HttpServerErrorException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0)
+    )
     public FastAPIResponse fetchSajuFromFastAPI(LocalDate birthDate, LocalTime birthTime) {
-        if (birthDate == null) {
-            throw new InvalidSajuDataException(ErrorMessageConstants.BIRTH_DATE_REQUIRED.getMessage());
-        }
-        if (birthTime == null) {
-            throw new InvalidSajuDataException(ErrorMessageConstants.BIRTH_TIME_REQUIRED.getMessage());
-        }
+        requestValidator.validateBirthInfo(birthDate, birthTime);
 
-
-        return executeWithRetry(birthDate, birthTime, 0);
-    }
-
-    private FastAPIResponse executeWithRetry(LocalDate birthDate, LocalTime birthTime, int attempt) {
         try {
-            return fastApiWebClient.post()
+            return fastApiRestClient
+                    .post()
                     .uri("/api/saju/calculate")
-                    .bodyValue(new FastApiRequest(birthDate, birthTime))
+                    .body(new FastApiRequest(birthDate, birthTime))
                     .retrieve()
-                    .bodyToMono(FastAPIResponse.class)
-                    .block();
-        } catch (Exception e) {
-            if (isTimeout(e) && attempt < maxRetries) {
-                long delayMs = (long) Math.pow(2, attempt) * 1000;
-                log.warn("FastAPI 타임아웃 (시도 {}/{}), {}ms 후 재시도", attempt + 1, maxRetries + 1, delayMs);
-                try {
-                    Thread.sleep(delayMs);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new FastAPITimeoutException(ErrorMessageConstants.FASTAPI_THREAD_INTERRUPTED.getMessage(), ie);
-                }
-                return executeWithRetry(birthDate, birthTime, attempt + 1);
+                    .toEntity(FastAPIResponse.class)
+                    .getBody();
+        } catch (ResourceAccessException e) {
+            // 네트워크/타임아웃 → @Retryable 재시도 대상
+            log.warn("FastAPI 네트워크 오류 발생, 재시도 예정");
+            throw e;
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().is4xxClientError()) {
+                // 4xx: 입력 오류 → 재시도 안 함
+                throw new InvalidSajuDataException(
+                        ErrorMessageConstants.FASTAPI_CALL_FAILED.getMessage(), e);
             }
-
-            if (isTimeout(e)) {
-                throw new FastAPITimeoutException(
-                        "FastAPI 요청 시간 초과 (" + (maxRetries + 1) + "회 시도)", e);
-            }
-            log.error("FastAPI 호출 실패", e);
-            throw new ExternalApiException(ErrorMessageConstants.FASTAPI_CALL_FAILED.getMessage(), e);
+            // 5xx: 서버 오류 → @Retryable 재시도 대상 (원본 예외 유지)
+            log.warn("FastAPI 서버 오류 발생, 재시도 예정");
+            throw e;
         }
     }
 
-    private boolean isTimeout(Exception e) {
-        if (e.getCause() instanceof java.util.concurrent.TimeoutException) return true;
-        String msg = e.getMessage();
-        return msg != null && (msg.contains("timeout") || msg.contains("Timeout") || msg.contains("timed out"));
-    }
-
-    private record FastApiRequest(@JsonFormat(pattern = "yyyy-MM-dd")
-                                  LocalDate birthDate,
-
-                                  @JsonFormat(pattern = "HH:mm") // :ss를 빼서 5글자(HH:mm)로 고정!
-                                  LocalTime birthTime) {
-    }
+    private record FastApiRequest(
+            @JsonFormat(pattern = "yyyy-MM-dd") LocalDate birthDate,
+            @JsonFormat(pattern = "HH:mm") LocalTime birthTime
+    ) {}
 }

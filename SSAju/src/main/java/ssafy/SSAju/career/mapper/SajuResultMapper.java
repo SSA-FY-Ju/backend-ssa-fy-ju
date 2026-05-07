@@ -1,6 +1,8 @@
 package ssafy.SSAju.career.mapper;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.CareerFortune;
 import ssafy.SSAju.career.entity.HiddenStemData;
 import ssafy.SSAju.career.entity.SajuResult;
@@ -18,8 +20,8 @@ public class SajuResultMapper {
 
     public SajuResult buildSajuResult(UserProfile userProfile,
                                        FastAPIResponse sajuData,
-                                       Map<String, Integer> tenGodDistribution,
-                                       Map<String, List<String>> hiddenStems,
+                                       TenGodDistribution tenGodDistribution,
+                                       HiddenStems hiddenStems,
                                        String favoredPeriod,
                                        int confidenceScore,
                                        String reasoning) {
@@ -45,8 +47,8 @@ public class SajuResultMapper {
 
     public SajuResult buildSajuResultWithoutFortune(UserProfile userProfile,
                                                      FastAPIResponse sajuData,
-                                                     Map<String, Integer> tenGodDistribution,
-                                                     Map<String, List<String>> hiddenStems) {
+                                                     TenGodDistribution tenGodDistribution,
+                                                     HiddenStems hiddenStems) {
         SajuResult result = SajuResult.builder()
                 .userProfile(userProfile)
                 .fullSajuData(toFullSajuDataMap(sajuData))
@@ -72,11 +74,11 @@ public class SajuResultMapper {
         return map;
     }
 
-    private List<TenGodData> toTenGodDataList(SajuResult result, Map<String, Integer> tenGodDistribution) {
-        if (tenGodDistribution == null || tenGodDistribution.isEmpty()) {
+    private List<TenGodData> toTenGodDataList(SajuResult result, TenGodDistribution tenGodDistribution) {
+        if (tenGodDistribution == null || tenGodDistribution.asMap().isEmpty()) {
             return new ArrayList<>();
         }
-        return tenGodDistribution.entrySet().stream()
+        return tenGodDistribution.asMap().entrySet().stream()
                 .map(entry -> TenGodData.builder()
                         .sajuResult(result)
                         .tenGodName(entry.getKey())
@@ -85,11 +87,11 @@ public class SajuResultMapper {
                 .toList();
     }
 
-    private List<HiddenStemData> toHiddenStemDataList(SajuResult result, Map<String, List<String>> hiddenStems) {
-        if (hiddenStems == null || hiddenStems.isEmpty()) {
+    private List<HiddenStemData> toHiddenStemDataList(SajuResult result, HiddenStems hiddenStems) {
+        if (hiddenStems == null || hiddenStems.asMap().isEmpty()) {
             return new ArrayList<>();
         }
-        return hiddenStems.entrySet().stream()
+        return hiddenStems.asMap().entrySet().stream()
                 .flatMap(entry -> {
                     List<String> stems = entry.getValue();
                     if (stems == null || stems.isEmpty()) {
