@@ -13,6 +13,7 @@ import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.TenGodCalculator;
+import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
@@ -44,6 +45,7 @@ class CareerFortuneServiceTest {
     private final TenGodCalculator tenGodCalculator = new TenGodCalculator();
     private final HiddenStemCalculator hiddenStemCalculator = new HiddenStemCalculator();
     private final CareerFortuneAnalyzer careerFortuneAnalyzer = new CareerFortuneAnalyzer(tenGodCalculator);
+    private final SajuValidator sajuValidator = new SajuValidator();
 
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 10, 10);
     private static final LocalTime BIRTH_TIME = LocalTime.of(14, 30);
@@ -61,7 +63,7 @@ class CareerFortuneServiceTest {
     void setUp() {
         service = new CareerFortuneService(
                 sajuDataService, userProfileProvider, sajuResultWriteService,
-                tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer, sajuResultMapper);
+                tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer, sajuResultMapper, sajuValidator);
     }
 
     // ─────────────────────────────────────────

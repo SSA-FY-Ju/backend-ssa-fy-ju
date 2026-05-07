@@ -1,8 +1,9 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
-import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.enums.TenGodConstants;
+import ssafy.SSAju.career.validator.CompatibilityValidator;
 
 import java.util.HashMap;
 import java.util.List;
@@ -31,9 +32,12 @@ public class CompatibilityScoreCalculator {
     private static final List<String> ALL_ELEMENTS = List.of("木", "火", "土", "金", "水");
 
     private final TenGodCalculator tenGodCalculator;
+    private final CompatibilityValidator compatibilityValidator;
 
-    public CompatibilityScoreCalculator(TenGodCalculator tenGodCalculator) {
+    public CompatibilityScoreCalculator(TenGodCalculator tenGodCalculator,
+                                         CompatibilityValidator compatibilityValidator) {
         this.tenGodCalculator = tenGodCalculator;
+        this.compatibilityValidator = compatibilityValidator;
     }
 
     /**
@@ -45,22 +49,11 @@ public class CompatibilityScoreCalculator {
      * @param companyDayMaster 기업 설립일 일간
      * @return 궁합 점수 (0~100)
      */
-    public int calculate(Map<String, List<String>> userHiddenStems,
+    public int calculate(HiddenStems userHiddenStems,
                          String userDayMaster,
-                         Map<String, List<String>> companyHiddenStems,
+                         HiddenStems companyHiddenStems,
                          String companyDayMaster) {
-        if (userHiddenStems == null) {
-            throw new IllegalArgumentException(ErrorMessageConstants.USER_HIDDEN_STEM_NULL.getMessage());
-        }
-        if (userDayMaster == null || userDayMaster.isBlank()) {
-            throw new IllegalArgumentException(ErrorMessageConstants.USER_DAY_MASTER_NULL.getMessage());
-        }
-        if (companyHiddenStems == null) {
-            throw new IllegalArgumentException(ErrorMessageConstants.COMPANY_HIDDEN_STEM_NULL.getMessage());
-        }
-        if (companyDayMaster == null || companyDayMaster.isBlank()) {
-            throw new IllegalArgumentException(ErrorMessageConstants.COMPANY_DAY_MASTER_NULL.getMessage());
-        }
+        compatibilityValidator.validate(userHiddenStems, userDayMaster, companyHiddenStems, companyDayMaster);
 
         int officerHarmonyScore = calculateOfficerHarmony(userHiddenStems,
                 userDayMaster, companyDayMaster);
@@ -71,7 +64,7 @@ public class CompatibilityScoreCalculator {
         return Math.max(0, Math.min(rawScore, 100));
     }
 
-    private int calculateOfficerHarmony(Map<String, List<String>> userHiddenStems,
+    private int calculateOfficerHarmony(HiddenStems userHiddenStems,
                                          String userDayMaster,
                                          String companyDayMaster) {
         // 기업 일간이 사용자 일간의 관성(정관/편관)에 해당하는지 확인
@@ -83,7 +76,7 @@ public class CompatibilityScoreCalculator {
 
         // 지장간 내 사용자 관성 강도 보정
         int userOfficerCount = 0;
-        for (List<String> stems : userHiddenStems.values()) {
+        for (List<String> stems : userHiddenStems.asMap().values()) {
             for (String stem : stems) {
                 String godName = tenGodCalculator.getTenGod(userDayMaster, stem);
                 TenGodConstants god = TenGodConstants.fromName(godName);
@@ -96,8 +89,8 @@ public class CompatibilityScoreCalculator {
         return Math.min(baseScore + userOfficerCount * 5, 100);
     }
 
-    private int calculateElementBalance(Map<String, List<String>> userHiddenStems,
-                                         Map<String, List<String>> companyHiddenStems) {
+    private int calculateElementBalance(HiddenStems userHiddenStems,
+                                         HiddenStems companyHiddenStems) {
         Map<String, Integer> userElements = countElements(userHiddenStems);
         Map<String, Integer> companyElements = countElements(companyHiddenStems);
 
@@ -115,9 +108,9 @@ public class CompatibilityScoreCalculator {
         return Math.min(complementScore, 100);
     }
 
-    private Map<String, Integer> countElements(Map<String, List<String>> hiddenStems) {
+    private Map<String, Integer> countElements(HiddenStems hiddenStems) {
         Map<String, Integer> counts = new HashMap<>();
-        for (List<String> stems : hiddenStems.values()) {
+        for (List<String> stems : hiddenStems.asMap().values()) {
             for (String stem : stems) {
                 String element = ELEMENT_MAP.get(stem);
                 if (element != null) {

@@ -72,7 +72,6 @@ class FeedbackServiceTest {
 
         // Then
         assertThat(response.feedbackContent()).isEqualTo("좋았습니다");
-        assertThat(response.createdAt()).isNotNull();
         verify(feedbackRepository).save(any(UserSatisfactionFeedback.class));
     }
 

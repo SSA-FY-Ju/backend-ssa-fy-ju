@@ -1,6 +1,8 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.enums.TenGodConstants;
 import ssafy.SSAju.exception.InvalidSajuDataException;
@@ -55,8 +57,8 @@ public class CareerFortuneAnalyzer {
      * @param earthlyBranches 지지 목록 (年月日時)
      * @return "H1" 또는 "H2"
      */
-    public String analyzeFavoredPeriod(Map<String, Integer> tenGodDistribution,
-                                        Map<String, List<String>> hiddenStems,
+    public String analyzeFavoredPeriod(TenGodDistribution tenGodDistribution,
+                                        HiddenStems hiddenStems,
                                         String dayMaster,
                                         List<String> earthlyBranches) {
         if (tenGodDistribution == null) {
@@ -86,12 +88,12 @@ public class CareerFortuneAnalyzer {
      * - 식신·상관: 감점 (관성 설기)
      * - 비겹 2개 이상: 감점 (관성 부담)
      */
-    private int calculateOfficerScore(Map<String, Integer> tenGodDistribution,
-                                       Map<String, List<String>> hiddenStems,
+    private int calculateOfficerScore(TenGodDistribution tenGodDistribution,
+                                       HiddenStems hiddenStems,
                                        String dayMaster) {
         int score = 0;
 
-        for (Map.Entry<String, Integer> entry : tenGodDistribution.entrySet()) {
+        for (Map.Entry<String, Integer> entry : tenGodDistribution.asMap().entrySet()) {
             TenGodConstants tenGod = TenGodConstants.fromName(entry.getKey());
             if (tenGod != null) {
                 score += entry.getValue() * tenGod.getScoreModifier();
@@ -99,7 +101,7 @@ public class CareerFortuneAnalyzer {
         }
 
         // 지장간 기반 보정: 정관/편관 +5, 식신/상관 -3
-        for (List<String> stems : hiddenStems.values()) {
+        for (List<String> stems : hiddenStems.asMap().values()) {
             for (String stem : stems) {
                 String tenGodName = tenGodCalculator.getTenGod(dayMaster, stem);
                 TenGodConstants tenGod = TenGodConstants.fromName(tenGodName);
@@ -117,15 +119,15 @@ public class CareerFortuneAnalyzer {
     /**
      * 신뢰도 점수(0~100)를 계산합니다.
      */
-    public int calculateConfidenceScore(Map<String, Integer> tenGodDistribution,
-                                         Map<String, List<String>> hiddenStems,
+    public int calculateConfidenceScore(TenGodDistribution tenGodDistribution,
+                                         HiddenStems hiddenStems,
                                          String dayMaster) {
         int officerCount = OFFICER_GODS.stream()
-                .mapToInt(god -> tenGodDistribution.getOrDefault(god, 0))
+                .mapToInt(tenGodDistribution::getScore)
                 .sum();
 
         int hiddenOfficerCount = 0;
-        for (Map.Entry<String, List<String>> entry : hiddenStems.entrySet()) {
+        for (Map.Entry<String, List<String>> entry : hiddenStems.asMap().entrySet()) {
             for (String stem : entry.getValue()) {
                 String god = tenGodCalculator.getTenGod(dayMaster, stem);
                 if (OFFICER_GODS.contains(god)) {
@@ -138,8 +140,8 @@ public class CareerFortuneAnalyzer {
         return Math.min(rawScore + 40, 100);
     }
 
-    public String buildReasoning(String favoredPeriod, Map<String, Integer> tenGodDistribution) {
-        if (tenGodDistribution == null || tenGodDistribution.isEmpty()) {
+    public String buildReasoning(String favoredPeriod, TenGodDistribution tenGodDistribution) {
+        if (tenGodDistribution == null || tenGodDistribution.asMap().isEmpty()) {
             throw new InvalidSajuDataException(ErrorMessageConstants.TEN_GOD_DATA_NULL.getMessage());
         }
         if (!"H1".equals(favoredPeriod) && !"H2".equals(favoredPeriod)) {
@@ -147,7 +149,7 @@ public class CareerFortuneAnalyzer {
                     "길한 시기는 H1 또는 H2만 가능합니다. 받은 값: " + favoredPeriod);
         }
         int officerCount = OFFICER_GODS.stream()
-                .mapToInt(god -> tenGodDistribution.getOrDefault(god, 0))
+                .mapToInt(tenGodDistribution::getScore)
                 .sum();
         String period = "H1".equals(favoredPeriod) ? "상반기" : "하반기";
         StringBuilder sb = new StringBuilder(period + "가 취업에 유리합니다. ");

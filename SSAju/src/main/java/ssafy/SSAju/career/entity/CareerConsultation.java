@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -11,6 +13,7 @@ import java.util.List;
 
 @Getter
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
+@EntityListeners(AuditingEntityListener.class)
 @Entity
 @Table(name = "career_consultation")
 public class CareerConsultation {
@@ -26,7 +29,8 @@ public class CareerConsultation {
     @Column(name = "openai_model_version")
     private String openaiModelVersion;
 
-    @Column(name = "generated_at", nullable = false)
+    @CreatedDate
+    @Column(name = "generated_at", nullable = false, updatable = false)
     private LocalDateTime generatedAt;
 
     @OneToMany(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
@@ -45,7 +49,6 @@ public class CareerConsultation {
     public CareerConsultation(SajuResult sajuResult, String openaiModelVersion) {
         this.sajuResult = sajuResult;
         this.openaiModelVersion = openaiModelVersion;
-        this.generatedAt = LocalDateTime.now();
     }
 
     public void assignIndustries(List<Industry> list) {
@@ -58,5 +61,17 @@ public class CareerConsultation {
 
     public void assignStrengths(List<Strength> list) {
         this.strengths = list;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof CareerConsultation that)) return false;
+        return id != null && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
     }
 }

@@ -1,6 +1,7 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 
 import java.util.HashMap;
@@ -37,7 +38,7 @@ public class HiddenStemCalculator {
      * @param earthlyBranches 지지 목록 (年月日時 순서, 4개)
      * @return 지지 → 지장간 목록 Map
      */
-    public Map<String, List<String>> calculate(List<String> earthlyBranches) {
+    public HiddenStems calculate(List<String> earthlyBranches) {
         if (earthlyBranches == null || earthlyBranches.size() != 4) {
             throw new IllegalArgumentException(ErrorMessageConstants.EARTHLY_BRANCHES_COUNT_INVALID.getMessage());
         }
@@ -49,7 +50,7 @@ public class HiddenStemCalculator {
             }
             hiddenStems.put(branch, stems);
         }
-        return hiddenStems;
+        return new HiddenStems(hiddenStems);
     }
 
     public List<String> getHiddenStems(String earthlyBranch) {

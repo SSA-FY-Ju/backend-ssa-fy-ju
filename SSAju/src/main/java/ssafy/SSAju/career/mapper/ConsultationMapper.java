@@ -1,6 +1,7 @@
 package ssafy.SSAju.career.mapper;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.Industry;
 import ssafy.SSAju.career.entity.InterviewTip;
@@ -31,7 +32,7 @@ public class ConsultationMapper {
     }
 
     public String buildAnalysisSummary(String dayMaster,
-                                        Map<String, Integer> tenGodDistribution,
+                                        TenGodDistribution tenGodDistribution,
                                         Map<String, Integer> fiveElements,
                                         String favoredPeriod) {
         String dominantElements = (fiveElements == null || fiveElements.isEmpty())
@@ -42,8 +43,8 @@ public class ConsultationMapper {
                         .map(Map.Entry::getKey)
                         .collect(Collectors.joining("·"));
 
-        int officerCount = tenGodDistribution.getOrDefault("정관", 0)
-                + tenGodDistribution.getOrDefault("편관", 0);
+        int officerCount = tenGodDistribution.getScore("정관")
+                + tenGodDistribution.getScore("편관");
         String tenGodSummary = officerCount > 0 ? "정관·편관 기운" : "십신 종합";
 
         int currentYear = LocalDate.now().getYear();
