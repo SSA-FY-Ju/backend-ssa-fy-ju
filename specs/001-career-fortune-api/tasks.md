@@ -762,7 +762,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ### SajuFullData Normalization
 
-- [ ] T069 [Refactor] Create `SajuFullData` entity for normalizing SajuResult.fullSajuData
+- [v] T069 [Refactor] Create `SajuFullData` entity for normalizing SajuResult.fullSajuData
   - **Purpose**: SajuResult.fullSajuData (Map<String, Object>) 완전 정규화 → 객체 저장으로 타입 안전성 및 쿼리 성능 향상
   - **Fields**: 
     - id: Long (PK)
@@ -780,10 +780,10 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - **설계 원칙**: 변경 빈도 낮은 필드(fiveElements, solarCorrection)는 JSON 유지하여 쿼리 단순화. 자주 조회/필터링되는 필드(yearPillar, dayMaster 등)는 엔티티 필드로 저장
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/SajuFullData.java`
 
-- [ ] T070 [Refactor] Create `SajuFullDataRepository` in `repository/`
+- [v] T070 [Refactor] Create `SajuFullDataRepository` in `repository/`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/SajuFullDataRepository.java`
 
-- [ ] T071 [Refactor] Update `SajuResult` to use normalized entities (SajuFullData, TenGodData, HiddenStemData, CareerFortune)
+- [v] T071 [Refactor] Update `SajuResult` to use normalized entities (SajuFullData, TenGodData, HiddenStemData, CareerFortune)
   - **Phase 3-Refactor 진행 상황**:
     - ✅ Phase 3.1-3.2: SajuResult.fullSajuData, tenGodDistribution, hiddenStems, careerFortune을 JSON (Map)으로 임시 저장
     - ⏭ Phase 3-Refactor: 다음 4가지를 엔티티로 정규화 (이 작업 이후):
@@ -808,7 +808,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/SajuResult.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/mapper/SajuResultMapper.java`
 
-- [ ] T072 [Refactor] Update Service layer to save all normalized entities (TenGodData, HiddenStemData, CareerFortune, SajuFullData)
+- [v] T072 [Refactor] Update Service layer to save all normalized entities (TenGodData, HiddenStemData, CareerFortune, SajuFullData)
   - **Modify CareerFortuneService**:
     1. SajuDataService에서 FastAPI 응답 받음 (FastAPIResponse)
     2. SajuResultMapper를 이용하여 다음 4가지 변환:
@@ -835,19 +835,19 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CareerFortuneService.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
 
-- [ ] T073 [Refactor] Update tests for SajuFullData normalization
+- [v] T073 [Refactor] Update tests for SajuFullData normalization
   - **Update**: CareerFortuneServiceTest, ConsultationServiceTest에서 SajuFullData 검증 추가
   - Test: SajuFullData 엔티티가 올바르게 생성되고 저장되는지 확인
   - File: `SSAju/src/test/java/ssafy/SSAju/service/CareerFortuneServiceTest.java`
   - File: `SSAju/src/test/java/ssafy/SSAju/service/ConsultationServiceTest.java`
 
-- [ ] T074 [Refactor] Run all tests for SajuFullData refactoring
+- [v] T074 [Refactor] Run all tests for SajuFullData refactoring
   - Command: `./gradlew test`
   - Verify: BUILD SUCCESSFUL, no SQL errors, SajuFullData 저장 확인
 
 ### PromptProvider Separation
 
-- [ ] T075 [Refactor] Create `PromptProvider` component in `service/`
+- [v] T075 [Refactor] Create `PromptProvider` component in `service/`
   - **Purpose**: ConsultationService의 buildPrompt 메서드 외부화
   - **Methods**:
     - `getCareerConsultationPrompt(SajuData sajuData, int currentYear, LocalDate birthDate, LocalTime birthTime)`: 
@@ -863,7 +863,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/service/PromptProvider.java`
   - File: `SSAju/src/test/java/ssafy/SSAju/service/PromptProviderTest.java`
 
-- [ ] T076 [Refactor] Update `ConsultationService` to use PromptProvider
+- [v] T076 [Refactor] Update `ConsultationService` to use PromptProvider
   - **Modify**: `callOpenAI()` 또는 `getCareerConsultation()` 메서드에서 PromptProvider 호출
   - **Before**:
     ```java
@@ -878,14 +878,14 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - **Remove**: ConsultationService.buildPrompt() 메서드 삭제 (PromptProvider로 이동)
   - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
 
-- [ ] T077 [Refactor] Verify PromptProvider integration
+- [v] T077 [Refactor] Verify PromptProvider integration
   - Test: ConsultationServiceTest에서 PromptProvider mock 확인
   - Verify: 프롬프트 변경이 PromptProvider에만 영향을 미치는지 확인
   - File: `SSAju/src/test/java/ssafy/SSAju/service/ConsultationServiceTest.java`
 
 ### Final Constants Extraction & Cleanup
 
-- [ ] T078 [Refactor] Extract remaining magic numbers and strings
+- [v] T078 [Refactor] Extract remaining magic numbers and strings
   - **Scope**: 이전 T079~T075에서 놓친 모든 하드코딩된 값
   - **검색 대상**:
     - 숫자 리터럴: 0, 1, 2, 3, 4, 5, 8, 12, 25, 30, 35, 50, 75, 100, 1000, etc.
@@ -901,7 +901,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
     ```
   - File: career/constants/*.java (기존 또는 신규)
 
-- [ ] T079 [Refactor] Refactor all services and utilities to use final extracted constants
+- [v] T079 [Refactor] Refactor all services and utilities to use final extracted constants
   - **Targets**:
     - SajuDataService.java: API 타임아웃, 엔드포인트 URL
     - ConsultationService.java: 현재 연도 기본값, 12개월, JSON 모드
@@ -912,7 +912,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Verification: 모든 magic number/string 제거 확인
   - File: Multiple service and util files
 
-- [ ] T080 [Refactor] Run final test suite and verify constant extraction
+- [v] T080 [Refactor] Run final test suite and verify constant extraction
   - Command: `./gradlew test`
   - Verify:
     1. 모든 테스트 통과
