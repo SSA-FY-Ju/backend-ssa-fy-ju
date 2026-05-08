@@ -100,6 +100,10 @@ public class SajuFullData {
         return id != null && id.equals(that.id);
     }
 
+    public void setSajuResult(SajuResult result) {
+        this.sajuResult = result;
+    }
+
     @Override
     public int hashCode() {
         return getClass().hashCode();
