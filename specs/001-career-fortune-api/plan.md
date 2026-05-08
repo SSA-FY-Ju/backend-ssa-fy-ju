@@ -86,11 +86,11 @@ SSAju 백엔드는 사주 명리학 데이터(만세력, 십신, 지장간, 관�
 - 모든 예외: @RestControllerAdvice 처리 (try-catch 금지)
 
 **Scale/Scope**:
-- **엔티티: 11개** (Phase 1 구현 완료):
+- **엔티티: 19개** (Phase 1 구현 완료):
   - 기본: UserProfile, SajuResult (**Phase 1: fullSajuData는 JSON 유지**)
   - Saju 분석: TenGodData, HiddenStemData, CareerFortune (3개, 모두 1:N 또는 1:1)
   - 컨설팅: CareerConsultation, Industry, InterviewTip, Strength (4개)
-  - 호환성: CompanyCompatibility, RecommendedRole (2개)
+  - 호환성: CompanyCompatibility, TargetRoleAnalysis, FiveElementsAnalysis, AnalysisBreakdown, ActionableStrategy, ExpectedInterviewQuestion, RoleCompatibility, MonthlyForecast, Caution (9개)
   - 피드백: UserSatisfactionFeedback (1개)
   - **미포함**: SajuFullData (Phase 3-Refactor-3에서 추가 예정), User (Phase 2에서 추가)
 - API 엔드포인트: 4개 (`/api/career/timing`, `/api/career/consultation`, `/api/company/compatibility`, `/api/feedback/satisfaction`)
@@ -154,20 +154,29 @@ SSAju/
 │   │   │   ├── Industry.java (1:N to CareerConsultation, 추천 산업)
 │   │   │   ├── InterviewTip.java (1:N to CareerConsultation, 면접 팁)
 │   │   │   ├── Strength.java (1:N to CareerConsultation, 강점)
-│   │   │   ├── CompanyCompatibility.java
-│   │   │   ├── RecommendedRole.java (1:N to CompanyCompatibility, 추천 직무)
+│   │   │   ├── CompanyCompatibility.java (루트, UNIQUE: userProfileId+companyName+targetRoleCategory)
+│   │   │   ├── TargetRoleAnalysis.java (1:1 to CompanyCompatibility)
+│   │   │   ├── FiveElementsAnalysis.java (1:1 to CompanyCompatibility)
+│   │   │   ├── AnalysisBreakdown.java (1:1 to CompanyCompatibility)
+│   │   │   ├── ActionableStrategy.java (1:1 to CompanyCompatibility)
+│   │   │   ├── ExpectedInterviewQuestion.java (1:N to CompanyCompatibility)
+│   │   │   ├── RoleCompatibility.java (1:N to CompanyCompatibility, 추천 직무 대체)
+│   │   │   ├── MonthlyForecast.java (1:N to CompanyCompatibility)
+│   │   │   ├── Caution.java (1:N to CompanyCompatibility)
 │   │   │   ├── UserSatisfactionFeedback.java
 │   │   ├── util/
 │   │   │   ├── TenGodCalculator.java (十神 계산)
 │   │   │   ├── HiddenStemCalculator.java (地藏干 계산)
 │   │   │   ├── CareerFortuneAnalyzer.java (H1/H2 판정)
-│   │   │   └── CompatibilityScoreCalculator.java (궁합 점수)
+│   │   │   ├── CompatibilityScoreCalculator.java (궁합 점수)
+│   │   │   ├── JobCategoryEnum.java (직군별 오행 매핑 Enum)
+│   │   │   └── JobRoleAnalyzer.java (직군 오행 분석 → targetRoleAnalysis 생성)
 │   │
 │   ├── dto/
 │   │   ├── request/
 │   │   │   ├── CareerTimingRequest.java (birthDate + birthTime)
 │   │   │   ├── ConsultationRequest.java (birthDate + birthTime)
-│   │   │   ├── CompatibilityRequest.java (userBirthDate + userBirthTime + companyInfo)
+│   │   │   ├── CompatibilityRequest.java (userBirthDate + userBirthTime + targetRole + companyInfo)
 │   │   │   └── SatisfactionFeedbackRequest.java
 │   │   ├── response/
 │   │   │   ├── CareerTimingResponse.java
@@ -206,7 +215,15 @@ SSAju/
 │   │   ├── InterviewTipRepository.java (new)
 │   │   ├── StrengthRepository.java (new)
 │   │   ├── CompanyCompatibilityRepository.java
-│   │   ├── RecommendedRoleRepository.java (new)
+│   │   ├── CompanyCompatibilityJdbcRepository.java (INSERT IGNORE, UNIQUE 중복 방지)
+│   │   ├── TargetRoleAnalysisRepository.java (new)
+│   │   ├── FiveElementsAnalysisRepository.java (new)
+│   │   ├── AnalysisBreakdownRepository.java (new)
+│   │   ├── ActionableStrategyRepository.java (new)
+│   │   ├── ExpectedInterviewQuestionRepository.java (new)
+│   │   ├── RoleCompatibilityRepository.java (new)
+│   │   ├── MonthlyForecastRepository.java (new)
+│   │   ├── CautionRepository.java (new)
 │   │   └── UserSatisfactionFeedbackRepository.java
 │   │
 │   ├── exception/
@@ -261,11 +278,11 @@ SSAju/
 - **모듈화 전략 (Option C)**: 같은 Spring Boot 애플리케이션 내에서 논리적 패키지 분리
 - **Phase 1** (지금 구현): `career/` 패키지에서 Career Fortune API 구현 (로그인 제외)
   - User 엔티티는 **제외** (추후 auth/ 패키지에서 구현)
-  - **정규화된 11개 엔티티 포함** (JSON 저장 제거):
+  - **정규화된 19개 엔티티 포함** (JSON 저장 제거):
     - 기본: UserProfile, SajuResult
     - Saju 분석: TenGodData, HiddenStemData, CareerFortune
     - 컨설팅: CareerConsultation, Industry, InterviewTip, Strength
-    - 호환성: CompanyCompatibility, RecommendedRole
+    - 호환성: CompanyCompatibility, TargetRoleAnalysis, FiveElementsAnalysis, AnalysisBreakdown, ActionableStrategy, ExpectedInterviewQuestion, RoleCompatibility, MonthlyForecast, Caution
     - 피드백: UserSatisfactionFeedback
 - **Phase 2+** (나중): `auth/` 패키지 추가 시 User 엔티티 추가 및 통합
 - **계층형 아키텍처**: Controller → Service → Repository 준수
@@ -280,7 +297,7 @@ SSAju/
 
 | 설계 결정 | 필요 이유 | 더 단순한 대안과 거절 이유 |
 |---------|---------|------------------------|
-| **11개 정규화된 엔티티** (Phase 1, JSON 저장 제거) | UserProfile ↔ SajuResult (1:1), SajuResult ↔ TenGodData (1:N, 십신 - 십신별 행 단위), SajuResult ↔ CareerFortune (1:1, 관운), SajuResult ↔ HiddenStemData (1:N, 지장간), SajuResult ↔ CareerConsultation (1:N), CareerConsultation ↔ Industry/InterviewTip/Strength (1:N), UserProfile ↔ CompanyCompatibility (1:N), CompanyCompatibility ↔ RecommendedRole (1:N), SajuResult ↔ UserSatisfactionFeedback (1:N) | JSON 저장 방식 → N+1 쿼리, 데이터 정규화 부족, 재사용성 저하, 타입 안전성 낮음, 쿼리 최적화 어려움 |
+| **19개 정규화된 엔티티** (Phase 1, JSON 저장 제거) | UserProfile ↔ SajuResult (1:1), SajuResult ↔ TenGodData (1:N, 십신 - 십신별 행 단위), SajuResult ↔ CareerFortune (1:1, 관운), SajuResult ↔ HiddenStemData (1:N, 지장간), SajuResult ↔ CareerConsultation (1:N), CareerConsultation ↔ Industry/InterviewTip/Strength (1:N), UserProfile ↔ CompanyCompatibility (1:N, UNIQUE userProfileId+companyName+targetRoleCategory), CompanyCompatibility ↔ TargetRoleAnalysis/FiveElementsAnalysis/AnalysisBreakdown/ActionableStrategy (1:1), CompanyCompatibility ↔ ExpectedInterviewQuestion/RoleCompatibility/MonthlyForecast/Caution (1:N), SajuResult ↔ UserSatisfactionFeedback (1:N) | JSON 저장 방식 → N+1 쿼리, 데이터 정규화 부족, 재사용성 저하, 타입 안전성 낮음, 쿼리 최적화 어려움 |
 | **4개 독립 Service** | 각 기능(관운, 컨설팅, 궁합, 피드백)이 독립적으로 테스트/배포 가능해야 함. P1/P2 우선순위 구분으로 점진적 개발 필요 | 단일 Service → 테스트 복잡도 증가, 변경 파급 범위 확대, 리팩토링 위험 |
 | **TenGodCalculator + HiddenStemCalculator 분리** | 십신(十神)과 지장간(地藏干)은 별개의 계산 로직. 분리하면 각각 독립 테스트 가능, 재사용성 향상. 더 정확한 오행 분포 계산 가능 | 통합 Calculator → 로직 혼재, 테스트 복잡도 증대, 유지보수 어려움. 지장간 미포함 시 사주 분석 정확도 저하 |
 | **Spring에서 십신+지장간 계산** | FastAPI는 기본 데이터(천간/지지/오행)만 제공 → Spring 단에서 모든 계산 담당하므로 FastAPI 변경에 영향받지 않음. 도메인 로직 통제 가능 | FastAPI에서 십신/지장간까지 계산 → FastAPI 변경 시 Spring도 영향, 통제 불가. 지장간 미포함 시 정확도 저하 |
@@ -429,19 +446,80 @@ Strength (1:N to CareerConsultation, 강점 분석)
 ├── careerConsultationId: Long (FK to CareerConsultation, NOT NULL)
 └── description: TEXT (강점 설명)
 
-CompanyCompatibility (1:N to UserProfile, 기업 궁합)
+CompanyCompatibility (루트, 기업 궁합)
 ├── id: Long (PK)
 ├── userProfileId: Long (FK to UserProfile, NOT NULL)
 ├── companyName: String (NOT NULL)
+├── targetRoleCategory: JobCategoryEnum (NOT NULL)
+├── targetRoleDetailName: String (optional, 프롬프트 노출용 자유 텍스트)
 ├── compatibilityScore: Integer (0-100, NOT NULL)
+├── summary: TEXT (궁합 한 줄 요약)
 ├── createdAt: LocalDateTime
-├── (1:N) → RecommendedRole (추천 직무)
-└── (복합 인덱스: userProfileId + companyName)
+├── UNIQUE(userProfileId, companyName, targetRoleCategory) — INSERT IGNORE로 중복 방지
+├── (1:1) → TargetRoleAnalysis
+├── (1:1) → FiveElementsAnalysis
+├── (1:1) → AnalysisBreakdown
+├── (1:1) → ActionableStrategy
+├── (1:N) → ExpectedInterviewQuestion
+├── (1:N) → RoleCompatibility
+├── (1:N) → MonthlyForecast
+└── (1:N) → Caution
 
-RecommendedRole (1:N to CompanyCompatibility, 추천 직무)
+TargetRoleAnalysis (1:1 to CompanyCompatibility, 직군 오행 분석)
+├── id: Long (PK)
+├── compatibilityId: Long (FK to CompanyCompatibility, NOT NULL, UNIQUE)
+├── matchScore: Integer (0-100)
+├── synergy: TEXT (시너지 설명)
+└── warning: TEXT (주의사항 설명)
+
+FiveElementsAnalysis (1:1 to CompanyCompatibility, 오행 분포 비교)
+├── id: Long (PK)
+├── compatibilityId: Long (FK to CompanyCompatibility, NOT NULL, UNIQUE)
+├── userDistribution: JSON (사용자 오행 분포 Map)
+├── companyDistribution: JSON (기업 오행 분포 Map)
+└── synergyDescription: TEXT (시너지 설명)
+
+AnalysisBreakdown (1:1 to CompanyCompatibility, 세부 분석 점수)
+├── id: Long (PK)
+├── compatibilityId: Long (FK to CompanyCompatibility, NOT NULL, UNIQUE)
+├── characterMatch: Integer (사주 기질 궁합, 0-100)
+├── potentialSynergy: Integer (오행 시너지 잠재력, 0-100)
+└── longTermStability: Integer (장기 안정성, 0-100)
+
+ActionableStrategy (1:1 to CompanyCompatibility, 실행 전략)
+├── id: Long (PK)
+├── compatibilityId: Long (FK to CompanyCompatibility, NOT NULL, UNIQUE)
+├── interviewKeywords: JSON (List<String>)
+├── weaknessDefense: TEXT (약점 방어 전략)
+├── luckyDays: JSON (List<String>, 길일 목록)
+└── preferredTime: String (선호 면접 시간대)
+
+ExpectedInterviewQuestion (1:N to CompanyCompatibility, 예상 면접 질문)
 ├── id: Long (PK)
 ├── compatibilityId: Long (FK to CompanyCompatibility, NOT NULL)
-└── roleName: String (직무명)
+├── question: TEXT (예상 질문)
+└── intent: TEXT (질문 의도)
+
+RoleCompatibility (1:N to CompanyCompatibility, 직무별 적합도)
+├── id: Long (PK)
+├── compatibilityId: Long (FK to CompanyCompatibility, NOT NULL)
+├── roleName: String (직무명)
+├── score: Integer (0-100)
+├── reason: TEXT (추천/비추천 이유)
+└── tag: String (e.g., "강력 추천", "보통")
+
+MonthlyForecast (1:N to CompanyCompatibility, 월별 운세)
+├── id: Long (PK)
+├── compatibilityId: Long (FK to CompanyCompatibility, NOT NULL)
+├── month: Integer (1-12)
+├── score: Integer (0-100)
+├── status: Enum (LUCKY/NORMAL/CAUTION)
+└── advice: TEXT (조언)
+
+Caution (1:N to CompanyCompatibility, 주의사항)
+├── id: Long (PK)
+├── compatibilityId: Long (FK to CompanyCompatibility, NOT NULL)
+└── content: TEXT (주의사항 내용)
 
 UserSatisfactionFeedback (1:N to SajuResult, 만족도 피드백)
 ├── id: Long (PK)
@@ -464,7 +542,14 @@ UserSatisfactionFeedback (1:N to SajuResult, 만족도 피드백)
   - CareerConsultation (1) ↔ InterviewTip (1:N) via careerConsultationId, FetchType.LAZY
   - CareerConsultation (1) ↔ Strength (1:N) via careerConsultationId, FetchType.LAZY
   - UserProfile (1) ↔ CompanyCompatibility (1:N) via userProfileId, FetchType.LAZY
-  - CompanyCompatibility (1) ↔ RecommendedRole (1:N) via compatibilityId, FetchType.LAZY
+  - CompanyCompatibility (1) ↔ TargetRoleAnalysis (1:1) via compatibilityId, FetchType.LAZY
+  - CompanyCompatibility (1) ↔ FiveElementsAnalysis (1:1) via compatibilityId, FetchType.LAZY
+  - CompanyCompatibility (1) ↔ AnalysisBreakdown (1:1) via compatibilityId, FetchType.LAZY
+  - CompanyCompatibility (1) ↔ ActionableStrategy (1:1) via compatibilityId, FetchType.LAZY
+  - CompanyCompatibility (1) ↔ ExpectedInterviewQuestion (1:N) via compatibilityId, FetchType.LAZY
+  - CompanyCompatibility (1) ↔ RoleCompatibility (1:N) via compatibilityId, FetchType.LAZY
+  - CompanyCompatibility (1) ↔ MonthlyForecast (1:N) via compatibilityId, FetchType.LAZY
+  - CompanyCompatibility (1) ↔ Caution (1:N) via compatibilityId, FetchType.LAZY
   - SajuResult (1) ↔ UserSatisfactionFeedback (1:N) via sajuResultId, FetchType.LAZY
 - **Phase 2+** (추후):
   - User (1) ↔ UserProfile (1:1) via userId, FetchType.LAZY (auth/ 패키지에서 추가)
@@ -652,134 +737,108 @@ Content-Type: application/json
 
 Request:
 {
-  "birthDate": "1990-10-10",              // 사용자 생년월일, required
-  "birthTime": "14:30",                   // 사용자 태어난 시간 (HH:mm), required
-  "companyName": "Samsung Electronics",   // 기업명 (공공데이터 조회용)
-  "companyFoundingDate": "1938-01-13",   // (Optional) 기업 설립일, 조회 실패 시 사용자 입력
+  "userBirthDate": "1998-05-07",          // 사용자 생년월일 (YYYY-MM-DD), required
+  "userBirthTime": "14:30",              // 사용자 태어난 시간 (HH:mm), optional (null 허용 시 미상 처리)
+  "targetRole": {
+    "category": "TECH_BACKEND",          // JobCategoryEnum, required (직군 오행 매핑용)
+    "detailName": "스프링 백엔드 개발자" // (Optional) 프롬프트 및 응답 에코용 자유 텍스트
+  },
+  "companyName": "현대오토에버",          // 기업명 (공공데이터 조회용), required
+  "companyFoundingDate": "2000-04-10",   // (Optional) 기업 설립일, 조회 실패 시 사용자 입력
   "companyFoundingTime": "12:00"         // (Optional) 기업 설립 시간 (HH:mm), 미상 시 기본값 12:00으로 자동 설정
 }
 
-참고: 기업 설립일도 사용자 생년월일과 동일한 수준으로 지장간 포함하여 사주 계산. 설립 시간 미상 시 정오(12:00)로 기본 설정.
+참고:
+- 기업 설립일도 사용자 생년월일과 동일한 수준으로 지장간 포함하여 사주 계산. 설립 시간 미상 시 정오(12:00)로 기본 설정.
+- targetRole.category는 JobCategoryEnum 값 중 하나여야 함. 유효하지 않은 값은 400 Bad Request.
+- JobCategoryEnum: TECH_BACKEND, TECH_FRONTEND, TECH_MOBILE, TECH_DATA, TECH_INFRA, FINANCE, MARKETING, HR, OPERATIONS, SALES, STRATEGY, RESEARCH
 
 Response (200 OK):
 {
   "success": true,
   "data": {
-    // 핵심 점수
-    "compatibilityScore": 78,                    // 0-100
-    "confidenceLevel": "HIGH",                   // LOW, MEDIUM, HIGH
-    
-    // 분석 근거
-    "reasoning": "사용자의 정관(正官) 기운과 기업 설립일의 오행(金/水)이 강한 상호보완적 시너지를 냅니다. 특히 체계적인 시스템 안에서 능력을 발휘하는 데 유리한 명식입니다.",
-    
-    // 점수 투명성
-    "scoreBreakdown": {
-      "tenGodCompatibility": 82,                 // 십신 기반 궁합
-      "fiveElementsMatch": 75,                   // 오행 기반 궁합
-      "hiddenStemAlignment": 76,                 // 지장간 기반 궁합
-      "leadershipFit": 80                        // 리더십 매칭도
+    // 요청 컨텍스트 에코 (프론트엔드 렌더링용)
+    "requestContext": {
+      "companyName": "현대오토에버",
+      "targetRole": {
+        "category": "TECH_BACKEND",
+        "detailName": "백엔드 개발자"
+      }
     },
-    
-    // 직무별 맞춤 정보 (Array of Objects)
+
+    // 핵심 점수 및 요약
+    "compatibilityScore": 78,            // 0-100
+    "summary": "안정적인 조직 체계 안에서 본인의 논리적 역량이 빛을 발하는 '상생(相生)'의 궁합입니다.",
+
+    // 직군 오행 분석 (JobRoleAnalyzer에서 생성, DB 미저장)
+    "targetRoleAnalysis": {
+      "matchScore": 85,
+      "synergy": "회사의 안정적인 '土(토)' 기운이 사용자의 구조적 설계 능력('金(금)')을 단단하게 뒷받침해 주는 토생금(土生金)의 유리한 흐름입니다.",
+      "warning": "다만, 혁신적인 신기술 도입보다는 기존 레거시 시스템 유지보수 및 안정화에 집중하는 환경일 수 있어 답답함을 느낄 수 있습니다."
+    },
+
+    // 오행 분포 비교 (Service 계층에서 생성, DB 미저장)
+    "fiveElements": {
+      "userDistribution": { "WOOD": 10, "FIRE": 15, "EARTH": 25, "METAL": 40, "WATER": 10 },
+      "companyDistribution": { "WOOD": 15, "FIRE": 10, "EARTH": 20, "METAL": 25, "WATER": 30 },
+      "synergyDescription": "사용자의 강한 '金(논리)' 기운이 회사의 '水(전략)' 흐름을 돕는 금생수(金生水) 구조입니다."
+    },
+
+    // 점수 세부 분석 (Service 계층에서 계산, DB 미저장)
+    "analysisBreakdown": {
+      "characterMatch": 82,              // 사주 기질 궁합
+      "potentialSynergy": 75,            // 오행 시너지 잠재력
+      "longTermStability": 76            // 장기 안정성
+    },
+
+    // 실행 전략 (Service 계층에서 생성, DB 미저장)
+    "actionableStrategy": {
+      "interviewKeywords": ["원칙 중심", "체계적 설계", "안정적 실행"],
+      "weaknessDefense": "조직 변화에 대한 스트레스 질문 시, '나만의 루틴을 통한 빠른 적응력'을 강조하세요.",
+      "bestTiming": {
+        "luckyDays": ["2026-05-12", "2026-05-15", "2026-05-22"],
+        "preferredTime": "오전 09:00 ~ 11:00 (사시)"
+      }
+    },
+
+    // 예상 면접 질문 (Service 계층에서 생성, DB 미저장)
+    "expectedInterviewQuestions": [
+      {
+        "question": "우리 회사는 체계가 뚜렷하지만 때로는 의사결정이 느릴 수 있습니다. 본인의 빠른 추진력과 부딪힐 때 어떻게 대처하시겠습니까?",
+        "intent": "사용자의 개인적 성향과 보수적인 기업 문화 간의 충돌 대처 능력 검증"
+      }
+    ],
+
+    // 직무별 맞춤 정보 (Array of Objects, score/reason/tag는 Service에서 계산)
     "roleCompatibility": [
       {
-        "roleName": "제조 관리자",
-        "score": 85,
-        "reason": "조직력 강점과 정확히 매치",
-        "recommendation": "즉시 지원 권장"
+        "roleName": "시스템 아키텍트",
+        "score": 88,
+        "reason": "구조적 설계 능력과 회사의 시스템 아키텍처가 일치",
+        "tag": "강력 추천"
       },
       {
-        "roleName": "공급망 담당자",
-        "score": 78,
-        "reason": "체계성 우수하나 유연성 보완 필요",
-        "recommendation": "관련 경험 어필 시 유리"
-      },
-      {
-        "roleName": "R&D 리더",
-        "score": 72,
-        "reason": "기술력은 있으나 창의적 발산보다 관리형 리더십에 가까움",
-        "recommendation": "실무 경력 축적 후 매니징 롤 지원 추천"
+        "roleName": "인프라 엔지니어",
+        "score": 75,
+        "reason": "안정성을 추구하는 성향과 잘 맞으나, 지속적인 야간 장애 대응에 스트레스를 받을 수 있음",
+        "tag": "보통"
       }
     ],
-    
-    // 핵심 강점
-    "synergies": [
-      "정관 기운이 회사의 체계적 조직 문화와 부합",
-      "오행 金 분포가 제조 및 IT 산업 특성과 일치",
-      "지장간 분석 결과 장기 근속 시 안정성 매우 높음"
+
+    // 월별 운세: 핵심 달 5개월만 (month는 정수형 1-12, status: LUCKY/NORMAL/CAUTION)
+    "monthlyForecast": [
+      { "month": 5, "score": 50, "status": "NORMAL", "advice": "포트폴리오 정비 및 CS 기초 역량 강화" },
+      { "month": 6, "score": 95, "status": "LUCKY", "advice": "공고 확인 및 적극적인 지원 적기" }
     ],
-    
+
     // 주의 사항
     "cautions": [
-      "회사의 급격한 조직 개편 시 적응 스트레스 예상",
-      "상반기보다 하반기에 뚜렷한 성과 기대"
-    ],
-    
-    // 월별 운세: 핵심 달 5개월만 (month는 정수형 1-12)
-    "monthlyForecast": [
-      {
-        "month": 1,
-        "score": 35,
-        "type": "CAUTION",
-        "label": "주의",
-        "advice": "신입 채용 지원 자제, 이직 지양",
-        "details": "기운 전환기, 현재 역량 강화에 집중할 시기"
-      },
-      {
-        "month": 2,
-        "score": 50,
-        "type": "NORMAL",
-        "label": "보통",
-        "advice": "이력서 및 포트폴리오 정비",
-        "details": "서서히 기운이 풀리는 시기, 실무 면접 대비 적기"
-      },
-      {
-        "month": 3,
-        "score": 95,
-        "type": "LUCKY",
-        "label": "최고조",
-        "advice": "이 시기에 집중적으로 지원 권장",
-        "details": "정관 기운이 정점, 면접관의 평가가 매우 호의적으로 작용함"
-      },
-      {
-        "month": 6,
-        "score": 88,
-        "type": "LUCKY",
-        "label": "매우 높음",
-        "advice": "중요 면접 일정 잡기 좋음",
-        "details": "오행의 균형이 가장 잘 맞는 시기"
-      },
-      {
-        "month": 7,
-        "score": 42,
-        "type": "CAUTION",
-        "label": "주의",
-        "advice": "충분한 사전 준비 후 지원 필수",
-        "details": "회사와의 에너지 충돌 가능성, 압박 면접 주의"
-      }
-    ],
-    
-    // 경력 발전 마일스톤
-    "careerMilestones": {
-      "immediate": {
-        "period": "1-3개월",
-        "action": "집중 채용 기간 대비 지원",
-        "expectedOutcome": "서류 및 1차 면접 통과 가능성 80% 이상"
-      },
-      "shortTerm": {
-        "period": "3-12개월",
-        "action": "신규 팀 적응 및 업무 프로세스 파악",
-        "expectedOutcome": "조기 적응 및 팀 내 핵심 실무자로 신뢰 구축"
-      },
-      "mediumTerm": {
-        "period": "1-3년",
-        "action": "주요 프로젝트 주도 및 성과 창출",
-        "expectedOutcome": "빠른 인사 고과 인정 및 조기 진급 기회 확보"
-      }
-    }
+      "초기 입사 후 조직 문화 적응에 시간이 다소 걸릴 수 있음",
+      "사내 정치보다는 실무 성과와 안정적인 코드 품질로 승부해야 하는 운 흐름"
+    ]
   },
   "error": null,
-  "timestamp": 1712700000000
+  "timestamp": 1715089200000
 }
 
 Error Response (404 Not Found):
@@ -789,6 +848,18 @@ Error Response (404 Not Found):
   "error": {
     "code": "COMPANY_NOT_FOUND",
     "message": "Company not found in public database. Please provide founding date.",
+    "requestId": "req-12345-abc"
+  },
+  "timestamp": 1712700000000
+}
+
+Error Response (400 Bad Request - 유효하지 않은 직군):
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "INVALID_JOB_CATEGORY",
+    "message": "targetRole.category must be one of: TECH_BACKEND, TECH_FRONTEND, TECH_MOBILE, TECH_DATA, TECH_INFRA, FINANCE, MARKETING, HR, OPERATIONS, SALES, STRATEGY, RESEARCH",
     "requestId": "req-12345-abc"
   },
   "timestamp": 1712700000000

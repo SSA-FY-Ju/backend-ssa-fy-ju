@@ -1224,6 +1224,105 @@ public class CareerFortuneService {
 
 ---
 
+## 직군 오행 분석 패턴 (JobCategoryEnum + JobRoleAnalyzer)
+
+### JobCategoryEnum: 직군별 오행 매핑
+
+직군은 고유한 오행 특성을 가집니다. Enum 상수에 `primaryElement`(주요 오행)와 `secondaryElement`(보조 오행)를 포함하여 분석에 활용합니다.
+
+```java
+// career/util/JobCategoryEnum.java
+public enum JobCategoryEnum {
+    TECH_BACKEND("백엔드 개발", "金", "水"),      // 논리적 구조화 + 유연한 처리
+    TECH_FRONTEND("프론트엔드 개발", "火", "木"),  // 창의적 표현 + 성장
+    TECH_MOBILE("모바일 개발", "火", "金"),
+    TECH_DATA("데이터/AI", "水", "金"),           // 분석 + 정밀
+    TECH_INFRA("인프라/DevOps", "土", "金"),      // 안정성 + 정밀
+    FINANCE("금융/회계", "金", "土"),
+    MARKETING("마케팅", "火", "木"),
+    HR("인사/조직", "土", "水"),
+    OPERATIONS("운영/기획", "土", "金"),
+    SALES("영업", "火", "木"),
+    STRATEGY("전략/경영", "水", "木"),
+    RESEARCH("연구개발", "水", "木");
+
+    private final String displayName;
+    private final String primaryElement;
+    private final String secondaryElement;
+}
+```
+
+### JobRoleAnalyzer: 직군 오행 분석 컴포넌트
+
+사용자 오행 분포와 직군 오행을 비교하여 `targetRoleAnalysis`를 생성합니다. 결과는 **정규화된 자식 엔티티로 DB에 저장**합니다 (AI 호출 비용 절감 목적).
+
+```java
+// career/util/JobRoleAnalyzer.java
+@Component
+public class JobRoleAnalyzer {
+
+    public TargetRoleAnalysis analyze(FiveElements userFiveElements, JobCategoryEnum category) {
+        int primaryScore = userFiveElements.getScore(category.getPrimaryElement());
+        int secondaryScore = userFiveElements.getScore(category.getSecondaryElement());
+        int matchScore = calculateMatchScore(primaryScore, secondaryScore);
+        String synergy = buildSynergyText(category, primaryScore, secondaryScore);
+        String warning = buildWarningText(category, userFiveElements);
+        return new TargetRoleAnalysis(matchScore, synergy, warning);
+    }
+}
+
+// CompanyMatchingService에서 사용 (INSERT IGNORE + 전체 자식 엔티티 저장)
+@Service
+public class CompanyMatchingService {
+    private final JobRoleAnalyzer jobRoleAnalyzer;
+    private final CompanyCompatibilityJdbcRepository compatibilityJdbc;
+
+    public CompatibilityResponse analyzeCompatibility(CompatibilityRequest request) {
+        // 1. 사용자/기업 사주 조회 및 계산
+        FiveElements userFiveElements = ...;
+
+        // 2. [신규] 직군 오행 분석
+        TargetRoleAnalysis roleAnalysis = jobRoleAnalyzer.analyze(
+            userFiveElements, request.targetRole().category());
+
+        // 3. 궁합 점수 계산
+        int score = compatibilityScoreCalculator.calculate(userSaju, companySaju);
+
+        // 4. INSERT IGNORE로 CompanyCompatibility 루트 저장
+        //    UNIQUE(userProfileId, companyName, targetRoleCategory) 중복 방지
+        CompanyCompatibility root = buildCompatibilityEntity(request, score, ...);
+        int inserted = compatibilityJdbc.insertOrIgnore(root);
+
+        if (inserted == 0) {
+            // 이미 존재 → 기존 레코드 조회하여 반환 (AI 재호출 없음)
+            return loadExistingCompatibilityResponse(request, userProfile);
+        }
+
+        // 5. 신규 삽입: 모든 자식 엔티티 저장
+        CompanyCompatibility saved = compatibilityRepo.findByUniqueKey(...).orElseThrow();
+        targetRoleAnalysisRepo.save(new TargetRoleAnalysis(saved.getId(), roleAnalysis));
+        fiveElementsAnalysisRepo.save(new FiveElementsAnalysis(saved.getId(), ...));
+        analysisBreakdownRepo.save(new AnalysisBreakdown(saved.getId(), ...));
+        actionableStrategyRepo.save(new ActionableStrategy(saved.getId(), ...));
+        expectedInterviewQuestionRepo.saveAll(buildQuestions(saved.getId()));
+        roleCompatibilityRepo.saveAll(buildRoleCompatibilities(saved.getId()));
+        monthlyForecastRepo.saveAll(buildForecasts(saved.getId()));
+        cautionRepo.saveAll(buildCautions(saved.getId()));
+
+        return CompatibilityResponse.of(score, roleAnalysis, ...);
+    }
+}
+```
+
+**원칙**:
+- ✅ JobRoleAnalyzer는 단일 책임: 직군 오행 분석만 담당
+- ✅ 분석 결과 전체를 정규화된 자식 엔티티로 DB 저장 (AI 호출 비용 절감)
+- ✅ INSERT IGNORE + UNIQUE constraint로 Race Condition 안전 처리
+- ✅ 동일 조합 재요청 시 기존 DB 결과 반환 (AI 재호출 없음)
+- ✅ Service는 orchestration만, 분석 로직은 JobRoleAnalyzer에 위임
+
+---
+
 ## Phase 1 제약사항
 
 - **캐싱 금지**: Redis, In-Memory 전역 캐시 사용 금지
@@ -1450,6 +1549,58 @@ ADD UNIQUE KEY unique_user_saju (user_profile_id);
 - ✅ 명확한 반환값: inserted=1/0 구분
 - ✅ 예외 처리 불필요: INSERT IGNORE는 예외 발생 안 함
 - ✅ 성능: 네이티브 SQL로 최적화
+
+### CompanyCompatibility INSERT IGNORE 패턴
+
+**As-Is**: 매 요청마다 AI 호출 → 비용 증가
+**To-Be**: UNIQUE(userProfileId, companyName, targetRoleCategory) + INSERT IGNORE → 동일 조합 재요청 시 기존 결과 재사용
+
+```java
+// CompanyCompatibilityJdbcRepository.java
+@Repository
+public class CompanyCompatibilityJdbcRepository {
+    private final JdbcTemplate jdbcTemplate;
+
+    public int insertOrIgnore(CompanyCompatibility entity) {
+        String sql = "INSERT IGNORE INTO company_compatibility " +
+            "(user_profile_id, company_name, target_role_category, " +
+            " target_role_detail_name, compatibility_score, summary, created_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+        return jdbcTemplate.update(sql,
+            entity.getUserProfileId(),
+            entity.getCompanyName(),
+            entity.getTargetRoleCategory().name(),
+            entity.getTargetRoleDetailName(),
+            entity.getCompatibilityScore(),
+            entity.getSummary(),
+            LocalDateTime.now()
+        );
+    }
+}
+```
+
+**UNIQUE 제약**:
+```sql
+-- schema.sql: company_compatibility에 3-column UNIQUE 제약
+ALTER TABLE company_compatibility
+ADD UNIQUE KEY unique_user_company_role (user_profile_id, company_name, target_role_category);
+```
+
+**Service 흐름**:
+```java
+int inserted = compatibilityJdbc.insertOrIgnore(root);
+if (inserted == 0) {
+    // 이미 존재 → 기존 레코드 + 자식 엔티티 조회하여 반환
+    return buildResponseFromExisting(compatibilityRepo.findByUniqueKey(...));
+}
+// 신규 → 자식 엔티티 일괄 저장
+```
+
+**이점**:
+- ✅ AI 호출 비용 절감: 동일 분석 결과 재사용
+- ✅ Race Condition 안전: UNIQUE 제약으로 중복 insert 방지
+- ✅ SajuResult INSERT IGNORE 패턴과 동일한 접근 방식으로 일관성 확보
 
 ### H2 MySQL 모드 테스트
 

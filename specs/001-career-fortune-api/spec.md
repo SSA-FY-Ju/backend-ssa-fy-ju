@@ -141,27 +141,30 @@ SSAju는 사주 명리학의 관성(정관/편관) 데이터를 활용해 취업
 
 ### User Story 3 - Company & Job Fit Analysis (Priority: P2)
 
-취업 준비생이 목표 기업의 설립일시(사주)와 자신의 생년월일시를 입력하여 궁합 점수(0~100)와 추천 직무를 얻습니다.
+취업 준비생이 목표 기업의 설립일시(사주)와 자신의 생년월일시, 지원 직군을 입력하여 궁합 점수(0~100)와 직군 오행 분석, 추천 직무, 예상 면접 질문을 얻습니다.
 
 **Why this priority**: 보조 기능. 기업 선택 신뢰도를 높이지만, P1 기능(타이밍+컨설팅)이 핵심가치입니다.
 
-**Independent Test**: 사용자 사주 + 기업 설립일 → 궁합 계산 → 호환성 점수 + 추천 직무 반환. P1/P2 불필요합니다.
+**Independent Test**: 사용자 사주 + 기업 설립일 + 지원 직군 → 궁합 계산 → 호환성 점수 + 직군 오행 분석 + 추천 직무 반환. P1/P2 불필요합니다.
 
 **Acceptance Scenarios**:
 
-1. **Given** 사용자 사주(YYYY-MM-DD HH:mm) + 기업 설립일(YYYY-MM-DD, 선택사항으로 시간 HH:mm 추가 가능), **When** 호환성 분석, **Then** 다음 8개 필드 포함 JSON 반환:
+1. **Given** 사용자 사주(YYYY-MM-DD HH:mm) + 지원 직군(category + detailName) + 기업 설립일(YYYY-MM-DD, 선택사항으로 시간 HH:mm 추가 가능), **When** 호환성 분석, **Then** 다음 필드 포함 JSON 반환:
+   - requestContext: {companyName, targetRole: {category, detailName}} (프론트 응답 에코)
    - compatibilityScore: 0-100 정수
-   - confidenceLevel: "LOW", "MEDIUM", "HIGH"
-   - reasoning: 호환성 분석 근거 텍스트
-   - scoreBreakdown: {tenGodCompatibility, fiveElementsMatch, hiddenStemAlignment, leadershipFit} (Service 계층에서 계산된 값)
-   - roleCompatibility[]: [{roleName, score, reason, recommendation}] (추천 직무 Array, score/reason/recommendation은 Service에서 계산)
-   - synergies[]: 핵심 강점 배열
+   - summary: 전체 궁합 한 줄 요약 텍스트
+   - targetRoleAnalysis: {matchScore, synergy, warning} (직군 오행 분석, Service 계층에서 생성)
+   - fiveElements: {userDistribution, companyDistribution, synergyDescription} (오행 분포 비교, Service 계층에서 생성)
+   - analysisBreakdown: {characterMatch, potentialSynergy, longTermStability} (Service 계층에서 계산된 값)
+   - actionableStrategy: {interviewKeywords[], weaknessDefense, bestTiming: {luckyDays[], preferredTime}} (Service 계층에서 생성)
+   - expectedInterviewQuestions[]: [{question, intent}] (Service 계층에서 생성)
+   - roleCompatibility[]: [{roleName, score, reason, tag}] (추천 직무 Array, score/reason/tag는 Service에서 계산)
+   - monthlyForecast[]: [{month(1-12), score, status, advice}] (5개월만 포함, status: LUCKY/NORMAL/CAUTION)
    - cautions[]: 주의사항 배열
-   - monthlyForecast[]: [{month(1-12), score, type, label, advice, details}] (5개월만 포함)
-   - careerMilestones: {immediate, shortTerm, mediumTerm} (기대 진로 로드맵)
    (기본값 및 지장간 계산은 Clarifications 참고)
-2. **Given** 유효한 두 사주 데이터, **When** 매칭 실행, **Then** 응답에 신뢰도 수준(confidenceLevel) 포함. scoreBreakdown으로 점수 투명성 제공
+2. **Given** 유효한 두 사주 데이터 + 지원 직군, **When** 매칭 실행, **Then** targetRoleAnalysis에 직군 오행 기반 synergy/warning 포함
 3. **Given** 기업 설립일시가 불완전할 경우(시간 정보 미상), **When** 요청 제출, **Then** 계속 진행 (기본값 12:00 적용, Clarifications 참고). 지장간은 완전 데이터로 계산
+4. **Given** targetRole.category가 유효하지 않은 값, **When** 요청 제출, **Then** 400 Bad Request 반환
 
 ---
 
@@ -305,6 +308,8 @@ public record ErrorInfo(
 - **FR-008**: Timeout/API 실패 시 @RestControllerAdvice로 처리 (try-catch 금지)
 - **FR-008-1**: RestClient 외부 API 호출 시 @Retryable 적용. 예외 분류: ResourceAccessException(네트워크/타임아웃) 재시도 대상, RestClientResponseException의 4xx(클라이언트 오류) 재시도 안 함, 5xx(서버 오류) 재시도 함. (CodeRabbit PR #9 지적사항)
 - **FR-009**: 기업 설립일을 공공데이터API로 조회. 조회 실패 시 사용자 입력으로 폴백하고, 기업 설립일과 사용자 사주를 비교하여 호환성 점수 계산 (0~100 범위)
+- **FR-009-1**: CompatibilityRequest에 targetRole (category: JobCategoryEnum, detailName: String) 필드 포함. category는 필수, detailName은 선택사항(응답 에코 및 프롬프트 노출용 자유 텍스트)
+- **FR-009-2**: JobCategoryEnum은 직군별 주요 오행(primaryElement)과 보조 오행(secondaryElement)을 포함. `JobRoleAnalyzer`가 사용자 오행 분포와 직군 오행을 비교하여 targetRoleAnalysis (matchScore, synergy, warning) 생성. 분석 결과(targetRoleAnalysis, fiveElements, analysisBreakdown, actionableStrategy, expectedInterviewQuestions, roleCompatibility, monthlyForecast, cautions) 전체를 정규화된 자식 엔티티로 DB에 저장. CompanyCompatibility에 UNIQUE(userProfileId, companyName, targetRoleCategory) 제약 + INSERT IGNORE 패턴으로 중복 방지
 - **FR-010**: 모든 API 응답은 ApiResponse<T> 래퍼 사용 (success, data, error, timestamp)
 - **FR-011**: 모든 엔티티는 @Getter + @NoArgsConstructor(access=PROTECTED) + @Builder 사용 (@Data/@ToString 금지)
 - **FR-012**: 모든 연관관계는 FetchType.LAZY 명시 (N+1 문제 방지)
@@ -345,12 +350,19 @@ public record ErrorInfo(
 | **InterviewTip** | id, careerConsultationId, content | Long, Long (FK), String | FK to CareerConsultation (1:N) |
 | **Strength** | id, careerConsultationId, description | Long, Long (FK), String | FK to CareerConsultation (1:N) |
 
-**Company Compatibility Entities**:
+**Company Compatibility Entities (정규화 구조)**:
 
 | Entity | Fields | Type | Constraints |
 |--------|--------|------|-------------|
-| **CompanyCompatibility** | id, userProfileId, companyName, compatibilityScore, createdAt | Long, Long (FK), String, Integer, LocalDateTime | FK to UserProfile (1:N), composite index (userProfileId, companyName) |
-| **RecommendedRole** | id, compatibilityId, roleName | Long, Long (FK), String | FK to CompanyCompatibility (1:N) |
+| **CompanyCompatibility** | id, userProfileId, companyName, targetRoleCategory, targetRoleDetailName, compatibilityScore, summary, createdAt | Long, Long (FK), String, JobCategoryEnum, String, Integer, String, LocalDateTime | FK to UserProfile (1:N), **UNIQUE(userProfileId, companyName, targetRoleCategory)** |
+| **TargetRoleAnalysis** | id, compatibilityId, matchScore, synergy, warning | Long, Long (FK, UNIQUE), Integer, Text, Text | FK to CompanyCompatibility (1:1, UNIQUE) |
+| **FiveElementsAnalysis** | id, compatibilityId, userDistribution, companyDistribution, synergyDescription | Long, Long (FK, UNIQUE), JSON, JSON, Text | FK to CompanyCompatibility (1:1, UNIQUE) |
+| **AnalysisBreakdown** | id, compatibilityId, characterMatch, potentialSynergy, longTermStability | Long, Long (FK, UNIQUE), Integer, Integer, Integer | FK to CompanyCompatibility (1:1, UNIQUE) |
+| **ActionableStrategy** | id, compatibilityId, interviewKeywords, weaknessDefense, luckyDays, preferredTime | Long, Long (FK, UNIQUE), JSON, Text, JSON, String | FK to CompanyCompatibility (1:1, UNIQUE) |
+| **ExpectedInterviewQuestion** | id, compatibilityId, question, intent | Long, Long (FK), Text, Text | FK to CompanyCompatibility (1:N) |
+| **RoleCompatibility** | id, compatibilityId, roleName, score, reason, tag | Long, Long (FK), String, Integer, Text, String | FK to CompanyCompatibility (1:N) |
+| **MonthlyForecast** | id, compatibilityId, month, score, status, advice | Long, Long (FK), Integer, Integer, Enum(LUCKY/NORMAL/CAUTION), Text | FK to CompanyCompatibility (1:N) |
+| **Caution** | id, compatibilityId, content | Long, Long (FK), Text | FK to CompanyCompatibility (1:N) |
 
 **Feedback Entity**:
 

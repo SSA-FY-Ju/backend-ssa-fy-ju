@@ -930,69 +930,123 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ### User Story 3: Company & Job Fit Analysis (Priority P2)
 
-**Goal**: Users can analyze compatibility between their saju and target company founding date, receiving a score (0-100) and recommended roles.
-**Independent Test**: User saju + company date → Compatibility calculation → Score + roles response (depends on core structures)
-**Expected Outcome**: Compatibility endpoint working, CompanyCompatibility + RecommendedRole entities stored in DB
+**Goal**: Users can analyze compatibility between their saju, target job role, and target company founding date, receiving a score (0-100), job role five-elements analysis, recommended roles, and actionable interview strategy.
+**Independent Test**: User saju + targetRole + company date → Compatibility calculation → Score + targetRoleAnalysis + roles response (depends on core structures)
+**Expected Outcome**: Compatibility endpoint working, CompanyCompatibility + RecommendedRole entities stored in DB. targetRoleAnalysis, fiveElements, analysisBreakdown, actionableStrategy, expectedInterviewQuestions는 Service에서 계산 후 응답에만 포함 (DB 미저장)
 
-- [ ] T081 [US3] Create `CompanyCompatibility` and `RecommendedRole` entities in `career/entity/`
-  - **CompanyCompatibility**: id, userProfileId (FK), companyName, compatibilityScore (0-100), createdAt. **No JSON 저장** — recommendedRoles는 별도 RecommendedRole 엔티티에 1:N 관계로 저장
-  - **RecommendedRole**: id, companyCompatibilityId (FK), roleName (String), createdAt. **N:1 관계** to CompanyCompatibility
-  - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for relationships
+- [ ] T081 [US3] Create `CompanyCompatibility` and normalized child entities in `career/entity/`
+  - **CompanyCompatibility** (루트 엔티티):
+    - id (Long, PK), userProfileId (FK to UserProfile), companyName (String, NOT NULL)
+    - targetRoleCategory (JobCategoryEnum, NOT NULL), targetRoleDetailName (String, optional)
+    - compatibilityScore (Integer, 0-100, NOT NULL), summary (TEXT), createdAt (LocalDateTime)
+    - **UNIQUE(userProfileId, companyName, targetRoleCategory)** — INSERT IGNORE로 중복 방지
+    - 1:1 자식: TargetRoleAnalysis, FiveElementsAnalysis, AnalysisBreakdown, ActionableStrategy
+    - 1:N 자식: ExpectedInterviewQuestion, RoleCompatibility, MonthlyForecast, Caution
+  - **TargetRoleAnalysis** (1:1): id, compatibilityId (FK, UNIQUE), matchScore (Integer), synergy (TEXT), warning (TEXT)
+  - **FiveElementsAnalysis** (1:1): id, compatibilityId (FK, UNIQUE), userDistribution (JSON), companyDistribution (JSON), synergyDescription (TEXT)
+  - **AnalysisBreakdown** (1:1): id, compatibilityId (FK, UNIQUE), characterMatch (Integer), potentialSynergy (Integer), longTermStability (Integer)
+  - **ActionableStrategy** (1:1): id, compatibilityId (FK, UNIQUE), interviewKeywords (JSON), weaknessDefense (TEXT), luckyDays (JSON), preferredTime (String)
+  - **ExpectedInterviewQuestion** (1:N): id, compatibilityId (FK), question (TEXT), intent (TEXT)
+  - **RoleCompatibility** (1:N): id, compatibilityId (FK), roleName (String), score (Integer), reason (TEXT), tag (String)
+  - **MonthlyForecast** (1:N): id, compatibilityId (FK), month (Integer, 1-12), score (Integer), status (Enum: LUCKY/NORMAL/CAUTION), advice (TEXT)
+  - **Caution** (1:N): id, compatibilityId (FK), content (TEXT)
+  - Use: @Getter, @NoArgsConstructor(access=PROTECTED), @Builder, FetchType.LAZY for all relationships
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/CompanyCompatibility.java`
-  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/RecommendedRole.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/TargetRoleAnalysis.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/FiveElementsAnalysis.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/AnalysisBreakdown.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/ActionableStrategy.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/ExpectedInterviewQuestion.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/RoleCompatibility.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/MonthlyForecast.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/Caution.java`
 
-- [ ] T082 [US3] [P] Create `CompanyCompatibilityRepository` and `RecommendedRoleRepository` in `repository/`
+- [ ] T082 [US3] [P] Create repositories for all CompanyCompatibility entities in `repository/`
+  - **CompanyCompatibilityRepository**: JPA repository + `findByUserProfileIdAndCompanyNameAndTargetRoleCategory()` 쿼리 메서드
+  - **CompanyCompatibilityJdbcRepository**: JdbcTemplate 기반 INSERT IGNORE 구현
+    - `insertOrIgnore(CompanyCompatibility)`: UNIQUE(userProfileId, companyName, targetRoleCategory) 활용
+    - Returns: 1 (신규 삽입) 또는 0 (이미 존재)
+  - 자식 엔티티 Repository: TargetRoleAnalysisRepository, FiveElementsAnalysisRepository, AnalysisBreakdownRepository, ActionableStrategyRepository, ExpectedInterviewQuestionRepository, RoleCompatibilityRepository, MonthlyForecastRepository, CautionRepository
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/CompanyCompatibilityRepository.java`
-  - File: `SSAju/src/main/java/ssafy/SSAju/repository/RecommendedRoleRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/CompanyCompatibilityJdbcRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/TargetRoleAnalysisRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/FiveElementsAnalysisRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/AnalysisBreakdownRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/ActionableStrategyRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/ExpectedInterviewQuestionRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/RoleCompatibilityRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/MonthlyForecastRepository.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/repository/CautionRepository.java`
 
-- [ ] T083 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs
-  - Request fields: birthDate (LocalDate, @NotNull), birthTime (LocalTime, @NotNull), companyName (@NotNull), companyFoundingDate (LocalDate, optional), companyFoundingTime (LocalTime, optional, **defaults to 12:00 if missing**)
-  - Response fields (8 fields):
+- [ ] T083 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs, and `JobCategoryEnum`
+  - Request fields: userBirthDate (LocalDate, @NotNull), userBirthTime (LocalTime, optional), targetRole (TargetRoleRequest record: category(JobCategoryEnum, @NotNull), detailName(String, optional)), companyName (@NotNull), companyFoundingDate (LocalDate, optional), companyFoundingTime (LocalTime, optional, **defaults to 12:00 if missing**)
+  - Response fields:
+    - requestContext: {companyName, targetRole: {category, detailName}} (요청 에코)
     - compatibilityScore: 0-100 정수
-    - confidenceLevel: "LOW", "MEDIUM", "HIGH"
-    - reasoning: 호환성 분석 텍스트
-    - scoreBreakdown: {tenGodCompatibility, fiveElementsMatch, hiddenStemAlignment, leadershipFit} (모두 계산값)
-    - roleCompatibility[]: [{roleName, score, reason, recommendation}] (Array of Objects, score/reason/recommendation은 Service에서 계산)
-    - synergies[]: 핵심 강점 문자열 배열
+    - summary: 전체 궁합 한 줄 요약 텍스트
+    - targetRoleAnalysis: {matchScore, synergy, warning} (JobRoleAnalyzer에서 생성, DB 미저장)
+    - fiveElements: {userDistribution, companyDistribution, synergyDescription} (Service에서 계산, DB 미저장)
+    - analysisBreakdown: {characterMatch, potentialSynergy, longTermStability} (Service에서 계산)
+    - actionableStrategy: {interviewKeywords[], weaknessDefense, bestTiming: {luckyDays[], preferredTime}} (Service에서 생성)
+    - expectedInterviewQuestions[]: [{question, intent}] (Service에서 생성)
+    - roleCompatibility[]: [{roleName, score, reason, tag}] (Array of Objects, score/reason/tag는 Service에서 계산)
+    - monthlyForecast[]: [{month(1-12), score, status(LUCKY/NORMAL/CAUTION), advice}] - 5개 월만 포함
     - cautions[]: 주의사항 문자열 배열
-    - monthlyForecast[]: [{month(1-12), score, type, label, advice, details}] - 5개 월만 포함
-    - careerMilestones: {immediate, shortTerm, mediumTerm} (각 period, action, expectedOutcome)
-  - Note: 모든 계산 필드(scoreBreakdown, synergies, cautions, monthlyForecast, careerMilestones)는 Service 계층에서 생성. DB에는 CompatibilityScore, RecommendedRole만 저장. companyFoundingTime 미상 시 자동으로 12:00으로 설정하고 지장간 포함 계산.
+  - JobCategoryEnum: TECH_BACKEND, TECH_FRONTEND, TECH_MOBILE, TECH_DATA, TECH_INFRA, FINANCE, MARKETING, HR, OPERATIONS, SALES, STRATEGY, RESEARCH. 각 항목은 primaryElement(String), secondaryElement(String) 보유
+  - Note: 모든 분석 결과(targetRoleAnalysis, fiveElements, analysisBreakdown, actionableStrategy, expectedInterviewQuestions, roleCompatibility, monthlyForecast, cautions)를 정규화된 자식 엔티티로 DB 저장. CompanyCompatibility에 UNIQUE(userProfileId, companyName, targetRoleCategory) + INSERT IGNORE 패턴으로 중복 방지. companyFoundingTime 미상 시 자동으로 12:00으로 설정하고 지장간 포함 계산.
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/request/CompatibilityRequest.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/CompatibilityResponse.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/util/JobCategoryEnum.java`
 
 - [ ] T084 [US3] Create `CompanyInfoService` in `service/`
   - Method: `lookupCompanyFoundingDate(companyName)` → calls public data API with fallback to manual input. If time not found, use default 12:00
   - Handles: API timeout → PublicDataApiException, company not found → inform user to provide founding date. If time missing → auto-set to 12:00
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyInfoService.java`
 
-- [ ] T085 [US3] Create `CompanyMatchingService` in `service/`
-  - Method: `analyzeCompatibility(LocalDate userBirthDate, LocalTime userBirthTime, LocalDate companyFoundingDate, LocalTime companyFoundingTime)` → compatibility score + role recommendations with 지장간 calculation
-  - Logic: Fetch user saju via SajuDataService with birthDate + birthTime → Calculate user HiddenStems + TenGod. Fetch company saju (with time defaulting to 12:00 if missing) → Calculate company HiddenStems + TenGod. Use `CompatibilityScoreCalculator` with both sets of data for accurate scoring. Save to CompanyCompatibility + RecommendedRole entities
-  - Note: 기업 설립일도 사용자 사주와 동일한 수준으로 지장간 포함 계산. 시간 미상 시 정오(12:00)로 기본 설정. 추천 직무는 RecommendedRole 엔티티로 저장
+- [ ] T085 [US3] Create `CompanyMatchingService` and `JobRoleAnalyzer` in `service/` and `career/util/`
+  - Method: `analyzeCompatibility(CompatibilityRequest request)` → compatibility score + all analysis results (DB 저장)
+  - Logic:
+    1. Fetch user saju via SajuDataService with userBirthDate + userBirthTime → Calculate user HiddenStems + TenGod + FiveElements
+    2. Fetch company saju (with companyFoundingTime defaulting to 12:00 if missing) → Calculate company HiddenStems + TenGod
+    3. Use `CompatibilityScoreCalculator` with both sets of data for accurate scoring
+    4. Use `JobRoleAnalyzer.analyze(userFiveElements, request.targetRole().category())` → targetRoleAnalysis (matchScore, synergy, warning)
+    5. Build fiveElements comparison, analysisBreakdown, actionableStrategy, expectedInterviewQuestions, roleCompatibility, monthlyForecast, cautions
+    6. **INSERT IGNORE 패턴**: `CompanyCompatibilityJdbcRepository.insertOrIgnore()` → UNIQUE(userProfileId, companyName, targetRoleCategory) 중복 방지
+    7. 기존 레코드 존재 시 조회하여 반환 (AI 비용 절감). 신규 삽입 시 모든 자식 엔티티 저장:
+       - 1:1: TargetRoleAnalysis, FiveElementsAnalysis, AnalysisBreakdown, ActionableStrategy
+       - 1:N: ExpectedInterviewQuestion[], RoleCompatibility[], MonthlyForecast[], Caution[]
+  - JobRoleAnalyzer: @Component, `analyze(FiveElements userFiveElements, JobCategoryEnum category)` → targetRoleAnalysis 생성. JobCategoryEnum의 primaryElement/secondaryElement와 사용자 오행 분포를 비교하여 matchScore, synergy, warning 산출
+  - Note: 기업 설립일도 사용자 사주와 동일한 수준으로 지장간 포함 계산. 시간 미상 시 정오(12:00)로 기본 설정. 동일 조합(userProfileId+companyName+targetRoleCategory) 재요청 시 기존 DB 결과 반환 (AI 재호출 없음)
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyMatchingService.java`
+  - File: `SSAju/src/main/java/ssafy/SSAju/career/util/JobRoleAnalyzer.java`
 
 - [ ] T086 [US3] Create `CompatibilityController` in `controller/`
-  - Endpoint: `POST /api/company/compatibility` with CompatibilityRequest (userBirthDate + userBirthTime required, companyFoundingDate optional, companyFoundingTime optional)
-  - Handles: Request validation (@Valid), validates user birth time required, looks up company (with time fallback to 12:00), calculates compatibility, returns `ApiResponse<CompatibilityResponse>` (recommendedRoles는 엔티티에서 추출한 List<String>)
-  - Validation: Reject requests with missing userBirthTime (400 Bad Request)
+  - Endpoint: `POST /api/company/compatibility` with CompatibilityRequest (userBirthDate + targetRole.category required, userBirthTime optional, companyFoundingDate optional, companyFoundingTime optional)
+  - Handles: Request validation (@Valid), validates targetRole.category is valid JobCategoryEnum (400 Bad Request if invalid), looks up company (with time fallback to 12:00), calculates compatibility, returns `ApiResponse<CompatibilityResponse>`
+  - Validation: targetRole.category 유효성 검증 (400 INVALID_JOB_CATEGORY), companyName @NotNull
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/CompatibilityController.java`
 
 - [ ] T087 [US3] Write unit & integration tests for Company Compatibility
+  - Test cases (JobRoleAnalyzer):
+    1. Valid TECH_BACKEND category + 金 강세 user FiveElements → matchScore 높음, synergy 텍스트 포함
+    2. Valid MARKETING category + 木/火 강세 user FiveElements → matchScore 및 synergy/warning 반환
+    3. 사용자 오행 분포가 직군 오행과 상극(相剋) 관계 → warning 메시지 포함
   - Test cases (CompanyMatchingService):
-    1. Valid compatibility analysis (user birthDate + birthTime, company founding date + time) → compatibility score + roles including 지장간-based analysis
+    1. Valid compatibility analysis (user birthDate + birthTime + targetRole, company founding date + time) → compatibilityScore + targetRoleAnalysis + roles including 지장간-based analysis. DB에 CompanyCompatibility + 모든 자식 엔티티 저장 확인
     2. Company founding time missing → auto-default to 12:00 and calculate 지장간
     3. Company founding date missing but time provided → Invalid request (date required)
-    4. Missing user birthTime → InvalidSajuDataException
-    5. Invalid user birthTime format → InvalidSajuDataException
+    4. 동일한 (userProfileId, companyName, targetRoleCategory) 재요청 → INSERT IGNORE로 기존 레코드 재사용. 자식 엔티티 중복 삽입 없음 검증
+    5. 동시 요청 Race Condition: 동일 조합 2건 동시 요청 → CompanyCompatibility 1개만 생성, 나머지 무시 (insertOrIgnore 반환값 0 검증)
   - Test cases (CompatibilityController):
-    1. Valid request (user birthDate + birthTime + company founding date) → 200 OK with score/roles
-    2. Valid request (user birthDate + birthTime + company, no company time) → 200 OK with score (company time defaults to 12:00)
-    3. Missing user birthTime → 400 Bad Request
-    4. Company not found (with company founding date fallback) → score still calculated with 지장간 included
-    5. Invalid user time format → 400 Bad Request
+    1. Valid request (userBirthDate + targetRole.category + companyName + companyFoundingDate) → 200 OK with score/targetRoleAnalysis/roles
+    2. Valid request (no companyFoundingTime) → 200 OK with score (company time defaults to 12:00)
+    3. Invalid targetRole.category → 400 Bad Request (INVALID_JOB_CATEGORY)
+    4. Missing targetRole.category → 400 Bad Request
+    5. Company not found (with company founding date fallback) → score still calculated with 지장간 included
   - File: `SSAju/src/test/java/ssafy/SSAju/service/CompanyMatchingServiceTest.java`
   - File: `SSAju/src/test/java/ssafy/SSAju/controller/CompatibilityControllerTest.java`
+  - File: `SSAju/src/test/java/ssafy/SSAju/unit/JobRoleAnalyzerTest.java`
+  - File: `SSAju/src/test/java/ssafy/SSAju/repository/CompanyCompatibilityJdbcRepositoryTest.java` (INSERT IGNORE + Race Condition 검증)
 
 ---
 
