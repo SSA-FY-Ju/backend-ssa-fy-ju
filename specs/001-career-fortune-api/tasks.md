@@ -541,7 +541,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ### 0. 📦 Cleanup & Optimization
 
-- [ ] T030-1 [Refactor] Remove unnecessary Jackson @JsonProperty annotations from DTOs
+- [v] T030-1 [Refactor] Remove unnecessary Jackson @JsonProperty annotations from DTOs
   - **Rationale**: FastAPI 응답이 이미 camelCase이고, Java 필드명도 camelCase이므로 @JsonProperty 불필요. Jackson이 자동으로 매칭함.
   - Remove: FastAPIResponse.java의 모든 @JsonProperty 어노테이션
   - Result: DTO 간결화, Jackson import 제거 (의존성 불필요)
@@ -554,7 +554,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 **주의**: 이 섹션은 Phase 1에서 즉시 진행해야 합니다. spec.md(L227~230) 및 plan.md에서 RestClient로 확정되었습니다.
 
-- [ ] T051 [Enhancement] 의존성 추가: Spring Retry, RestClient
+- [v] T051 [Enhancement] 의존성 추가: Spring Retry, RestClient
   - `build.gradle`에 다음 추가:
     ```gradle
     implementation 'org.springframework:spring-retry'
@@ -563,14 +563,14 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Remove: WebClient 기반 설정 (WebClientConfig.java 제거 또는 RestClient 설정으로 전환)
   - File: `SSAju/build.gradle`
 
-- [ ] T052 [Enhancement] Create `FastApiRestClientConfig` in `config/`
+- [v] T052 [Enhancement] Create `FastApiRestClientConfig` in `config/`
   - RestClient bean 생성 (default timeout, SSL 설정 등)
   - @EnableRetry 어노테이션 추가 (Spring Retry 활성화, application.yaml 설정 불필요)
   - Exponential backoff 정책: 1초, 2초, 4초 (최대 3회, @Retryable 어노테이션 속성으로 제어)
   - Note: `spring.task.retry.*` 프로퍼티는 `ThreadPoolTask*` 설정용이므로 사용하지 말 것
   - File: `SSAju/src/main/java/ssafy/SSAju/config/FastApiRestClientConfig.java`
 
-- [ ] T053 [Enhancement] Refactor `SajuDataService` to use RestClient
+- [v] T053 [Enhancement] Refactor `SajuDataService` to use RestClient
   - **Before**: WebClient + .block() 동기 처리
   - **After**: RestClient + Spring Retry (@Retryable)
   - Method: `fetchSajuFromFastAPI(LocalDate, LocalTime)` → RestClient 호출, 자동 재시도
@@ -580,12 +580,12 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
     - RestClientResponseException 5xx (서버 오류) → 그대로 던지기 (재시도 대상 유지)
   - File: `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
 
-- [ ] T054 [Enhancement] Refactor `ConsultationService` OpenAI RestClient 호출
+- [v] T054 [Enhancement] Refactor `ConsultationService` OpenAI RestClient 호출
   - **Option**: ChatClient 유지 vs. RestClient로 전환 (프롬프트 유연성 필요 시)
   - Spring Retry 적용: OpenAI 타임아웃 시 재시도 (최대 2회)
   - File: `SSAju/src/main/java/ssafy/SSAju/service/ConsultationService.java`
 
-- [ ] T055 [Enhancement] 통신 테스트 업데이트
+- [v] T055 [Enhancement] 통신 테스트 업데이트
   - Update: SajuDataServiceTest (RestClient mock 대응)
   - Update: ConsultationServiceTest (RestClient mock 대응)
   - Verify: Spring Retry 동작 확인 (재시도 로그 검증)
@@ -596,19 +596,19 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 **Rationale**: DataIntegrityViolationException 대신 JdbcTemplate INSERT IGNORE 활용. H2 MySQL 모드로 프로덕션 환경 근접.
 
-- [ ] T056 [Enhancement] Create `SajuResultJdbcRepository` (JdbcTemplate 기반)
+- [v] T056 [Enhancement] Create `SajuResultJdbcRepository` (JdbcTemplate 기반)
   - Method: `insertOrIgnore(SajuResult)` - INSERT IGNORE 네이티브 쿼리
   - Returns: 1 (신규 삽입) 또는 0 (이미 존재)
   - UNIQUE constraint: user_profile_id 활용 (saju_result는 userProfile과 1:1 관계, birthDate/birthTime은 user_profile에 있음)
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/SajuResultJdbcRepository.java`
 
-- [ ] T057 [Enhancement] Update `SajuDataService` to use INSERT IGNORE
+- [v] T057 [Enhancement] Update `SajuDataService` to use INSERT IGNORE
   - **Before**: try-catch with DataIntegrityViolationException
   - **After**: `SajuResultJdbcRepository.insertOrIgnore()` 호출
   - Logic: SajuResult 존재 확인 → 없으면 insertOrIgnore → 엔티티 반환
   - File: `SSAju/src/main/java/ssafy/SSAju/service/SajuDataService.java`
 
-- [ ] T058 [Enhancement] Configure H2 MySQL mode in test
+- [v] T058 [Enhancement] Configure H2 MySQL mode in test
   - `application-test.properties` (또는 `application-test.yaml`)에:
     ```properties
     spring.datasource.url=jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE
@@ -619,7 +619,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Verify: MySQL 문법 호환성 테스트 (예: INSERT IGNORE, UNIQUE constraint)
   - File: `SSAju/src/test/resources/application-test.yaml`
 
-- [ ] T059 [Enhancement] Test race condition handling
+- [v] T059 [Enhancement] Test race condition handling
   - Test: 동시에 동일한 (birthDate, birthTime) SajuResult 생성 → insertOrIgnore 검증
   - Verify: 한 번만 INSERT, 나머지는 무시
   - Tool: @ParameterizedTest + concurrent threads
@@ -629,7 +629,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 **Rationale**: @CreatedDate/@LastModifiedDate 자동 관리, equals&hashCode는 ID 기준 구현 (Proxy 안전성), 엔티티 상태 명확화.
 
-- [ ] T060 [Enhancement] Enable JPA Auditing & implement equals/hashCode
+- [v] T060 [Enhancement] Enable JPA Auditing & implement equals/hashCode
   - **@EnableJpaAuditing** 추가: `SSAjuApplication.java` 또는 @Configuration 클래스
   - **모든 엔티티에 적용**:
     - Remove: `@PreUpdate` 어노테이션
@@ -655,7 +655,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
     - `SSAju/src/main/java/ssafy/SSAju/SSAjuApplication.java` (@EnableJpaAuditing 추가)
     - `SSAju/src/main/java/ssafy/SSAju/career/entity/*.java` (모든 엔티티 equals/hashCode 구현)
 
-- [ ] T061 [Enhancement] Clarify entity state lifecycle
+- [v] T061 [Enhancement] Clarify entity state lifecycle
   - Document: 영속(Persistent), 준영속(Detached), 비영속(Transient) 상태 정확히 이해
   - Service 계층에서 엔티티 상태 명확히 (예: `repository.save()` 전/후 상태 변화)
   - **패턴**:
@@ -669,7 +669,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
     ```
   - Document: `SSAju/src/main/java/ssafy/SSAju/career/entity/README.md` (엔티티 상태 가이드)
 
-- [ ] T062 [Enhancement] Test equals/hashCode & lazy loading safety
+- [v] T062 [Enhancement] Test equals/hashCode & lazy loading safety
   - Test: equals/hashCode가 Proxy 객체에서도 정상 동작하는지 검증
   - Test: equals(null), equals(different type) 엣지 케이스
   - Test: HashSet/HashMap에 엔티티 저장 후 조회 가능한지 확인
@@ -679,7 +679,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 **Rationale**: 컬렉션 객체화 (TenGodDistribution 같은 일급 객체), 검증 로직 분리 (서비스 책임 단순화).
 
-- [ ] T063 [Enhancement] Create value objects for collections
+- [v] T063 [Enhancement] Create value objects for collections
   - **TenGodDistribution**: `Map<String, Integer>` → 일급 컬렉션
     ```java
     public class TenGodDistribution {
@@ -705,7 +705,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
     - `SSAju/src/main/java/ssafy/SSAju/career/domain/HiddenStems.java`
     - `SSAju/src/main/java/ssafy/SSAju/career/domain/FiveElements.java`
 
-- [ ] T064 [Enhancement] Refactor services to use value objects
+- [v] T064 [Enhancement] Refactor services to use value objects
   - **CareerFortuneAnalyzer**: `Map<String, Integer>` → `TenGodDistribution` 사용
   - **HiddenStemCalculator**: `Map<String, List<String>>` → `HiddenStems` 사용
   - **CompatibilityScoreCalculator**: 두 객체 모두 사용
@@ -714,7 +714,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
     - `SSAju/src/main/java/ssafy/SSAju/career/util/HiddenStemCalculator.java`
     - `SSAju/src/main/java/ssafy/SSAju/career/util/CompatibilityScoreCalculator.java`
 
-- [ ] T065 [Enhancement] Create validation utility classes
+- [v] T065 [Enhancement] Create validation utility classes
   - **SajuValidator**: 사주 데이터 검증 (heavenlyStems, earthlyBranches 개수, 형식 등)
   - **RequestValidator**: DTO 검증 로직 (birthDate 범위, birthTime 형식 등)
   - **CompatibilityValidator**: 호환성 분석 입력 검증
@@ -724,14 +724,14 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
     - `SSAju/src/main/java/ssafy/SSAju/career/validator/RequestValidator.java`
     - `SSAju/src/main/java/ssafy/SSAju/career/validator/CompatibilityValidator.java`
 
-- [ ] T066 [Enhancement] Refactor services to use validators
+- [v] T066 [Enhancement] Refactor services to use validators
   - **SajuDataService**: SajuValidator 사용 (FastAPI 응답 검증)
   - **CareerFortuneService**: RequestValidator 사용 (요청 검증)
   - **ConsultationService**: 두 validator 모두 사용
   - **CompanyMatchingService**: CompatibilityValidator 사용
   - File: 위 Service 파일들
 
-- [ ] T067 [Enhancement] Update tests for value objects & validators
+- [v] T067 [Enhancement] Update tests for value objects & validators
   - Test: TenGodDistribution, HiddenStems, FiveElements 객체 기능
   - Test: Validator 정상 동작 (valid/invalid 경우)
   - Test: Service가 Validator 호출하는지 검증
@@ -740,7 +740,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
     - `SSAju/src/test/java/ssafy/SSAju/career/validator/*Test.java`
     - Updated service tests
 
-- [ ] T068 [Enhancement] Run full test suite and verify refactoring
+- [v] T068 [Enhancement] Run full test suite and verify refactoring
   - Command: `./gradlew clean test`
   - Verify:
     1. ✅ RestClient 모든 통신 정상
