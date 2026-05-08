@@ -12,6 +12,7 @@ import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
+import ssafy.SSAju.repository.SajuFullDataRepository;
 import ssafy.SSAju.repository.SajuResultJdbcRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.TenGodDataRepository;
@@ -19,8 +20,6 @@ import ssafy.SSAju.repository.UserProfileRepository;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -47,24 +46,20 @@ class JpaVsJdbcConcurrencyBenchmarkTest {
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 7, 15);
     private static final LocalTime BIRTH_TIME = LocalTime.of(12, 0);
 
-    private static final Map<String, Object> FULL_SAJU_DATA = Map.of(
-            "heavenlyStems",    List.of("庚", "甲", "己", "丁"),
-            "earthlyBranches",  List.of("午", "戌", "未", "寅"),
-            "fiveElements",     Map.of("木", 1, "火", 2, "土", 2, "金", 2, "水", 1)
-    );
-
     @Autowired private SajuResultRepository      sajuResultRepository;
     @Autowired private SajuResultJdbcRepository  sajuResultJdbcRepository;
     @Autowired private UserProfileRepository     userProfileRepository;
     @Autowired private TenGodDataRepository      tenGodDataRepository;
     @Autowired private HiddenStemDataRepository  hiddenStemDataRepository;
     @Autowired private CareerFortuneRepository   careerFortuneRepository;
+    @Autowired private SajuFullDataRepository    sajuFullDataRepository;
 
     @BeforeEach
     void cleanDb() {
         tenGodDataRepository.deleteAllInBatch();
         hiddenStemDataRepository.deleteAllInBatch();
         careerFortuneRepository.deleteAllInBatch();
+        sajuFullDataRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
         userProfileRepository.deleteAllInBatch();
     }
@@ -101,7 +96,6 @@ class JpaVsJdbcConcurrencyBenchmarkTest {
 
                     SajuResult result = SajuResult.builder()
                             .userProfile(sharedProfile)
-                            .fullSajuData(FULL_SAJU_DATA)
                             .build();
                     sajuResultRepository.save(result);
                     jpaSuccessCount.incrementAndGet();
@@ -159,7 +153,6 @@ class JpaVsJdbcConcurrencyBenchmarkTest {
 
                     SajuResult result = SajuResult.builder()
                             .userProfile(sharedProfile)
-                            .fullSajuData(FULL_SAJU_DATA)
                             .build();
                     sajuResultJdbcRepository.insertOrIgnore(result);
                     jdbcSuccessCount.incrementAndGet();

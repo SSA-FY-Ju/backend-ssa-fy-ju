@@ -5,18 +5,27 @@ import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.CareerFortune;
 import ssafy.SSAju.career.entity.HiddenStemData;
+import ssafy.SSAju.career.entity.SajuFullData;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.TenGodData;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Component
 public class SajuResultMapper {
+
+    private static final Map<String, String> STEM_ELEMENT_MAP = Map.of(
+            "甲", "木", "乙", "木",
+            "丙", "火", "丁", "火",
+            "戊", "土", "己", "土",
+            "庚", "金", "辛", "金",
+            "壬", "水", "癸", "水"
+    );
 
     public SajuResult buildSajuResult(UserProfile userProfile,
                                        FastAPIResponse sajuData,
@@ -27,9 +36,9 @@ public class SajuResultMapper {
                                        String reasoning) {
         SajuResult result = SajuResult.builder()
                 .userProfile(userProfile)
-                .fullSajuData(toFullSajuDataMap(sajuData))
                 .build();
 
+        SajuFullData fullData = toSajuFullData(result, sajuData);
         List<TenGodData> tenGodEntities = toTenGodDataList(result, tenGodDistribution);
         List<HiddenStemData> hiddenStemEntities = toHiddenStemDataList(result, hiddenStems);
         CareerFortune careerFortune = CareerFortune.builder()
@@ -39,6 +48,7 @@ public class SajuResultMapper {
                 .reasoning(reasoning)
                 .build();
 
+        result.assignSajuFullData(fullData);
         result.assignTenGodData(tenGodEntities);
         result.assignHiddenStemData(hiddenStemEntities);
         result.assignCareerFortune(careerFortune);
@@ -51,27 +61,33 @@ public class SajuResultMapper {
                                                      HiddenStems hiddenStems) {
         SajuResult result = SajuResult.builder()
                 .userProfile(userProfile)
-                .fullSajuData(toFullSajuDataMap(sajuData))
                 .build();
 
+        result.assignSajuFullData(toSajuFullData(result, sajuData));
         result.assignTenGodData(toTenGodDataList(result, tenGodDistribution));
         result.assignHiddenStemData(toHiddenStemDataList(result, hiddenStems));
         return result;
     }
 
-    public Map<String, Object> toFullSajuDataMap(FastAPIResponse r) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("heavenlyStems", r.heavenlyStems());
-        map.put("earthlyBranches", r.earthlyBranches());
-        map.put("fiveElements", r.fiveElements());
-        map.put("yearPillar", r.yearPillar());
-        map.put("monthPillar", r.monthPillar());
-        map.put("dayPillar", r.dayPillar());
-        map.put("hourPillar", r.hourPillar());
-        map.put("birthTime", r.birthTime());
-        map.put("birthDate", r.birthDate());
-        map.put("solarCorrection", r.solarCorrection());
-        return map;
+    public SajuFullData toSajuFullData(SajuResult result, FastAPIResponse r) {
+        String dayMaster = extractDayMaster(r.heavenlyStems());
+        String dayMasterElement = STEM_ELEMENT_MAP.getOrDefault(dayMaster, "");
+        return SajuFullData.builder()
+                .sajuResult(result)
+                .yearPillar(r.yearPillar())
+                .monthPillar(r.monthPillar())
+                .dayPillar(r.dayPillar())
+                .hourPillar(r.hourPillar())
+                .dayMaster(dayMaster)
+                .dayMasterElement(dayMasterElement)
+                .fiveElements(r.fiveElements())
+                .solarCorrection(r.solarCorrection())
+                .build();
+    }
+
+    private String extractDayMaster(List<String> heavenlyStems) {
+        if (heavenlyStems == null || heavenlyStems.size() <= SajuPillarIndex.DAY_INDEX) return "";
+        return heavenlyStems.get(SajuPillarIndex.DAY_INDEX);
     }
 
     private List<TenGodData> toTenGodDataList(SajuResult result, TenGodDistribution tenGodDistribution) {

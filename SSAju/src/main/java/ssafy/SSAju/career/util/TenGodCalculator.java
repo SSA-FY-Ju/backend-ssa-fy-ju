@@ -3,6 +3,7 @@ package ssafy.SSAju.career.util;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.enums.TenGodConstants;
 
 import java.util.HashMap;
@@ -62,11 +63,11 @@ public class TenGodCalculator {
         if (heavenlyStems == null || heavenlyStems.size() != 4) {
             throw new IllegalArgumentException(ErrorMessageConstants.HEAVENLY_STEMS_COUNT_INVALID.getMessage());
         }
-        String dayMaster = heavenlyStems.get(2); // 일간(日干) - 인덱스 2 (年月日時 순서)
+        String dayMaster = heavenlyStems.get(SajuPillarIndex.DAY_INDEX);
         Map<String, Integer> distribution = new HashMap<>();
 
         for (int i = 0; i < heavenlyStems.size(); i++) {
-            if (i == 2) continue; // 일간 제외
+            if (i == SajuPillarIndex.DAY_INDEX) continue;
             String stem = heavenlyStems.get(i);
             String tenGod = getTenGod(dayMaster, stem);
             distribution.merge(tenGod, 1, Integer::sum);

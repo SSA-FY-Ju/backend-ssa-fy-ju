@@ -11,6 +11,7 @@ import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
+import ssafy.SSAju.repository.SajuFullDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.TenGodDataRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
@@ -18,7 +19,6 @@ import ssafy.SSAju.repository.UserProfileRepository;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -40,17 +40,14 @@ class SajuResultProviderInsertOrIgnoreTest {
     @Autowired private HiddenStemDataRepository hiddenStemDataRepository;
     @Autowired private CareerFortuneRepository careerFortuneRepository;
 
-    private static final Map<String, Object> FULL_SAJU_DATA = Map.of(
-            "heavenlyStems", List.of("庚", "甲", "己", "丁"),
-            "earthlyBranches", List.of("午", "戌", "未", "寅"),
-            "fiveElements", Map.of("木", 1, "火", 2, "土", 2, "金", 2, "水", 1)
-    );
+    @Autowired private SajuFullDataRepository sajuFullDataRepository;
 
     @BeforeEach
     void cleanDb() {
         tenGodDataRepository.deleteAllInBatch();
         hiddenStemDataRepository.deleteAllInBatch();
         careerFortuneRepository.deleteAllInBatch();
+        sajuFullDataRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
         userProfileRepository.deleteAllInBatch();
     }
@@ -83,7 +80,6 @@ class SajuResultProviderInsertOrIgnoreTest {
                     startLatch.await();
                     SajuResult newResult = SajuResult.builder()
                             .userProfile(userProfile)
-                            .fullSajuData(FULL_SAJU_DATA)
                             .build();
                     sajuResultProvider.findOrCreate(userProfile, newResult);
                     successCount.incrementAndGet();

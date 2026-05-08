@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.entity.CareerFortune;
 import ssafy.SSAju.career.entity.HiddenStemData;
+import ssafy.SSAju.career.entity.SajuFullData;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.TenGodData;
 import ssafy.SSAju.career.entity.UserProfile;
@@ -49,6 +50,21 @@ public class SajuResultProvider {
     }
 
     private void attachChildren(SajuResult saved, SajuResult source) {
+        SajuFullData srcFullData = source.getSajuFullData();
+        if (srcFullData != null) {
+            saved.assignSajuFullData(SajuFullData.builder()
+                    .sajuResult(saved)
+                    .yearPillar(srcFullData.getYearPillar())
+                    .monthPillar(srcFullData.getMonthPillar())
+                    .dayPillar(srcFullData.getDayPillar())
+                    .hourPillar(srcFullData.getHourPillar())
+                    .dayMaster(srcFullData.getDayMaster())
+                    .dayMasterElement(srcFullData.getDayMasterElement())
+                    .fiveElements(srcFullData.getFiveElements())
+                    .solarCorrection(srcFullData.getSolarCorrection())
+                    .build());
+        }
+
         List<TenGodData> tenGods = source.getTenGodDataList().stream()
                 .map(e -> TenGodData.builder()
                         .sajuResult(saved)

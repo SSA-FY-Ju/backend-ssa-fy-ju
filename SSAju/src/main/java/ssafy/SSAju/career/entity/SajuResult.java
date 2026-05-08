@@ -4,12 +4,10 @@ import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import ssafy.SSAju.career.converter.ObjectMapConverter;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Getter
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
@@ -25,12 +23,11 @@ public class SajuResult {
     @JoinColumn(name = "user_profile_id", nullable = false)
     private UserProfile userProfile;
 
-    @Convert(converter = ObjectMapConverter.class)
-    @Column(name = "full_saju_data", columnDefinition = "json")
-    private Map<String, Object> fullSajuData;
-
     @Column(name = "fetched_at", nullable = false)
     private LocalDateTime fetchedAt;
+
+    @OneToOne(mappedBy = "sajuResult", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private SajuFullData sajuFullData;
 
     @OneToMany(mappedBy = "sajuResult", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<TenGodData> tenGodDataList = new ArrayList<>();
@@ -42,10 +39,13 @@ public class SajuResult {
     private CareerFortune careerFortune;
 
     @Builder
-    public SajuResult(UserProfile userProfile, Map<String, Object> fullSajuData) {
+    public SajuResult(UserProfile userProfile) {
         this.userProfile = userProfile;
-        this.fullSajuData = fullSajuData;
         this.fetchedAt = LocalDateTime.now();
+    }
+
+    public void assignSajuFullData(SajuFullData data) {
+        this.sajuFullData = data;
     }
 
     public void assignTenGodData(List<TenGodData> list) {
