@@ -13,11 +13,10 @@ import org.springframework.web.client.ResourceAccessException;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.career.provider.PromptProvider;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.exception.OpenAIApiException;
-
-import java.time.LocalDate;
 
 @Slf4j
 @Component
@@ -25,6 +24,7 @@ import java.time.LocalDate;
 public class ConsultationOpenAICaller {
 
     private final ChatClient chatClient;
+    private final PromptProvider promptProvider;
 
     /**
      * OpenAI API를 호출하여 커리어 조언을 받습니다.
@@ -46,7 +46,7 @@ public class ConsultationOpenAICaller {
                                      TenGodDistribution tenGodDistribution,
                                      HiddenStems hiddenStems,
                                      String dayMaster) {
-        String prompt = buildPrompt(sajuData, tenGodDistribution, hiddenStems, dayMaster);
+        String prompt = promptProvider.getCareerConsultationPrompt(sajuData, tenGodDistribution, hiddenStems, dayMaster);
         CareerAdviceResponse response;
         try {
             response = chatClient.prompt()
@@ -56,13 +56,9 @@ public class ConsultationOpenAICaller {
         } catch (OpenAIApiException e) {
             throw e;
         } catch (ResourceAccessException | HttpServerErrorException e) {
-            // 네트워크/타임아웃/5xx → @Retryable 재시도 대상
-            // TODO: 문서 정리 시 log.error("...", e) 로 예외 객체 전달하여 스택 트레이스 포함할 것
             log.error("OpenAI API 호출 실패, 재시도 예정");
             throw e;
         } catch (Exception e) {
-            // 역직렬화 실패, 응답 스키마 불일치 등 비일시적 오류 → 재시도 안 함
-            // TODO: 문서 정리 시 log.error("...", e) 로 예외 객체 전달하여 스택 트레이스 포함할 것
             log.error("OpenAI API 응답 처리 실패 (재시도 불가)");
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
         }
@@ -79,7 +75,6 @@ public class ConsultationOpenAICaller {
                                         TenGodDistribution tenGodDistribution,
                                         HiddenStems hiddenStems,
                                         String dayMaster) {
-        // TODO: 문서 정리 시 log.error("...", ex) 로 예외 객체 전달하여 스택 트레이스 포함할 것
         log.error("OpenAI API 재시도 후 최종 실패");
         throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), ex);
     }
@@ -114,46 +109,5 @@ public class ConsultationOpenAICaller {
                 throw new OpenAIApiException(ErrorMessageConstants.OPENAI_INVALID_STRENGTH_ITEM.getMessage());
             }
         }
-    }
-
-    private String buildPrompt(FastAPIResponse sajuData,
-                                TenGodDistribution tenGodDistribution,
-                                HiddenStems hiddenStems,
-                                String dayMaster) {
-        int currentYear = LocalDate.now().getYear();
-        return """
-                당신은 사주 명리학 전문가이자 취업 커리어 컨설턴트입니다.
-                아래 사주 데이터를 분석하여 취업 준비생에게 맞춤 커리어 조언을 한글로 제공해주세요.
-
-                [사주 데이터]
-                - 일간(日干): %s
-                - 천간(天干): %s
-                - 지지(地支): %s
-                - 오행 분포: %s
-                - 지장간(地藏干): %s
-                - 십신 분포(十神): %s
-
-                [분석 요청]
-                - 취업 적합 산업군 3~5개 (name, reason, recommendedRoles 포함)
-                - 면접 전략 및 직무 강점·약점 분석
-                - 재물운, 장기 커리어 로드맵(0~2년, 3~5년 단계)
-                - 퍼스널 브랜딩, 자소서 파워키워드(3개, 오행 기반, 해시태그 형식)
-                - 멘탈 케어, 최적 근무 환경, 업무 스타일, 인간관계 전략
-                - %d년 기준 12개월 월별 운세 및 전환점(pivotPoints: 점수 8 이상인 달만)
-                - 일간(%s) 기반 성향 분석 및 핵심 십신 2~3개 선별
-
-                [중요] careerTimeline.months의 각 달은 반드시 객체 형식으로 응답:
-                올바른 예: "January": {"type": "적극기", "description": "면접 기회가 많은 시기"}
-                잘못된 예: "January": "좋음" 또는 "January": 3
-                """.formatted(
-                dayMaster,
-                sajuData.heavenlyStems(),
-                sajuData.earthlyBranches(),
-                sajuData.fiveElements(),
-                hiddenStems,
-                tenGodDistribution,
-                currentYear,
-                dayMaster
-        );
     }
 }

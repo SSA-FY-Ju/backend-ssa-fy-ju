@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.enums.TenGodConstants;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
@@ -74,7 +75,7 @@ public class CareerFortuneAnalyzer {
             throw new InvalidSajuDataException(ErrorMessageConstants.EARTHLY_BRANCHES_4_INVALID.getMessage());
         }
         int officerScore = calculateOfficerScore(tenGodDistribution, hiddenStems, dayMaster);
-        String monthBranch = earthlyBranches.get(1);
+        String monthBranch = earthlyBranches.get(SajuPillarIndex.MONTH_INDEX);
 
         if (FAVORABLE_OFFICER_BRANCHES_H1.contains(monthBranch)) {
             return officerScore >= 0 ? "H1" : "H2";

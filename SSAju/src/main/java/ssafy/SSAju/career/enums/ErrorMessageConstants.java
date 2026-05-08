@@ -82,6 +82,7 @@ public enum ErrorMessageConstants {
     COMPANY_DAY_MASTER_NULL("INVALID_SAJU_DATA", "기업 일간이 null이거나 비어있습니다."),
     SAJU_PROFILE_NULL("INVALID_SAJU_DATA", "userProfile과 newResult는 null이 아니어야 합니다"),
     USER_PROFILE_MISMATCH("INVALID_SAJU_DATA", "newResult의 userProfile이 전달받은 userProfile과 불일치합니다"),
+    SAJU_FULL_DATA_OWNER_MISMATCH("INVALID_SAJU_DATA", "SajuFullData의 sajuResult 참조가 현재 SajuResult와 일치하지 않습니다"),
 
     // === DB 접근 예외 메시지 ===
     SAJU_RESULT_ACCESS_FAILED("DATABASE_ERROR", "SajuResult 조회/생성 실패"),

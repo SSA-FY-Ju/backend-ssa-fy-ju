@@ -10,6 +10,7 @@ import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.mapper.ConsultationMapper;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
 import ssafy.SSAju.career.provider.SajuResultProvider;
@@ -61,7 +62,7 @@ public class ConsultationService {
         TenGodDistribution tenGodDistribution = tenGodCalculator.calculate(heavenlyStems);
         HiddenStems hiddenStems = hiddenStemCalculator.calculate(earthlyBranches);
 
-        String dayMaster = heavenlyStems.get(2);
+        String dayMaster = heavenlyStems.get(SajuPillarIndex.DAY_INDEX);
         String favoredPeriod = careerFortuneAnalyzer.analyzeFavoredPeriod(
                 tenGodDistribution, hiddenStems, dayMaster, earthlyBranches);
         int confidenceScore = careerFortuneAnalyzer.calculateConfidenceScore(

@@ -14,6 +14,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
+import ssafy.SSAju.repository.SajuFullDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.TenGodDataRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
@@ -64,6 +65,7 @@ class CareerFortuneConcurrencyTest {
     @Autowired private TenGodDataRepository tenGodDataRepository;
     @Autowired private HiddenStemDataRepository hiddenStemDataRepository;
     @Autowired private CareerFortuneRepository careerFortuneRepository;
+    @Autowired private SajuFullDataRepository sajuFullDataRepository;
 
     private static final LocalDate BASE_DATE = LocalDate.of(1990, 1, 1);
     private static final LocalTime BASE_TIME = LocalTime.of(12, 0);
@@ -82,6 +84,7 @@ class CareerFortuneConcurrencyTest {
         tenGodDataRepository.deleteAllInBatch();
         hiddenStemDataRepository.deleteAllInBatch();
         careerFortuneRepository.deleteAllInBatch();
+        sajuFullDataRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
         userProfileRepository.deleteAllInBatch();
     }
