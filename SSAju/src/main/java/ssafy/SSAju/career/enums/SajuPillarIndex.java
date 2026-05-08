@@ -8,11 +8,19 @@ package ssafy.SSAju.career.enums;
  */
 public final class SajuPillarIndex {
 
+    /** 연주(年柱) 인덱스 — 년도 천간/지지 위치. */
     public static final int YEAR_INDEX  = 0;
+
+    /** 월주(月柱) 인덱스 — 월 천간/지지 위치. */
     public static final int MONTH_INDEX = 1;
+
+    /** 일주(日柱) 인덱스 — 일간(日干) 위치. */
     public static final int DAY_INDEX   = 2;
+
+    /** 시주(時柱) 인덱스 — 시 천간/지지 위치. */
     public static final int HOUR_INDEX  = 3;
 
+    /** 사주 기둥 수 (年·月·日·時). */
     public static final int PILLAR_COUNT = 4;
 
     private SajuPillarIndex() {}

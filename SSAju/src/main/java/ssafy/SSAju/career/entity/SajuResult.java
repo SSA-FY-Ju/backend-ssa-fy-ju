@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -45,6 +47,9 @@ public class SajuResult {
     }
 
     public void assignSajuFullData(SajuFullData data) {
+        if (data != null && data.getSajuResult() != this) {
+            throw new InvalidSajuDataException(ErrorMessageConstants.SAJU_FULL_DATA_OWNER_MISMATCH.getMessage());
+        }
         this.sajuFullData = data;
     }
 

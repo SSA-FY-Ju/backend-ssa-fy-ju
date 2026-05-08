@@ -7,9 +7,30 @@ import ssafy.SSAju.dto.external.FastAPIResponse;
 
 import java.time.LocalDate;
 
+/**
+ * OpenAI 호출에 사용될 프롬프트를 생성하는 컴포넌트.
+ *
+ * <p>사주 데이터(일간, 천간, 지지, 오행, 지장간, 십신)를 조합하여
+ * 취업 커리어 컨설팅용 한국어 프롬프트를 생성합니다.
+ * ConsultationOpenAICaller에서 주입받아 사용됩니다.
+ *
+ * @see ssafy.SSAju.career.caller.ConsultationOpenAICaller
+ */
 @Component
 public class PromptProvider {
 
+    /**
+     * 커리어 컨설팅 요청에 사용할 프롬프트를 생성합니다.
+     *
+     * <p>일간, 천간/지지, 오행 분포, 지장간, 십신 분포를 포함하며
+     * 현재 연도 기준 12개월 월별 운세·타임라인 형식을 지정합니다.
+     *
+     * @param sajuData           FastAPI에서 받은 사주 원본 데이터
+     * @param tenGodDistribution 십신 분포 (계산된 값)
+     * @param hiddenStems        지장간 데이터 (계산된 값)
+     * @param dayMaster          일간 (예: "己")
+     * @return OpenAI에 전달할 한국어 프롬프트 문자열
+     */
     public String getCareerConsultationPrompt(FastAPIResponse sajuData,
                                                TenGodDistribution tenGodDistribution,
                                                HiddenStems hiddenStems,
