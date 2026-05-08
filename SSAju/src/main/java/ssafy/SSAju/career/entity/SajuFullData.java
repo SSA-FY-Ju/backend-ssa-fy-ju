@@ -100,7 +100,7 @@ public class SajuFullData {
         return id != null && id.equals(that.id);
     }
 
-    public void setSajuResult(SajuResult result) {
+    void attachTo(SajuResult result) {
         this.sajuResult = result;
     }
 

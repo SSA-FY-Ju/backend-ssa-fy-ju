@@ -47,10 +47,13 @@ public class SajuResult {
     }
 
     public void assignSajuFullData(SajuFullData data) {
-        if (data != null && data.getSajuResult() != this) {
-            throw new InvalidSajuDataException(ErrorMessageConstants.SAJU_FULL_DATA_OWNER_MISMATCH.getMessage());
+        if (this.sajuFullData != null && this.sajuFullData != data) {
+            this.sajuFullData.attachTo(null);
         }
         this.sajuFullData = data;
+        if (data != null && data.getSajuResult() != this) {
+            data.attachTo(this);
+        }
     }
 
     public void assignTenGodData(List<TenGodData> list) {
