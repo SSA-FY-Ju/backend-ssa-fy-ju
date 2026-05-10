@@ -14,6 +14,7 @@ import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.CompatibilityRequest;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
+import ssafy.SSAju.exception.PublicDataApiException;
 import ssafy.SSAju.repository.*;
 
 import java.time.LocalDate;
@@ -36,6 +37,7 @@ public class CompanyMatchingService {
     private static final LocalTime DEFAULT_FOUNDING_TIME = LocalTime.of(12, 0);
 
     private final SajuDataService sajuDataService;
+    private final CompanyInfoService companyInfoService;
     private final UserProfileProvider userProfileProvider;
     private final SajuValidator sajuValidator;
     private final TenGodCalculator tenGodCalculator;
@@ -69,8 +71,8 @@ public class CompanyMatchingService {
         String userDayMaster = userSaju.heavenlyStems().get(SajuPillarIndex.DAY_INDEX);
         FiveElements userFiveElements = new FiveElements(userSaju.fiveElements());
 
-        // 기업 설립일 사주 조회 및 계산 (시간 미상 시 12:00 기본값)
-        LocalDate companyDate = request.companyFoundingDate();
+        // 기업 설립일 결정: 요청에 포함된 경우 그대로 사용, 없으면 공공데이터 API 자동 조회
+        LocalDate companyDate = resolveCompanyFoundingDate(request);
         LocalTime companyTime = request.companyFoundingTime() != null
                 ? request.companyFoundingTime() : DEFAULT_FOUNDING_TIME;
 
@@ -141,6 +143,24 @@ public class CompanyMatchingService {
 
     private LocalTime resolveUserBirthTime(CompatibilityRequest request) {
         return request.userBirthTime() != null ? request.userBirthTime() : DEFAULT_FOUNDING_TIME;
+    }
+
+    /**
+     * 기업 설립일자를 결정합니다.
+     * <ol>
+     *   <li>요청에 {@code companyFoundingDate}가 있으면 그대로 사용</li>
+     *   <li>없으면 공공데이터 API로 {@code companyName}(corpNm) 조회</li>
+     *   <li>API 조회도 실패하면 {@link PublicDataApiException} 발생 (클라이언트가 직접 입력)</li>
+     * </ol>
+     */
+    private LocalDate resolveCompanyFoundingDate(CompatibilityRequest request) {
+        if (request.companyFoundingDate() != null) {
+            return request.companyFoundingDate();
+        }
+        log.info("기업 설립일 미제공 → 공공데이터 API 자동 조회: company={}", request.companyName());
+        return companyInfoService.lookupCompanyFoundingDate(request.companyName())
+                .orElseThrow(() -> new PublicDataApiException(
+                        "기업 설립일을 공공데이터에서 조회할 수 없습니다. companyFoundingDate를 직접 입력해주세요."));
     }
 
     private void saveAllChildren(CompanyCompatibility saved,

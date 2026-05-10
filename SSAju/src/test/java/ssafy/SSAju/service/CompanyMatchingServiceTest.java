@@ -53,6 +53,7 @@ import static org.mockito.Mockito.verify;
 class CompanyMatchingServiceTest {
 
     @Mock private SajuDataService sajuDataService;
+    @Mock private CompanyInfoService companyInfoService;
     @Mock private UserProfileProvider userProfileProvider;
     @Mock private SajuValidator sajuValidator;
     @Mock private TenGodCalculator tenGodCalculator;
@@ -92,7 +93,7 @@ class CompanyMatchingServiceTest {
     @BeforeEach
     void setUp() {
         service = new CompanyMatchingService(
-                sajuDataService, userProfileProvider, sajuValidator,
+                sajuDataService, companyInfoService, userProfileProvider, sajuValidator,
                 tenGodCalculator, hiddenStemCalculator,
                 compatibilityScoreCalculator, jobRoleAnalyzer,
                 companyCompatibilityRepository, companyCompatibilityJdbcRepository,
