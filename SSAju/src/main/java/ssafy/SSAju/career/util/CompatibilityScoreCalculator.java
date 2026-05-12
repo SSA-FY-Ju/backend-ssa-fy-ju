@@ -1,5 +1,6 @@
 package ssafy.SSAju.career.util;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.enums.TenGodConstants;
@@ -19,6 +20,7 @@ import java.util.Map;
  * - 지장간 보완: 지장간을 포함한 오행 분포 비교
  */
 @Component
+@RequiredArgsConstructor
 public class CompatibilityScoreCalculator {
 
     private static final Map<String, String> ELEMENT_MAP = Map.of(
@@ -33,12 +35,6 @@ public class CompatibilityScoreCalculator {
 
     private final TenGodCalculator tenGodCalculator;
     private final CompatibilityValidator compatibilityValidator;
-
-    public CompatibilityScoreCalculator(TenGodCalculator tenGodCalculator,
-                                         CompatibilityValidator compatibilityValidator) {
-        this.tenGodCalculator = tenGodCalculator;
-        this.compatibilityValidator = compatibilityValidator;
-    }
 
     /**
      * 궁합 점수를 계산합니다.

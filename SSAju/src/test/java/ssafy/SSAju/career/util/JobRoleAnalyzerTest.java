@@ -2,8 +2,8 @@ package ssafy.SSAju.career.util;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.FiveElements;
-import ssafy.SSAju.dto.response.CompatibilityResponse;
 
 import java.util.Map;
 
@@ -22,7 +22,7 @@ class JobRoleAnalyzerTest {
                 Map.of("木", 1, "火", 1, "土", 1, "金", 2, "水", 1));
 
         // When
-        CompatibilityResponse.TargetRoleAnalysis result =
+        CompatibilityAnalysisData.RoleAnalysis result =
                 analyzer.analyze(userFiveElements, JobCategoryEnum.TECH_BACKEND);
 
         // Then
@@ -39,7 +39,7 @@ class JobRoleAnalyzerTest {
                 Map.of("木", 2, "火", 2, "土", 2, "金", 0, "水", 0));
 
         // When
-        CompatibilityResponse.TargetRoleAnalysis result =
+        CompatibilityAnalysisData.RoleAnalysis result =
                 analyzer.analyze(userFiveElements, JobCategoryEnum.TECH_BACKEND);
 
         // Then
@@ -55,7 +55,7 @@ class JobRoleAnalyzerTest {
                 Map.of("木", 3, "火", 0, "土", 0, "金", 0, "水", 0));
 
         // When
-        CompatibilityResponse.TargetRoleAnalysis result =
+        CompatibilityAnalysisData.RoleAnalysis result =
                 analyzer.analyze(userFiveElements, JobCategoryEnum.TECH_BACKEND);
 
         // Then

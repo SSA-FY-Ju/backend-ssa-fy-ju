@@ -34,34 +34,34 @@ class CompatibilityValidatorTest {
     }
 
     @Test
-    @DisplayName("사용자 지장간 null → IllegalArgumentException")
+    @DisplayName("사용자 지장간 null → InvalidSajuDataException")
     void validate_nullUserHiddenStems_throws() {
         assertThatThrownBy(() -> validator.validate(null, "甲", COMPANY_STEMS, "庚"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ssafy.SSAju.exception.InvalidSajuDataException.class)
                 .hasMessageContaining("사용자 지장간");
     }
 
     @Test
-    @DisplayName("사용자 일간 null → IllegalArgumentException")
+    @DisplayName("사용자 일간 null → InvalidSajuDataException")
     void validate_nullUserDayMaster_throws() {
         assertThatThrownBy(() -> validator.validate(USER_STEMS, null, COMPANY_STEMS, "庚"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ssafy.SSAju.exception.InvalidSajuDataException.class)
                 .hasMessageContaining("사용자 일간");
     }
 
     @Test
-    @DisplayName("기업 지장간 null → IllegalArgumentException")
+    @DisplayName("기업 지장간 null → InvalidSajuDataException")
     void validate_nullCompanyHiddenStems_throws() {
         assertThatThrownBy(() -> validator.validate(USER_STEMS, "甲", null, "庚"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ssafy.SSAju.exception.InvalidSajuDataException.class)
                 .hasMessageContaining("기업 지장간");
     }
 
     @Test
-    @DisplayName("기업 일간 빈 문자열 → IllegalArgumentException")
+    @DisplayName("기업 일간 빈 문자열 → InvalidSajuDataException")
     void validate_blankCompanyDayMaster_throws() {
         assertThatThrownBy(() -> validator.validate(USER_STEMS, "甲", COMPANY_STEMS, "  "))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ssafy.SSAju.exception.InvalidSajuDataException.class)
                 .hasMessageContaining("기업 일간");
     }
 }

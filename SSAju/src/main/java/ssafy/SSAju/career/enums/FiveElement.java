@@ -2,6 +2,7 @@ package ssafy.SSAju.career.enums;
 
 import java.util.Arrays;
 import java.util.List;
+import ssafy.SSAju.exception.InvalidSajuDataException;
 
 /**
  * 오행(五行) 열거형.
@@ -48,7 +49,7 @@ public enum FiveElement {
         return Arrays.stream(values())
                 .filter(e -> e.symbol.equals(symbol))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("알 수 없는 오행 값입니다: " + symbol));
+                .orElseThrow(() -> new InvalidSajuDataException("알 수 없는 오행 값입니다: " + symbol));
     }
 
     /**

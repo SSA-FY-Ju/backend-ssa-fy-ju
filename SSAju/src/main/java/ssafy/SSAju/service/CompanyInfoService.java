@@ -3,6 +3,7 @@ package ssafy.SSAju.service;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,10 +35,12 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class CompanyInfoService {
 
     private static final DateTimeFormatter YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd");
 
+    @Qualifier("publicDataRestClient")
     private final RestClient publicDataRestClient;
 
     @Value("${saju.public-data.api-key}")
@@ -45,10 +48,6 @@ public class CompanyInfoService {
 
     @Value("${saju.public-data.url}")
     private String publicDataUrl;
-
-    public CompanyInfoService(@Qualifier("publicDataRestClient") RestClient publicDataRestClient) {
-        this.publicDataRestClient = publicDataRestClient;
-    }
 
     /**
      * 기업명(법인명)으로 설립일자를 조회합니다.

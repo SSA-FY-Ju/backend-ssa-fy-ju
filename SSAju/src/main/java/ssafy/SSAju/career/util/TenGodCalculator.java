@@ -5,6 +5,7 @@ import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.enums.TenGodConstants;
+import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -61,7 +62,7 @@ public class TenGodCalculator {
 
     public TenGodDistribution calculate(List<String> heavenlyStems) {
         if (heavenlyStems == null || heavenlyStems.size() != 4) {
-            throw new IllegalArgumentException(ErrorMessageConstants.HEAVENLY_STEMS_COUNT_INVALID.getMessage());
+            throw new InvalidSajuDataException(ErrorMessageConstants.HEAVENLY_STEMS_COUNT_INVALID.getMessage());
         }
         String dayMaster = heavenlyStems.get(SajuPillarIndex.DAY_INDEX);
         Map<String, Integer> distribution = new HashMap<>();
@@ -77,10 +78,10 @@ public class TenGodCalculator {
 
     public String getTenGod(String dayMaster, String targetStem) {
         if (dayMaster == null || !FIVE_ELEMENT_MAP.containsKey(dayMaster)) {
-            throw new IllegalArgumentException(ErrorMessageConstants.INVALID_DAY_MASTER.getMessage() + ": " + dayMaster);
+            throw new InvalidSajuDataException(ErrorMessageConstants.INVALID_DAY_MASTER.getMessage() + ": " + dayMaster);
         }
         if (targetStem == null || !FIVE_ELEMENT_MAP.containsKey(targetStem)) {
-            throw new IllegalArgumentException(ErrorMessageConstants.INVALID_HEAVENLY_STEM.getMessage() + ": " + targetStem);
+            throw new InvalidSajuDataException(ErrorMessageConstants.INVALID_HEAVENLY_STEM.getMessage() + ": " + targetStem);
         }
         String masterElement = FIVE_ELEMENT_MAP.get(dayMaster);
         String targetElement = FIVE_ELEMENT_MAP.get(targetStem);
@@ -107,6 +108,6 @@ public class TenGodCalculator {
             return samePolarity ? TenGodConstants.SIDE_SEAL.getName() : TenGodConstants.CHIEF_SEAL.getName();
         }
 
-        throw new IllegalArgumentException(ErrorMessageConstants.UNKNOWN_STEM_COMBINATION.getMessage() + ": " + dayMaster + " vs " + targetStem);
+        throw new InvalidSajuDataException(ErrorMessageConstants.UNKNOWN_STEM_COMBINATION.getMessage() + ": " + dayMaster + " vs " + targetStem);
     }
 }
