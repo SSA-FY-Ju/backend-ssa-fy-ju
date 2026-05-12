@@ -934,7 +934,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 **Independent Test**: User saju + targetRole + company date → Compatibility calculation → Score + targetRoleAnalysis + roles response (depends on core structures)
 **Expected Outcome**: Compatibility endpoint working, CompanyCompatibility + RecommendedRole entities stored in DB. targetRoleAnalysis, fiveElements, analysisBreakdown, actionableStrategy, expectedInterviewQuestions는 Service에서 계산 후 응답에만 포함 (DB 미저장)
 
-- [ ] T081 [US3] Create `CompanyCompatibility` and normalized child entities in `career/entity/`
+- [v] T081 [US3] Create `CompanyCompatibility` and normalized child entities in `career/entity/`
   - **CompanyCompatibility** (루트 엔티티):
     - id (Long, PK), userProfileId (FK to UserProfile), companyName (String, NOT NULL)
     - targetRoleCategory (JobCategoryEnum, NOT NULL), targetRoleDetailName (String, optional)
@@ -961,7 +961,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/MonthlyForecast.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/entity/Caution.java`
 
-- [ ] T082 [US3] [P] Create repositories for all CompanyCompatibility entities in `repository/`
+- [v] T082 [US3] [P] Create repositories for all CompanyCompatibility entities in `repository/`
   - **CompanyCompatibilityRepository**: JPA repository + `findByUserProfileIdAndCompanyNameAndTargetRoleCategory()` 쿼리 메서드
   - **CompanyCompatibilityJdbcRepository**: JdbcTemplate 기반 INSERT IGNORE 구현
     - `insertOrIgnore(CompanyCompatibility)`: UNIQUE(userProfileId, companyName, targetRoleCategory) 활용
@@ -978,7 +978,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/MonthlyForecastRepository.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/repository/CautionRepository.java`
 
-- [ ] T083 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs, and `JobCategoryEnum`
+- [v] T083 [US3] [P] Create `CompatibilityRequest` and `CompatibilityResponse` DTOs, and `JobCategoryEnum`
   - Request fields: userBirthDate (LocalDate, @NotNull), userBirthTime (LocalTime, optional), targetRole (TargetRoleRequest record: category(JobCategoryEnum, @NotNull), detailName(String, optional)), companyName (@NotNull), companyFoundingDate (LocalDate, optional), companyFoundingTime (LocalTime, optional, **defaults to 12:00 if missing**)
   - Response fields:
     - requestContext: {companyName, targetRole: {category, detailName}} (요청 에코)
@@ -998,12 +998,12 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/dto/response/CompatibilityResponse.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/util/JobCategoryEnum.java`
 
-- [ ] T084 [US3] Create `CompanyInfoService` in `service/`
+- [v] T084 [US3] Create `CompanyInfoService` in `service/`
   - Method: `lookupCompanyFoundingDate(companyName)` → calls public data API with fallback to manual input. If time not found, use default 12:00
   - Handles: API timeout → PublicDataApiException, company not found → inform user to provide founding date. If time missing → auto-set to 12:00
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyInfoService.java`
 
-- [ ] T085 [US3] Create `CompanyMatchingService` and `JobRoleAnalyzer` in `service/` and `career/util/`
+- [v] T085 [US3] Create `CompanyMatchingService` and `JobRoleAnalyzer` in `service/` and `career/util/`
   - Method: `analyzeCompatibility(CompatibilityRequest request)` → compatibility score + all analysis results (DB 저장)
   - Logic:
     1. Fetch user saju via SajuDataService with userBirthDate + userBirthTime → Calculate user HiddenStems + TenGod + FiveElements
@@ -1020,13 +1020,13 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: `SSAju/src/main/java/ssafy/SSAju/service/CompanyMatchingService.java`
   - File: `SSAju/src/main/java/ssafy/SSAju/career/util/JobRoleAnalyzer.java`
 
-- [ ] T086 [US3] Create `CompatibilityController` in `controller/`
+- [v] T086 [US3] Create `CompatibilityController` in `controller/`
   - Endpoint: `POST /api/company/compatibility` with CompatibilityRequest (userBirthDate + targetRole.category required, userBirthTime optional, companyFoundingDate optional, companyFoundingTime optional)
   - Handles: Request validation (@Valid), validates targetRole.category is valid JobCategoryEnum (400 Bad Request if invalid), looks up company (with time fallback to 12:00), calculates compatibility, returns `ApiResponse<CompatibilityResponse>`
   - Validation: targetRole.category 유효성 검증 (400 INVALID_JOB_CATEGORY), companyName @NotNull
   - File: `SSAju/src/main/java/ssafy/SSAju/controller/CompatibilityController.java`
 
-- [ ] T087 [US3] Write unit & integration tests for Company Compatibility
+- [v] T087 [US3] Write unit & integration tests for Company Compatibility
   - Test cases (JobRoleAnalyzer):
     1. Valid TECH_BACKEND category + 金 강세 user FiveElements → matchScore 높음, synergy 텍스트 포함
     2. Valid MARKETING category + 木/火 강세 user FiveElements → matchScore 및 synergy/warning 반환
