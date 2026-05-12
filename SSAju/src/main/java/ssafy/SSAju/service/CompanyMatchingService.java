@@ -23,18 +23,20 @@ import java.util.List;
 /**
  * 기업/직무 궁합 분석 오케스트레이션 서비스.
  *
- * <p>이 클래스는 다음 역할만 담당합니다:
+ * <p><strong>이 클래스의 단일 책임</strong>: 분석 흐름 제어
  * <ol>
- *   <li>외부 API 호출 흐름 제어 (FastAPI, 공공데이터)</li>
+ *   <li>사주 계산 (FastAPI 호출 → validate → 오행/십신 계산)</li>
  *   <li>INSERT IGNORE 기반 Race Condition 안전 처리</li>
- *   <li>신규/기존 분기 로직</li>
+ *   <li>신규/기존 분기 후 응답 반환</li>
  * </ol>
  *
- * <p>DTO 포매팅은 {@link AnalysisResponseBuilder},
+ * <p>자식 엔티티 저장은 {@link CompatibilityChildSaveService}에 위임합니다.
+ * DTO 포매팅은 {@link AnalysisResponseBuilder},
  * 비즈니스 계산은 각 Calculator 클래스에 위임합니다.
  *
  * <p>{@code @Transactional} 없음: FastAPI 외부 I/O 동안 DB 커넥션을 점유하지 않도록
- * 트랜잭션을 분리. 각 DB 작업은 Repository의 {@code @Transactional}에 의해 실행됨.
+ * 트랜잭션을 분리. 각 DB 작업은 Repository 또는 {@link CompatibilityChildSaveService}의
+ * {@code @Transactional}에 의해 실행됩니다.
  */
 @Slf4j
 @Service
@@ -57,10 +59,13 @@ public class CompanyMatchingService {
     private final AnalysisResponseBuilder responseBuilder;
 
     // ─────────────────────────────────────────
-    // 레포지토리
+    // 레포지토리 / 자식 저장 서비스
     // ─────────────────────────────────────────
     private final CompanyCompatibilityRepository companyCompatibilityRepository;
     private final CompanyCompatibilityJdbcRepository companyCompatibilityJdbcRepository;
+    private final CompatibilityChildSaveService childSaveService;
+
+    // 캐시 재사용 경로(buildResponseFromExisting)에서 자식 엔티티 조회용
     private final TargetRoleAnalysisRepository targetRoleAnalysisRepository;
     private final FiveElementsAnalysisRepository fiveElementsAnalysisRepository;
     private final AnalysisBreakdownRepository analysisBreakdownRepository;
@@ -122,7 +127,31 @@ public class CompanyMatchingService {
         String summary =
                 responseBuilder.buildSummary(compatibilityScore, request.targetRole().category());
 
-        // ─── INSERT IGNORE (Race Condition 안전 처리) ────────────
+        // ───────────────────────────────────────────────────────────────────
+        // INSERT IGNORE: DB 제약(UNIQUE) 기반 동시 요청 안전 처리
+        //
+        // 설계 의도:
+        // 1. JDBC로 root 엔티티만 먼저 삽입 (즉시 자동 커밋)
+        //    - UNIQUE(user_profile_id, company_name, target_role_category) 제약 위반 시 반환값 0
+        // 2. inserted 값에 따라 신규(1) vs 기존(0) 분기 처리
+        // 3. 신규이면 자식 엔티티들을 각 Repository 트랜잭션으로 저장
+        //
+        // 레이스 컨디션 시나리오:
+        // 시간순서 | 요청 A              | 요청 B
+        // ────────┼──────────────────────┼──────────────────────
+        // T1     | INSERT IGNORE 실행    |
+        // T2     | root 커밋 (inserted=1)|
+        // T3     |                       | INSERT IGNORE 실행
+        // T4     |                       | UNIQUE 제약 위반, inserted=0 반환
+        // T5     |                       | buildResponseFromExisting() 호출
+        // T6     | saveAllChildren() 시작|
+        // T7     |                       | 자식 엔티티들이 아직 저장 중 → 불완전한 응답 반환 위험
+        // T8     | 자식 엔티티들 저장 완료|
+        //
+        // 위 시나리오는 아래 두 가지로 해결됩니다:
+        // - Option A: completed 플래그 → inserted==0 + completed==false 시 캐시 차단
+        // - Option B: CompatibilityChildSaveService(@Transactional REQUIRES_NEW) → 자식 원자적 저장
+        // ───────────────────────────────────────────────────────────────────
         CompanyCompatibility root = CompanyCompatibility.builder()
                 .userProfile(userProfile)
                 .companyName(request.companyName())
@@ -143,12 +172,25 @@ public class CompanyMatchingService {
                         "CompanyCompatibility 조회 실패"));
 
         if (inserted == 0) {
-            log.info("기존 궁합 분석 결과 재사용 (compatibilityId={})", saved.getId());
-            return buildResponseFromExisting(saved, request);
+            if (saved.isCompleted()) {
+                // Option A: completed=true → 자식 데이터가 완전히 저장된 캐시만 재사용
+                log.info("완료된 궁합 분석 캐시 재사용 (compatibilityId={})", saved.getId());
+                return buildResponseFromExisting(saved, request);
+            }
+            // completed=false: 다른 요청이 자식 저장 진행 중 → 현재 계산 결과로 응답
+            // (재계산 없이 이미 인메모리에 있는 결과를 그대로 반환, DB 저장은 진행 중인 요청에 위임)
+            log.info("자식 저장 진행 중인 기존 레코드 감지 (compatibilityId={}), 현재 계산 결과로 응답",
+                    saved.getId());
+            return buildNewResponse(saved, request, targetRoleAnalysis, fiveElementsData,
+                    analysisBreakdown, actionableStrategy, questions, roleCompatibilities,
+                    monthlyForecasts, cautions);
         }
 
-        saveAllChildren(saved, targetRoleAnalysis, fiveElementsData, analysisBreakdown,
-                actionableStrategy, questions, roleCompatibilities, monthlyForecasts, cautions);
+        // Option B: 자식 엔티티 전체 저장을 단일 트랜잭션(REQUIRES_NEW)으로 위임
+        // 실패 시 모든 자식이 롤백되어 부분 저장 방지
+        childSaveService.saveAllAndMarkCompleted(saved, targetRoleAnalysis, fiveElementsData,
+                analysisBreakdown, actionableStrategy, questions, roleCompatibilities,
+                monthlyForecasts, cautions);
 
         log.info("기업 궁합 분석 완료: compatibilityScore={}", compatibilityScore);
         return buildNewResponse(saved, request, targetRoleAnalysis, fiveElementsData,
@@ -277,77 +319,4 @@ public class CompanyMatchingService {
         );
     }
 
-    // ─────────────────────────────────────────
-    // private: 자식 엔티티 저장
-    // ─────────────────────────────────────────
-
-    private void saveAllChildren(CompanyCompatibility saved,
-                                  CompatibilityResponse.TargetRoleAnalysis roleAnalysis,
-                                  CompatibilityResponse.FiveElements fiveElementsData,
-                                  CompatibilityResponse.AnalysisBreakdown breakdown,
-                                  CompatibilityResponse.ActionableStrategy strategy,
-                                  List<CompatibilityResponse.InterviewQuestion> questions,
-                                  List<CompatibilityResponse.RoleCompatibility> roles,
-                                  List<CompatibilityResponse.MonthlyForecast> forecasts,
-                                  List<String> cautions) {
-        targetRoleAnalysisRepository.save(TargetRoleAnalysis.builder()
-                .companyCompatibility(saved)
-                .matchScore(roleAnalysis.matchScore())
-                .synergy(roleAnalysis.synergy())
-                .warning(roleAnalysis.warning())
-                .build());
-
-        fiveElementsAnalysisRepository.save(FiveElementsAnalysis.builder()
-                .companyCompatibility(saved)
-                .userDistribution(fiveElementsData.userDistribution())
-                .companyDistribution(fiveElementsData.companyDistribution())
-                .synergyDescription(fiveElementsData.synergyDescription())
-                .build());
-
-        analysisBreakdownRepository.save(AnalysisBreakdown.builder()
-                .companyCompatibility(saved)
-                .characterMatch(breakdown.characterMatch())
-                .potentialSynergy(breakdown.potentialSynergy())
-                .longTermStability(breakdown.longTermStability())
-                .build());
-
-        actionableStrategyRepository.save(ActionableStrategy.builder()
-                .companyCompatibility(saved)
-                .interviewKeywords(strategy.interviewKeywords())
-                .weaknessDefense(strategy.weaknessDefense())
-                .luckyDays(strategy.bestTiming().luckyDays())
-                .preferredTime(strategy.bestTiming().preferredTime())
-                .build());
-
-        questions.forEach(q -> expectedInterviewQuestionRepository.save(
-                ExpectedInterviewQuestion.builder()
-                        .companyCompatibility(saved)
-                        .question(q.question())
-                        .intent(q.intent())
-                        .build()));
-
-        roles.forEach(r -> roleCompatibilityRepository.save(
-                RoleCompatibility.builder()
-                        .companyCompatibility(saved)
-                        .roleName(r.roleName())
-                        .score(r.score())
-                        .reason(r.reason())
-                        .tag(r.tag())
-                        .build()));
-
-        forecasts.forEach(f -> monthlyForecastRepository.save(
-                MonthlyForecast.builder()
-                        .companyCompatibility(saved)
-                        .month(f.month())
-                        .score(f.score())
-                        .status(f.status())
-                        .advice(f.advice())
-                        .build()));
-
-        cautions.forEach(c -> cautionRepository.save(
-                Caution.builder()
-                        .companyCompatibility(saved)
-                        .content(c)
-                        .build()));
-    }
 }

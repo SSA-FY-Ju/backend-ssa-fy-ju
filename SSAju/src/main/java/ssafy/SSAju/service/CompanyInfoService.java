@@ -66,6 +66,21 @@ public class CompanyInfoService {
     public Optional<LocalDate> lookupCompanyFoundingDate(String corpNm) {
         try {
             String encodedApiKey = apiKey;
+            // ───────────────────────────────────────────────────────────────────
+            // URI 인코딩 전략: 금융위원회 공공데이터 API의 비표준 요구사항
+            //
+            // 문제: 공공데이터 API는 ServiceKey 파라미터가 '이미 인코딩된 상태'를 요구합니다.
+            // - API Key는 config 로드 시 사전에 인코딩됨 (+, /, = 등을 %로 변환)
+            // - .build(true)는 "파라미터가 이미 인코딩되었음"을 선언하여 중복 인코딩 방지
+            //
+            // RFC 3986 vs. application/x-www-form-urlencoded:
+            // - URLEncoder.encode()는 application/x-www-form-urlencoded 표준 사용 (공백→+)
+            // - 공공데이터 API는 특수문자 처리가 비표준이므로 추가 조정 필요
+            //
+            // TODO: URLEncoder.encode() → UriUtils.encodeQueryParam() 변경
+            // - UriUtils.encodeQueryParam()은 RFC 3986을 준수하며 public data API와의
+            //   호환성이 더 우수함 (공백→%20, 특수문자 처리 개선)
+            // ───────────────────────────────────────────────────────────────────
             String encodedCorpNm = URLEncoder.encode(corpNm, StandardCharsets.UTF_8);
 
             URI uri = UriComponentsBuilder
@@ -76,7 +91,7 @@ public class CompanyInfoService {
                     .queryParam("pageNo", 1)
                     .queryParam("numOfRows", 1)
                     .queryParam("resultType", "json")
-                    .build(true) // <--- 핵심: "이미 인코딩됨"을 선언!
+                    .build(true) // 핵심: "파라미터가 이미 인코딩됨"을 선언하여 중복 인코딩 방지
                     .toUri();
 
             PublicDataApiResponse response = publicDataRestClient
