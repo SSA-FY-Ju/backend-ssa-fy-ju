@@ -1,6 +1,8 @@
 package ssafy.SSAju.career.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,9 +28,11 @@ public class MonthlyForecast {
     @JoinColumn(name = "compatibility_id", nullable = false)
     private CompanyCompatibility companyCompatibility;
 
+    @Min(1) @Max(12)
     @Column(name = "month", nullable = false)
     private Integer month;
 
+    @Min(0) @Max(100)
     @Column(name = "score", nullable = false)
     private Integer score;
 

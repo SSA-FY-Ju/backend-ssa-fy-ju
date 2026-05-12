@@ -92,7 +92,8 @@ public class CompanyInfoService {
                 log.info("공공데이터 API 클라이언트 오류 ({}): corpNm 생략", e.getStatusCode().value());
                 return Optional.empty();
             }
-            log.warn("공공데이터 API 서버 오류 ({}), 재시도 예정", e.getStatusCode().value());
+            // 5xx는 @Retryable 대상(ResourceAccessException)이 아니므로 즉시 실패
+            log.warn("공공데이터 API 서버 오류 ({}), 즉시 실패 (재시도 없음)", e.getStatusCode().value());
             throw new PublicDataApiException("공공데이터 API 서버 오류", e);
         } catch (ResourceAccessException e) {
             log.warn("공공데이터 API 네트워크 오류 발생, 재시도 예정: {}", e.getMessage());

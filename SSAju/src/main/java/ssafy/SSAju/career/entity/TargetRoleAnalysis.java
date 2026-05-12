@@ -1,6 +1,8 @@
 package ssafy.SSAju.career.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,6 +27,7 @@ public class TargetRoleAnalysis {
     @JoinColumn(name = "compatibility_id", nullable = false, unique = true)
     private CompanyCompatibility companyCompatibility;
 
+    @Min(0) @Max(100)
     @Column(name = "match_score", nullable = false)
     private Integer matchScore;
 

@@ -6,12 +6,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.entity.ActionableStrategy;
+import ssafy.SSAju.career.entity.AnalysisBreakdown;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
+import ssafy.SSAju.career.entity.FiveElementsAnalysis;
+import ssafy.SSAju.career.entity.TargetRoleAnalysis;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.enums.ForecastStatus;
 import ssafy.SSAju.career.provider.UserProfileProvider;
+import ssafy.SSAju.career.util.AnalysisResponseBuilder;
 import ssafy.SSAju.career.util.CompatibilityScoreCalculator;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.JobCategoryEnum;
@@ -42,13 +49,14 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("CompanyMatchingService 단위 테스트")
 class CompanyMatchingServiceTest {
 
@@ -60,6 +68,7 @@ class CompanyMatchingServiceTest {
     @Mock private HiddenStemCalculator hiddenStemCalculator;
     @Mock private CompatibilityScoreCalculator compatibilityScoreCalculator;
     @Mock private JobRoleAnalyzer jobRoleAnalyzer;
+    @Mock private AnalysisResponseBuilder analysisResponseBuilder;
     @Mock private CompanyCompatibilityRepository companyCompatibilityRepository;
     @Mock private CompanyCompatibilityJdbcRepository companyCompatibilityJdbcRepository;
     @Mock private TargetRoleAnalysisRepository targetRoleAnalysisRepository;
@@ -95,13 +104,27 @@ class CompanyMatchingServiceTest {
         service = new CompanyMatchingService(
                 sajuDataService, companyInfoService, userProfileProvider, sajuValidator,
                 tenGodCalculator, hiddenStemCalculator,
-                compatibilityScoreCalculator, jobRoleAnalyzer,
+                compatibilityScoreCalculator, jobRoleAnalyzer, analysisResponseBuilder,
                 companyCompatibilityRepository, companyCompatibilityJdbcRepository,
                 targetRoleAnalysisRepository, fiveElementsAnalysisRepository,
                 analysisBreakdownRepository, actionableStrategyRepository,
                 expectedInterviewQuestionRepository, roleCompatibilityRepository,
                 monthlyForecastRepository, cautionRepository
         );
+
+        // AnalysisResponseBuilder 기본 mock 설정 (lenient - 테스트별 필요에 따라 재정의 가능)
+        given(analysisResponseBuilder.buildFiveElementsData(any(), any()))
+                .willReturn(new CompatibilityResponse.FiveElements(Map.of(), Map.of(), "테스트 시너지"));
+        given(analysisResponseBuilder.buildAnalysisBreakdown(anyInt()))
+                .willReturn(new CompatibilityResponse.AnalysisBreakdown(80, 70, 75));
+        given(analysisResponseBuilder.buildActionableStrategy(any()))
+                .willReturn(new CompatibilityResponse.ActionableStrategy(List.of(), "약점 방어",
+                        new CompatibilityResponse.ActionableStrategy.BestTiming(List.of(), "09:00")));
+        given(analysisResponseBuilder.buildInterviewQuestions(any())).willReturn(List.of());
+        given(analysisResponseBuilder.buildRoleCompatibilities(any(), any())).willReturn(List.of());
+        given(analysisResponseBuilder.buildMonthlyForecasts()).willReturn(List.of());
+        given(analysisResponseBuilder.buildCautions(any(), any())).willReturn(List.of());
+        given(analysisResponseBuilder.buildSummary(anyInt(), any())).willReturn("테스트 요약");
     }
 
     // ─────────────────────────────────────────
@@ -176,6 +199,15 @@ class CompanyMatchingServiceTest {
         given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(0);
         given(companyCompatibilityRepository.findByUserProfile_IdAndCompanyNameAndTargetRoleCategory(
                 any(), anyString(), any())).willReturn(Optional.of(existingEntity));
+        // 캐시 재사용 경로에서 4개 단일 분석 필드 로드
+        given(targetRoleAnalysisRepository.findByCompanyCompatibility_Id(any()))
+                .willReturn(Optional.of(buildTargetRoleAnalysisEntity(existingEntity)));
+        given(fiveElementsAnalysisRepository.findByCompanyCompatibility_Id(any()))
+                .willReturn(Optional.of(buildFiveElementsAnalysisEntity(existingEntity)));
+        given(analysisBreakdownRepository.findByCompanyCompatibility_Id(any()))
+                .willReturn(Optional.of(buildAnalysisBreakdownEntity(existingEntity)));
+        given(actionableStrategyRepository.findByCompanyCompatibility_Id(any()))
+                .willReturn(Optional.of(buildActionableStrategyEntity(existingEntity)));
         given(expectedInterviewQuestionRepository.findByCompanyCompatibility_Id(any()))
                 .willReturn(List.of());
         given(roleCompatibilityRepository.findByCompanyCompatibility_Id(any()))
@@ -188,9 +220,15 @@ class CompanyMatchingServiceTest {
         // When
         CompatibilityResponse response = service.analyzeCompatibility(request);
 
-        // Then
+        // Then: 신규 저장 없음
         assertThat(response).isNotNull();
         verify(targetRoleAnalysisRepository, never()).save(any());
+        // 캐시 재사용 경로에서도 4개 분석 필드가 정상적으로 채워지는지 검증 (버그 방지)
+        assertThat(response.targetRoleAnalysis()).isNotNull();
+        assertThat(response.targetRoleAnalysis().matchScore()).isEqualTo(85);
+        assertThat(response.fiveElements()).isNotNull();
+        assertThat(response.analysisBreakdown()).isNotNull();
+        assertThat(response.actionableStrategy()).isNotNull();
     }
 
     // ─────────────────────────────────────────
@@ -322,6 +360,43 @@ class CompanyMatchingServiceTest {
                 .targetRoleDetailName("개발자")
                 .compatibilityScore(78)
                 .summary("테스트 요약")
+                .build();
+    }
+
+    private TargetRoleAnalysis buildTargetRoleAnalysisEntity(CompanyCompatibility compatibility) {
+        return TargetRoleAnalysis.builder()
+                .companyCompatibility(compatibility)
+                .matchScore(85)
+                .synergy("시너지 텍스트")
+                .warning("경고 텍스트")
+                .build();
+    }
+
+    private FiveElementsAnalysis buildFiveElementsAnalysisEntity(CompanyCompatibility compatibility) {
+        return FiveElementsAnalysis.builder()
+                .companyCompatibility(compatibility)
+                .userDistribution(Map.of("木", 1, "火", 2, "土", 2, "金", 2, "水", 1))
+                .companyDistribution(Map.of("木", 2, "火", 1, "土", 1, "金", 2, "水", 2))
+                .synergyDescription("균형 잡힌 오행 구조")
+                .build();
+    }
+
+    private AnalysisBreakdown buildAnalysisBreakdownEntity(CompanyCompatibility compatibility) {
+        return AnalysisBreakdown.builder()
+                .companyCompatibility(compatibility)
+                .characterMatch(83)
+                .potentialSynergy(73)
+                .longTermStability(78)
+                .build();
+    }
+
+    private ActionableStrategy buildActionableStrategyEntity(CompanyCompatibility compatibility) {
+        return ActionableStrategy.builder()
+                .companyCompatibility(compatibility)
+                .interviewKeywords(List.of("체계적 설계", "논리적 사고"))
+                .weaknessDefense("지속적 학습 의지를 강조하세요.")
+                .luckyDays(List.of("2026-05-19", "2026-05-26"))
+                .preferredTime("오전 09:00 ~ 11:00")
                 .build();
     }
 }
