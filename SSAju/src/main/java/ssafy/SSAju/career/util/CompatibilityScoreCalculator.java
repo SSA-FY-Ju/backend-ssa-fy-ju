@@ -10,6 +10,7 @@ import ssafy.SSAju.career.validator.CompatibilityValidator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 사주 궁합 점수 계산기
@@ -23,14 +24,6 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class CompatibilityScoreCalculator {
-
-    private static final Map<String, String> ELEMENT_MAP = Map.of(
-            "甲", "木", "乙", "木",
-            "丙", "火", "丁", "火",
-            "戊", "土", "己", "土",
-            "庚", "金", "辛", "金",
-            "壬", "水", "癸", "水"
-    );
 
     private final TenGodCalculator tenGodCalculator;
     private final CompatibilityValidator compatibilityValidator;
@@ -107,10 +100,12 @@ public class CompatibilityScoreCalculator {
         Map<String, Integer> counts = new HashMap<>();
         for (List<String> stems : hiddenStems.asMap().values()) {
             for (String stem : stems) {
-                String element = ELEMENT_MAP.get(stem);
-                if (element != null) {
-                    counts.merge(element, 1, Integer::sum);
-                }
+                Optional.ofNullable(stem)
+                        .map(s -> {
+                            try { return FiveElement.fromStem(s); }
+                            catch (Exception e) { return null; }
+                        })
+                        .ifPresent(fe -> counts.merge(fe.getSymbol(), 1, Integer::sum));
             }
         }
         return counts;

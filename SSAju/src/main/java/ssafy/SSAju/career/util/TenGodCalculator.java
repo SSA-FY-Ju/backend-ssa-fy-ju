@@ -3,6 +3,7 @@ package ssafy.SSAju.career.util;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.career.enums.FiveElement;
 import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.enums.TenGodConstants;
 import ssafy.SSAju.exception.InvalidSajuDataException;
@@ -31,14 +32,6 @@ import java.util.Map;
  */
 @Component
 public class TenGodCalculator {
-
-    private static final Map<String, String> FIVE_ELEMENT_MAP = Map.of(
-            "甲", "木", "乙", "木",
-            "丙", "火", "丁", "火",
-            "戊", "土", "己", "土",
-            "庚", "金", "辛", "金",
-            "壬", "水", "癸", "水"
-    );
 
     private static final Map<String, String> YANG_YIN_MAP = Map.of(
             "甲", "陽", "乙", "陰",
@@ -77,14 +70,14 @@ public class TenGodCalculator {
     }
 
     public String getTenGod(String dayMaster, String targetStem) {
-        if (dayMaster == null || !FIVE_ELEMENT_MAP.containsKey(dayMaster)) {
+        if (dayMaster == null || !YANG_YIN_MAP.containsKey(dayMaster)) {
             throw new InvalidSajuDataException(ErrorMessageConstants.INVALID_DAY_MASTER.getMessage() + ": " + dayMaster);
         }
-        if (targetStem == null || !FIVE_ELEMENT_MAP.containsKey(targetStem)) {
+        if (targetStem == null || !YANG_YIN_MAP.containsKey(targetStem)) {
             throw new InvalidSajuDataException(ErrorMessageConstants.INVALID_HEAVENLY_STEM.getMessage() + ": " + targetStem);
         }
-        String masterElement = FIVE_ELEMENT_MAP.get(dayMaster);
-        String targetElement = FIVE_ELEMENT_MAP.get(targetStem);
+        String masterElement = FiveElement.fromStem(dayMaster).getSymbol();
+        String targetElement = FiveElement.fromStem(targetStem).getSymbol();
         String masterPolarity = YANG_YIN_MAP.get(dayMaster);
         String targetPolarity = YANG_YIN_MAP.get(targetStem);
 
