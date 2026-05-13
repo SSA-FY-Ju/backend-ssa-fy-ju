@@ -10,7 +10,6 @@ import ssafy.SSAju.career.validator.CompatibilityValidator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * 사주 궁합 점수 계산기
@@ -100,12 +99,8 @@ public class CompatibilityScoreCalculator {
         Map<String, Integer> counts = new HashMap<>();
         for (List<String> stems : hiddenStems.asMap().values()) {
             for (String stem : stems) {
-                Optional.ofNullable(stem)
-                        .map(s -> {
-                            try { return FiveElement.fromStem(s); }
-                            catch (Exception e) { return null; }
-                        })
-                        .ifPresent(fe -> counts.merge(fe.getSymbol(), 1, Integer::sum));
+                FiveElement element = FiveElement.fromStem(stem);
+                counts.merge(element.getSymbol(), 1, Integer::sum);
             }
         }
         return counts;
