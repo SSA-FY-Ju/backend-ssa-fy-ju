@@ -3,6 +3,7 @@ package ssafy.SSAju.career.util;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.enums.FiveElement;
 import ssafy.SSAju.career.enums.TenGodConstants;
 import ssafy.SSAju.career.validator.CompatibilityValidator;
 
@@ -30,8 +31,6 @@ public class CompatibilityScoreCalculator {
             "庚", "金", "辛", "金",
             "壬", "水", "癸", "水"
     );
-
-    private static final List<String> ALL_ELEMENTS = List.of("木", "火", "土", "金", "水");
 
     private final TenGodCalculator tenGodCalculator;
     private final CompatibilityValidator compatibilityValidator;
@@ -91,7 +90,7 @@ public class CompatibilityScoreCalculator {
         Map<String, Integer> companyElements = countElements(companyHiddenStems);
 
         int complementScore = 0;
-        for (String element : ALL_ELEMENTS) {
+        for (String element : FiveElement.allSymbols()) {
             int userCount = userElements.getOrDefault(element, 0);
             int companyCount = companyElements.getOrDefault(element, 0);
             // 사용자에게 부족한 오행을 기업이 가지고 있으면 높은 점수

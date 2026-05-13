@@ -45,6 +45,7 @@ import java.util.List;
 public class CompanyMatchingService {
 
     private static final LocalTime DEFAULT_BIRTH_TIME = LocalTime.of(12, 0);
+    private static final LocalDate MIN_SUPPORTED_DATE = LocalDate.of(1900, 1, 1);
 
     // ─────────────────────────────────────────
     // 외부 서비스 / 유틸리티
@@ -201,16 +202,26 @@ public class CompanyMatchingService {
      *   <li>요청에 {@code companyFoundingDate}가 있으면 그대로 사용</li>
      *   <li>없으면 공공데이터 API로 {@code companyName}(corpNm) 조회</li>
      *   <li>API 조회도 실패하면 {@link PublicDataApiException} 발생</li>
+     *   <li>1900-01-01 이전 날짜는 사주 라이브러리 지원 범위 밖이므로 1900-01-01로 자동 조정</li>
      * </ol>
      */
     private LocalDate resolveCompanyFoundingDate(CompatibilityRequest request) {
+        LocalDate date;
         if (request.companyFoundingDate() != null) {
-            return request.companyFoundingDate();
+            date = request.companyFoundingDate();
+        } else {
+            log.info("기업 설립일 미제공 → 공공데이터 API 자동 조회: company={}", request.companyName());
+            date = companyInfoService.lookupCompanyFoundingDate(request.companyName())
+                    .orElseThrow(() -> new PublicDataApiException(
+                            "기업 설립일을 공공데이터에서 조회할 수 없습니다. companyFoundingDate를 직접 입력해주세요."));
         }
-        log.info("기업 설립일 미제공 → 공공데이터 API 자동 조회: company={}", request.companyName());
-        return companyInfoService.lookupCompanyFoundingDate(request.companyName())
-                .orElseThrow(() -> new PublicDataApiException(
-                        "기업 설립일을 공공데이터에서 조회할 수 없습니다. companyFoundingDate를 직접 입력해주세요."));
+
+        if (date.isBefore(MIN_SUPPORTED_DATE)) {
+            log.warn("기업 설립일({})이 사주 라이브러리 지원 범위(1900-01-01) 이전입니다. 1900-01-01로 자동 조정합니다.",
+                    date);
+            return MIN_SUPPORTED_DATE;
+        }
+        return date;
     }
 
     // ─────────────────────────────────────────
