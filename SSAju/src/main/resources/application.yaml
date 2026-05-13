@@ -25,6 +25,15 @@ spring:
           response-format:
             type: JSON_OBJECT
 
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    doc-expansion: list
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+
 saju:
   fastapi:
     url: ${FASTAPI_URL}
