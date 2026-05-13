@@ -17,6 +17,7 @@ import ssafy.SSAju.career.provider.SajuResultProvider;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
+import ssafy.SSAju.career.enums.TenGodConstants;
 import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
@@ -27,6 +28,7 @@ import ssafy.SSAju.repository.CareerConsultationRepository;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -81,13 +83,23 @@ public class ConsultationService {
         CareerConsultation consultation = consultationMapper.buildConsultation(sajuResult, advice, modelVersion);
         careerConsultationRepository.save(consultation);
 
+        Map<String, String> tenGodCharacteristics = tenGodDistribution.asMap().keySet().stream()
+                .collect(Collectors.toMap(
+                        name -> name,
+                        name -> {
+                            TenGodConstants tg = TenGodConstants.fromName(name);
+                            return tg != null ? tg.getCharacteristics() : "";
+                        }
+                ));
+
         ConsultationResponse.SajuProfile sajuProfile = new ConsultationResponse.SajuProfile(
                 dayMaster,
                 advice.dayMasterDescription(),
                 sajuData.fiveElements(),
                 advice.fiveElementsAnalysis(),
                 tenGodDistribution.asMap(),
-                advice.keyTenGods()
+                advice.keyTenGods(),
+                tenGodCharacteristics
         );
 
         String analysisSummary = consultationMapper.buildAnalysisSummary(

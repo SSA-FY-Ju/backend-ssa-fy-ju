@@ -41,6 +41,7 @@ public record ConsultationResponse(
             Map<String, Integer> fiveElements,
             String fiveElementsAnalysis,
             Map<String, Integer> tenGodDistribution,
-            List<String> keyTenGods
+            List<String> keyTenGods,
+            Map<String, String> tenGodCharacteristics  // 십신별 커리어 특성 문구
     ) {}
 }
