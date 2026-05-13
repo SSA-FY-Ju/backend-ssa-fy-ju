@@ -7,11 +7,18 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import ssafy.SSAju.career.converter.StringListConverter;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 기업 궁합 지원 전략.
+ *
+ * <p>정규화 이력:
+ * - interview_keywords (TEXT/JSON) → {@link ActionableKeyword} 테이블
+ * - lucky_days (TEXT/JSON) → {@link LuckyDay} 테이블
+ */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
@@ -27,32 +34,38 @@ public class ActionableStrategy {
     @JoinColumn(name = "compatibility_id", nullable = false, unique = true)
     private CompanyCompatibility companyCompatibility;
 
-    @Convert(converter = StringListConverter.class)
-    @Column(name = "interview_keywords", columnDefinition = "text")
-    private List<String> interviewKeywords;
-
     @Column(name = "weakness_defense", columnDefinition = "text")
     private String weaknessDefense;
 
-    @Convert(converter = StringListConverter.class)
-    @Column(name = "lucky_days", columnDefinition = "text")
-    private List<String> luckyDays;
-
     @Column(name = "preferred_time")
     private String preferredTime;
+
+    @OneToMany(mappedBy = "actionableStrategy", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("displayOrder ASC")
+    private List<ActionableKeyword> keywords = new ArrayList<>();
+
+    @OneToMany(mappedBy = "actionableStrategy", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("displayOrder ASC")
+    private List<LuckyDay> luckyDays = new ArrayList<>();
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public ActionableStrategy(CompanyCompatibility companyCompatibility, List<String> interviewKeywords,
-                               String weaknessDefense, List<String> luckyDays, String preferredTime) {
+    public ActionableStrategy(CompanyCompatibility companyCompatibility,
+                               String weaknessDefense, String preferredTime) {
         this.companyCompatibility = companyCompatibility;
-        this.interviewKeywords = interviewKeywords;
         this.weaknessDefense = weaknessDefense;
-        this.luckyDays = luckyDays;
         this.preferredTime = preferredTime;
+    }
+
+    public void assignKeywords(List<ActionableKeyword> keywordList) {
+        this.keywords = keywordList;
+    }
+
+    public void assignLuckyDays(List<LuckyDay> luckyDayList) {
+        this.luckyDays = luckyDayList;
     }
 
     @Override

@@ -97,7 +97,7 @@ class TenGodCalculatorTest {
 
         // When & Then
         assertThatThrownBy(() -> calculator.calculate(stems))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ssafy.SSAju.exception.InvalidSajuDataException.class)
                 .hasMessageContaining("정확히 4개");
     }
 
@@ -109,7 +109,7 @@ class TenGodCalculatorTest {
 
         // When & Then
         assertThatThrownBy(() -> calculator.calculate(stems))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ssafy.SSAju.exception.InvalidSajuDataException.class)
                 .hasMessageContaining("정확히 4개");
     }
 }

@@ -3,6 +3,7 @@ package ssafy.SSAju.career.util;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -40,13 +41,13 @@ public class HiddenStemCalculator {
      */
     public HiddenStems calculate(List<String> earthlyBranches) {
         if (earthlyBranches == null || earthlyBranches.size() != 4) {
-            throw new IllegalArgumentException(ErrorMessageConstants.EARTHLY_BRANCHES_COUNT_INVALID.getMessage());
+            throw new InvalidSajuDataException(ErrorMessageConstants.EARTHLY_BRANCHES_COUNT_INVALID.getMessage());
         }
         Map<String, List<String>> hiddenStems = new HashMap<>();
         for (String branch : earthlyBranches) {
             List<String> stems = HIDDEN_STEMS_TABLE.get(branch);
             if (stems == null) {
-                throw new IllegalArgumentException(ErrorMessageConstants.UNKNOWN_EARTHLY_BRANCH.getMessage() + ": " + branch);
+                throw new InvalidSajuDataException(ErrorMessageConstants.UNKNOWN_EARTHLY_BRANCH.getMessage() + ": " + branch);
             }
             hiddenStems.put(branch, stems);
         }
@@ -56,7 +57,7 @@ public class HiddenStemCalculator {
     public List<String> getHiddenStems(String earthlyBranch) {
         List<String> stems = HIDDEN_STEMS_TABLE.get(earthlyBranch);
         if (stems == null) {
-            throw new IllegalArgumentException(ErrorMessageConstants.UNKNOWN_EARTHLY_BRANCH.getMessage() + ": " + earthlyBranch);
+            throw new InvalidSajuDataException(ErrorMessageConstants.UNKNOWN_EARTHLY_BRANCH.getMessage() + ": " + earthlyBranch);
         }
         return stems;
     }

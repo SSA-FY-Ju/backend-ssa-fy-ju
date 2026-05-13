@@ -1,5 +1,6 @@
 package ssafy.SSAju.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.retry.annotation.Backoff;
@@ -21,16 +22,12 @@ import java.time.LocalTime;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SajuDataService {
 
+    @Qualifier("fastApiRestClient")
     private final RestClient fastApiRestClient;
     private final RequestValidator requestValidator;
-
-    public SajuDataService(@Qualifier("fastApiRestClient") RestClient fastApiRestClient,
-                           RequestValidator requestValidator) {
-        this.fastApiRestClient = fastApiRestClient;
-        this.requestValidator = requestValidator;
-    }
 
     /**
      * FastAPI에서 사주 데이터를 조회합니다.
@@ -81,7 +78,7 @@ public class SajuDataService {
     public FastAPIResponse recoverFetchSajuFromFastAPI(RuntimeException ex,
                                                        LocalDate birthDate,
                                                        LocalTime birthTime) {
-        log.error("FastAPI 호출 재시도 후 최종 실패: {} {}", birthDate, birthTime, ex);
+        log.error("FastAPI 호출 재시도 후 최종 실패", ex);
         throw new InvalidSajuDataException(ErrorMessageConstants.FASTAPI_CALL_FAILED.getMessage(), ex);
     }
 

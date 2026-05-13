@@ -44,6 +44,7 @@ public enum ErrorMessageConstants {
 
     // === 입력 검증 예외 메시지 ===
     BIRTH_DATE_REQUIRED("INVALID_SAJU_DATA", "생년월일이 필수입니다"),
+    BIRTH_DATE_TOO_OLD("INVALID_SAJU_DATA", "1900년 이전 생년월일은 지원하지 않습니다. (파이썬 사주 라이브러리 제약)"),
     BIRTH_TIME_REQUIRED("INVALID_SAJU_DATA", "태어난 시간이 필수입니다 (HH:mm 형식)"),
 
     // === FastAPI 예외 메시지 ===
@@ -51,14 +52,14 @@ public enum ErrorMessageConstants {
     FASTAPI_CALL_FAILED("EXTERNAL_API_ERROR", "FastAPI 호출 실패"),
 
     // === OpenAI 예외 메시지 ===
-    OPENAI_CALL_FAILED("OPENAI_API_TIMEOUT", "OpenAI API 호출 실패"),
-    OPENAI_EMPTY_RESPONSE("OPENAI_API_TIMEOUT", "OpenAI 응답이 비어있습니다"),
-    OPENAI_MISSING_INDUSTRIES("OPENAI_API_TIMEOUT", "산업 추천 정보가 누락되었습니다"),
-    OPENAI_INVALID_INDUSTRY_ITEM("OPENAI_API_TIMEOUT", "산업 추천 항목에 빈 name 또는 reason이 포함되어 있습니다"),
-    OPENAI_MISSING_INTERVIEW_TIPS("OPENAI_API_TIMEOUT", "면접 팁 정보가 누락되었습니다"),
-    OPENAI_INVALID_INTERVIEW_ITEM("OPENAI_API_TIMEOUT", "면접 팁 항목에 빈 값이 포함되어 있습니다"),
-    OPENAI_MISSING_STRENGTHS("OPENAI_API_TIMEOUT", "강점 분석 정보가 누락되었습니다"),
-    OPENAI_INVALID_STRENGTH_ITEM("OPENAI_API_TIMEOUT", "강점 분석 항목에 빈 값이 포함되어 있습니다"),
+    OPENAI_CALL_FAILED("OPENAI_API_ERROR", "OpenAI API 호출 실패"),
+    OPENAI_EMPTY_RESPONSE("OPENAI_INVALID_RESPONSE", "OpenAI 응답이 비어있습니다"),
+    OPENAI_MISSING_INDUSTRIES("OPENAI_INVALID_RESPONSE", "산업 추천 정보가 누락되었습니다"),
+    OPENAI_INVALID_INDUSTRY_ITEM("OPENAI_INVALID_RESPONSE", "산업 추천 항목에 빈 name 또는 reason이 포함되어 있습니다"),
+    OPENAI_MISSING_INTERVIEW_TIPS("OPENAI_INVALID_RESPONSE", "면접 팁 정보가 누락되었습니다"),
+    OPENAI_INVALID_INTERVIEW_ITEM("OPENAI_INVALID_RESPONSE", "면접 팁 항목에 빈 값이 포함되어 있습니다"),
+    OPENAI_MISSING_STRENGTHS("OPENAI_INVALID_RESPONSE", "강점 분석 정보가 누락되었습니다"),
+    OPENAI_INVALID_STRENGTH_ITEM("OPENAI_INVALID_RESPONSE", "강점 분석 항목에 빈 값이 포함되어 있습니다"),
 
     // === 사주 데이터 검증 예외 메시지 ===
     EARTHLY_BRANCHES_COUNT_INVALID("INVALID_SAJU_DATA", "지지 목록은 정확히 4개여야 합니다."),

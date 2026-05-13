@@ -40,10 +40,12 @@ public class SajuGlobalExceptionHandler {
     @ExceptionHandler(InvalidSajuDataException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidSajuData(
             InvalidSajuDataException e, HttpServletRequest request) {
-        log.warn("Invalid saju data: {}", e.getMessage());
+        log.warn("Invalid saju data", e);
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure(new ErrorInfo(
-                        ErrorMessageConstants.INVALID_SAJU_DATA.getCode(), e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.INVALID_SAJU_DATA.getCode(),
+                        ErrorMessageConstants.INVALID_SAJU_DATA.getMessage(),
+                        generateRequestId())));
     }
 
     @ExceptionHandler(FastAPITimeoutException.class)

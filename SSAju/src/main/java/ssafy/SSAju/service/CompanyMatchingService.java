@@ -3,6 +3,7 @@ package ssafy.SSAju.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.entity.*;
@@ -44,6 +45,7 @@ import java.util.List;
 public class CompanyMatchingService {
 
     private static final LocalTime DEFAULT_BIRTH_TIME = LocalTime.of(12, 0);
+    private static final LocalDate MIN_SUPPORTED_DATE = LocalDate.of(1900, 1, 1);
 
     // ─────────────────────────────────────────
     // 외부 서비스 / 유틸리티
@@ -70,6 +72,8 @@ public class CompanyMatchingService {
     private final FiveElementsAnalysisRepository fiveElementsAnalysisRepository;
     private final AnalysisBreakdownRepository analysisBreakdownRepository;
     private final ActionableStrategyRepository actionableStrategyRepository;
+    private final ActionableKeywordRepository actionableKeywordRepository;
+    private final LuckyDayRepository luckyDayRepository;
     private final ExpectedInterviewQuestionRepository expectedInterviewQuestionRepository;
     private final RoleCompatibilityRepository roleCompatibilityRepository;
     private final MonthlyForecastRepository monthlyForecastRepository;
@@ -107,25 +111,17 @@ public class CompanyMatchingService {
         int compatibilityScore = compatibilityScoreCalculator.calculate(
                 userHiddenStems, userDayMaster, companyHiddenStems, companyDayMaster);
 
-        CompatibilityResponse.TargetRoleAnalysis targetRoleAnalysis =
-                jobRoleAnalyzer.analyze(userFiveElements, request.targetRole().category());
-
-        CompatibilityResponse.FiveElements fiveElementsData =
-                responseBuilder.buildFiveElementsData(userFiveElements, companyFiveElements);
-        CompatibilityResponse.AnalysisBreakdown analysisBreakdown =
-                responseBuilder.buildAnalysisBreakdown(compatibilityScore);
-        CompatibilityResponse.ActionableStrategy actionableStrategy =
-                responseBuilder.buildActionableStrategy(request.targetRole().category());
-        List<CompatibilityResponse.InterviewQuestion> questions =
-                responseBuilder.buildInterviewQuestions(request.targetRole().category());
-        List<CompatibilityResponse.RoleCompatibility> roleCompatibilities =
-                responseBuilder.buildRoleCompatibilities(request.targetRole().category(), userFiveElements);
-        List<CompatibilityResponse.MonthlyForecast> monthlyForecasts =
-                responseBuilder.buildMonthlyForecasts();
-        List<String> cautions =
-                responseBuilder.buildCautions(userFiveElements, request.targetRole().category());
-        String summary =
-                responseBuilder.buildSummary(compatibilityScore, request.targetRole().category());
+        CompatibilityAnalysisData analysisData = new CompatibilityAnalysisData(
+                jobRoleAnalyzer.analyze(userFiveElements, request.targetRole().category()),
+                responseBuilder.buildFiveElementsData(userFiveElements, companyFiveElements),
+                responseBuilder.buildAnalysisBreakdown(compatibilityScore),
+                responseBuilder.buildActionableStrategy(request.targetRole().category()),
+                responseBuilder.buildInterviewQuestions(request.targetRole().category()),
+                responseBuilder.buildRoleCompatibilities(request.targetRole().category(), userFiveElements),
+                responseBuilder.buildMonthlyForecasts(),
+                responseBuilder.buildCautions(userFiveElements, request.targetRole().category())
+        );
+        String summary = responseBuilder.buildSummary(compatibilityScore, request.targetRole().category());
 
         // ───────────────────────────────────────────────────────────────────
         // INSERT IGNORE: DB 제약(UNIQUE) 기반 동시 요청 안전 처리
@@ -181,21 +177,15 @@ public class CompanyMatchingService {
             // (재계산 없이 이미 인메모리에 있는 결과를 그대로 반환, DB 저장은 진행 중인 요청에 위임)
             log.info("자식 저장 진행 중인 기존 레코드 감지 (compatibilityId={}), 현재 계산 결과로 응답",
                     saved.getId());
-            return buildNewResponse(saved, request, targetRoleAnalysis, fiveElementsData,
-                    analysisBreakdown, actionableStrategy, questions, roleCompatibilities,
-                    monthlyForecasts, cautions);
+            return buildNewResponse(saved, request, analysisData);
         }
 
         // Option B: 자식 엔티티 전체 저장을 단일 트랜잭션(REQUIRES_NEW)으로 위임
         // 실패 시 모든 자식이 롤백되어 부분 저장 방지
-        childSaveService.saveAllAndMarkCompleted(saved, targetRoleAnalysis, fiveElementsData,
-                analysisBreakdown, actionableStrategy, questions, roleCompatibilities,
-                monthlyForecasts, cautions);
+        childSaveService.saveAllAndMarkCompleted(saved, analysisData);
 
         log.info("기업 궁합 분석 완료: compatibilityScore={}", compatibilityScore);
-        return buildNewResponse(saved, request, targetRoleAnalysis, fiveElementsData,
-                analysisBreakdown, actionableStrategy, questions, roleCompatibilities,
-                monthlyForecasts, cautions);
+        return buildNewResponse(saved, request, analysisData);
     }
 
     // ─────────────────────────────────────────
@@ -212,16 +202,26 @@ public class CompanyMatchingService {
      *   <li>요청에 {@code companyFoundingDate}가 있으면 그대로 사용</li>
      *   <li>없으면 공공데이터 API로 {@code companyName}(corpNm) 조회</li>
      *   <li>API 조회도 실패하면 {@link PublicDataApiException} 발생</li>
+     *   <li>1900-01-01 이전 날짜는 사주 라이브러리 지원 범위 밖이므로 1900-01-01로 자동 조정</li>
      * </ol>
      */
     private LocalDate resolveCompanyFoundingDate(CompatibilityRequest request) {
+        LocalDate date;
         if (request.companyFoundingDate() != null) {
-            return request.companyFoundingDate();
+            date = request.companyFoundingDate();
+        } else {
+            log.info("기업 설립일 미제공 → 공공데이터 API 자동 조회: company={}", request.companyName());
+            date = companyInfoService.lookupCompanyFoundingDate(request.companyName())
+                    .orElseThrow(() -> new PublicDataApiException(
+                            "기업 설립일을 공공데이터에서 조회할 수 없습니다. companyFoundingDate를 직접 입력해주세요."));
         }
-        log.info("기업 설립일 미제공 → 공공데이터 API 자동 조회: company={}", request.companyName());
-        return companyInfoService.lookupCompanyFoundingDate(request.companyName())
-                .orElseThrow(() -> new PublicDataApiException(
-                        "기업 설립일을 공공데이터에서 조회할 수 없습니다. companyFoundingDate를 직접 입력해주세요."));
+
+        if (date.isBefore(MIN_SUPPORTED_DATE)) {
+            log.warn("기업 설립일({})이 사주 라이브러리 지원 범위(1900-01-01) 이전입니다. 1900-01-01로 자동 조정합니다.",
+                    date);
+            return MIN_SUPPORTED_DATE;
+        }
+        return date;
     }
 
     // ─────────────────────────────────────────
@@ -234,7 +234,6 @@ public class CompanyMatchingService {
      */
     private CompatibilityResponse buildResponseFromExisting(CompanyCompatibility saved,
                                                               CompatibilityRequest request) {
-        // 단일 분석 자식 엔티티 로드
         CompatibilityResponse.TargetRoleAnalysis targetRoleAnalysis =
                 targetRoleAnalysisRepository.findByCompanyCompatibility_Id(saved.getId())
                         .map(e -> new CompatibilityResponse.TargetRoleAnalysis(
@@ -255,13 +254,20 @@ public class CompanyMatchingService {
 
         CompatibilityResponse.ActionableStrategy actionableStrategy =
                 actionableStrategyRepository.findByCompanyCompatibility_Id(saved.getId())
-                        .map(e -> new CompatibilityResponse.ActionableStrategy(
-                                e.getInterviewKeywords(), e.getWeaknessDefense(),
-                                new CompatibilityResponse.ActionableStrategy.BestTiming(
-                                        e.getLuckyDays(), e.getPreferredTime())))
+                        .map(e -> {
+                            List<String> keywords = actionableKeywordRepository
+                                    .findByActionableStrategy_IdOrderByDisplayOrderAsc(e.getId())
+                                    .stream().map(ActionableKeyword::getKeyword).toList();
+                            List<String> luckyDays = luckyDayRepository
+                                    .findByActionableStrategy_IdOrderByDisplayOrderAsc(e.getId())
+                                    .stream().map(LuckyDay::getLuckyDay).toList();
+                            return new CompatibilityResponse.ActionableStrategy(
+                                    keywords, e.getWeaknessDefense(),
+                                    new CompatibilityResponse.ActionableStrategy.BestTiming(
+                                            luckyDays, e.getPreferredTime()));
+                        })
                         .orElse(null);
 
-        // 다중 자식 엔티티 로드
         List<ExpectedInterviewQuestion> questions =
                 expectedInterviewQuestionRepository.findByCompanyCompatibility_Id(saved.getId());
         List<RoleCompatibility> roles =
@@ -291,20 +297,35 @@ public class CompanyMatchingService {
 
     private CompatibilityResponse buildNewResponse(CompanyCompatibility saved,
                                                      CompatibilityRequest request,
-                                                     CompatibilityResponse.TargetRoleAnalysis roleAnalysis,
-                                                     CompatibilityResponse.FiveElements fiveElements,
-                                                     CompatibilityResponse.AnalysisBreakdown breakdown,
-                                                     CompatibilityResponse.ActionableStrategy strategy,
-                                                     List<CompatibilityResponse.InterviewQuestion> questions,
-                                                     List<CompatibilityResponse.RoleCompatibility> roles,
-                                                     List<CompatibilityResponse.MonthlyForecast> forecasts,
-                                                     List<String> cautions) {
+                                                     CompatibilityAnalysisData data) {
+        CompatibilityAnalysisData.StrategyInfo s = data.strategy();
         return new CompatibilityResponse(
                 buildRequestContext(saved, request),
                 saved.getCompatibilityScore(),
                 saved.getSummary(),
-                roleAnalysis, fiveElements, breakdown, strategy,
-                questions, roles, forecasts, cautions
+                new CompatibilityResponse.TargetRoleAnalysis(
+                        data.roleAnalysis().matchScore(),
+                        data.roleAnalysis().synergy(),
+                        data.roleAnalysis().warning()),
+                new CompatibilityResponse.FiveElements(
+                        data.fiveElements().userDistribution(),
+                        data.fiveElements().companyDistribution(),
+                        data.fiveElements().synergyDescription()),
+                new CompatibilityResponse.AnalysisBreakdown(
+                        data.breakdown().characterMatch(),
+                        data.breakdown().potentialSynergy(),
+                        data.breakdown().longTermStability()),
+                new CompatibilityResponse.ActionableStrategy(
+                        s.keywords(), s.weaknessDefense(),
+                        new CompatibilityResponse.ActionableStrategy.BestTiming(
+                                s.luckyDays(), s.preferredTime())),
+                data.questions().stream().map(q -> new CompatibilityResponse.InterviewQuestion(
+                        q.question(), q.intent())).toList(),
+                data.roles().stream().map(r -> new CompatibilityResponse.RoleCompatibility(
+                        r.roleName(), r.score(), r.reason(), r.tag())).toList(),
+                data.forecasts().stream().map(f -> new CompatibilityResponse.MonthlyForecast(
+                        f.month(), f.score(), f.status(), f.advice())).toList(),
+                data.cautions()
         );
     }
 

@@ -1,7 +1,9 @@
 package ssafy.SSAju.career.util;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.enums.FiveElement;
 import ssafy.SSAju.career.enums.TenGodConstants;
 import ssafy.SSAju.career.validator.CompatibilityValidator;
 
@@ -19,26 +21,11 @@ import java.util.Map;
  * - 지장간 보완: 지장간을 포함한 오행 분포 비교
  */
 @Component
+@RequiredArgsConstructor
 public class CompatibilityScoreCalculator {
-
-    private static final Map<String, String> ELEMENT_MAP = Map.of(
-            "甲", "木", "乙", "木",
-            "丙", "火", "丁", "火",
-            "戊", "土", "己", "土",
-            "庚", "金", "辛", "金",
-            "壬", "水", "癸", "水"
-    );
-
-    private static final List<String> ALL_ELEMENTS = List.of("木", "火", "土", "金", "水");
 
     private final TenGodCalculator tenGodCalculator;
     private final CompatibilityValidator compatibilityValidator;
-
-    public CompatibilityScoreCalculator(TenGodCalculator tenGodCalculator,
-                                         CompatibilityValidator compatibilityValidator) {
-        this.tenGodCalculator = tenGodCalculator;
-        this.compatibilityValidator = compatibilityValidator;
-    }
 
     /**
      * 궁합 점수를 계산합니다.
@@ -95,7 +82,7 @@ public class CompatibilityScoreCalculator {
         Map<String, Integer> companyElements = countElements(companyHiddenStems);
 
         int complementScore = 0;
-        for (String element : ALL_ELEMENTS) {
+        for (String element : FiveElement.allSymbols()) {
             int userCount = userElements.getOrDefault(element, 0);
             int companyCount = companyElements.getOrDefault(element, 0);
             // 사용자에게 부족한 오행을 기업이 가지고 있으면 높은 점수
@@ -112,10 +99,8 @@ public class CompatibilityScoreCalculator {
         Map<String, Integer> counts = new HashMap<>();
         for (List<String> stems : hiddenStems.asMap().values()) {
             for (String stem : stems) {
-                String element = ELEMENT_MAP.get(stem);
-                if (element != null) {
-                    counts.merge(element, 1, Integer::sum);
-                }
+                FiveElement element = FiveElement.fromStem(stem);
+                counts.merge(element.getSymbol(), 1, Integer::sum);
             }
         }
         return counts;

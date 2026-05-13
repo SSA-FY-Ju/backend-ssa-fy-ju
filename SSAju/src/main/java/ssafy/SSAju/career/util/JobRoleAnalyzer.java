@@ -1,9 +1,9 @@
 package ssafy.SSAju.career.util;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.enums.FiveElement;
-import ssafy.SSAju.dto.response.CompatibilityResponse;
 
 /**
  * 사용자 오행(五行) 분포와 직군 오행을 비교하여 직군 적합도를 분석합니다.
@@ -37,9 +37,11 @@ public class JobRoleAnalyzer {
 
     /**
      * 사용자 오행 분포와 직군 오행을 비교하여 직군 적합도를 분석합니다.
+     *
+     * @return {@link CompatibilityAnalysisData.RoleAnalysis} — Presentation Layer와 무관한 내부 VO
      */
-    public CompatibilityResponse.TargetRoleAnalysis analyze(FiveElements userFiveElements,
-                                                             JobCategoryEnum category) {
+    public CompatibilityAnalysisData.RoleAnalysis analyze(FiveElements userFiveElements,
+                                                           JobCategoryEnum category) {
         int primaryCount = userFiveElements.getCount(category.getPrimaryElement());
         int secondaryCount = userFiveElements.getCount(category.getSecondaryElement());
 
@@ -47,7 +49,7 @@ public class JobRoleAnalyzer {
         String synergy = buildSynergyText(category, primaryCount, secondaryCount);
         String warning = buildWarningText(category, userFiveElements);
 
-        return new CompatibilityResponse.TargetRoleAnalysis(matchScore, synergy, warning);
+        return new CompatibilityAnalysisData.RoleAnalysis(matchScore, synergy, warning);
     }
 
     private int calculateMatchScore(int primaryCount, int secondaryCount) {

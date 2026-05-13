@@ -75,7 +75,7 @@ class HiddenStemCalculatorTest {
 
         // When & Then
         assertThatThrownBy(() -> calculator.calculate(branches))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ssafy.SSAju.exception.InvalidSajuDataException.class)
                 .hasMessageContaining("정확히 4개");
     }
 
@@ -84,7 +84,7 @@ class HiddenStemCalculatorTest {
     void shouldThrowException_WhenUnknownBranch() {
         // Given & When & Then
         assertThatThrownBy(() -> calculator.getHiddenStems("甲"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ssafy.SSAju.exception.InvalidSajuDataException.class)
                 .hasMessageContaining("알 수 없는 지지");
     }
 

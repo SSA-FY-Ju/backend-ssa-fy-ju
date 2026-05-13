@@ -2,28 +2,50 @@ package ssafy.SSAju.career.enums;
 
 import java.util.Arrays;
 import java.util.List;
+import ssafy.SSAju.exception.InvalidSajuDataException;
 
 /**
  * 오행(五行) 열거형.
  * <p>
  * 음양오행론에서 사용하는 5가지 기운(木·火·土·金·水)과 각 오행의 상극(相剋) 관계를 정의합니다.
+ * 각 오행에 대응하는 천간(天干) 목록도 포함합니다.
  */
 public enum FiveElement {
 
-    WOOD("木"),
-    FIRE("火"),
-    EARTH("土"),
-    METAL("金"),
-    WATER("水");
+    WOOD("木",  List.of("甲", "乙")),
+    FIRE("火",  List.of("丙", "丁")),
+    EARTH("土", List.of("戊", "己")),
+    METAL("金", List.of("庚", "辛")),
+    WATER("水", List.of("壬", "癸"));
 
     private final String symbol;
+    private final List<String> heavenlyStems;
 
-    FiveElement(String symbol) {
+    FiveElement(String symbol, List<String> heavenlyStems) {
         this.symbol = symbol;
+        this.heavenlyStems = heavenlyStems;
     }
 
     public String getSymbol() {
         return symbol;
+    }
+
+    public List<String> getHeavenlyStems() {
+        return heavenlyStems;
+    }
+
+    /**
+     * 천간(天干) 한자로 해당 오행을 조회합니다.
+     *
+     * @param stem 천간 한자 (예: "甲", "乙")
+     * @return 해당 FiveElement
+     * @throws InvalidSajuDataException 알 수 없는 천간 값인 경우
+     */
+    public static FiveElement fromStem(String stem) {
+        return Arrays.stream(values())
+                .filter(e -> e.heavenlyStems.contains(stem))
+                .findFirst()
+                .orElseThrow(() -> new InvalidSajuDataException("알 수 없는 천간 값입니다: " + stem));
     }
 
     /**
@@ -48,7 +70,7 @@ public enum FiveElement {
         return Arrays.stream(values())
                 .filter(e -> e.symbol.equals(symbol))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("알 수 없는 오행 값입니다: " + symbol));
+                .orElseThrow(() -> new InvalidSajuDataException("알 수 없는 오행 값입니다: " + symbol));
     }
 
     /**
