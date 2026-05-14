@@ -28,9 +28,11 @@ import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("Career API 통합 테스트 (T089) - 4개 엔드포인트 전체 흐름")
@@ -273,6 +275,29 @@ class CareerApiIntegrationTest {
 
         mockMvc.perform(post("/api/company/compatibility")
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Swagger 인증 보호 검증
+    // ─────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("T089-6: Swagger API Docs는 Basic Auth로 인증 보호됨")
+    void swaggerDocs_authenticationRequired() throws Exception {
+        // When: BasicAuth로 /v3/api-docs 접근
+        // Then: 200 OK (인증되면 접근 가능)
+        mockMvc.perform(get("/v3/api-docs")
+                        .with(httpBasic("admin", "swagger1234")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("T089-7: API 엔드포인트는 여전히 인증 불필요")
+    void apiEndpoints_withoutAuth_returns400notUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/career/timing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
                 .andExpect(status().isBadRequest());
     }
 

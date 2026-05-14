@@ -1,11 +1,17 @@
 package ssafy.SSAju.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -17,6 +23,12 @@ import java.util.Arrays;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    @Value("${swagger.auth.username:admin}")
+    private String swaggerUsername;
+
+    @Value("${swagger.auth.password:swagger1234}")
+    private String swaggerPassword;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -25,14 +37,25 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth ->
-                // TODO: Phase 2 인증 추가 시 다음과 같이 수정 필요
-                // auth
-                //     .requestMatchers("/api/feedback/**").authenticated()  // 피드백 엔드포인트는 인증 필수
-                //     .requestMatchers("/api/auth/**", "/api/saju/**").permitAll()  // 공개 엔드포인트
-                //     .anyRequest().authenticated();
-                auth.anyRequest().permitAll());
+                auth
+                    .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**").authenticated()
+                    // TODO: Phase 2 인증 추가 시 다음과 같이 수정 필요
+                    // .requestMatchers("/api/feedback/**").authenticated()
+                    // .requestMatchers("/api/auth/**", "/api/saju/**").permitAll()
+                    .anyRequest().permitAll())
+            .httpBasic(Customizer.withDefaults());
 
         return http.build();
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        UserDetails user = User.builder()
+            .username(swaggerUsername)
+            .password("{noop}" + swaggerPassword)
+            .roles("USER")
+            .build();
+        return new InMemoryUserDetailsManager(user);
     }
 
     @Bean
