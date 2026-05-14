@@ -23,10 +23,10 @@ import java.util.Arrays;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${swagger.auth.username:admin}")
+    @Value("${swagger.auth.username}")
     private String swaggerUsername;
 
-    @Value("${swagger.auth.password:swagger1234}")
+    @Value("${swagger.auth.password}")
     private String swaggerPassword;
 
     @Bean
@@ -38,7 +38,7 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth ->
                 auth
-                    .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**").authenticated()
+                    .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").authenticated()
                     // TODO: Phase 2 인증 추가 시 다음과 같이 수정 필요
                     // .requestMatchers("/api/feedback/**").authenticated()
                     // .requestMatchers("/api/auth/**", "/api/saju/**").permitAll()

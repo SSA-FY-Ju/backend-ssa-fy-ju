@@ -33,3 +33,8 @@ saju:
     api-key: ${PUBLIC_DATA_API_KEY:test-key}
     timeout-seconds: 5
     max-retries: 1
+
+swagger:
+  auth:
+    username: admin
+    password: swagger1234

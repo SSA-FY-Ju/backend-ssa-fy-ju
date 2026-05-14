@@ -28,11 +28,12 @@ import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("Career API 통합 테스트 (T089) - 4개 엔드포인트 전체 흐름")
@@ -57,7 +58,9 @@ class CareerApiIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -285,11 +288,21 @@ class CareerApiIntegrationTest {
     @Test
     @DisplayName("T089-6: Swagger API Docs는 Basic Auth로 인증 보호됨")
     void swaggerDocs_authenticationRequired() throws Exception {
-        // When: BasicAuth로 /v3/api-docs 접근
-        // Then: 200 OK (인증되면 접근 가능)
+        // Given: 무인증 요청 → 401
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isUnauthorized());
+
+        // Given: BasicAuth 인증 요청 → 200
         mockMvc.perform(get("/v3/api-docs")
                         .with(httpBasic("admin", "swagger1234")))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("T089-6a: Swagger YAML Docs도 무인증 시 401 반환")
+    void swaggerYamlDocs_withoutAuth_returns401() throws Exception {
+        mockMvc.perform(get("/v3/api-docs.yaml"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
