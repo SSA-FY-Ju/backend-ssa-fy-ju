@@ -1052,7 +1052,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
 
 ## Phase 4: Polish & Integration
 
-- [ ] T088 Generate Swagger/OpenAPI documentation
+- [v] T088 Generate Swagger/OpenAPI documentation
   - Add: `springdoc-openapi-starter-webmvc-ui` dependency to `build.gradle`
   - Configure: `@OpenAPIDefinition`, `@Info`, `@Server` annotations in `SSAjuApplication.java`
   - Add: `@Operation`, `@RequestBody`, `@ApiResponse` annotations to all controllers
@@ -1061,7 +1061,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - File: All controller classes updated with OpenAPI annotations
   - Verify: Accessible at `http://localhost:8080/swagger-ui.html` after `./gradlew bootRun`
 
-- [ ] T089 Write integration test for full Career API flow (all 4 endpoints)
+- [v] T089 Write integration test for full Career API flow (all 4 endpoints)
   - Test:
     1. Create UserProfile with birthDate + birthTime
     2. POST /api/career/timing with birthDate + birthTime → Get H1/H2
@@ -1071,7 +1071,7 @@ Phase 1 (Setup) ──┬─→ Phase 2 (Foundational) ──┬─→ Phase 3.1
   - Verify: Data persistence (normalized entities TenGodData, HiddenStemData, CareerFortune, Industry, InterviewTip, Strength, RecommendedRole), response consistency, birthTime required fields validated, error handling across flows, **no JSON stored in tables**
   - File: `SSAju/src/test/java/ssafy/SSAju/integration/CareerApiIntegrationTest.java`
 
-- [ ] T090 Final verification: Run full test suite and validate coverage
+- [v] T090 Final verification: Run full test suite and validate coverage
   - Command: `./gradlew clean test`
   - Verify: 100% of Phase 1-3 tests pass, no warnings, coverage >80%
   - Verify: **All entities use normalized structure (no JSON columns)**
