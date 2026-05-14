@@ -1,5 +1,10 @@
 package ssafy.SSAju.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,11 +22,19 @@ import ssafy.SSAju.service.CompanyMatchingService;
 @RestController
 @RequestMapping("/api/company")
 @RequiredArgsConstructor
+@Tag(name = "기업 궁합", description = "사용자 사주와 기업 설립일 기반 궁합 분석 API")
 public class CompatibilityController {
 
     private final CompanyMatchingService companyMatchingService;
 
     @PostMapping("/compatibility")
+    @Operation(summary = "기업 궁합 분석", description = "사용자 사주와 기업 설립일의 십신+지장간 분석을 통한 호환성 점수 및 직군 적합도 반환")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "기업 궁합 분석 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 검증 실패 (userBirthDate/targetRole/companyName 누락)", content = @Content(schema = @Schema(hidden = true))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "기업 정보 미발견 (공공데이터 API)", content = @Content(schema = @Schema(hidden = true))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "FastAPI 타임아웃", content = @Content(schema = @Schema(hidden = true)))
+    })
     public ResponseEntity<ApiResponse<CompatibilityResponse>> analyzeCompatibility(
             @Valid @RequestBody CompatibilityRequest request
     ) {

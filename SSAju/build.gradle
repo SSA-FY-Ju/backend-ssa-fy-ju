@@ -51,6 +51,9 @@ dependencies {
 	implementation 'org.springframework.retry:spring-retry:2.0.11'
 	implementation 'org.springframework:spring-aspects'
 
+	// Swagger/OpenAPI 문서화
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
+
 	// Lombok
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'

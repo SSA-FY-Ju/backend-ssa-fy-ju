@@ -1,5 +1,10 @@
 package ssafy.SSAju.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,19 +22,23 @@ import ssafy.SSAju.service.FeedbackService;
 @RestController
 @RequestMapping("/api/feedback")
 @RequiredArgsConstructor
+@Tag(name = "피드백", description = "사용자 만족도 피드백 수집 API")
 public class FeedbackController {
 
     private final FeedbackService feedbackService;
 
     @PostMapping("/satisfaction")
+    @Operation(summary = "만족도 피드백 저장", description = "커리어 상담 결과에 대한 사용자 만족도 및 피드백 저장")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "피드백 저장 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 검증 실패 (sajuResultId/feedbackType/satisfactionStatus 누락)", content = @Content(schema = @Schema(hidden = true))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 SajuResult", content = @Content(schema = @Schema(hidden = true)))
+    })
     public ResponseEntity<ApiResponse<SatisfactionFeedbackResponse>> submitFeedback(
             @Valid @RequestBody SatisfactionFeedbackRequest request
             // TODO: Phase 2 로그인 추가 시 @AuthenticationPrincipal UserPrincipal user 추가
-            // - 현재는 인증 없음 (SecurityConfig.permitAll)
-            // - Phase 2에서 인증 컨텍스트 추가 후 현재 사용자 정보 받기
     ) {
         log.info("만족도 피드백 요청 수신");
-        // TODO: Phase 2에서 user 정보를 FeedbackService에 전달
         SatisfactionFeedbackResponse response = feedbackService.saveFeedback(request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
