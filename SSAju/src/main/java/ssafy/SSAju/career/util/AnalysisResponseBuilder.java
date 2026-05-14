@@ -127,8 +127,8 @@ public class AnalysisResponseBuilder {
     /**
      * 사용자 오행 분포를 기반으로 향후 5개월 운세 데이터를 빌드합니다.
      *
-     * 각 월의 계절 오행(봄=木, 여름=火, 가을=金, 겨울=水)이 사용자 오행 분포와
-     * 얼마나 일치하는지를 기반으로 점수를 산정합니다.
+     * 각 월의 계절 오행(겨울=水, 봄=木, 여름=火, 가을=金)과 사용자 오행 분포의
+     * 일치 정도로 점수를 산정합니다.
      */
     public List<CompatibilityAnalysisData.MonthlyForecast> buildMonthlyForecasts(FiveElements userFiveElements) {
         int currentMonth = LocalDate.now().getMonthValue();
@@ -139,9 +139,7 @@ public class AnalysisResponseBuilder {
             String seasonElement = getSeasonElement(forecastMonth);
             int elementCount = userFiveElements.getCount(seasonElement);
 
-            int score = Math.min(
-                    AnalysisConstants.MEDIUM_COMPATIBILITY_THRESHOLD + elementCount * 10,
-                    AnalysisConstants.MAX_SCORE);
+            int score = calculateForecastScore(elementCount);
             ForecastStatus status = toForecastStatus(score);
             String message = buildForecastMessage(forecastMonth, seasonElement, elementCount, status);
 
@@ -150,12 +148,28 @@ public class AnalysisResponseBuilder {
         return forecasts;
     }
 
+    /**
+     * 해당 계절 오행 보유 수를 기반으로 점수를 계산합니다. (순수 계산 로직)
+     *
+     * elementCount=0 → 40점(CAUTION 경계), 1 → 50점, 이후 10점씩 증가.
+     */
+    private int calculateForecastScore(int elementCount) {
+        return Math.min(
+                Math.max(
+                        AnalysisConstants.MEDIUM_COMPATIBILITY_THRESHOLD + (elementCount - 1) * 10,
+                        AnalysisConstants.MIN_SCORE),
+                AnalysisConstants.MAX_SCORE);
+    }
+
+    /**
+     * 24절기 기준 계절-오행 매핑. (겨울: 12·1·2월, 봄: 3·4·5월, 여름: 6·7·8월, 가을: 9·10·11월)
+     */
     private String getSeasonElement(int month) {
         return switch (month) {
-            case 1, 2, 3 -> FiveElement.WOOD.getSymbol();
-            case 4, 5, 6 -> FiveElement.FIRE.getSymbol();
-            case 7, 8, 9 -> FiveElement.METAL.getSymbol();
-            default ->       FiveElement.WATER.getSymbol();
+            case 12, 1, 2 -> FiveElement.WATER.getSymbol();
+            case 3, 4, 5  -> FiveElement.WOOD.getSymbol();
+            case 6, 7, 8  -> FiveElement.FIRE.getSymbol();
+            default        -> FiveElement.METAL.getSymbol();
         };
     }
 
@@ -167,9 +181,9 @@ public class AnalysisResponseBuilder {
 
     private String buildForecastMessage(int month, String element, int elementCount, ForecastStatus status) {
         return switch (status) {
-            case LUCKY  -> String.format("%d월은 '%s' 기운이 강해 사용자의 오행과 조화를 이루는 시기입니다. 적극적인 행동을 추천합니다.", month, element);
+            case LUCKY   -> String.format("%d월은 '%s' 기운이 강해 사용자의 오행과 조화를 이루는 시기입니다. 적극적인 행동을 추천합니다.", month, element);
             case CAUTION -> String.format("%d월은 '%s' 기운이 부족한 시기입니다. 신중하게 결정하세요.", month, element);
-            default     -> elementCount > 0
+            default      -> elementCount > 0
                     ? String.format("%d월은 '%s' 기운이 안정적인 시기입니다. 꾸준한 준비를 지속하세요.", month, element)
                     : String.format("%d월은 '%s' 기운을 보완할 역량 강화에 집중하세요.", month, element);
         };
