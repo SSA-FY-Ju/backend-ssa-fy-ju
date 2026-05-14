@@ -1,5 +1,6 @@
 package ssafy.SSAju.career.util;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.FiveElements;
@@ -18,7 +19,11 @@ import java.util.List;
  * 생성된 VO는 Persistence Layer에 저장되거나 CompatibilityResponse로 변환됩니다.
  */
 @Component
+@RequiredArgsConstructor
 public class AnalysisResponseBuilder {
+
+    private final ForecastScoreCalculator forecastScoreCalculator;
+    private final RoleCompatibilityCalculator roleCompatibilityCalculator;
 
     /**
      * 오행 분포 분석 데이터를 빌드합니다.
@@ -59,17 +64,16 @@ public class AnalysisResponseBuilder {
      * 직군 카테고리 기반으로 실행 전략을 빌드합니다.
      */
     public CompatibilityAnalysisData.StrategyInfo buildActionableStrategy(JobCategoryEnum category) {
-        List<String> keywords = List.of("체계적 설계", "논리적 사고", "안정적 실행");
         String weaknessDefense = String.format(
                 "%s 분야 관련 약점 질문 시, 지속적인 학습과 성장 의지를 강조하세요.",
                 category.getDisplayName());
         List<String> luckyDays = List.of(
-                LocalDate.now().plusDays(7).toString(),
-                LocalDate.now().plusDays(14).toString(),
-                LocalDate.now().plusDays(21).toString()
+                LocalDate.now().plusDays(AnalysisConstants.LUCKY_DAY_FIRST_OFFSET).toString(),
+                LocalDate.now().plusDays(AnalysisConstants.LUCKY_DAY_SECOND_OFFSET).toString(),
+                LocalDate.now().plusDays(AnalysisConstants.LUCKY_DAY_THIRD_OFFSET).toString()
         );
-        String preferredTime = "오전 09:00 ~ 11:00";
-        return new CompatibilityAnalysisData.StrategyInfo(keywords, weaknessDefense, luckyDays, preferredTime);
+        return new CompatibilityAnalysisData.StrategyInfo(
+                category.getKeywords(), weaknessDefense, luckyDays, AnalysisConstants.PREFERRED_TIME);
     }
 
     /**
@@ -94,33 +98,23 @@ public class AnalysisResponseBuilder {
      */
     public List<CompatibilityAnalysisData.RoleCompatibility> buildRoleCompatibilities(
             JobCategoryEnum category, FiveElements userFiveElements) {
-        int primaryScore = Math.min(
-                userFiveElements.getCount(category.getPrimaryElement())
-                        * AnalysisConstants.PRIMARY_ROLE_SCORE_MULTIPLIER
-                        + AnalysisConstants.PRIMARY_ROLE_SCORE_BASE,
-                AnalysisConstants.MAX_SCORE);
-        int secondaryScore = Math.max(
-                primaryScore - AnalysisConstants.SECONDARY_ROLE_SCORE_PENALTY,
-                AnalysisConstants.MIN_SCORE);
+        int primaryScore   = roleCompatibilityCalculator.calculatePrimary(userFiveElements, category);
+        int secondaryScore = roleCompatibilityCalculator.calculateSecondary(primaryScore);
 
-        String primaryTag = primaryScore >= AnalysisConstants.TAG_STRONG_RECOMMEND_THRESHOLD
-                ? "강력 추천" : "보통";
-        String secondaryTag = secondaryScore >= AnalysisConstants.TAG_NORMAL_THRESHOLD
-                ? "보통" : "신중 검토";
+        String primaryTag   = primaryScore   >= AnalysisConstants.TAG_STRONG_RECOMMEND_THRESHOLD ? "강력 추천" : "보통";
+        String secondaryTag = secondaryScore >= AnalysisConstants.TAG_NORMAL_THRESHOLD            ? "보통"     : "신중 검토";
 
         return List.of(
                 new CompatibilityAnalysisData.RoleCompatibility(
                         category.getDisplayName() + " 전문가",
                         primaryScore,
                         String.format("%s 오행 기반 적성이 높습니다.", category.getPrimaryElement()),
-                        primaryTag
-                ),
+                        primaryTag),
                 new CompatibilityAnalysisData.RoleCompatibility(
                         category.getDisplayName() + " 리드",
                         secondaryScore,
                         "리더십 역량과 기술 전문성을 함께 요구합니다.",
-                        secondaryTag
-                )
+                        secondaryTag)
         );
     }
 
@@ -134,43 +128,18 @@ public class AnalysisResponseBuilder {
         int currentMonth = LocalDate.now().getMonthValue();
         List<CompatibilityAnalysisData.MonthlyForecast> forecasts = new ArrayList<>();
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < AnalysisConstants.FORECAST_MONTH_COUNT; i++) {
             int forecastMonth = ((currentMonth - 1 + i) % 12) + 1;
-            String seasonElement = getSeasonElement(forecastMonth);
+            String seasonElement = FiveElement.fromMonth(forecastMonth).getSymbol();
             int elementCount = userFiveElements.getCount(seasonElement);
 
-            int score = calculateForecastScore(elementCount);
+            int score = forecastScoreCalculator.calculate(elementCount);
             ForecastStatus status = toForecastStatus(score);
             String message = buildForecastMessage(forecastMonth, seasonElement, elementCount, status);
 
             forecasts.add(new CompatibilityAnalysisData.MonthlyForecast(forecastMonth, score, status, message));
         }
         return forecasts;
-    }
-
-    /**
-     * 해당 계절 오행 보유 수를 기반으로 점수를 계산합니다. (순수 계산 로직)
-     *
-     * elementCount=0 → 40점(CAUTION 경계), 1 → 50점, 이후 10점씩 증가.
-     */
-    private int calculateForecastScore(int elementCount) {
-        return Math.min(
-                Math.max(
-                        AnalysisConstants.MEDIUM_COMPATIBILITY_THRESHOLD + (elementCount - 1) * 10,
-                        AnalysisConstants.MIN_SCORE),
-                AnalysisConstants.MAX_SCORE);
-    }
-
-    /**
-     * 24절기 기준 계절-오행 매핑. (겨울: 12·1·2월, 봄: 3·4·5월, 여름: 6·7·8월, 가을: 9·10·11월)
-     */
-    private String getSeasonElement(int month) {
-        return switch (month) {
-            case 12, 1, 2 -> FiveElement.WATER.getSymbol();
-            case 3, 4, 5  -> FiveElement.WOOD.getSymbol();
-            case 6, 7, 8  -> FiveElement.FIRE.getSymbol();
-            default        -> FiveElement.METAL.getSymbol();
-        };
     }
 
     private ForecastStatus toForecastStatus(int score) {

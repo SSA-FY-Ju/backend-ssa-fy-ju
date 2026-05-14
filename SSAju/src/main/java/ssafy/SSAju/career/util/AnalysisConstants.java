@@ -76,4 +76,30 @@ public final class AnalysisConstants {
 
     /** 이 개수 이상이면 "강한 상극" 경고 문구를 출력 */
     public static final int STRONG_OPPOSING_THRESHOLD = 2;
+
+    // ─────────────────────────────────────────
+    // 월별 운세(ForecastScoreCalculator)
+    // ─────────────────────────────────────────
+
+    /** 월별 운세 출력 개월 수 */
+    public static final int FORECAST_MONTH_COUNT = 5;
+
+    /** 오행 보유 수 1개당 점수 증분 */
+    public static final int FORECAST_SCORE_STEP = 10;
+
+    // ─────────────────────────────────────────
+    // 실행 전략(AnalysisResponseBuilder)
+    // ─────────────────────────────────────────
+
+    /** 행운의 날 첫 번째 오프셋(일) */
+    public static final int LUCKY_DAY_FIRST_OFFSET  = 7;
+
+    /** 행운의 날 두 번째 오프셋(일) */
+    public static final int LUCKY_DAY_SECOND_OFFSET = 14;
+
+    /** 행운의 날 세 번째 오프셋(일) */
+    public static final int LUCKY_DAY_THIRD_OFFSET  = 21;
+
+    /** 전략 집중 시간 문구 */
+    public static final String PREFERRED_TIME = "오전 09:00 ~ 11:00";
 }
