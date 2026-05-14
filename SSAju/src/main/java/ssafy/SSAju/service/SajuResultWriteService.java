@@ -9,12 +9,17 @@ import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ssafy.SSAju.career.entity.CareerFortune;
+import ssafy.SSAju.career.entity.HiddenStemData;
+import ssafy.SSAju.career.entity.SajuFullData;
 import ssafy.SSAju.career.entity.SajuResult;
+import ssafy.SSAju.career.entity.TenGodData;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.sql.SQLException;
+import java.util.List;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
@@ -64,6 +69,61 @@ public class SajuResultWriteService {
             sajuResultRepository.deleteByUserProfileJpql(userProfile);
         });
         sajuResultRepository.save(newResult);
+    }
+
+    /**
+     * insertOrIgnore로 삽입된 새 SajuResult에 자식 엔티티를 붙여 저장.
+     *
+     * insertOrIgnore(AUTO COMMIT) 성공 후 자식 저장이 단일 트랜잭션으로 보호되어,
+     * 자식 저장 실패 시 롤백되어 root만 남는 불일치 상태를 방지.
+     */
+    @Transactional
+    public SajuResult saveNewResultWithChildren(SajuResult saved, SajuResult source) {
+        SajuFullData srcFullData = source.getSajuFullData();
+        if (srcFullData != null) {
+            saved.assignSajuFullData(SajuFullData.builder()
+                    .sajuResult(saved)
+                    .yearPillar(srcFullData.getYearPillar())
+                    .monthPillar(srcFullData.getMonthPillar())
+                    .dayPillar(srcFullData.getDayPillar())
+                    .hourPillar(srcFullData.getHourPillar())
+                    .dayMaster(srcFullData.getDayMaster())
+                    .dayMasterElement(srcFullData.getDayMasterElement())
+                    .fiveElements(srcFullData.getFiveElements())
+                    .solarCorrection(srcFullData.getSolarCorrection())
+                    .build());
+        }
+
+        List<TenGodData> tenGods = source.getTenGodDataList().stream()
+                .map(e -> TenGodData.builder()
+                        .sajuResult(saved)
+                        .tenGodName(e.getTenGodName())
+                        .score(e.getScore())
+                        .build())
+                .toList();
+
+        List<HiddenStemData> hiddenStems = source.getHiddenStemDataList().stream()
+                .map(e -> HiddenStemData.builder()
+                        .sajuResult(saved)
+                        .earthlyBranch(e.getEarthlyBranch())
+                        .hiddenStem(e.getHiddenStem())
+                        .build())
+                .toList();
+
+        saved.assignTenGodData(tenGods);
+        saved.assignHiddenStemData(hiddenStems);
+
+        CareerFortune cf = source.getCareerFortune();
+        if (cf != null) {
+            saved.assignCareerFortune(CareerFortune.builder()
+                    .sajuResult(saved)
+                    .favoredPeriod(cf.getFavoredPeriod())
+                    .confidenceScore(cf.getConfidenceScore())
+                    .reasoning(cf.getReasoning())
+                    .build());
+        }
+
+        return sajuResultRepository.save(saved);
     }
 
     /**

@@ -127,7 +127,7 @@ class CompanyMatchingServiceTest {
                 .willReturn(new CompatibilityAnalysisData.StrategyInfo(List.of(), "약점 방어", List.of(), "09:00"));
         given(analysisResponseBuilder.buildInterviewQuestions(any())).willReturn(List.of());
         given(analysisResponseBuilder.buildRoleCompatibilities(any(), any())).willReturn(List.of());
-        given(analysisResponseBuilder.buildMonthlyForecasts()).willReturn(List.of());
+        given(analysisResponseBuilder.buildMonthlyForecasts(any())).willReturn(List.of());
         given(analysisResponseBuilder.buildCautions(any(), any())).willReturn(List.of());
         given(analysisResponseBuilder.buildSummary(anyInt(), any())).willReturn("테스트 요약");
     }

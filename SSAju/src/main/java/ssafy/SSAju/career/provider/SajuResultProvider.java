@@ -2,19 +2,14 @@ package ssafy.SSAju.career.provider;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import ssafy.SSAju.career.entity.CareerFortune;
-import ssafy.SSAju.career.entity.HiddenStemData;
-import ssafy.SSAju.career.entity.SajuFullData;
 import ssafy.SSAju.career.entity.SajuResult;
-import ssafy.SSAju.career.entity.TenGodData;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.repository.SajuResultJdbcRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
-
-import java.util.List;
+import ssafy.SSAju.service.SajuResultWriteService;
 
 @Component
 @RequiredArgsConstructor
@@ -22,6 +17,7 @@ public class SajuResultProvider {
 
     private final SajuResultRepository sajuResultRepository;
     private final SajuResultJdbcRepository sajuResultJdbcRepository;
+    private final SajuResultWriteService sajuResultWriteService;
 
     public SajuResult findOrCreate(UserProfile userProfile, SajuResult newResult) {
         if (userProfile == null || newResult == null) {
@@ -43,55 +39,8 @@ public class SajuResultProvider {
                 .orElseThrow(() -> new DataAccessException(ErrorMessageConstants.SAJU_RESULT_ACCESS_FAILED.getMessage()));
 
         if (inserted == 1) {
-            attachChildren(saved, newResult);
-            return sajuResultRepository.save(saved);
+            return sajuResultWriteService.saveNewResultWithChildren(saved, newResult);
         }
         return saved;
-    }
-
-    private void attachChildren(SajuResult saved, SajuResult source) {
-        SajuFullData srcFullData = source.getSajuFullData();
-        if (srcFullData != null) {
-            saved.assignSajuFullData(SajuFullData.builder()
-                    .sajuResult(saved)
-                    .yearPillar(srcFullData.getYearPillar())
-                    .monthPillar(srcFullData.getMonthPillar())
-                    .dayPillar(srcFullData.getDayPillar())
-                    .hourPillar(srcFullData.getHourPillar())
-                    .dayMaster(srcFullData.getDayMaster())
-                    .dayMasterElement(srcFullData.getDayMasterElement())
-                    .fiveElements(srcFullData.getFiveElements())
-                    .solarCorrection(srcFullData.getSolarCorrection())
-                    .build());
-        }
-
-        List<TenGodData> tenGods = source.getTenGodDataList().stream()
-                .map(e -> TenGodData.builder()
-                        .sajuResult(saved)
-                        .tenGodName(e.getTenGodName())
-                        .score(e.getScore())
-                        .build())
-                .toList();
-
-        List<HiddenStemData> hiddenStems = source.getHiddenStemDataList().stream()
-                .map(e -> HiddenStemData.builder()
-                        .sajuResult(saved)
-                        .earthlyBranch(e.getEarthlyBranch())
-                        .hiddenStem(e.getHiddenStem())
-                        .build())
-                .toList();
-
-        saved.assignTenGodData(tenGods);
-        saved.assignHiddenStemData(hiddenStems);
-
-        CareerFortune cf = source.getCareerFortune();
-        if (cf != null) {
-            saved.assignCareerFortune(CareerFortune.builder()
-                    .sajuResult(saved)
-                    .favoredPeriod(cf.getFavoredPeriod())
-                    .confidenceScore(cf.getConfidenceScore())
-                    .reasoning(cf.getReasoning())
-                    .build());
-        }
     }
 }

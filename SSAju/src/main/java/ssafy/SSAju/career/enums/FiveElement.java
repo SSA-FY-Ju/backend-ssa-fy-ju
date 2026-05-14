@@ -12,18 +12,21 @@ import ssafy.SSAju.exception.InvalidSajuDataException;
  */
 public enum FiveElement {
 
-    WOOD("木",  List.of("甲", "乙")),
-    FIRE("火",  List.of("丙", "丁")),
-    EARTH("土", List.of("戊", "己")),
-    METAL("金", List.of("庚", "辛")),
-    WATER("水", List.of("壬", "癸"));
+    WOOD ("木", List.of("甲", "乙"),        List.of(3, 4, 5)),
+    FIRE ("火", List.of("丙", "丁"),        List.of(6, 7, 8)),
+    EARTH("土", List.of("戊", "己"),        List.of()),
+    METAL("金", List.of("庚", "辛"),        List.of(9, 10, 11)),
+    WATER("水", List.of("壬", "癸"),        List.of(12, 1, 2));
 
     private final String symbol;
     private final List<String> heavenlyStems;
+    /** 24절기 기준 해당 계절에 속하는 월 목록. EARTH(환절기)는 빈 리스트. */
+    private final List<Integer> seasonMonths;
 
-    FiveElement(String symbol, List<String> heavenlyStems) {
+    FiveElement(String symbol, List<String> heavenlyStems, List<Integer> seasonMonths) {
         this.symbol = symbol;
         this.heavenlyStems = heavenlyStems;
+        this.seasonMonths = seasonMonths;
     }
 
     public String getSymbol() {
@@ -32,6 +35,17 @@ public enum FiveElement {
 
     public List<String> getHeavenlyStems() {
         return heavenlyStems;
+    }
+
+    /**
+     * 월(1~12)로 해당 계절 오행을 조회합니다. (24절기 기준)
+     * 환절기에 해당하는 월이 없으면 EARTH를 반환합니다.
+     */
+    public static FiveElement fromMonth(int month) {
+        return Arrays.stream(values())
+                .filter(e -> e.seasonMonths.contains(month))
+                .findFirst()
+                .orElse(EARTH);
     }
 
     /**
