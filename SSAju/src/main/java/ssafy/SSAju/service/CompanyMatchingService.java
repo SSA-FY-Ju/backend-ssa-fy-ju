@@ -118,7 +118,7 @@ public class CompanyMatchingService {
                 responseBuilder.buildActionableStrategy(request.targetRole().category()),
                 responseBuilder.buildInterviewQuestions(request.targetRole().category()),
                 responseBuilder.buildRoleCompatibilities(request.targetRole().category(), userFiveElements),
-                responseBuilder.buildMonthlyForecasts(),
+                responseBuilder.buildMonthlyForecasts(userFiveElements),
                 responseBuilder.buildCautions(userFiveElements, request.targetRole().category())
         );
         String summary = responseBuilder.buildSummary(compatibilityScore, request.targetRole().category());

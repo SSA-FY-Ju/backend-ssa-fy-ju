@@ -7,6 +7,7 @@ import ssafy.SSAju.career.enums.FiveElement;
 import ssafy.SSAju.career.enums.ForecastStatus;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -124,23 +125,54 @@ public class AnalysisResponseBuilder {
     }
 
     /**
-     * 현재 월 기준으로 향후 5개월 운세 데이터를 빌드합니다.
-     * TODO: 현재 하드코딩된 임시 로직. 사용자 사주 데이터 기반 실제 분석으로 개선 필요.
+     * 사용자 오행 분포를 기반으로 향후 5개월 운세 데이터를 빌드합니다.
+     *
+     * 각 월의 계절 오행(봄=木, 여름=火, 가을=金, 겨울=水)이 사용자 오행 분포와
+     * 얼마나 일치하는지를 기반으로 점수를 산정합니다.
      */
-    public List<CompatibilityAnalysisData.MonthlyForecast> buildMonthlyForecasts() {
+    public List<CompatibilityAnalysisData.MonthlyForecast> buildMonthlyForecasts(FiveElements userFiveElements) {
         int currentMonth = LocalDate.now().getMonthValue();
-        return List.of(
-                new CompatibilityAnalysisData.MonthlyForecast(
-                        currentMonth, 75, ForecastStatus.LUCKY, "적극적인 지원 시기입니다."),
-                new CompatibilityAnalysisData.MonthlyForecast(
-                        (currentMonth % 12) + 1, 50, ForecastStatus.NORMAL, "역량 강화에 집중하세요."),
-                new CompatibilityAnalysisData.MonthlyForecast(
-                        ((currentMonth + 1) % 12) + 1, 85, ForecastStatus.LUCKY, "면접 성과가 기대되는 시기입니다."),
-                new CompatibilityAnalysisData.MonthlyForecast(
-                        ((currentMonth + 2) % 12) + 1, 40, ForecastStatus.CAUTION, "신중한 결정이 필요한 시기입니다."),
-                new CompatibilityAnalysisData.MonthlyForecast(
-                        ((currentMonth + 3) % 12) + 1, 65, ForecastStatus.NORMAL, "꾸준한 준비가 결실을 맺는 시기입니다.")
-        );
+        List<CompatibilityAnalysisData.MonthlyForecast> forecasts = new ArrayList<>();
+
+        for (int i = 0; i < 5; i++) {
+            int forecastMonth = ((currentMonth - 1 + i) % 12) + 1;
+            String seasonElement = getSeasonElement(forecastMonth);
+            int elementCount = userFiveElements.getCount(seasonElement);
+
+            int score = Math.min(
+                    AnalysisConstants.MEDIUM_COMPATIBILITY_THRESHOLD + elementCount * 10,
+                    AnalysisConstants.MAX_SCORE);
+            ForecastStatus status = toForecastStatus(score);
+            String message = buildForecastMessage(forecastMonth, seasonElement, elementCount, status);
+
+            forecasts.add(new CompatibilityAnalysisData.MonthlyForecast(forecastMonth, score, status, message));
+        }
+        return forecasts;
+    }
+
+    private String getSeasonElement(int month) {
+        return switch (month) {
+            case 1, 2, 3 -> FiveElement.WOOD.getSymbol();
+            case 4, 5, 6 -> FiveElement.FIRE.getSymbol();
+            case 7, 8, 9 -> FiveElement.METAL.getSymbol();
+            default ->       FiveElement.WATER.getSymbol();
+        };
+    }
+
+    private ForecastStatus toForecastStatus(int score) {
+        if (score >= AnalysisConstants.HIGH_COMPATIBILITY_THRESHOLD) return ForecastStatus.LUCKY;
+        if (score >= AnalysisConstants.MEDIUM_COMPATIBILITY_THRESHOLD) return ForecastStatus.NORMAL;
+        return ForecastStatus.CAUTION;
+    }
+
+    private String buildForecastMessage(int month, String element, int elementCount, ForecastStatus status) {
+        return switch (status) {
+            case LUCKY  -> String.format("%d월은 '%s' 기운이 강해 사용자의 오행과 조화를 이루는 시기입니다. 적극적인 행동을 추천합니다.", month, element);
+            case CAUTION -> String.format("%d월은 '%s' 기운이 부족한 시기입니다. 신중하게 결정하세요.", month, element);
+            default     -> elementCount > 0
+                    ? String.format("%d월은 '%s' 기운이 안정적인 시기입니다. 꾸준한 준비를 지속하세요.", month, element)
+                    : String.format("%d월은 '%s' 기운을 보완할 역량 강화에 집중하세요.", month, element);
+        };
     }
 
     /**
