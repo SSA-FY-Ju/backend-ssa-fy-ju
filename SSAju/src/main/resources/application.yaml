@@ -36,8 +36,8 @@ springdoc:
 
 swagger:
   auth:
-    username: ${SWAGGER_USERNAME:admin}
-    password: ${SWAGGER_PASSWORD:swagger1234}
+    username: ${SWAGGER_USERNAME}
+    password: ${SWAGGER_PASSWORD}
 
 saju:
   fastapi:
