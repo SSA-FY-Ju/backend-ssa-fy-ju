@@ -38,3 +38,8 @@ swagger:
   auth:
     username: admin
     password: swagger1234
+
+jwt:
+  secret: test-secret-key-must-be-at-least-256-bits-long-for-hmac-sha256
+  access-token-expiration: 3600000
+  refresh-token-expiration: 604800000

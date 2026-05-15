@@ -39,6 +39,11 @@ swagger:
     username: ${SWAGGER_USERNAME}
     password: ${SWAGGER_PASSWORD}
 
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 3600000     # 1시간 (ms)
+  refresh-token-expiration: 604800000  # 7일 (ms)
+
 saju:
   fastapi:
     url: ${FASTAPI_URL}

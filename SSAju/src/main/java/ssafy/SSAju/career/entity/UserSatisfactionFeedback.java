@@ -9,6 +9,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import ssafy.SSAju.career.enums.FeedbackType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
+import ssafy.SSAju.entity.User;
 
 import java.time.LocalDateTime;
 
@@ -18,7 +19,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
     name = "user_satisfaction_feedback",
-    indexes = @Index(name = "idx_feedback_saju_result_created", columnList = "saju_result_id, created_at")
+    indexes = @Index(name = "idx_feedback_saju_result_created", columnList = "saju_result_id, created_at"),
+    uniqueConstraints = @UniqueConstraint(name = "uk_feedback_saju_user", columnNames = {"saju_result_id", "user_id"})
 )
 public class UserSatisfactionFeedback {
 
@@ -27,19 +29,12 @@ public class UserSatisfactionFeedback {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "saju_result_id", nullable = false)
     private SajuResult sajuResult;
-
-    // TODO: Phase 2 인증 추가 시 User 필드 추가 필요
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "user_id", nullable = false)
-    // private User user;
-    //
-    // 또한 @Table의 uniqueConstraints 추가:
-    // uniqueConstraints = {
-    //     @UniqueConstraint(name = "uk_feedback_saju_user", columnNames = {"saju_result_id", "user_id"})
-    // }
-    // → 사용자당 SajuResult당 피드백 1개만 가능
 
     @Enumerated(EnumType.STRING)
     @Column(name = "feedback_type", nullable = false)
@@ -57,8 +52,9 @@ public class UserSatisfactionFeedback {
     private LocalDateTime createdAt;
 
     @Builder
-    public UserSatisfactionFeedback(SajuResult sajuResult, FeedbackType feedbackType,
+    public UserSatisfactionFeedback(User user, SajuResult sajuResult, FeedbackType feedbackType,
                                     SatisfactionStatus satisfactionStatus, String feedbackContent) {
+        this.user = user;
         this.sajuResult = sajuResult;
         this.feedbackType = feedbackType;
         this.satisfactionStatus = satisfactionStatus;
