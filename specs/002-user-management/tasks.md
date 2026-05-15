@@ -16,8 +16,8 @@
 
 **Purpose**: Project initialization and Spring Boot configuration
 
-- [ ] T001 Initialize Spring Security PasswordEncoder configuration in SSAju/src/main/java/ssafy/SSAju/config/SecurityConfig.java
-- [ ] T002 [P] Create custom exception hierarchy (User, Authentication, DailyApiUsage exceptions) in SSAju/src/main/java/ssafy/SSAju/exception/
+- [v] T001 Initialize Spring Security PasswordEncoder configuration in SSAju/src/main/java/ssafy/SSAju/config/SecurityConfig.java
+- [v] T002 [P] Create custom exception hierarchy (User, Authentication, DailyApiUsage exceptions) in SSAju/src/main/java/ssafy/SSAju/exception/
 
 ---
 
