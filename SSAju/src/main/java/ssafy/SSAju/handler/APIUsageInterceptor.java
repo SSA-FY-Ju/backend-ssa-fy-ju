@@ -35,11 +35,10 @@ public class APIUsageInterceptor implements HandlerInterceptor {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
-                || authentication.getPrincipal() instanceof String) {
+                || !(authentication.getPrincipal() instanceof Long userId)) {
             return true;
         }
 
-        Long userId = (Long) authentication.getPrincipal();
         dailyApiUsageService.checkAndIncrementDailyUsage(userId);
         return true;
     }

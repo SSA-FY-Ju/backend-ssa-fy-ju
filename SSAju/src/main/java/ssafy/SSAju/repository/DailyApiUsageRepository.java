@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 @Repository
-public interface DailyApiUsageRepository extends JpaRepository<DailyApiUsage, Long> {
+public interface DailyApiUsageRepository extends JpaRepository<DailyApiUsage, Long>, DailyApiUsageCustomRepository {
 
     Optional<DailyApiUsage> findByUserIdAndUsageDate(Long userId, LocalDate usageDate);
 }

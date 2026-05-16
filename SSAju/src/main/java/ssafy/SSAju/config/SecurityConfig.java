@@ -1,5 +1,6 @@
 package ssafy.SSAju.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,9 +21,13 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import ssafy.SSAju.filter.JwtAuthenticationFilter;
+import ssafy.SSAju.security.JwtAccessDeniedHandler;
+import ssafy.SSAju.security.JwtAuthenticationEntryPoint;
+import ssafy.SSAju.security.JwtExceptionFilter;
 import ssafy.SSAju.util.JwtUtil;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -34,8 +39,29 @@ public class SecurityConfig {
     @Value("${swagger.auth.password}")
     private String swaggerPassword;
 
+    @Value("${cors.allowed-origins}")
+    private String corsAllowedOrigins;
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil) throws Exception {
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
+    }
+
+    @Bean
+    public JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint(ObjectMapper objectMapper) {
+        return new JwtAuthenticationEntryPoint(objectMapper);
+    }
+
+    @Bean
+    public JwtAccessDeniedHandler jwtAccessDeniedHandler(ObjectMapper objectMapper) {
+        return new JwtAccessDeniedHandler(objectMapper);
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil,
+                                           JwtAuthenticationEntryPoint entryPoint,
+                                           JwtAccessDeniedHandler accessDeniedHandler,
+                                           ObjectMapper objectMapper) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -48,7 +74,11 @@ public class SecurityConfig {
                     .requestMatchers("/api/career/**", "/api/feedback/**", "/api/company/**").permitAll()
                     .requestMatchers("/api/mypage/**", "/api/users/**").authenticated()
                     .anyRequest().permitAll())
-            .addFilterBefore(new JwtAuthenticationFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class)
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(entryPoint)
+                .accessDeniedHandler(accessDeniedHandler))
+            .addFilterBefore(new JwtExceptionFilter(objectMapper), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new JwtAuthenticationFilter(jwtUtil), JwtExceptionFilter.class)
             .httpBasic(Customizer.withDefaults());
 
         return http.build();
@@ -71,8 +101,10 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        List<String> allowedOrigins = Arrays.asList(corsAllowedOrigins.split(","));
+
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);

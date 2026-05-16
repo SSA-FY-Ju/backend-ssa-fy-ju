@@ -51,7 +51,7 @@ public class RefreshToken {
     }
 
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
+        return !LocalDateTime.now().isBefore(expiresAt);
     }
 
     public void revoke() {
@@ -62,11 +62,11 @@ public class RefreshToken {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof RefreshToken that)) return false;
-        return Objects.equals(id, that.id);
+        return id != null && id.equals(that.id);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id);
+        return id != null ? id.hashCode() : System.identityHashCode(this);
     }
 }

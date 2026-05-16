@@ -75,6 +75,13 @@
   - CORS configuration
   - PasswordEncoder bean (BCrypt)
 
+- [ ] T010-1 [P] JWT 에러 처리 및 예외 프레임워크 구현 (Security Components) in SSAju/src/main/java/ssafy/SSAju/security/
+  - **JwtExceptionFilter**: `JwtAuthenticationFilter` 앞단에 배치하여 토큰 검증 시 발생하는 예외(`ExpiredJwtException`, `SignatureException`, `MalformedJwtException` 등)를 캐치하고 HTTP 401 JSON 응답으로 반환 (@ControllerAdvice가 Filter 예외를 잡지 못하는 문제 해결)
+  - **JwtAuthenticationEntryPoint**: 인증되지 않은 사용자 접근 시(401) 일관된 JSON 에러 응답을 반환하도록 `AuthenticationEntryPoint` 구현
+  - **JwtAccessDeniedHandler**: 권한이 부족한 사용자 접근 시(403) 일관된 JSON 에러 응답을 반환하도록 `AccessDeniedHandler` 구현
+  - **RefreshToken 예외 처리**: `RefreshToken.isExpired()` 경계값 처리 (만료 시간과 동일한 경우도 만료로 간주)
+  - **보안성 강화**: SecurityContext에 유효하지 않은 토큰 전파를 방지하고, 클라이언트에게 내부 예외 상세(Stack trace 등)가 노출되지 않도록 마스킹 처리된 명확한 에러 메시지 제공
+
 - [ ] T011 Implement HttpOnly cookie utility in SSAju/src/main/java/ssafy/SSAju/util/CookieUtil.java
   - Set RefreshToken with HttpOnly, Secure, SameSite attributes
 
@@ -432,7 +439,7 @@ For **Phase 2 MVP** (Phase 1의존, Phase 1 구현 후):
 - US1-US3: T014-T025
 - US7 (마이페이지): T037-T041-2
 
-**Total Tasks for MVP**: T003-T025 + T006-1 (24 tasks)
+**Total Tasks for MVP**: T003-T025 + T006-1 + T010-1 (25 tasks)
 **Total Tasks for MVP + Full MyPage**: T003-T041-2 (includes Phase 1 integration)
 **Estimated Timeline**: 2-3 weeks for experienced team
 
@@ -440,8 +447,8 @@ For **Phase 2 MVP** (Phase 1의존, Phase 1 구현 후):
 
 ## Task Summary
 
-**Total Tasks**: 57
-**Setup/Foundational**: 14 (T001-T013 + T006-1 UserSatisfactionFeedback)
+**Total Tasks**: 58
+**Setup/Foundational**: 15 (T001-T013 + T006-1 + T010-1)
 **User Story 1 (회원가입)**: 4 (T014-T017)
 **User Story 2 (로그인 + 보안 로깅)**: 7 (T018-T022-2, EventPublisher 패턴 + ClientIpUtil + failure_reason)
 **User Story 3 (로그아웃)**: 3 (T023-T025)
@@ -499,4 +506,5 @@ For **Phase 2 MVP** (Phase 1의존, Phase 1 구현 후):
 ✅ **NEW**: T022-1 & T022-2 (LoginAttemptEvent + ClientIpUtil)
   - **T022-1**: EventPublisher 기반 비동기 로그인 시도 기록 (로그인 응답 지연 방지)
   - **T022-2**: X-Forwarded-For 헤더를 고려한 실제 IP 추출 (운영 환경 대비)
-✅ Total task count: 57 tasks
+✅ **NEW**: T010-1 (JWT 예외 처리 프레임워크 - JwtExceptionFilter 등 추가)
+✅ Total task count: 58 tasks

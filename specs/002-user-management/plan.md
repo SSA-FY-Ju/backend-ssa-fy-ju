@@ -275,7 +275,8 @@ Response (200):
   - **동의 기록**: terms_agreed_at, privacy_agreed_at에 현재 시간 저장 (법적 증거)
 - [ ] User 로그인 (**PasswordEncoder.matches()로 비밀번호 검증**, AccessToken + RefreshToken 발급)
 - [ ] Token 갱신 (RefreshToken으로 새 AccessToken 발급)
-- [ ] Token 검증 필터 (Spring Security Filter)
+- [ ] Token 검증 필터 (Spring Security JwtAuthenticationFilter)
+- [ ] JWT 예외 처리 프레임워크 추가 (JwtExceptionFilter, JwtAuthenticationEntryPoint, JwtAccessDeniedHandler)를 통한 일관된 401/403 JSON 에러 응답 및 RefreshToken 경계값 검증
 - [ ] 로그아웃 (RefreshToken revoked_at 마크)
 
 **HttpOnly 쿠키 설정**
@@ -695,7 +696,9 @@ WHERE user_id = ? AND usage_date = ? AND request_count < 3;
 
 ### Task 4: Security & Filter
 ```
-- SecurityConfig: Spring Security 설정
+- SecurityConfig: Spring Security 설정 (EntryPoint, AccessDeniedHandler 등록)
+- JwtExceptionFilter: Token 예외(만료, 잘못된 서명 등) 캐치 후 401 JSON 응답 처리 (@ControllerAdvice 우회 문제 해결)
+- JwtAuthenticationEntryPoint / JwtAccessDeniedHandler: 인증/인가 실패 시 보안 상세 노출 없이 명확한 에러 메시지 제공
 - JwtAuthenticationFilter: JWT 검증 필터
 - CookieUtil: HttpOnly 쿠키 설정
 - CORS, CSRF 설정

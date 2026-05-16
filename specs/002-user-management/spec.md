@@ -196,6 +196,8 @@ Phase 1에서 생성되는 **모든 분석 결과**(사주 분석, 취업 관운
   - **AccessToken**: 유효기간 1시간, 모든 API 요청에 포함됨
   - **RefreshToken**: 유효기간 7일, AccessToken 만료 시 새 AccessToken 발급에 사용
 - **FR-007**: 시스템은 모든 API 요청에서 AccessToken을 검증하여 인증 여부를 확인해야 함
+- **FR-007-1**: 시스템은 JWT 검증 중 발생하는 예외(토큰 만료, 서명 오류, 잘못된 형식 등) 및 권한 부족(401/403) 상황에서 클라이언트에게 서버 내부 보안 상세(Stack trace 등) 노출 없이 명확한 JSON 에러 메시지를 일관되게 제공해야 함 (Spring Security 예외 처리 필터 및 EntryPoint 활용)
+- **FR-007-2**: 유효하지 않은 토큰(만료/변조 등)은 SecurityContext로 전파되지 않도록 완벽히 차단해야 함
 - **FR-008**: 사용자는 RefreshToken을 사용하여 만료된 AccessToken을 갱신할 수 있어야 함
 
 **로그아웃**

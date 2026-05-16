@@ -4,8 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,9 +15,9 @@ import ssafy.SSAju.util.JwtUtil;
 import java.io.IOException;
 import java.util.List;
 
+@Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
@@ -34,17 +33,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = extractToken(request);
 
         if (StringUtils.hasText(token) && jwtUtil.validateToken(token)) {
-            Long userId = jwtUtil.getUserIdFromToken(token);
-            String email = jwtUtil.getEmailFromToken(token);
+            try {
+                Long userId = jwtUtil.getUserIdFromToken(token);
+                String email = jwtUtil.getEmailFromToken(token);
 
-            var auth = new UsernamePasswordAuthenticationToken(
-                    userId,
-                    null,
-                    List.of(new SimpleGrantedAuthority("ROLE_USER"))
-            );
-            auth.setDetails(email);
-            SecurityContextHolder.getContext().setAuthentication(auth);
-            log.debug("JWT 인증 성공: userId={}", userId);
+                var auth = new UsernamePasswordAuthenticationToken(
+                        userId,
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                );
+                auth.setDetails(email);
+                SecurityContextHolder.getContext().setAuthentication(auth);
+                log.debug("JWT 인증 성공: userId={}", userId);
+            } catch (Exception e) {
+                log.warn("JWT 클레임 추출 실패: {}", e.getClass().getSimpleName());
+                SecurityContextHolder.clearContext();
+            }
         }
 
         filterChain.doFilter(request, response);
