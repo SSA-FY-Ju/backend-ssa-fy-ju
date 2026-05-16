@@ -11,13 +11,18 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.ErrorInfo;
+import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.exception.DataAccessException;
+import ssafy.SSAju.exception.DailyLimitExceededException;
+import ssafy.SSAju.exception.DuplicateEmailException;
 import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
+import ssafy.SSAju.exception.InvalidPasswordException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.exception.PublicDataApiException;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
+import ssafy.SSAju.exception.UserNotFoundException;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -26,6 +31,56 @@ import org.springframework.validation.FieldError;
 @Slf4j
 @RestControllerAdvice
 public class SajuGlobalExceptionHandler {
+
+    @ExceptionHandler(DuplicateEmailException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateEmail(
+            DuplicateEmailException e, HttpServletRequest request) {
+        log.warn("중복 이메일: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.DUPLICATE_EMAIL.getCode(),
+                        ErrorMessageConstants.DUPLICATE_EMAIL.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(AuthException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthException(
+            AuthException e, HttpServletRequest request) {
+        log.warn("인증 예외: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.INVALID_CREDENTIALS.getCode(),
+                        e.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUserNotFound(
+            UserNotFoundException e, HttpServletRequest request) {
+        log.warn("사용자 미발견: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.USER_NOT_FOUND.getCode(),
+                        ErrorMessageConstants.USER_NOT_FOUND.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(InvalidPasswordException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidPassword(
+            InvalidPasswordException e, HttpServletRequest request) {
+        log.warn("비밀번호 오류: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.INVALID_CREDENTIALS.getCode(),
+                        ErrorMessageConstants.INVALID_CREDENTIALS.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(DailyLimitExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDailyLimitExceeded(
+            DailyLimitExceededException e, HttpServletRequest request) {
+        log.warn("일일 API 사용 한도 초과: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.DAILY_LIMIT_EXCEEDED.getCode(),
+                        ErrorMessageConstants.DAILY_LIMIT_EXCEEDED.getMessage(), generateRequestId())));
+    }
 
     @ExceptionHandler(SajuResultNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleSajuResultNotFound(

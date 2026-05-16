@@ -16,8 +16,8 @@
 
 **Purpose**: Project initialization and Spring Boot configuration
 
-- [x] T001 Initialize Spring Security PasswordEncoder configuration in SSAju/src/main/java/ssafy/SSAju/config/SecurityConfig.java
-- [x] T002 [P] Create custom exception hierarchy (User, Authentication, DailyApiUsage exceptions) in SSAju/src/main/java/ssafy/SSAju/exception/
+- [v] T001 Initialize Spring Security PasswordEncoder configuration in SSAju/src/main/java/ssafy/SSAju/config/SecurityConfig.java
+- [v] T002 [P] Create custom exception hierarchy (User, Authentication, DailyApiUsage exceptions) in SSAju/src/main/java/ssafy/SSAju/exception/
 
 ---
 
@@ -29,36 +29,36 @@
 
 ### Database & Data Model
 
-- [x] T003 [P] Create User entity with PasswordEncoder (bcrypt) fields in SSAju/src/main/java/ssafy/SSAju/entity/User.java
+- [v] T003 [P] Create User entity with PasswordEncoder (bcrypt) fields in SSAju/src/main/java/ssafy/SSAju/entity/User.java
   - Fields: id, email (UNIQUE), password_hash, name, role (ENUM: USER, ADMIN), status, last_login_at, terms_agreed_at, privacy_agreed_at, deleted_at, created_at, updated_at
   - Soft delete annotation (@SQLRestriction 사용, @SQLDelete 금지)
 
-- [x] T004 [P] Create RefreshToken entity in SSAju/src/main/java/ssafy/SSAju/entity/RefreshToken.java
+- [v] T004 [P] Create RefreshToken entity in SSAju/src/main/java/ssafy/SSAju/entity/RefreshToken.java
   - Fields: id, user_id (FK), token_hash (UNIQUE), expires_at, revoked_at, created_at
 
-- [x] T005 [P] Create DailyApiUsage entity with UNIQUE constraint in SSAju/src/main/java/ssafy/SSAju/entity/DailyApiUsage.java
+- [v] T005 [P] Create DailyApiUsage entity with UNIQUE constraint in SSAju/src/main/java/ssafy/SSAju/entity/DailyApiUsage.java
   - Fields: id, user_id (FK), request_count, usage_date (KST 기준), created_at
   - **CRITICAL**: UNIQUE(user_id, usage_date) 제약 조건 필수 (Race Condition 방지)
 
-- [x] T006 [P] Create LoginAttempt entity in SSAju/src/main/java/ssafy/SSAju/entity/LoginAttempt.java
+- [v] T006 [P] Create LoginAttempt entity in SSAju/src/main/java/ssafy/SSAju/entity/LoginAttempt.java
   - Fields: id, email, success, ip_address, failure_reason (ENUM: SUCCESS, INVALID_EMAIL, WRONG_PASSWORD, UNKNOWN), attempted_at
   - **Purpose**: 클라이언트는 통합 응답(User Enumeration 방지), 서버 로그는 원인 상세 기록
 
-- [x] T006-1 [P] Create UserSatisfactionFeedback entity in SSAju/src/main/java/ssafy/SSAju/entity/UserSatisfactionFeedback.java
+- [v] T006-1 [P] Create UserSatisfactionFeedback entity in SSAju/src/main/java/ssafy/SSAju/entity/UserSatisfactionFeedback.java
   - Fields: id, user_id (FK), feedback_type (ENUM: SAJU, CAREER_FORTUNE, COMPANY_COMPATIBILITY), saju_result_id (FK, nullable), career_fortune_result_id (FK, nullable), company_compatibility_result_id (FK, nullable), satisfaction_status (ENUM), feedback_content (String, nullable), created_at, updated_at
   - Relationship: @ManyToOne User (user_id FK)
   - Used by T003 (delete/mask on account deletion)
 
 ### Repository & Database Setup
 
-- [x] T007 [P] Create repository interfaces in SSAju/src/main/java/ssafy/SSAju/repository/
+- [v] T007 [P] Create repository interfaces in SSAju/src/main/java/ssafy/SSAju/repository/
   - UserRepository
   - RefreshTokenRepository
   - DailyApiUsageRepository
   - LoginAttemptRepository
   - UserSatisfactionFeedbackRepository (added for T004-1)
 
-- [x] T008 Create SQL schema migration script in SSAju/src/main/resources/db/migration/
+- [v] T008 Create SQL schema migration script in SSAju/src/main/resources/db/migration/
   - Include UNIQUE INDEX `idx_daily_api_usage_user_date` on (user_id, usage_date)
   - Include all table definitions for User, RefreshToken, DailyApiUsage, LoginAttempt, UserSatisfactionFeedback
   - **LoginAttempt table**: id, email, success (BOOLEAN), ip_address (VARCHAR(45)), failure_reason (ENUM: 'SUCCESS', 'INVALID_EMAIL', 'WRONG_PASSWORD', 'UNKNOWN'), attempted_at (TIMESTAMP)
@@ -66,34 +66,34 @@
 
 ### Security & Token Framework
 
-- [x] T009 Implement JWT utility (token generation/validation) in SSAju/src/main/java/ssafy/SSAju/util/JwtUtil.java
+- [v] T009 Implement JWT utility (token generation/validation) in SSAju/src/main/java/ssafy/SSAju/util/JwtUtil.java
   - Generate AccessToken (1시간), RefreshToken (7일)
   - Validate and extract claims
 
-- [x] T010 [P] Configure Spring Security filter chain in SSAju/src/main/java/ssafy/SSAju/config/SecurityConfig.java
+- [v] T010 [P] Configure Spring Security filter chain in SSAju/src/main/java/ssafy/SSAju/config/SecurityConfig.java
   - JWT validation filter
   - CORS configuration
   - PasswordEncoder bean (BCrypt)
 
-- [x] T010-1 [P] JWT 에러 처리 및 예외 프레임워크 구현 (Security Components) in SSAju/src/main/java/ssafy/SSAju/security/
+- [v] T010-1 [P] JWT 에러 처리 및 예외 프레임워크 구현 (Security Components) in SSAju/src/main/java/ssafy/SSAju/security/
   - **JwtExceptionFilter**: `JwtAuthenticationFilter` 앞단에 배치하여 토큰 검증 시 발생하는 예외(`ExpiredJwtException`, `SignatureException`, `MalformedJwtException` 등)를 캐치하고 HTTP 401 JSON 응답으로 반환 (@ControllerAdvice가 Filter 예외를 잡지 못하는 문제 해결)
   - **JwtAuthenticationEntryPoint**: 인증되지 않은 사용자 접근 시(401) 일관된 JSON 에러 응답을 반환하도록 `AuthenticationEntryPoint` 구현
   - **JwtAccessDeniedHandler**: 권한이 부족한 사용자 접근 시(403) 일관된 JSON 에러 응답을 반환하도록 `AccessDeniedHandler` 구현
   - **RefreshToken 예외 처리**: `RefreshToken.isExpired()` 경계값 처리 (만료 시간과 동일한 경우도 만료로 간주)
   - **보안성 강화**: SecurityContext에 유효하지 않은 토큰 전파를 방지하고, 클라이언트에게 내부 예외 상세(Stack trace 등)가 노출되지 않도록 마스킹 처리된 명확한 에러 메시지 제공
 
-- [x] T011 Implement HttpOnly cookie utility in SSAju/src/main/java/ssafy/SSAju/util/CookieUtil.java
+- [v] T011 Implement HttpOnly cookie utility in SSAju/src/main/java/ssafy/SSAju/util/CookieUtil.java
   - Set RefreshToken with HttpOnly, Secure, SameSite attributes
 
 ### DailyApiUsage Framework (Race Condition Prevention)
 
-- [x] T012 Implement DailyApiUsageService with Atomic UPDATE + Exception handling in SSAju/src/main/java/ssafy/SSAju/service/DailyApiUsageService.java
+- [v] T012 Implement DailyApiUsageService with Atomic UPDATE + Exception handling in SSAju/src/main/java/ssafy/SSAju/service/DailyApiUsageService.java
   - Method: checkAndIncrementDailyUsage(Long userId)
   - Atomic UPDATE: update where request_count < 3
   - DataIntegrityViolationException catch for Race Condition handling
   - KST timezone support (LocalDate.now(ZoneId.of("Asia/Seoul")))
 
-- [x] T013 Implement APIUsageInterceptor in SSAju/src/main/java/ssafy/SSAju/handler/APIUsageInterceptor.java
+- [v] T013 Implement APIUsageInterceptor in SSAju/src/main/java/ssafy/SSAju/handler/APIUsageInterceptor.java
   - Pre-request check for daily API limit
   - HTTP 429 response when limit exceeded
 
@@ -109,20 +109,20 @@
 
 ### Implementation for US1
 
-- [ ] T014 [US1] Create SignupRequest DTO in SSAju/src/main/java/ssafy/SSAju/dto/request/SignupRequest.java
+- [v] T014 [US1] Create SignupRequest DTO in SSAju/src/main/java/ssafy/SSAju/dto/request/SignupRequest.java
   - Fields: email, password, name, termsAgreed, privacyAgreed
 
-- [ ] T015 [US1] Create AuthService in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
+- [v] T015 [US1] Create AuthService in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
   - Method: signup(SignupRequest) with PasswordEncoder.encode()
   - Validation: email uniqueness, password strength (8자 이상), terms agreement
   - Record terms_agreed_at, privacy_agreed_at
 
-- [ ] T016 [US1] Create AuthController with POST /api/auth/signup in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
+- [v] T016 [US1] Create AuthController with POST /api/auth/signup in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
   - Input validation via @Valid
   - Error handling: duplicate email, weak password, missing consent
   - Response: 201 Created + redirect URL
 
-- [ ] T017 [US1] Add logging for signup events in AuthService
+- [v] T017 [US1] Add logging for signup events in AuthService
 
 **Checkpoint**: User Story 1 (회원가입) is complete and independently testable
 
@@ -136,35 +136,35 @@
 
 ### Implementation for US2
 
-- [ ] T018 [US2] Create LoginRequest DTO in SSAju/src/main/java/ssafy/SSAju/dto/request/LoginRequest.java
+- [v] T018 [US2] Create LoginRequest DTO in SSAju/src/main/java/ssafy/SSAju/dto/request/LoginRequest.java
   - Fields: email, password
 
-- [ ] T019 [US2] Create AuthTokenResponse DTO in SSAju/src/main/java/ssafy/SSAju/dto/response/AuthTokenResponse.java
+- [v] T019 [US2] Create AuthTokenResponse DTO in SSAju/src/main/java/ssafy/SSAju/dto/response/AuthTokenResponse.java
   - Fields: accessToken, accessTokenExpiresIn
 
-- [ ] T020 [US2] Implement AuthService.login() in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
+- [v] T020 [US2] Implement AuthService.login() in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
   - PasswordEncoder.matches(password, user.getPasswordHash())
   - Generate AccessToken (JwtUtil)
   - Save RefreshToken to DB (token_hash)
   - Update user.last_login_at
 
-- [ ] T021 [US2] Enhance AuthController with POST /api/auth/login in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
+- [v] T021 [US2] Enhance AuthController with POST /api/auth/login in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
   - Set HttpOnly RefreshToken cookie (CookieUtil)
   - Return AccessToken in response body
   - Error: "이메일 또는 비밀번호가 일치하지 않습니다"
 
-- [ ] T022 [US2] Implement EventPublisher-based login attempt logging in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
+- [v] T022 [US2] Implement EventPublisher-based login attempt logging in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
   - Pattern: AuthService에서 ApplicationEventPublisher.publishEvent(LoginAttemptEvent) 발행
   - failure_reason에 INVALID_EMAIL, WRONG_PASSWORD, SUCCESS 등 상세히 기록
   - 클라이언트 응답은 "이메일 또는 비밀번호가 일치하지 않습니다" (User Enumeration 방지)
   - @EventListener (@TransactionalEventListener 또는 @Async)에서 DB 저장은 T022-1에서 구현
 
-- [ ] T022-1 [US2] Create LoginAttemptEvent and listener for async logging in SSAju/src/main/java/ssafy/SSAju/event/
+- [v] T022-1 [US2] Create LoginAttemptEvent and listener for async logging in SSAju/src/main/java/ssafy/SSAju/event/
   - Event class: LoginAttemptEvent (email, success, failureReason ENUM, ipAddress, timestamp)
-  - Listener class: LoginAttemptEventListener with @EventListener @TransactionalEventListener @Async
+  - Listener class: LoginAttemptEventListener with @EventListener @Async @Transactional(REQUIRES_NEW)
   - Purpose: 로깅으로 인한 로그인 응답 지연 방지, 비동기 DB 저장
 
-- [ ] T022-2 [US2] Create ClientIpUtil for real IP extraction in SSAju/src/main/java/ssafy/SSAju/util/ClientIpUtil.java
+- [v] T022-2 [US2] Create ClientIpUtil for real IP extraction in SSAju/src/main/java/ssafy/SSAju/util/ClientIpUtil.java
   - Method: getClientIp(HttpServletRequest request) → String
   - Header 순서대로 검사: X-Forwarded-For → CF-Connecting-IP → X-Real-IP → request.getRemoteAddr()
   - Purpose: 로드밸런서/리버스 프록시 뒤에서도 실제 클라이언트 IP 추출 (운영 환경 대비)
@@ -182,15 +182,15 @@
 
 ### Implementation for US3
 
-- [ ] T023 [US3] Implement AuthService.logout() in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
+- [v] T023 [US3] Implement AuthService.logout() in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
   - Extract userId from SecurityContext (로그인된 사용자 확인)
   - Mark RefreshToken.revoked_at = NOW()
   - Invalidate AccessToken (store in blacklist if needed)
 
-- [ ] T024 [US3] Implement TokenValidationFilter to check revoked RefreshToken in SSAju/src/main/java/ssafy/SSAju/filter/TokenValidationFilter.java
+- [v] T024 [US3] Implement TokenValidationFilter to check revoked RefreshToken in SSAju/src/main/java/ssafy/SSAju/filter/TokenValidationFilter.java
   - Reject requests with revoked tokens (401 Unauthorized)
 
-- [ ] T025 [US3] Enhance AuthController with POST /api/auth/logout in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
+- [v] T025 [US3] Enhance AuthController with POST /api/auth/logout in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
   - Extract AccessToken from Authorization header and RefreshToken from HttpOnly cookie
   - Call AuthService.logout(userId)
   - Clear RefreshToken cookie

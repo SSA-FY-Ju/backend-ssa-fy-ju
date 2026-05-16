@@ -66,6 +66,10 @@ public class JwtUtil {
         return LocalDateTime.now().plusSeconds(refreshTokenExpirationMs / 1000);
     }
 
+    public long getAccessTokenExpirationSeconds() {
+        return accessTokenExpirationMs / 1000;
+    }
+
     private String buildToken(Long userId, String email, String type, long expirationMs) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);

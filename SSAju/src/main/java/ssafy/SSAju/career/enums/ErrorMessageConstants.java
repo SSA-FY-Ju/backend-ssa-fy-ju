@@ -91,7 +91,17 @@ public enum ErrorMessageConstants {
 
     // === 피드백 예외 메시지 ===
     SAJU_RESULT_NOT_FOUND("SAJU_RESULT_NOT_FOUND", "해당 SajuResult를 찾을 수 없습니다."),
-    INVALID_FEEDBACK_TYPE("INVALID_FEEDBACK_TYPE", "feedbackType은 CAREER_TIMING, CONSULTATION, COMPATIBILITY 중 하나여야 합니다.");
+    INVALID_FEEDBACK_TYPE("INVALID_FEEDBACK_TYPE", "feedbackType은 CAREER_TIMING, CONSULTATION, COMPATIBILITY 중 하나여야 합니다."),
+
+    // === 인증 예외 메시지 ===
+    DUPLICATE_EMAIL("DUPLICATE_EMAIL", "이미 사용 중인 이메일입니다."),
+    INVALID_CREDENTIALS("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 일치하지 않습니다."),
+    USER_NOT_FOUND("USER_NOT_FOUND", "사용자를 찾을 수 없습니다."),
+    INVALID_TOKEN("INVALID_TOKEN", "유효하지 않은 토큰입니다."),
+    TOKEN_EXPIRED("TOKEN_EXPIRED", "만료된 토큰입니다."),
+    DAILY_LIMIT_EXCEEDED("DAILY_LIMIT_EXCEEDED", "하루 3회 분석 제한에 도달했습니다."),
+    TERMS_AGREEMENT_REQUIRED("TERMS_AGREEMENT_REQUIRED", "이용약관 및 개인정보 수집에 동의해야 합니다."),
+    UNAUTHORIZED("UNAUTHORIZED", "인증이 필요합니다.");
 
     private final String code;
     private final String message;
