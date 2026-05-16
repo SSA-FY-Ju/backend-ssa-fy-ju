@@ -1,5 +1,6 @@
 package ssafy.SSAju.config;
 
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,11 +16,18 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import ssafy.SSAju.filter.JwtAuthenticationFilter;
+import ssafy.SSAju.security.JwtAccessDeniedHandler;
+import ssafy.SSAju.security.JwtAuthenticationEntryPoint;
+import ssafy.SSAju.security.JwtExceptionFilter;
+import ssafy.SSAju.util.JwtUtil;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -31,8 +39,24 @@ public class SecurityConfig {
     @Value("${swagger.auth.password}")
     private String swaggerPassword;
 
+    @Value("${cors.allowed-origins}")
+    private String corsAllowedOrigins;
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint(ObjectMapper objectMapper) {
+        return new JwtAuthenticationEntryPoint(objectMapper);
+    }
+
+    @Bean
+    public JwtAccessDeniedHandler jwtAccessDeniedHandler(ObjectMapper objectMapper) {
+        return new JwtAccessDeniedHandler(objectMapper);
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil,
+                                           JwtAuthenticationEntryPoint entryPoint,
+                                           JwtAccessDeniedHandler accessDeniedHandler,
+                                           ObjectMapper objectMapper) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -41,10 +65,15 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth ->
                 auth
                     .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").authenticated()
-                    // TODO: Phase 2 인증 추가 시 다음과 같이 수정 필요
-                    // .requestMatchers("/api/feedback/**").authenticated()
-                    // .requestMatchers("/api/auth/**", "/api/saju/**").permitAll()
+                    .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/api/career/**", "/api/feedback/**", "/api/company/**").permitAll()
+                    .requestMatchers("/api/mypage/**", "/api/users/**").authenticated()
                     .anyRequest().permitAll())
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(entryPoint)
+                .accessDeniedHandler(accessDeniedHandler))
+            .addFilterBefore(new JwtExceptionFilter(objectMapper), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new JwtAuthenticationFilter(jwtUtil), JwtExceptionFilter.class)
             .httpBasic(Customizer.withDefaults());
 
         return http.build();
@@ -67,8 +96,12 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        List<String> allowedOrigins = Arrays.stream(corsAllowedOrigins.split(","))
+                .map(String::trim)
+                .toList();
+
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList("*"));  // 모든 origin 허용 (로컬 개발용)
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
