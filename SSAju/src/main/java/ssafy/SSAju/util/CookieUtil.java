@@ -9,18 +9,21 @@ import org.springframework.stereotype.Component;
 public class CookieUtil {
 
     private static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
-    private static final long REFRESH_TOKEN_MAX_AGE_SECONDS = 604800L; // 7일
+
+    @Value("${jwt.refresh-token-expiration}")
+    private long refreshTokenExpirationMs;
 
     @Value("${server.cookie.secure:true}")
     private boolean secureCookie;
 
     public void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
+        long maxAgeSecs = refreshTokenExpirationMs / 1000;
         ResponseCookie cookie = ResponseCookie
                 .from(REFRESH_TOKEN_COOKIE_NAME, refreshToken)
                 .httpOnly(true)
                 .secure(secureCookie)
                 .sameSite("Strict")
-                .maxAge(REFRESH_TOKEN_MAX_AGE_SECONDS)
+                .maxAge(maxAgeSecs)
                 .path("/")
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());
