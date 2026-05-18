@@ -32,6 +32,15 @@ import org.springframework.validation.FieldError;
 @RestControllerAdvice
 public class SajuGlobalExceptionHandler {
 
+    /**
+     * 이메일 중복 예외를 처리합니다.
+     *
+     * <p>회원가입 시 이미 등록된 이메일로 가입 시도할 경우 발생합니다.
+     *
+     * @param e DuplicateEmailException
+     * @param request HTTP 요청
+     * @return 409 Conflict, 에러 코드: DUPLICATE_EMAIL
+     */
     @ExceptionHandler(DuplicateEmailException.class)
     public ResponseEntity<ApiResponse<Void>> handleDuplicateEmail(
             DuplicateEmailException e, HttpServletRequest request) {
@@ -42,6 +51,16 @@ public class SajuGlobalExceptionHandler {
                         ErrorMessageConstants.DUPLICATE_EMAIL.getMessage(), generateRequestId())));
     }
 
+    /**
+     * 인증 예외를 처리합니다.
+     *
+     * <p>로그인 실패(이메일 미존재, 비밀번호 불일치), 약관 미동의 등의 인증 관련 오류입니다.
+     * User Enumeration 공격 방지를 위해 로그인 실패 시 구체적인 실패 원인을 공개하지 않습니다.
+     *
+     * @param e AuthException
+     * @param request HTTP 요청
+     * @return 401 Unauthorized, 에러 코드: INVALID_CREDENTIALS
+     */
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuthException(
             AuthException e, HttpServletRequest request) {
@@ -49,9 +68,18 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.INVALID_CREDENTIALS.getCode(),
-                        e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.INVALID_CREDENTIALS.getMessage(), generateRequestId())));
     }
 
+    /**
+     * 사용자 미발견 예외를 처리합니다.
+     *
+     * <p>마이페이지 접근, 사용자 정보 조회 시 해당 사용자를 찾을 수 없는 경우 발생합니다.
+     *
+     * @param e UserNotFoundException
+     * @param request HTTP 요청
+     * @return 404 Not Found, 에러 코드: USER_NOT_FOUND
+     */
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleUserNotFound(
             UserNotFoundException e, HttpServletRequest request) {
@@ -62,6 +90,16 @@ public class SajuGlobalExceptionHandler {
                         ErrorMessageConstants.USER_NOT_FOUND.getMessage(), generateRequestId())));
     }
 
+    /**
+     * 비밀번호 오류 예외를 처리합니다.
+     *
+     * <p>로그인 시 비밀번호가 일치하지 않는 경우 발생합니다.
+     * 사용자 열거 공격 방지를 위해 "이메일 또는 비밀번호가 일치하지 않습니다"로 응답합니다.
+     *
+     * @param e InvalidPasswordException
+     * @param request HTTP 요청
+     * @return 401 Unauthorized, 에러 코드: INVALID_CREDENTIALS
+     */
     @ExceptionHandler(InvalidPasswordException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidPassword(
             InvalidPasswordException e, HttpServletRequest request) {
@@ -72,6 +110,15 @@ public class SajuGlobalExceptionHandler {
                         ErrorMessageConstants.INVALID_CREDENTIALS.getMessage(), generateRequestId())));
     }
 
+    /**
+     * 일일 제한 초과 예외를 처리합니다.
+     *
+     * <p>사용자가 일일 API 사용 한도(3회 사주 분석)를 초과한 경우 발생합니다.
+     *
+     * @param e DailyLimitExceededException
+     * @param request HTTP 요청
+     * @return 429 Too Many Requests, 에러 코드: DAILY_LIMIT_EXCEEDED
+     */
     @ExceptionHandler(DailyLimitExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleDailyLimitExceeded(
             DailyLimitExceededException e, HttpServletRequest request) {
