@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.entity.User;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.time.LocalDateTime;
@@ -24,6 +25,10 @@ public class SajuResult {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_profile_id", nullable = false)
     private UserProfile userProfile;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @Column(name = "fetched_at", nullable = false)
     private LocalDateTime fetchedAt;
@@ -66,6 +71,10 @@ public class SajuResult {
 
     public void assignCareerFortune(CareerFortune fortune) {
         this.careerFortune = fortune;
+    }
+
+    public void assignUser(User user) {
+        this.user = user;
     }
 
     @Override

@@ -15,6 +15,7 @@ import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
 import ssafy.SSAju.service.CompanyMatchingService;
+import ssafy.SSAju.service.UserService;
 
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,9 @@ class CompatibilityControllerTest {
 
     @Mock
     private CompanyMatchingService companyMatchingService;
+
+    @Mock
+    private UserService userService;
 
     private MockMvc mockMvc;
 
@@ -62,7 +66,7 @@ class CompatibilityControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new CompatibilityController(companyMatchingService))
+                .standaloneSetup(new CompatibilityController(companyMatchingService, userService))
                 .setControllerAdvice(new SajuGlobalExceptionHandler())
                 .build();
     }

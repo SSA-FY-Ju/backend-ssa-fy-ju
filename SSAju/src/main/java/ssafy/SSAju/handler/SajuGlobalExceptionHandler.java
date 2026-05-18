@@ -231,6 +231,16 @@ public class SajuGlobalExceptionHandler {
                         ErrorMessageConstants.VALIDATION_FAILED.getCode(), message, generateRequestId())));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(
+            IllegalArgumentException e, HttpServletRequest request) {
+        log.warn("잘못된 요청 파라미터: {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.VALIDATION_FAILED.getCode(),
+                        e.getMessage(), generateRequestId())));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(
             Exception e, HttpServletRequest request) {

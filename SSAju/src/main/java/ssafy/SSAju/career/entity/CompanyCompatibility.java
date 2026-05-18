@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import ssafy.SSAju.career.util.JobCategoryEnum;
+import ssafy.SSAju.entity.User;
 
 import java.time.LocalDateTime;
 
@@ -31,6 +32,10 @@ public class CompanyCompatibility {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_profile_id", nullable = false)
     private UserProfile userProfile;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @Column(name = "company_name", nullable = false)
     private String companyName;
@@ -81,6 +86,10 @@ public class CompanyCompatibility {
      */
     public void markCompleted() {
         this.completed = true;
+    }
+
+    public void assignUser(User user) {
+        this.user = user;
     }
 
     @Override

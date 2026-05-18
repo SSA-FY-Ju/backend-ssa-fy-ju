@@ -9,6 +9,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +19,9 @@ import ssafy.SSAju.dto.request.CompatibilityRequest;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.service.CompanyMatchingService;
+import ssafy.SSAju.service.UserService;
+
+import java.time.LocalTime;
 
 @Slf4j
 @RestController
@@ -26,6 +31,9 @@ import ssafy.SSAju.service.CompanyMatchingService;
 public class CompatibilityController {
 
     private final CompanyMatchingService companyMatchingService;
+    private final UserService userService;
+
+    private static final LocalTime DEFAULT_BIRTH_TIME = LocalTime.of(12, 0);
 
     @PostMapping("/compatibility")
     @Operation(summary = "기업 궁합 분석", description = "사용자 사주와 기업 설립일의 십신+지장간 분석을 통한 호환성 점수 및 직군 적합도 반환")
@@ -40,6 +48,20 @@ public class CompatibilityController {
     ) {
         log.info("기업 궁합 분석 요청 수신: company={}", request.companyName());
         CompatibilityResponse response = companyMatchingService.analyzeCompatibility(request);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof Long userId) {
+            try {
+                LocalTime birthTime = request.userBirthTime() != null
+                        ? request.userBirthTime() : DEFAULT_BIRTH_TIME;
+                userService.associateCompatibilityWithUser(userId,
+                        request.userBirthDate(), birthTime,
+                        request.companyName(), request.targetRole().category());
+            } catch (Exception e) {
+                log.warn("사용자 연결 실패 (무시됨): userId={}", userId, e);
+            }
+        }
+
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

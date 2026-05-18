@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
 import ssafy.SSAju.service.CareerFortuneService;
+import ssafy.SSAju.service.UserService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -29,12 +30,15 @@ class CareerTimingControllerTest {
     @Mock
     private CareerFortuneService careerFortuneService;
 
+    @Mock
+    private UserService userService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new CareerTimingController(careerFortuneService))
+                .standaloneSetup(new CareerTimingController(careerFortuneService, userService))
                 .setControllerAdvice(new SajuGlobalExceptionHandler())
                 .build();
     }

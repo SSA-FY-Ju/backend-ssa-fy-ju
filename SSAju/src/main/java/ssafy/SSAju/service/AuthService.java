@@ -20,6 +20,8 @@ import ssafy.SSAju.event.LoginAttemptEvent;
 import org.springframework.dao.DataIntegrityViolationException;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.exception.DuplicateEmailException;
+import ssafy.SSAju.exception.InvalidTokenException;
+import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.RefreshTokenRepository;
 import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.util.CookieUtil;
@@ -61,6 +63,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final CookieUtil cookieUtil;
     private final ApplicationEventPublisher eventPublisher;
+    private final AnalysisResultMaskingService analysisMaskingService;
 
     /**
      * 사용자 회원가입을 처리합니다.
@@ -203,6 +206,44 @@ public class AuthService {
 
         cookieUtil.clearRefreshTokenCookie(response);
         log.info("로그아웃 완료: userId={}", userId);
+    }
+
+    /**
+     * 회원 탈퇴를 처리합니다.
+     *
+     * <p><b>프로세스:</b>
+     * <ol>
+     *   <li>비밀번호 재확인</li>
+     *   <li>만족도 피드백 등 분석 데이터 삭제</li>
+     *   <li>RefreshToken 전체 revoke</li>
+     *   <li>User Soft Delete (이름/이메일 마스킹, deleted_at 설정)</li>
+     *   <li>RefreshToken 쿠키 제거</li>
+     * </ol>
+     *
+     * @param userId  탈퇴 요청 사용자 ID
+     * @param password 재확인용 비밀번호
+     * @param response HTTP 응답 (쿠키 제거용)
+     * @throws UserNotFoundException 사용자를 찾을 수 없는 경우
+     * @throws AuthException 비밀번호가 일치하지 않는 경우
+     */
+    @Transactional
+    public void deleteUser(Long userId, String password, HttpServletResponse response) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
+
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new AuthException("비밀번호가 일치하지 않습니다.");
+        }
+
+        analysisMaskingService.maskForUser(user);
+
+        refreshTokenRepository.findAllByUser(user).forEach(RefreshToken::revoke);
+
+        user.softDelete();
+        userRepository.save(user);
+
+        cookieUtil.clearRefreshTokenCookie(response);
+        log.info("회원 탈퇴 완료: userId={}", userId);
     }
 
     /**
