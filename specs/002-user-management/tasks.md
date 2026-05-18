@@ -208,14 +208,14 @@
 
 ### Implementation for US4
 
-- [ ] T026 [US4] Implement AuthService.refreshAccessToken() in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
+- [x] T026 [US4] Implement AuthService.refreshAccessToken() in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
   - Extract RefreshToken from HttpOnly cookie (직접 추출, DTO 불필요)
   - Validate RefreshToken (not revoked, not expired)
   - Extract userId from RefreshToken
   - Generate new AccessToken
   - Return in response
 
-- [ ] T027 [US4] Enhance AuthController with POST /api/auth/refresh in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
+- [x] T027 [US4] Enhance AuthController with POST /api/auth/refresh in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
   - Read RefreshToken from HttpOnly cookie (Request.getCookies())
   - Extract and validate token (no request body needed)
   - Call AuthService.refreshAccessToken()
