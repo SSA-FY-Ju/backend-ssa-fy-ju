@@ -54,7 +54,7 @@ public class TokenValidationFilter extends OncePerRequestFilter {
      */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !REFRESH_ENDPOINT.equals(request.getRequestURI());
+        return !REFRESH_ENDPOINT.equals(request.getServletPath());
     }
 
     /**

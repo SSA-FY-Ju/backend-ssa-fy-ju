@@ -17,6 +17,7 @@ import ssafy.SSAju.entity.enums.LoginFailureReason;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.event.LoginAttemptEvent;
+import org.springframework.dao.DataIntegrityViolationException;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.exception.DuplicateEmailException;
 import ssafy.SSAju.repository.RefreshTokenRepository;
@@ -86,9 +87,7 @@ public class AuthService {
      */
     @Transactional
     public SignupResponse signup(SignupRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
-        }
+        checkEmailAvailability(request.email());
 
         if (!Boolean.TRUE.equals(request.termsAgreed()) || !Boolean.TRUE.equals(request.privacyAgreed())) {
             throw new AuthException("이용약관 및 개인정보 수집에 동의해야 합니다.");
@@ -105,7 +104,11 @@ public class AuthService {
                 .privacyAgreedAt(now)
                 .build();
 
-        userRepository.save(user);
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
+        }
         log.info("회원가입 완료: userId={}", user.getId());
 
         return new SignupResponse("회원가입 완료. 로그인해주세요.", "/login");
@@ -129,7 +132,7 @@ public class AuthService {
      * <ul>
      *   <li>이메일 미존재와 비밀번호 오류 시 동일한 에러 메시지 반환</li>
      *   <li>실제 실패 원인(INVALID_EMAIL vs WRONG_PASSWORD)은 이벤트에 기록</li>
-     *   <li>RefreshToken은 해시되지 않은 원본값으로 저장 (클라이언트와 비교용)</li>
+     *   <li>RefreshToken은 SHA-256으로 해시하여 DB 저장 (쿠키에는 원본값 유지)</li>
      * </ul>
      *
      * @param request 로그인 요청 (이메일, 비밀번호)
