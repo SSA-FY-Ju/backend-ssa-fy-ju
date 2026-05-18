@@ -109,20 +109,20 @@
 
 ### Implementation for US1
 
-- [ ] T014 [US1] Create SignupRequest DTO in SSAju/src/main/java/ssafy/SSAju/dto/request/SignupRequest.java
+- [x] T014 [US1] Create SignupRequest DTO in SSAju/src/main/java/ssafy/SSAju/dto/request/SignupRequest.java
   - Fields: email, password, name, termsAgreed, privacyAgreed
 
-- [ ] T015 [US1] Create AuthService in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
+- [x] T015 [US1] Create AuthService in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
   - Method: signup(SignupRequest) with PasswordEncoder.encode()
   - Validation: email uniqueness, password strength (8자 이상), terms agreement
   - Record terms_agreed_at, privacy_agreed_at
 
-- [ ] T016 [US1] Create AuthController with POST /api/auth/signup in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
+- [x] T016 [US1] Create AuthController with POST /api/auth/signup in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
   - Input validation via @Valid
   - Error handling: duplicate email, weak password, missing consent
   - Response: 201 Created + redirect URL
 
-- [ ] T017 [US1] Add logging for signup events in AuthService
+- [x] T017 [US1] Add logging for signup events in AuthService
 
 **Checkpoint**: User Story 1 (회원가입) is complete and independently testable
 
@@ -136,35 +136,35 @@
 
 ### Implementation for US2
 
-- [ ] T018 [US2] Create LoginRequest DTO in SSAju/src/main/java/ssafy/SSAju/dto/request/LoginRequest.java
+- [x] T018 [US2] Create LoginRequest DTO in SSAju/src/main/java/ssafy/SSAju/dto/request/LoginRequest.java
   - Fields: email, password
 
-- [ ] T019 [US2] Create AuthTokenResponse DTO in SSAju/src/main/java/ssafy/SSAju/dto/response/AuthTokenResponse.java
+- [x] T019 [US2] Create AuthTokenResponse DTO in SSAju/src/main/java/ssafy/SSAju/dto/response/AuthTokenResponse.java
   - Fields: accessToken, accessTokenExpiresIn
 
-- [ ] T020 [US2] Implement AuthService.login() in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
+- [x] T020 [US2] Implement AuthService.login() in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
   - PasswordEncoder.matches(password, user.getPasswordHash())
   - Generate AccessToken (JwtUtil)
   - Save RefreshToken to DB (token_hash)
   - Update user.last_login_at
 
-- [ ] T021 [US2] Enhance AuthController with POST /api/auth/login in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
+- [x] T021 [US2] Enhance AuthController with POST /api/auth/login in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
   - Set HttpOnly RefreshToken cookie (CookieUtil)
   - Return AccessToken in response body
   - Error: "이메일 또는 비밀번호가 일치하지 않습니다"
 
-- [ ] T022 [US2] Implement EventPublisher-based login attempt logging in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
+- [x] T022 [US2] Implement EventPublisher-based login attempt logging in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
   - Pattern: AuthService에서 ApplicationEventPublisher.publishEvent(LoginAttemptEvent) 발행
   - failure_reason에 INVALID_EMAIL, WRONG_PASSWORD, SUCCESS 등 상세히 기록
   - 클라이언트 응답은 "이메일 또는 비밀번호가 일치하지 않습니다" (User Enumeration 방지)
   - @EventListener (@TransactionalEventListener 또는 @Async)에서 DB 저장은 T022-1에서 구현
 
-- [ ] T022-1 [US2] Create LoginAttemptEvent and listener for async logging in SSAju/src/main/java/ssafy/SSAju/event/
+- [x] T022-1 [US2] Create LoginAttemptEvent and listener for async logging in SSAju/src/main/java/ssafy/SSAju/event/
   - Event class: LoginAttemptEvent (email, success, failureReason ENUM, ipAddress, timestamp)
-  - Listener class: LoginAttemptEventListener with @EventListener @TransactionalEventListener @Async
+  - Listener class: LoginAttemptEventListener with @EventListener @Async @Transactional(REQUIRES_NEW)
   - Purpose: 로깅으로 인한 로그인 응답 지연 방지, 비동기 DB 저장
 
-- [ ] T022-2 [US2] Create ClientIpUtil for real IP extraction in SSAju/src/main/java/ssafy/SSAju/util/ClientIpUtil.java
+- [x] T022-2 [US2] Create ClientIpUtil for real IP extraction in SSAju/src/main/java/ssafy/SSAju/util/ClientIpUtil.java
   - Method: getClientIp(HttpServletRequest request) → String
   - Header 순서대로 검사: X-Forwarded-For → CF-Connecting-IP → X-Real-IP → request.getRemoteAddr()
   - Purpose: 로드밸런서/리버스 프록시 뒤에서도 실제 클라이언트 IP 추출 (운영 환경 대비)
@@ -182,15 +182,15 @@
 
 ### Implementation for US3
 
-- [ ] T023 [US3] Implement AuthService.logout() in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
+- [x] T023 [US3] Implement AuthService.logout() in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
   - Extract userId from SecurityContext (로그인된 사용자 확인)
   - Mark RefreshToken.revoked_at = NOW()
   - Invalidate AccessToken (store in blacklist if needed)
 
-- [ ] T024 [US3] Implement TokenValidationFilter to check revoked RefreshToken in SSAju/src/main/java/ssafy/SSAju/filter/TokenValidationFilter.java
+- [x] T024 [US3] Implement TokenValidationFilter to check revoked RefreshToken in SSAju/src/main/java/ssafy/SSAju/filter/TokenValidationFilter.java
   - Reject requests with revoked tokens (401 Unauthorized)
 
-- [ ] T025 [US3] Enhance AuthController with POST /api/auth/logout in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
+- [x] T025 [US3] Enhance AuthController with POST /api/auth/logout in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
   - Extract AccessToken from Authorization header and RefreshToken from HttpOnly cookie
   - Call AuthService.logout(userId)
   - Clear RefreshToken cookie

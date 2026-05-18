@@ -21,6 +21,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import ssafy.SSAju.filter.JwtAuthenticationFilter;
+import ssafy.SSAju.filter.TokenValidationFilter;
+import ssafy.SSAju.repository.RefreshTokenRepository;
 import ssafy.SSAju.security.JwtAccessDeniedHandler;
 import ssafy.SSAju.security.JwtAuthenticationEntryPoint;
 import ssafy.SSAju.security.JwtExceptionFilter;
@@ -56,7 +58,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil,
                                            JwtAuthenticationEntryPoint entryPoint,
                                            JwtAccessDeniedHandler accessDeniedHandler,
-                                           ObjectMapper objectMapper) throws Exception {
+                                           ObjectMapper objectMapper,
+                                           RefreshTokenRepository refreshTokenRepository) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -65,7 +68,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth ->
                 auth
                     .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").authenticated()
-                    .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
+                    .requestMatchers("/api/auth/**").authenticated()
                     .requestMatchers("/api/career/**", "/api/feedback/**", "/api/company/**").permitAll()
                     .requestMatchers("/api/mypage/**", "/api/users/**").authenticated()
                     .anyRequest().permitAll())
@@ -74,6 +78,8 @@ public class SecurityConfig {
                 .accessDeniedHandler(accessDeniedHandler))
             .addFilterBefore(new JwtExceptionFilter(objectMapper), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new JwtAuthenticationFilter(jwtUtil), JwtExceptionFilter.class)
+            // RefreshToken 검증 필터: /api/auth/refresh 엔드포인트 요청 시 RefreshToken 쿠키 유효성 검증
+            .addFilterAfter(new TokenValidationFilter(refreshTokenRepository, objectMapper), JwtAuthenticationFilter.class)
             .httpBasic(Customizer.withDefaults());
 
         return http.build();
