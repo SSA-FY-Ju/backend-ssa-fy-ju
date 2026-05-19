@@ -80,6 +80,27 @@ public class AnalysisHistoryRepository {
             ) total
             """;
 
+    private static final String COUNT_BY_TYPE_QUERY = """
+            SELECT COUNT(*) FROM (
+                SELECT sr.id, 'SAJU' AS type FROM saju_result sr
+                WHERE sr.user_id = ?
+                  AND sr.fetched_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+
+                UNION ALL
+
+                SELECT cf.id, 'CAREER_FORTUNE' FROM career_fortune cf
+                JOIN saju_result sr ON cf.saju_result_id = sr.id
+                WHERE sr.user_id = ?
+                  AND cf.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+
+                UNION ALL
+
+                SELECT cc.id, 'COMPANY_COMPATIBILITY' FROM company_compatibility cc
+                WHERE cc.user_id = ?
+                  AND cc.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+            ) filtered WHERE filtered.type = ?
+            """;
+
     public List<UserAnalysisDto> findAllByUserId(Long userId, int page, int size) {
         String sql = UNION_QUERY + " ORDER BY created_at DESC LIMIT ? OFFSET ?";
         int offset = page * size;
@@ -114,6 +135,12 @@ public class AnalysisHistoryRepository {
 
     public long countAllByUserId(Long userId) {
         Long count = jdbcTemplate.queryForObject(COUNT_QUERY, Long.class, userId, userId, userId);
+        return count != null ? count : 0L;
+    }
+
+    public long countAllByUserIdAndType(Long userId, String type) {
+        Long count = jdbcTemplate.queryForObject(COUNT_BY_TYPE_QUERY, Long.class,
+                userId, userId, userId, type);
         return count != null ? count : 0L;
     }
 }

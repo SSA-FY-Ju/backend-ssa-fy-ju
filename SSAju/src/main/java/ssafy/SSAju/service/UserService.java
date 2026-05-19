@@ -9,6 +9,7 @@ import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.util.JobCategoryEnum;
 import ssafy.SSAju.dto.request.CompatibilityRequest;
 import ssafy.SSAju.dto.response.AnalysisDetailResponse;
@@ -47,16 +48,19 @@ public class UserService {
     private final CompanyMatchingService companyMatchingService;
 
     @Transactional(readOnly = true)
-    public MyPageResponse getMyPage(Long userId, String type, int page, int size) {
+    public MyPageResponse getMyPage(Long userId, AnalysisType type, int page, int size) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
-        List<UserAnalysisDto> analyses = (type != null && !type.isBlank())
-                ? analysisHistoryRepository.findAllByUserIdAndType(userId, type, page, size)
+        String typeStr = type != null ? type.name() : null;
+        List<UserAnalysisDto> analyses = (typeStr != null)
+                ? analysisHistoryRepository.findAllByUserIdAndType(userId, typeStr, page, size)
                 : analysisHistoryRepository.findAllByUserId(userId, page, size);
 
-        long total = analysisHistoryRepository.countAllByUserId(userId);
-        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 0;
+        long total = (typeStr != null)
+                ? analysisHistoryRepository.countAllByUserIdAndType(userId, typeStr)
+                : analysisHistoryRepository.countAllByUserId(userId);
+        int totalPages = (int) Math.ceil((double) total / size);
 
         MyPageResponse.UserProfileData profileData = new MyPageResponse.UserProfileData(
                 user.getId(), user.getName(), user.getEmail(),
@@ -67,32 +71,33 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public AnalysisDetailResponse getAnalysisDetail(Long userId, Long analysisId, String type) {
+    public AnalysisDetailResponse getAnalysisDetail(Long userId, Long analysisId, AnalysisType type) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
         return switch (type) {
-            case "SAJU" -> buildSajuDetail(user, analysisId);
-            case "CAREER_FORTUNE" -> buildCareerFortuneDetail(user, analysisId);
-            case "COMPANY_COMPATIBILITY" -> buildCompatibilityDetail(user, analysisId);
-            default -> throw new IllegalArgumentException("지원하지 않는 분석 타입: " + type);
+            case SAJU -> buildSajuDetail(user, analysisId);
+            case CAREER_FORTUNE -> buildCareerFortuneDetail(user, analysisId);
+            case COMPANY_COMPATIBILITY -> buildCompatibilityDetail(user, analysisId);
         };
     }
 
     /**
      * 재분석 실행.
-     * @Transactional 없음: 내부에서 careerFortuneService/companyMatchingService가
-     * 각자의 트랜잭션으로 커밋하므로, 재분석 후 findBy 조회 시 커밋된 데이터를 볼 수 있음.
+     *
+     * COMPANY_COMPATIBILITY는 INSERT IGNORE 캐시 구조상 기존 레코드를 삭제 후 재분석해야 함.
+     * 외부 API 실패 시 기존 데이터가 유실될 수 있는 설계 한계가 있으나,
+     * 사용자가 에러 응답을 받고 신규 분석을 재시도할 수 있으므로 허용 범위로 판단.
      */
-    public ReanalyzeResponse reanalyze(Long userId, Long analysisId, String type) {
+    @Transactional
+    public ReanalyzeResponse reanalyze(Long userId, Long analysisId, AnalysisType type) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
         return switch (type) {
-            case "SAJU" -> reanalyzeSaju(user, analysisId);
-            case "CAREER_FORTUNE" -> reanalyzeCareerFortune(user, analysisId);
-            case "COMPANY_COMPATIBILITY" -> reanalyzeCompatibility(user, analysisId);
-            default -> throw new IllegalArgumentException("지원하지 않는 분석 타입: " + type);
+            case SAJU -> reanalyzeSaju(user, analysisId);
+            case CAREER_FORTUNE -> reanalyzeCareerFortune(user, analysisId);
+            case COMPANY_COMPATIBILITY -> reanalyzeCompatibility(user, analysisId);
         };
     }
 
@@ -239,7 +244,10 @@ public class UserService {
         JobCategoryEnum targetRole = existing.getTargetRoleCategory();
         String detailName = existing.getTargetRoleDetailName();
 
+        // UNIQUE(user_profile_id, company_name, target_role_category) 제약 해제 후 재분석
+        // 실패 시 @Transactional(reanalyze)에 의해 rollback되어 기존 데이터 복원됨
         companyCompatibilityRepository.deleteById(existing.getId());
+        companyCompatibilityRepository.flush();
 
         CompatibilityRequest request = new CompatibilityRequest(
                 profile.getBirthDate(), profile.getBirthTime(),

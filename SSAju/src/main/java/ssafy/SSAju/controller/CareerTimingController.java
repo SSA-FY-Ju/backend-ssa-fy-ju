@@ -9,8 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,19 +38,15 @@ public class CareerTimingController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "FastAPI 타임아웃", content = @Content(schema = @Schema(hidden = true)))
     })
     public ResponseEntity<ApiResponse<CareerTimingResponse>> getCareerTiming(
-            @Valid @RequestBody CareerTimingRequest request
+            @Valid @RequestBody CareerTimingRequest request,
+            @AuthenticationPrincipal Long userId
     ) {
         log.info("관운 분석 요청 수신");
         CareerTimingResponse response = careerFortuneService.analyzeCareerTiming(
                 request.birthDate(), request.birthTime());
 
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof Long userId) {
-            try {
-                userService.associateSajuResultWithUser(userId, request.birthDate(), request.birthTime());
-            } catch (Exception e) {
-                log.warn("사용자 연결 실패 (무시됨): userId={}", userId, e);
-            }
+        if (userId != null) {
+            userService.associateSajuResultWithUser(userId, request.birthDate(), request.birthTime());
         }
 
         return ResponseEntity.ok(ApiResponse.success(response));

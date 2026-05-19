@@ -1,5 +1,6 @@
 package ssafy.SSAju.controller;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -7,6 +8,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ssafy.SSAju.career.enums.ForecastStatus;
@@ -17,11 +21,16 @@ import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
 import ssafy.SSAju.service.CompanyMatchingService;
 import ssafy.SSAju.service.UserService;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -68,7 +77,13 @@ class CompatibilityControllerTest {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new CompatibilityController(companyMatchingService, userService))
                 .setControllerAdvice(new SajuGlobalExceptionHandler())
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -145,6 +160,57 @@ class CompatibilityControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("인증된 사용자 요청 → associateCompatibilityWithUser 호출됨")
+    void shouldAssociateUser_WhenAuthenticated() throws Exception {
+        Long userId = 1L;
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, List.of()));
+
+        given(companyMatchingService.analyzeCompatibility(any())).willReturn(MOCK_RESPONSE);
+
+        mockMvc.perform(post("/api/company/compatibility")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userBirthDate": "1998-05-07",
+                                  "userBirthTime": "14:30",
+                                  "targetRole": {
+                                    "category": "TECH_BACKEND",
+                                    "detailName": "백엔드 개발자"
+                                  },
+                                  "companyName": "현대오토에버",
+                                  "companyFoundingDate": "2000-04-10"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        verify(userService).associateCompatibilityWithUser(
+                eq(userId), any(LocalDate.class), any(LocalTime.class),
+                any(String.class), any(JobCategoryEnum.class));
+    }
+
+    @Test
+    @DisplayName("비인증 요청 → associateCompatibilityWithUser 호출 안 됨")
+    void shouldNotAssociateUser_WhenNotAuthenticated() throws Exception {
+        given(companyMatchingService.analyzeCompatibility(any())).willReturn(MOCK_RESPONSE);
+
+        mockMvc.perform(post("/api/company/compatibility")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userBirthDate": "1998-05-07",
+                                  "userBirthTime": "14:30",
+                                  "targetRole": { "category": "TECH_BACKEND" },
+                                  "companyName": "현대오토에버",
+                                  "companyFoundingDate": "2000-04-10"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        verify(userService, never()).associateCompatibilityWithUser(any(), any(), any(), any(), any());
     }
 
     @Test
