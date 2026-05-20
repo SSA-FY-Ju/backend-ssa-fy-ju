@@ -5,7 +5,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
+import ssafy.SSAju.exception.DataAccessException;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
@@ -47,10 +49,15 @@ public class CompanyCompatibilityJdbcRepository {
      *
      * @return 생성된 레코드의 id
      */
+    /**
+     * 동시 요청에서의 버전 충돌을 방지하기 위해 SELECT FOR UPDATE로 행 락을 획득합니다.
+     * @Transactional로 락이 INSERT 완료까지 유지됩니다.
+     */
+    @Transactional
     public Long insertNewVersion(CompanyCompatibility entity) {
         Integer maxVersion = jdbcTemplate.queryForObject(
                 "SELECT COALESCE(MAX(version), 0) FROM company_compatibility " +
-                "WHERE user_id = ? AND company_name = ? AND target_role_category = ?",
+                "WHERE user_id = ? AND company_name = ? AND target_role_category = ? FOR UPDATE",
                 Integer.class,
                 entity.getUser().getId(),
                 entity.getCompanyName(),
@@ -79,6 +86,13 @@ public class CompanyCompatibilityJdbcRepository {
             return ps;
         }, keyHolder);
 
-        return keyHolder.getKey().longValue();
+        Number key = keyHolder.getKey();
+        if (key == null) {
+            throw new DataAccessException(
+                    String.format("CompanyCompatibility INSERT 후 ID 생성 실패: user_id=%d, company=%s",
+                            entity.getUser().getId(), entity.getCompanyName())
+            );
+        }
+        return key.longValue();
     }
 }
