@@ -125,6 +125,23 @@ public class AuthController {
     }
 
     /**
+     * RefreshToken으로 새로운 AccessToken을 발급합니다.
+     *
+     * <p>{@link ssafy.SSAju.filter.TokenValidationFilter}에서 RefreshToken의 유효성을
+     * 이미 검증한 후 이 엔드포인트에 도달합니다.
+     *
+     * @param request HTTP 요청 (RefreshToken 쿠키 추출용)
+     * @return 200 OK, 새 AccessToken 및 만료 시간
+     * @throws ssafy.SSAju.exception.InvalidTokenException RefreshToken이 유효하지 않은 경우
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthTokenResponse>> refresh(HttpServletRequest request) {
+        String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
+        AuthTokenResponse tokenResponse = authService.refreshAccessToken(refreshToken);
+        return ResponseEntity.ok(ApiResponse.success(tokenResponse));
+    }
+
+    /**
      * 이메일 중복 여부를 사전 확인합니다.
      *
      * <p>회원가입 폼에서 실시간으로 이메일 사용 가능 여부를 확인하는 용도입니다.

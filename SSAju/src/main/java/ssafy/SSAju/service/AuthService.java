@@ -247,6 +247,44 @@ public class AuthService {
     }
 
     /**
+     * RefreshToken으로 새로운 AccessToken을 발급합니다.
+     *
+     * <p><b>사전 조건:</b>
+     * {@link ssafy.SSAju.filter.TokenValidationFilter}에서 RefreshToken의 존재, revoked 여부,
+     * 만료 여부를 이미 검증한 상태입니다. 이 메서드는 방어적으로 재검증합니다.
+     *
+     * <p><b>프로세스:</b>
+     * <ol>
+     *   <li>RefreshToken 해시 계산 후 DB 조회</li>
+     *   <li>revoked/expired 상태 재검증</li>
+     *   <li>사용자 정보 기반 새 AccessToken 생성</li>
+     * </ol>
+     *
+     * @param refreshTokenValue 쿠키에서 추출한 RefreshToken 원본값
+     * @return 새 AccessToken 및 만료 시간 (초)
+     * @throws InvalidTokenException RefreshToken이 유효하지 않은 경우
+     */
+    @Transactional(readOnly = true)
+    public AuthTokenResponse refreshAccessToken(String refreshTokenValue) {
+        if (refreshTokenValue == null || refreshTokenValue.isBlank()) {
+            throw new InvalidTokenException("유효하지 않은 리프레시 토큰입니다.");
+        }
+
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hashToken(refreshTokenValue))
+                .orElseThrow(() -> new InvalidTokenException("유효하지 않은 리프레시 토큰입니다."));
+
+        if (refreshToken.isRevoked() || refreshToken.isExpired()) {
+            throw new InvalidTokenException("유효하지 않은 리프레시 토큰입니다.");
+        }
+
+        User user = refreshToken.getUser();
+        String newAccessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail());
+
+        log.info("AccessToken 갱신 완료: userId={}", user.getId());
+        return new AuthTokenResponse(newAccessToken, jwtUtil.getAccessTokenExpirationSeconds());
+    }
+
+    /**
      * 이메일 사용 가능 여부를 확인합니다.
      *
      * <p>회원가입 전 실시간 이메일 중복 확인 API(/api/auth/check-email)에서 사용됩니다.
