@@ -19,8 +19,8 @@ import java.time.LocalDateTime;
 @Table(
         name = "company_compatibility",
         uniqueConstraints = @UniqueConstraint(
-                name = "unique_user_company_role",
-                columnNames = {"user_profile_id", "company_name", "target_role_category"}
+                name = "uk_user_company_role_version",
+                columnNames = {"user_id", "company_name", "target_role_category", "version"}
         )
 )
 public class CompanyCompatibility {
@@ -63,6 +63,12 @@ public class CompanyCompatibility {
     @Column(name = "completed", nullable = false)
     private boolean completed = false;
 
+    @Column(name = "version", nullable = false)
+    private Integer version;
+
+    @Column(name = "analyzed_at", nullable = false, updatable = false)
+    private LocalDateTime analyzedAt;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -79,6 +85,8 @@ public class CompanyCompatibility {
         this.compatibilityScore = compatibilityScore;
         this.summary = summary;
         this.completed = false;
+        this.version = 1;
+        this.analyzedAt = LocalDateTime.now();
     }
 
     /**

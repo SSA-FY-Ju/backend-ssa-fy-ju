@@ -118,7 +118,8 @@ public class AnalysisHistoryRepository {
     }
 
     public List<UserAnalysisDto> findAllByUserIdAndType(Long userId, String type, int page, int size) {
-        String typeSql = UNION_QUERY + " HAVING type = ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        String typeSql = "SELECT * FROM (" + UNION_QUERY + ") AS combined_result " +
+                "WHERE type = ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
         int offset = page * size;
         return jdbcTemplate.query(
                 typeSql,

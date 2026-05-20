@@ -18,6 +18,7 @@ import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
 import ssafy.SSAju.entity.User;
+import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.UserRepository;
 
@@ -45,6 +46,9 @@ public class CareerFortuneService {
      * 각 DB 작업은 하위 컴포넌트의 @Transactional에 의해 개별 트랜잭션으로 실행됨.
      */
     public CareerTimingResponse analyzeCareerTiming(LocalDate birthDate, LocalTime birthTime, Long userId) {
+        if (userId == null) {
+            throw new UnauthorizedException("인증 정보가 없습니다. 로그인 후 시도해주세요.");
+        }
         log.info("관운 분석 시작");
 
         User user = userRepository.findById(userId)
