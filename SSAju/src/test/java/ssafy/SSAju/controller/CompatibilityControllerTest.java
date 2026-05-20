@@ -1,5 +1,6 @@
 package ssafy.SSAju.controller;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -7,6 +8,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ssafy.SSAju.career.enums.ForecastStatus;
@@ -20,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -33,6 +38,11 @@ class CompatibilityControllerTest {
     private CompanyMatchingService companyMatchingService;
 
     private MockMvc mockMvc;
+
+    // TODO (T049): UserService 추가 후 다음 테스트 시나리오 추가
+    // - 인증된 사용자: UserService.associateCompatibilityWithUser() 호출 검증
+    // - 비인증 사용자: 연관 메서드 미호출 검증
+    // - 연관 실패: 분석 결과는 정상 반환되는지 검증
 
     private static final CompatibilityResponse MOCK_RESPONSE = new CompatibilityResponse(
             new CompatibilityResponse.RequestContext(
@@ -64,13 +74,23 @@ class CompatibilityControllerTest {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new CompatibilityController(companyMatchingService))
                 .setControllerAdvice(new SajuGlobalExceptionHandler())
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }
 
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
-    @DisplayName("유효한 요청 → 200 OK + 궁합 점수 반환")
-    void shouldReturn200_WhenValidRequest() throws Exception {
-        given(companyMatchingService.analyzeCompatibility(any())).willReturn(MOCK_RESPONSE);
+    @DisplayName("인증된 사용자 + 유효한 요청 → 200 OK + 궁합 점수 반환")
+    void shouldReturn200_WhenAuthenticatedAndValidRequest() throws Exception {
+        Long userId = 1L;
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, List.of()));
+
+        given(companyMatchingService.analyzeCompatibility(any(), eq(userId))).willReturn(MOCK_RESPONSE);
 
         mockMvc.perform(post("/api/company/compatibility")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -146,7 +166,11 @@ class CompatibilityControllerTest {
     @Test
     @DisplayName("FastAPI 타임아웃 → 503 Service Unavailable")
     void shouldReturn503_WhenFastAPITimeout() throws Exception {
-        given(companyMatchingService.analyzeCompatibility(any()))
+        Long userId = 1L;
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, List.of()));
+
+        given(companyMatchingService.analyzeCompatibility(any(), eq(userId)))
                 .willThrow(new FastAPITimeoutException("FastAPI 응답 타임아웃"));
 
         mockMvc.perform(post("/api/company/compatibility")

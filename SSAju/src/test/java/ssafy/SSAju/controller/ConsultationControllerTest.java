@@ -1,5 +1,6 @@
 package ssafy.SSAju.controller;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -7,6 +8,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
@@ -99,7 +103,13 @@ class ConsultationControllerTest {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new ConsultationController(consultationService))
                 .setControllerAdvice(new SajuGlobalExceptionHandler())
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     // ─────────────────────────────────────────
@@ -109,7 +119,9 @@ class ConsultationControllerTest {
     @Test
     @DisplayName("유효한 요청 → 200 OK + 확장 컨설팅 응답")
     void shouldReturn200_WhenValidRequest() throws Exception {
-        given(consultationService.getCareerConsultation(any())).willReturn(MOCK_RESPONSE);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(1L, null, List.of()));
+        given(consultationService.getCareerConsultation(any(), any())).willReturn(MOCK_RESPONSE);
 
         mockMvc.perform(post("/api/career/consultation")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -174,7 +186,9 @@ class ConsultationControllerTest {
     @Test
     @DisplayName("OpenAI 타임아웃 → 504 Gateway Timeout")
     void shouldReturn504_WhenOpenAITimeout() throws Exception {
-        given(consultationService.getCareerConsultation(any()))
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(1L, null, List.of()));
+        given(consultationService.getCareerConsultation(any(), any()))
                 .willThrow(new OpenAIApiException("OpenAI API 요청 시간 초과"));
 
         mockMvc.perform(post("/api/career/consultation")

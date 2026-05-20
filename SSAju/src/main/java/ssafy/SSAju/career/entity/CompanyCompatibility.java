@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import ssafy.SSAju.career.util.JobCategoryEnum;
+import ssafy.SSAju.entity.User;
 
 import java.time.LocalDateTime;
 
@@ -18,8 +19,8 @@ import java.time.LocalDateTime;
 @Table(
         name = "company_compatibility",
         uniqueConstraints = @UniqueConstraint(
-                name = "unique_user_company_role",
-                columnNames = {"user_profile_id", "company_name", "target_role_category"}
+                name = "uk_user_company_role_version",
+                columnNames = {"user_id", "company_name", "target_role_category", "version"}
         )
 )
 public class CompanyCompatibility {
@@ -31,6 +32,10 @@ public class CompanyCompatibility {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_profile_id", nullable = false)
     private UserProfile userProfile;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @Column(name = "company_name", nullable = false)
     private String companyName;
@@ -58,21 +63,30 @@ public class CompanyCompatibility {
     @Column(name = "completed", nullable = false)
     private boolean completed = false;
 
+    @Column(name = "version", nullable = false)
+    private Integer version;
+
+    @Column(name = "analyzed_at", nullable = false, updatable = false)
+    private LocalDateTime analyzedAt;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public CompanyCompatibility(UserProfile userProfile, String companyName,
+    public CompanyCompatibility(UserProfile userProfile, User user, String companyName,
                                  JobCategoryEnum targetRoleCategory, String targetRoleDetailName,
                                  Integer compatibilityScore, String summary) {
         this.userProfile = userProfile;
+        this.user = user;
         this.companyName = companyName;
         this.targetRoleCategory = targetRoleCategory;
         this.targetRoleDetailName = targetRoleDetailName;
         this.compatibilityScore = compatibilityScore;
         this.summary = summary;
         this.completed = false;
+        this.version = 1;
+        this.analyzedAt = LocalDateTime.now();
     }
 
     /**
@@ -81,6 +95,10 @@ public class CompanyCompatibility {
      */
     public void markCompleted() {
         this.completed = true;
+    }
+
+    public void assignUser(User user) {
+        this.user = user;
     }
 
     @Override

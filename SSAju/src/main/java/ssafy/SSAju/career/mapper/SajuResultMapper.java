@@ -9,6 +9,7 @@ import ssafy.SSAju.career.entity.SajuFullData;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.TenGodData;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.entity.User;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.dto.external.FastAPIResponse;
@@ -32,6 +33,7 @@ public class SajuResultMapper {
     );
 
     public SajuResult buildSajuResult(UserProfile userProfile,
+                                       User user,
                                        FastAPIResponse sajuData,
                                        TenGodDistribution tenGodDistribution,
                                        HiddenStems hiddenStems,
@@ -40,6 +42,7 @@ public class SajuResultMapper {
                                        String reasoning) {
         SajuResult result = SajuResult.builder()
                 .userProfile(userProfile)
+                .user(user)
                 .build();
 
         SajuFullData fullData = toSajuFullData(result, sajuData);
@@ -60,11 +63,13 @@ public class SajuResultMapper {
     }
 
     public SajuResult buildSajuResultWithoutFortune(UserProfile userProfile,
+                                                     User user,
                                                      FastAPIResponse sajuData,
                                                      TenGodDistribution tenGodDistribution,
                                                      HiddenStems hiddenStems) {
         SajuResult result = SajuResult.builder()
                 .userProfile(userProfile)
+                .user(user)
                 .build();
 
         result.assignSajuFullData(toSajuFullData(result, sajuData));

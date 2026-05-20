@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,10 +37,11 @@ public class CompatibilityController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "FastAPI 타임아웃", content = @Content(schema = @Schema(hidden = true)))
     })
     public ResponseEntity<ApiResponse<CompatibilityResponse>> analyzeCompatibility(
-            @Valid @RequestBody CompatibilityRequest request
+            @Valid @RequestBody CompatibilityRequest request,
+            @AuthenticationPrincipal Long userId
     ) {
         log.info("기업 궁합 분석 요청 수신: company={}", request.companyName());
-        CompatibilityResponse response = companyMatchingService.analyzeCompatibility(request);
+        CompatibilityResponse response = companyMatchingService.analyzeCompatibility(request, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

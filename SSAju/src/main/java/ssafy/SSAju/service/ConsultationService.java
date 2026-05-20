@@ -24,7 +24,11 @@ import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.ConsultationRequest;
 import ssafy.SSAju.dto.response.ConsultationResponse;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.exception.UnauthorizedException;
+import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
+import ssafy.SSAju.repository.UserRepository;
 
 import java.util.List;
 import java.util.Map;
@@ -46,6 +50,7 @@ public class ConsultationService {
     private final ConsultationMapper consultationMapper;
     private final CareerConsultationRepository careerConsultationRepository;
     private final SajuValidator sajuValidator;
+    private final UserRepository userRepository;
 
     @Value("${spring.ai.openai.chat.options.model}")
     private String modelVersion;
@@ -53,8 +58,14 @@ public class ConsultationService {
     /**
      * @Transactional 없음: FastAPI/OpenAI I/O 동안 DB 커넥션을 점유하지 않도록 트랜잭션 분리.
      */
-    public ConsultationResponse getCareerConsultation(ConsultationRequest request) {
+    public ConsultationResponse getCareerConsultation(ConsultationRequest request, Long userId) {
+        if (userId == null) {
+            throw new UnauthorizedException("인증 정보가 없습니다. 로그인 후 시도해주세요.");
+        }
         log.info("커리어 컨설팅 시작");
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
         FastAPIResponse sajuData = sajuDataService.fetchSajuFromFastAPI(request.birthDate(), request.birthTime());
         sajuValidator.validateWithFiveElements(sajuData);
@@ -74,7 +85,7 @@ public class ConsultationService {
         UserProfile userProfile = userProfileProvider.findOrCreate(request.birthDate(), request.birthTime());
 
         SajuResult newResult = sajuResultMapper.buildSajuResult(
-                userProfile, sajuData, tenGodDistribution, hiddenStems,
+                userProfile, user, sajuData, tenGodDistribution, hiddenStems,
                 favoredPeriod, confidenceScore, reasoning);
         SajuResult sajuResult = sajuResultProvider.findOrCreate(userProfile, newResult);
 

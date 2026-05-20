@@ -8,6 +8,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.ErrorInfo;
@@ -249,6 +250,28 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.VALIDATION_FAILED.getCode(), message, generateRequestId())));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(
+            IllegalArgumentException e, HttpServletRequest request) {
+        String requestId = generateRequestId();
+        log.warn("잘못된 요청 파라미터: requestId={}", requestId);
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.VALIDATION_FAILED.getCode(),
+                        "요청 파라미터가 유효하지 않습니다.", requestId)));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(
+            MethodArgumentTypeMismatchException e, HttpServletRequest request) {
+        String requestId = generateRequestId();
+        log.warn("요청 파라미터 타입 오류: requestId={}", requestId);
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.VALIDATION_FAILED.getCode(),
+                        "요청 파라미터 값이 올바르지 않습니다.", requestId)));
     }
 
     @ExceptionHandler(Exception.class)

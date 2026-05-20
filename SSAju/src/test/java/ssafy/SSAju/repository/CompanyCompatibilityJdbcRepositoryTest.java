@@ -14,8 +14,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.util.JobCategoryEnum;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.entity.enums.UserRole;
+import ssafy.SSAju.entity.enums.UserStatus;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -54,6 +58,7 @@ class CompanyCompatibilityJdbcRepositoryTest {
     @Autowired private HiddenStemDataRepository hiddenStemDataRepository;
     @Autowired private CareerFortuneRepository careerFortuneRepository;
     @Autowired private SajuFullDataRepository sajuFullDataRepository;
+    @Autowired private UserRepository userRepository;
 
     // company_compatibility의 자식 테이블 레포지토리 (FK 안전 삭제용)
     @Autowired private TargetRoleAnalysisRepository targetRoleAnalysisRepository;
@@ -66,6 +71,7 @@ class CompanyCompatibilityJdbcRepositoryTest {
     @Autowired private CautionRepository cautionRepository;
 
     private UserProfile savedProfile;
+    private User testUser;
 
     @BeforeEach
     void setUp() {
@@ -85,6 +91,17 @@ class CompanyCompatibilityJdbcRepositoryTest {
         sajuFullDataRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
         userProfileRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
+
+        testUser = userRepository.save(User.builder()
+                .email("jdbc-test@test.com")
+                .passwordHash("hash")
+                .name("테스트")
+                .role(UserRole.USER)
+                .status(UserStatus.ACTIVE)
+                .termsAgreedAt(LocalDateTime.now())
+                .privacyAgreedAt(LocalDateTime.now())
+                .build());
 
         savedProfile = userProfileRepository.save(
                 UserProfile.builder()
@@ -172,6 +189,7 @@ class CompanyCompatibilityJdbcRepositoryTest {
                                               JobCategoryEnum category) {
         return CompanyCompatibility.builder()
                 .userProfile(profile)
+                .user(testUser)
                 .companyName(companyName)
                 .targetRoleCategory(category)
                 .targetRoleDetailName("테스트 직무")

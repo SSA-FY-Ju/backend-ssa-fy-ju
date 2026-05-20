@@ -7,6 +7,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
@@ -15,8 +18,10 @@ import ssafy.SSAju.service.CareerFortuneService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -36,13 +41,18 @@ class CareerTimingControllerTest {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new CareerTimingController(careerFortuneService))
                 .setControllerAdvice(new SajuGlobalExceptionHandler())
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }
 
     @Test
-    @DisplayName("유효한 birthDate + birthTime → 200 OK + H1/H2 응답")
-    void shouldReturn200_WhenValidRequest() throws Exception {
-        given(careerFortuneService.analyzeCareerTiming(any(LocalDate.class), any(LocalTime.class)))
+    @DisplayName("인증된 사용자 + 유효한 요청 → 200 OK")
+    void shouldReturn200_WhenAuthenticatedAndValidRequest() throws Exception {
+        Long userId = 1L;
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, List.of()));
+
+        given(careerFortuneService.analyzeCareerTiming(any(LocalDate.class), any(LocalTime.class), eq(userId)))
                 .willReturn(new CareerTimingResponse("H1", 75, "상반기가 취업에 유리합니다."));
 
         mockMvc.perform(post("/api/career/timing")
@@ -55,6 +65,8 @@ class CareerTimingControllerTest {
                 .andExpect(jsonPath("$.data.favoredPeriod").value("H1"))
                 .andExpect(jsonPath("$.data.confidenceScore").value(75))
                 .andExpect(jsonPath("$.data.reasoning").isNotEmpty());
+
+        SecurityContextHolder.clearContext();
     }
 
     @Test

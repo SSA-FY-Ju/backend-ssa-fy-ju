@@ -12,11 +12,18 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import ssafy.SSAju.career.caller.ConsultationOpenAICaller;
 import ssafy.SSAju.dto.external.FastAPIResponse;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.entity.enums.UserRole;
+import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
+import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.repository.UserSatisfactionFeedbackRepository;
+import ssafy.SSAju.service.DailyApiUsageService;
 import ssafy.SSAju.service.SajuDataService;
+import ssafy.SSAju.util.JwtUtil;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +55,9 @@ class CareerApiIntegrationTest {
     @MockitoBean
     private ConsultationOpenAICaller openAICaller; // OpenAI 호출 차단
 
+    @MockitoBean
+    private DailyApiUsageService dailyApiUsageService; // H2 호환 SQL 문제 방지
+
     // ─── 실제 빈: 서비스·리포지토리 (H2 DB) ─────────────────────────
     @Autowired
     private UserProfileRepository userProfileRepository;
@@ -57,6 +67,14 @@ class CareerApiIntegrationTest {
 
     @Autowired
     private UserSatisfactionFeedbackRepository feedbackRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    private String authHeader;
 
     @BeforeEach
     void setUp() {
@@ -68,6 +86,20 @@ class CareerApiIntegrationTest {
         feedbackRepository.deleteAll();
         sajuResultRepository.deleteAll();
         userProfileRepository.deleteAll();
+        userRepository.deleteAll();
+
+        // 실제 JWT 인증을 위한 테스트 사용자 생성
+        User testUser = userRepository.save(User.builder()
+                .email("integration-test@test.com")
+                .passwordHash("hash")
+                .name("통합테스트")
+                .role(UserRole.USER)
+                .status(UserStatus.ACTIVE)
+                .termsAgreedAt(LocalDateTime.now())
+                .privacyAgreedAt(LocalDateTime.now())
+                .build());
+        String token = jwtUtil.generateAccessToken(testUser.getId(), testUser.getEmail());
+        authHeader = "Bearer " + token;
 
         // FastAPI stub: 실제 사주 데이터 형태로 구성
         given(sajuDataService.fetchSajuFromFastAPI(any(), any()))
@@ -89,6 +121,7 @@ class CareerApiIntegrationTest {
     void careerTiming_persistsUserProfileAndSajuResult() throws Exception {
         // When
         mockMvc.perform(post("/api/career/timing")
+                        .header("Authorization", authHeader)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"birthDate": "1990-10-10", "birthTime": "14:30"}
@@ -113,6 +146,7 @@ class CareerApiIntegrationTest {
         // When: 동일 입력으로 2회 요청
         for (int i = 0; i < 2; i++) {
             mockMvc.perform(post("/api/career/timing")
+                            .header("Authorization", authHeader)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk());
@@ -132,6 +166,7 @@ class CareerApiIntegrationTest {
     void saveFeedback_afterCareerTiming_persistsFeedbackLinkedToSajuResult() throws Exception {
         // Given: 먼저 관운 분석으로 SajuResult 생성
         mockMvc.perform(post("/api/career/timing")
+                        .header("Authorization", authHeader)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"birthDate": "1990-10-10", "birthTime": "14:30"}
@@ -142,6 +177,7 @@ class CareerApiIntegrationTest {
 
         // When: 피드백 저장
         mockMvc.perform(post("/api/feedback/satisfaction")
+                        .header("Authorization", authHeader)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -164,6 +200,7 @@ class CareerApiIntegrationTest {
     @DisplayName("T090-4: 존재하지 않는 SajuResultId로 피드백 저장 → 404 Not Found")
     void saveFeedback_withNonExistentSajuResultId_returns404() throws Exception {
         mockMvc.perform(post("/api/feedback/satisfaction")
+                        .header("Authorization", authHeader)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
