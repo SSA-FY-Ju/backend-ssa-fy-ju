@@ -226,6 +226,10 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public AuthTokenResponse refreshAccessToken(String refreshTokenValue) {
+        if (refreshTokenValue == null || refreshTokenValue.isBlank()) {
+            throw new InvalidTokenException("유효하지 않은 리프레시 토큰입니다.");
+        }
+
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hashToken(refreshTokenValue))
                 .orElseThrow(() -> new InvalidTokenException("유효하지 않은 리프레시 토큰입니다."));
 
