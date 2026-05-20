@@ -38,6 +38,11 @@ class CompatibilityControllerTest {
 
     private MockMvc mockMvc;
 
+    // TODO (T049): UserService 추가 후 다음 테스트 시나리오 추가
+    // - 인증된 사용자: UserService.associateCompatibilityWithUser() 호출 검증
+    // - 비인증 사용자: 연관 메서드 미호출 검증
+    // - 연관 실패: 분석 결과는 정상 반환되는지 검증
+
     private static final CompatibilityResponse MOCK_RESPONSE = new CompatibilityResponse(
             new CompatibilityResponse.RequestContext(
                     "현대오토에버",

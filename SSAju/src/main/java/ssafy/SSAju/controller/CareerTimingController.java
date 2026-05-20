@@ -30,6 +30,9 @@ public class CareerTimingController {
 
     @PostMapping("/timing")
     @Operation(summary = "관운 분석", description = "생년월일시로부터 상반기(H1)/하반기(H2) 관운 판정, 신뢰도 점수 및 근거 반환")
+    // TODO: ApiResponse 클래스 이름 변경 후 import 정리
+    // (현재: 내부 dto.response.ApiResponse와 Swagger @ApiResponse 이름 충돌)
+    // 예: ApiResponse → ApiResponseDto로 변경 후 @ApiResponse로 간결화
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "관운 분석 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 검증 실패 (birthDate/birthTime 누락)", content = @Content(schema = @Schema(hidden = true))),
