@@ -174,7 +174,7 @@ class CompanyMatchingServiceTest {
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(new CompatibilityAnalysisData.RoleAnalysis(85, "시너지 텍스트", "경고 텍스트"));
         given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
-        given(companyCompatibilityRepository.findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategory(
+        given(companyCompatibilityRepository.findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
                 any(), any(), anyString(), any())).willReturn(Optional.of(savedEntity));
 
         // When
@@ -210,7 +210,7 @@ class CompanyMatchingServiceTest {
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(new CompatibilityAnalysisData.RoleAnalysis(85, "시너지", "경고"));
         given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(0);
-        given(companyCompatibilityRepository.findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategory(
+        given(companyCompatibilityRepository.findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
                 any(), any(), anyString(), any())).willReturn(Optional.of(existingEntity));
 
         // When
@@ -252,7 +252,7 @@ class CompanyMatchingServiceTest {
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(new CompatibilityAnalysisData.RoleAnalysis(60, "시너지", "경고"));
         given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
-        given(companyCompatibilityRepository.findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategory(
+        given(companyCompatibilityRepository.findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
                 any(), any(), anyString(), any())).willReturn(Optional.of(savedEntity));
 
         // When
@@ -286,7 +286,7 @@ class CompanyMatchingServiceTest {
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(new CompatibilityAnalysisData.RoleAnalysis(70, "시너지", "경고"));
         given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
-        given(companyCompatibilityRepository.findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategory(
+        given(companyCompatibilityRepository.findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
                 any(), any(), anyString(), any())).willReturn(Optional.of(savedEntity));
 
         // When
