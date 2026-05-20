@@ -13,6 +13,7 @@ import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.ErrorInfo;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.exception.DataAccessException;
+import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.DailyLimitExceededException;
 import ssafy.SSAju.exception.DuplicateEmailException;
 import ssafy.SSAju.exception.ExternalApiException;
@@ -49,6 +50,25 @@ public class SajuGlobalExceptionHandler {
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.DUPLICATE_EMAIL.getCode(),
                         ErrorMessageConstants.DUPLICATE_EMAIL.getMessage(), generateRequestId())));
+    }
+
+    /**
+     * 토큰 유효성 예외를 처리합니다.
+     *
+     * <p>RefreshToken 갱신 시 토큰이 유효하지 않거나 만료된 경우 발생합니다.
+     *
+     * @param e InvalidTokenException
+     * @param request HTTP 요청
+     * @return 401 Unauthorized, 에러 코드: INVALID_TOKEN
+     */
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidToken(
+            InvalidTokenException e, HttpServletRequest request) {
+        log.warn("유효하지 않은 토큰: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.INVALID_TOKEN.getCode(),
+                        ErrorMessageConstants.INVALID_TOKEN.getMessage(), generateRequestId())));
     }
 
     /**
