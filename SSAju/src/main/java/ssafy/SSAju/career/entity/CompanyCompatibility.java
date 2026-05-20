@@ -34,7 +34,7 @@ public class CompanyCompatibility {
     private UserProfile userProfile;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Column(name = "company_name", nullable = false)
@@ -68,10 +68,11 @@ public class CompanyCompatibility {
     private LocalDateTime createdAt;
 
     @Builder
-    public CompanyCompatibility(UserProfile userProfile, String companyName,
+    public CompanyCompatibility(UserProfile userProfile, User user, String companyName,
                                  JobCategoryEnum targetRoleCategory, String targetRoleDetailName,
                                  Integer compatibilityScore, String summary) {
         this.userProfile = userProfile;
+        this.user = user;
         this.companyName = companyName;
         this.targetRoleCategory = targetRoleCategory;
         this.targetRoleDetailName = targetRoleDetailName;

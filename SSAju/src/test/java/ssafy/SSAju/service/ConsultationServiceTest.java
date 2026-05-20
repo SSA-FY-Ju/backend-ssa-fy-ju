@@ -24,13 +24,19 @@ import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.ConsultationRequest;
 import ssafy.SSAju.dto.response.ConsultationResponse;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.entity.enums.UserRole;
+import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
+import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -55,8 +61,20 @@ class ConsultationServiceTest {
     @Mock private SajuResultMapper sajuResultMapper;
     @Mock private ConsultationMapper consultationMapper;
     @Mock private CareerConsultationRepository careerConsultationRepository;
+    @Mock private UserRepository userRepository;
 
     private ConsultationService service;
+
+    private static final Long USER_ID = 1L;
+    private static final User MOCK_USER = User.builder()
+            .email("test@test.com")
+            .passwordHash("hash")
+            .name("테스트")
+            .role(UserRole.USER)
+            .status(UserStatus.ACTIVE)
+            .termsAgreedAt(LocalDateTime.now())
+            .privacyAgreedAt(LocalDateTime.now())
+            .build();
 
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 10, 10);
     private static final LocalTime BIRTH_TIME = LocalTime.of(14, 30);
@@ -121,7 +139,8 @@ class ConsultationServiceTest {
         service = new ConsultationService(
                 openAICaller, sajuDataService, tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer,
                 userProfileProvider, sajuResultProvider, sajuResultMapper, consultationMapper,
-                careerConsultationRepository, new SajuValidator());
+                careerConsultationRepository, new SajuValidator(), userRepository);
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
         try {
             var field = ConsultationService.class.getDeclaredField("modelVersion");
             field.setAccessible(true);
@@ -149,7 +168,7 @@ class ConsultationServiceTest {
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(80);
         given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(userProfile, sajuResult)).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
@@ -158,7 +177,7 @@ class ConsultationServiceTest {
         given(consultationMapper.buildAnalysisSummary(any(), any(), any(), any()))
                 .willReturn("己 일간 · 오행 火·金 강세 · 정관·편관 기운 기반 | 2026년 12개월 타임라인 + 관운 분석 (H1)");
 
-        ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST);
+        ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
         // 기존 필드 검증
         assertThat(result.industries()).hasSize(1);
@@ -214,7 +233,7 @@ class ConsultationServiceTest {
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(60);
         given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("하반기가 취업에 유리합니다.");
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(newSajuResult);
         given(sajuResultProvider.findOrCreate(userProfile, newSajuResult)).willReturn(newSajuResult);
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
@@ -223,7 +242,7 @@ class ConsultationServiceTest {
         given(consultationMapper.buildAnalysisSummary(any(), any(), any(), any()))
                 .willReturn("己 일간 · 오행 火·金 강세 | H2");
 
-        ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST);
+        ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
         assertThat(result.openaiModelVersion()).isEqualTo("gpt-4o-mini");
         assertThat(result.sajuProfile()).isNotNull();
@@ -248,13 +267,13 @@ class ConsultationServiceTest {
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
         given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
                 .willThrow(new OpenAIApiException("OpenAI API 호출 실패: connection failed"));
 
-        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
+        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("OpenAI API 호출 실패");
     }
@@ -276,13 +295,13 @@ class ConsultationServiceTest {
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
         given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
                 .willThrow(new OpenAIApiException("OpenAI 응답이 비어있습니다"));
 
-        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
+        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("비어있습니다");
     }
@@ -300,13 +319,13 @@ class ConsultationServiceTest {
         given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
         given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
                 .willThrow(new OpenAIApiException("산업 추천 정보가 누락되었습니다"));
 
-        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST))
+        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("산업 추천 정보가 누락");
     }

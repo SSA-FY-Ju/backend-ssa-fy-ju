@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,10 +36,11 @@ public class ConsultationController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "504", description = "OpenAI API 타임아웃", content = @Content(schema = @Schema(hidden = true)))
     })
     public ResponseEntity<ApiResponse<ConsultationResponse>> getCareerConsultation(
-            @Valid @RequestBody ConsultationRequest request
+            @Valid @RequestBody ConsultationRequest request,
+            @AuthenticationPrincipal Long userId
     ) {
         log.info("커리어 컨설팅 요청 수신");
-        ConsultationResponse response = consultationService.getCareerConsultation(request);
+        ConsultationResponse response = consultationService.getCareerConsultation(request, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

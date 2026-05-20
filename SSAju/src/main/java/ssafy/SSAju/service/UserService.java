@@ -101,6 +101,7 @@ public class UserService {
         };
     }
 
+    // TODO(리팩토링): UserService 분리 시 제거 예정 - user_id가 생성 시점에 설정되므로 이 메서드는 불필요
     @Transactional
     public void associateSajuResultWithUser(Long userId, LocalDate birthDate, LocalTime birthTime) {
         userProfileRepository.findByBirthDateAndBirthTime(birthDate, birthTime)
@@ -115,6 +116,7 @@ public class UserService {
                 });
     }
 
+    // TODO(리팩토링): UserService 분리 시 제거 예정 - user_id가 생성 시점에 설정되므로 이 메서드는 불필요
     @Transactional
     public void associateCompatibilityWithUser(Long userId, LocalDate birthDate, LocalTime birthTime,
                                                String companyName, JobCategoryEnum targetRoleCategory) {
@@ -202,11 +204,10 @@ public class UserService {
                 .orElseThrow(() -> new SajuResultNotFoundException("사주 분석 결과를 찾을 수 없습니다."));
 
         UserProfile profile = existing.getUserProfile();
-        careerFortuneService.analyzeCareerTiming(profile.getBirthDate(), profile.getBirthTime());
+        careerFortuneService.analyzeCareerTiming(profile.getBirthDate(), profile.getBirthTime(), user.getId());
 
         SajuResult newResult = sajuResultRepository.findByUserProfile(profile)
                 .orElseThrow(() -> new SajuResultNotFoundException("재분석 결과를 찾을 수 없습니다."));
-        associateSajuResultWithUser(user.getId(), profile.getBirthDate(), profile.getBirthTime());
 
         log.info("사주 재분석 완료: userId={}, newId={}", user.getId(), newResult.getId());
         return new ReanalyzeResponse("재분석이 완료되었습니다.", newResult.getId(), "SAJU");
@@ -222,11 +223,10 @@ public class UserService {
         }
 
         UserProfile profile = sr.getUserProfile();
-        careerFortuneService.analyzeCareerTiming(profile.getBirthDate(), profile.getBirthTime());
+        careerFortuneService.analyzeCareerTiming(profile.getBirthDate(), profile.getBirthTime(), user.getId());
 
         SajuResult newResult = sajuResultRepository.findByUserProfile(profile)
                 .orElseThrow(() -> new SajuResultNotFoundException("재분석 결과를 찾을 수 없습니다."));
-        associateSajuResultWithUser(user.getId(), profile.getBirthDate(), profile.getBirthTime());
 
         CareerFortune newCf = careerFortuneRepository.findBySajuResult(newResult)
                 .orElseThrow(() -> new SajuResultNotFoundException("재분석 관운 결과를 찾을 수 없습니다."));
@@ -254,15 +254,12 @@ public class UserService {
                 new CompatibilityRequest.TargetRoleRequest(targetRole, detailName),
                 companyName, null, null);
 
-        companyMatchingService.analyzeCompatibility(request);
+        companyMatchingService.analyzeCompatibility(request, user.getId());
 
         CompanyCompatibility newCc = companyCompatibilityRepository
                 .findByUserProfile_IdAndCompanyNameAndTargetRoleCategory(
                         profile.getId(), companyName, targetRole)
                 .orElseThrow(() -> new SajuResultNotFoundException("재분석 결과를 찾을 수 없습니다."));
-
-        associateCompatibilityWithUser(user.getId(), profile.getBirthDate(), profile.getBirthTime(),
-                companyName, targetRole);
 
         log.info("기업 궁합 재분석 완료: userId={}, newId={}", user.getId(), newCc.getId());
         return new ReanalyzeResponse("재분석이 완료되었습니다.", newCc.getId(), "COMPANY_COMPATIBILITY");

@@ -27,7 +27,7 @@ public class SajuResult {
     private UserProfile userProfile;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Column(name = "fetched_at", nullable = false)
@@ -46,8 +46,9 @@ public class SajuResult {
     private CareerFortune careerFortune;
 
     @Builder
-    public SajuResult(UserProfile userProfile) {
+    public SajuResult(UserProfile userProfile, User user) {
         this.userProfile = userProfile;
+        this.user = user;
         this.fetchedAt = LocalDateTime.now();
     }
 

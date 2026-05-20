@@ -14,7 +14,9 @@ import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.CompatibilityRequest;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
+import ssafy.SSAju.entity.User;
 import ssafy.SSAju.exception.PublicDataApiException;
+import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.*;
 
 import java.time.LocalDate;
@@ -66,6 +68,7 @@ public class CompanyMatchingService {
     private final CompanyCompatibilityRepository companyCompatibilityRepository;
     private final CompanyCompatibilityJdbcRepository companyCompatibilityJdbcRepository;
     private final CompatibilityChildSaveService childSaveService;
+    private final UserRepository userRepository;
 
     // 캐시 재사용 경로(buildResponseFromExisting)에서 자식 엔티티 조회용
     private final TargetRoleAnalysisRepository targetRoleAnalysisRepository;
@@ -79,8 +82,11 @@ public class CompanyMatchingService {
     private final MonthlyForecastRepository monthlyForecastRepository;
     private final CautionRepository cautionRepository;
 
-    public CompatibilityResponse analyzeCompatibility(CompatibilityRequest request) {
+    public CompatibilityResponse analyzeCompatibility(CompatibilityRequest request, Long userId) {
         log.info("기업 궁합 분석 시작");
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
         // ─── 사용자 사주 계산 ──────────────────────────────────────
         LocalTime userBirthTime = resolveUserBirthTime(request);
@@ -150,6 +156,7 @@ public class CompanyMatchingService {
         // ───────────────────────────────────────────────────────────────────
         CompanyCompatibility root = CompanyCompatibility.builder()
                 .userProfile(userProfile)
+                .user(user)
                 .companyName(request.companyName())
                 .targetRoleCategory(request.targetRole().category())
                 .targetRoleDetailName(request.targetRole().detailName())

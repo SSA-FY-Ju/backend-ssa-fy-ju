@@ -1,6 +1,5 @@
 package ssafy.SSAju.controller;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,18 +18,13 @@ import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
 import ssafy.SSAju.service.CompanyMatchingService;
-import ssafy.SSAju.service.UserService;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,9 +35,6 @@ class CompatibilityControllerTest {
 
     @Mock
     private CompanyMatchingService companyMatchingService;
-
-    @Mock
-    private UserService userService;
 
     private MockMvc mockMvc;
 
@@ -75,21 +66,20 @@ class CompatibilityControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new CompatibilityController(companyMatchingService, userService))
+                .standaloneSetup(new CompatibilityController(companyMatchingService))
                 .setControllerAdvice(new SajuGlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }
 
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-    }
-
     @Test
-    @DisplayName("유효한 요청 → 200 OK + 궁합 점수 반환")
-    void shouldReturn200_WhenValidRequest() throws Exception {
-        given(companyMatchingService.analyzeCompatibility(any())).willReturn(MOCK_RESPONSE);
+    @DisplayName("인증된 사용자 + 유효한 요청 → 200 OK + 궁합 점수 반환")
+    void shouldReturn200_WhenAuthenticatedAndValidRequest() throws Exception {
+        Long userId = 1L;
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, List.of()));
+
+        given(companyMatchingService.analyzeCompatibility(any(), eq(userId))).willReturn(MOCK_RESPONSE);
 
         mockMvc.perform(post("/api/company/compatibility")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,6 +100,8 @@ class CompatibilityControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.compatibilityScore").value(78))
                 .andExpect(jsonPath("$.data.requestContext.companyName").value("현대오토에버"));
+
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -163,60 +155,13 @@ class CompatibilityControllerTest {
     }
 
     @Test
-    @DisplayName("인증된 사용자 요청 → associateCompatibilityWithUser 호출됨")
-    void shouldAssociateUser_WhenAuthenticated() throws Exception {
+    @DisplayName("FastAPI 타임아웃 → 503 Service Unavailable")
+    void shouldReturn503_WhenFastAPITimeout() throws Exception {
         Long userId = 1L;
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(userId, null, List.of()));
 
-        given(companyMatchingService.analyzeCompatibility(any())).willReturn(MOCK_RESPONSE);
-
-        mockMvc.perform(post("/api/company/compatibility")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "userBirthDate": "1998-05-07",
-                                  "userBirthTime": "14:30",
-                                  "targetRole": {
-                                    "category": "TECH_BACKEND",
-                                    "detailName": "백엔드 개발자"
-                                  },
-                                  "companyName": "현대오토에버",
-                                  "companyFoundingDate": "2000-04-10"
-                                }
-                                """))
-                .andExpect(status().isOk());
-
-        verify(userService).associateCompatibilityWithUser(
-                eq(userId), any(LocalDate.class), any(LocalTime.class),
-                any(String.class), any(JobCategoryEnum.class));
-    }
-
-    @Test
-    @DisplayName("비인증 요청 → associateCompatibilityWithUser 호출 안 됨")
-    void shouldNotAssociateUser_WhenNotAuthenticated() throws Exception {
-        given(companyMatchingService.analyzeCompatibility(any())).willReturn(MOCK_RESPONSE);
-
-        mockMvc.perform(post("/api/company/compatibility")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "userBirthDate": "1998-05-07",
-                                  "userBirthTime": "14:30",
-                                  "targetRole": { "category": "TECH_BACKEND" },
-                                  "companyName": "현대오토에버",
-                                  "companyFoundingDate": "2000-04-10"
-                                }
-                                """))
-                .andExpect(status().isOk());
-
-        verify(userService, never()).associateCompatibilityWithUser(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("FastAPI 타임아웃 → 503 Service Unavailable")
-    void shouldReturn503_WhenFastAPITimeout() throws Exception {
-        given(companyMatchingService.analyzeCompatibility(any()))
+        given(companyMatchingService.analyzeCompatibility(any(), eq(userId)))
                 .willThrow(new FastAPITimeoutException("FastAPI 응답 타임아웃"));
 
         mockMvc.perform(post("/api/company/compatibility")
@@ -232,5 +177,7 @@ class CompatibilityControllerTest {
                                 """))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.success").value(false));
+
+        SecurityContextHolder.clearContext();
     }
 }

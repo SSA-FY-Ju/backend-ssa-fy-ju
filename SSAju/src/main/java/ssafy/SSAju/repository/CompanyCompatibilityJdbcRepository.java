@@ -20,10 +20,11 @@ public class CompanyCompatibilityJdbcRepository {
     public int insertOrIgnore(CompanyCompatibility entity) {
         return jdbcTemplate.update(
                 "INSERT IGNORE INTO company_compatibility " +
-                        "(user_profile_id, company_name, target_role_category, target_role_detail_name, " +
+                        "(user_profile_id, user_id, company_name, target_role_category, target_role_detail_name, " +
                         "compatibility_score, summary, created_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, NOW())",
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, NOW())",
                 entity.getUserProfile().getId(),
+                entity.getUser().getId(),
                 entity.getCompanyName(),
                 entity.getTargetRoleCategory().name(),
                 entity.getTargetRoleDetailName(),

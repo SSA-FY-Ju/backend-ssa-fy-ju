@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -28,6 +29,7 @@ import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -56,6 +58,12 @@ class CareerApiControllerTest {
     @MockitoBean
     private FeedbackService feedbackService;
 
+    @MockitoBean
+    private ssafy.SSAju.service.DailyApiUsageService dailyApiUsageService;
+
+    private static final UsernamePasswordAuthenticationToken AUTH_TOKEN =
+            new UsernamePasswordAuthenticationToken(1L, null, List.of());
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
@@ -71,11 +79,12 @@ class CareerApiControllerTest {
     @DisplayName("T089-1: POST /api/career/timing - 유효한 요청 → H1/H2 판정 응답")
     void us1_careerTiming_validRequest_returnsH1orH2() throws Exception {
         // Given
-        given(careerFortuneService.analyzeCareerTiming(any(), any()))
+        given(careerFortuneService.analyzeCareerTiming(any(), any(), any()))
                 .willReturn(new CareerTimingResponse("H1", 75, "상반기가 취업에 유리합니다."));
 
         // When & Then
         mockMvc.perform(post("/api/career/timing")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"birthDate": "1990-10-10", "birthTime": "14:30"}
@@ -91,6 +100,7 @@ class CareerApiControllerTest {
     @DisplayName("T089-1a: POST /api/career/timing - birthTime 누락 → 400 Bad Request")
     void us1_careerTiming_missingBirthTime_returns400() throws Exception {
         mockMvc.perform(post("/api/career/timing")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"birthDate": "1990-10-10"}
@@ -108,11 +118,12 @@ class CareerApiControllerTest {
     @DisplayName("T089-2: POST /api/career/consultation - 유효한 요청 → 23개 필드 응답")
     void us2_consultation_validRequest_returns23Fields() throws Exception {
         // Given
-        given(consultationService.getCareerConsultation(any()))
+        given(consultationService.getCareerConsultation(any(), any()))
                 .willReturn(buildMockConsultationResponse());
 
         // When & Then
         mockMvc.perform(post("/api/career/consultation")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"birthDate": "1990-10-10", "birthTime": "14:30"}
@@ -150,6 +161,7 @@ class CareerApiControllerTest {
     @DisplayName("T089-2a: POST /api/career/consultation - birthTime 누락 → 400 Bad Request")
     void us2_consultation_missingBirthTime_returns400() throws Exception {
         mockMvc.perform(post("/api/career/consultation")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"birthDate": "1990-10-10"}
@@ -172,6 +184,7 @@ class CareerApiControllerTest {
 
         // When & Then
         mockMvc.perform(post("/api/feedback/satisfaction")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -192,6 +205,7 @@ class CareerApiControllerTest {
     @DisplayName("T089-3a: POST /api/feedback/satisfaction - sajuResultId 누락 → 400 Bad Request")
     void us4_feedback_missingSajuResultId_returns400() throws Exception {
         mockMvc.perform(post("/api/feedback/satisfaction")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -212,11 +226,12 @@ class CareerApiControllerTest {
     @DisplayName("T089-4: POST /api/company/compatibility - 유효한 요청 → 호환성 점수 반환")
     void us3_compatibility_validRequest_returnsScore() throws Exception {
         // Given
-        given(companyMatchingService.analyzeCompatibility(any()))
+        given(companyMatchingService.analyzeCompatibility(any(), any()))
                 .willReturn(buildMockCompatibilityResponse());
 
         // When & Then
         mockMvc.perform(post("/api/company/compatibility")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -243,6 +258,7 @@ class CareerApiControllerTest {
     @DisplayName("T089-4a: POST /api/company/compatibility - companyName 누락 → 400 Bad Request")
     void us3_compatibility_missingCompanyName_returns400() throws Exception {
         mockMvc.perform(post("/api/company/compatibility")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -265,18 +281,22 @@ class CareerApiControllerTest {
     @DisplayName("T089-5: 빈 요청 바디 → 4개 엔드포인트 모두 400 Bad Request")
     void allEndpoints_emptyBody_returns400() throws Exception {
         mockMvc.perform(post("/api/career/timing")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/career/consultation")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/feedback/satisfaction")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/company/compatibility")
+                        .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
     }
@@ -306,12 +326,34 @@ class CareerApiControllerTest {
     }
 
     @Test
-    @DisplayName("T089-7: API 엔드포인트는 여전히 인증 불필요")
-    void apiEndpoints_withoutAuth_returns400notUnauthorized() throws Exception {
+    @DisplayName("T089-7: 미인증 사용자의 API 엔드포인트 요청 → 401 Unauthorized")
+    void apiEndpoints_withoutAuth_returns401() throws Exception {
         mockMvc.perform(post("/api/career/timing")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest());
+                        .content("""
+                                {"birthDate": "1990-10-10", "birthTime": "14:30"}
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/career/consultation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"birthDate": "1990-10-10", "birthTime": "14:30"}
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/company/compatibility")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userBirthDate": "1990-10-10",
+                                  "userBirthTime": "14:30",
+                                  "targetRole": { "category": "TECH_BACKEND" },
+                                  "companyName": "Samsung",
+                                  "companyFoundingDate": "1938-01-13"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
     }
 
     // ─────────────────────────────────────────────────────────────────

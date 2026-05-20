@@ -12,14 +12,19 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import ssafy.SSAju.dto.external.FastAPIResponse;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.entity.enums.UserRole;
+import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
 import ssafy.SSAju.repository.SajuFullDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.TenGodDataRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
+import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.LongSummaryStatistics;
@@ -66,6 +71,9 @@ class CareerFortuneConcurrencyTest {
     @Autowired private HiddenStemDataRepository hiddenStemDataRepository;
     @Autowired private CareerFortuneRepository careerFortuneRepository;
     @Autowired private SajuFullDataRepository sajuFullDataRepository;
+    @Autowired private UserRepository userRepository;
+
+    private Long testUserId;
 
     private static final LocalDate BASE_DATE = LocalDate.of(1990, 1, 1);
     private static final LocalTime BASE_TIME = LocalTime.of(12, 0);
@@ -80,13 +88,25 @@ class CareerFortuneConcurrencyTest {
 
     @BeforeEach
     void cleanDb() {
-        // 자식 엔티티를 FK 순서에 따라 먼저 일괄 삭제 후 부모 삭제
+        // FK 순서에 따라 자식 엔티티부터 삭제
         tenGodDataRepository.deleteAllInBatch();
         hiddenStemDataRepository.deleteAllInBatch();
         careerFortuneRepository.deleteAllInBatch();
         sajuFullDataRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
         userProfileRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
+
+        User testUser = userRepository.save(User.builder()
+                .email("concurrency-test@test.com")
+                .passwordHash("hash")
+                .name("동시성테스트")
+                .role(UserRole.USER)
+                .status(UserStatus.ACTIVE)
+                .termsAgreedAt(LocalDateTime.now())
+                .privacyAgreedAt(LocalDateTime.now())
+                .build());
+        testUserId = testUser.getId();
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -115,7 +135,7 @@ class CareerFortuneConcurrencyTest {
             executor.submit(() -> {
                 try {
                     startLatch.await();
-                    service.analyzeCareerTiming(BASE_DATE, BASE_TIME);
+                    service.analyzeCareerTiming(BASE_DATE, BASE_TIME, testUserId);
                     successCount.incrementAndGet();
                 } catch (org.springframework.dao.DataIntegrityViolationException e) {
                     uniqueViolationCount.incrementAndGet();
@@ -184,7 +204,7 @@ class CareerFortuneConcurrencyTest {
                 try {
                     startLatch.await();
                     long t0 = System.currentTimeMillis();
-                    service.analyzeCareerTiming(BASE_DATE, BASE_TIME.plusMinutes(idx));
+                    service.analyzeCareerTiming(BASE_DATE, BASE_TIME.plusMinutes(idx), testUserId);
                     long latency = System.currentTimeMillis() - t0;
                     latencies.add(latency);
                     successCount.incrementAndGet();

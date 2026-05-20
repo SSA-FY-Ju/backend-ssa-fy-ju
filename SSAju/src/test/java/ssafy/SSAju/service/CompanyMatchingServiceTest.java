@@ -41,8 +41,13 @@ import ssafy.SSAju.repository.LuckyDayRepository;
 import ssafy.SSAju.repository.MonthlyForecastRepository;
 import ssafy.SSAju.repository.RoleCompatibilityRepository;
 import ssafy.SSAju.repository.TargetRoleAnalysisRepository;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.entity.enums.UserRole;
+import ssafy.SSAju.entity.enums.UserStatus;
+import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
@@ -84,8 +89,20 @@ class CompanyMatchingServiceTest {
     @Mock private MonthlyForecastRepository monthlyForecastRepository;
     @Mock private CautionRepository cautionRepository;
     @Mock private CompatibilityChildSaveService childSaveService;
+    @Mock private UserRepository userRepository;
 
     private CompanyMatchingService service;
+
+    private static final Long USER_ID = 1L;
+    private static final User MOCK_USER = User.builder()
+            .email("test@test.com")
+            .passwordHash("hash")
+            .name("테스트")
+            .role(UserRole.USER)
+            .status(UserStatus.ACTIVE)
+            .termsAgreedAt(LocalDateTime.now())
+            .privacyAgreedAt(LocalDateTime.now())
+            .build();
 
     private static final LocalDate USER_BIRTH_DATE = LocalDate.of(1998, 5, 7);
     private static final LocalTime USER_BIRTH_TIME = LocalTime.of(14, 30);
@@ -111,12 +128,14 @@ class CompanyMatchingServiceTest {
                 tenGodCalculator, hiddenStemCalculator,
                 compatibilityScoreCalculator, jobRoleAnalyzer, analysisResponseBuilder,
                 companyCompatibilityRepository, companyCompatibilityJdbcRepository, childSaveService,
+                userRepository,
                 targetRoleAnalysisRepository, fiveElementsAnalysisRepository,
                 analysisBreakdownRepository, actionableStrategyRepository,
                 actionableKeywordRepository, luckyDayRepository,
                 expectedInterviewQuestionRepository, roleCompatibilityRepository,
                 monthlyForecastRepository, cautionRepository
         );
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
 
         // AnalysisResponseBuilder 기본 mock 설정 (lenient - 테스트별 필요에 따라 재정의 가능)
         given(analysisResponseBuilder.buildFiveElementsData(any(), any()))
@@ -159,7 +178,7 @@ class CompanyMatchingServiceTest {
                 any(), anyString(), any())).willReturn(Optional.of(savedEntity));
 
         // When
-        CompatibilityResponse response = service.analyzeCompatibility(request);
+        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
 
         // Then
         assertThat(response).isNotNull();
@@ -195,7 +214,7 @@ class CompanyMatchingServiceTest {
                 any(), anyString(), any())).willReturn(Optional.of(existingEntity));
 
         // When
-        CompatibilityResponse response = service.analyzeCompatibility(request);
+        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
 
         // Then: 신규 저장 없음
         assertThat(response).isNotNull();
@@ -237,7 +256,7 @@ class CompanyMatchingServiceTest {
                 any(), anyString(), any())).willReturn(Optional.of(savedEntity));
 
         // When
-        CompatibilityResponse response = service.analyzeCompatibility(request);
+        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
 
         // Then
         assertThat(response).isNotNull();
@@ -271,7 +290,7 @@ class CompanyMatchingServiceTest {
                 any(), anyString(), any())).willReturn(Optional.of(savedEntity));
 
         // When
-        CompatibilityResponse response = service.analyzeCompatibility(request);
+        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
 
         // Then
         assertThat(response.requestContext().companyName()).isEqualTo("현대오토에버");
@@ -293,7 +312,7 @@ class CompanyMatchingServiceTest {
                 .willThrow(new FastAPITimeoutException("FastAPI 응답 타임아웃"));
 
         // When & Then
-        assertThatThrownBy(() -> service.analyzeCompatibility(request))
+        assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
                 .isInstanceOf(FastAPITimeoutException.class);
     }
 
@@ -316,6 +335,7 @@ class CompanyMatchingServiceTest {
     private CompanyCompatibility buildCompatibility(UserProfile profile, JobCategoryEnum category) {
         return CompanyCompatibility.builder()
                 .userProfile(profile)
+                .user(MOCK_USER)
                 .companyName("현대오토에버")
                 .targetRoleCategory(category)
                 .targetRoleDetailName("개발자")

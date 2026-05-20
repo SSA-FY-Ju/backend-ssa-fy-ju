@@ -13,8 +13,9 @@ public class SajuResultJdbcRepository {
 
     public int insertOrIgnore(SajuResult sajuResult) {
         return jdbcTemplate.update(
-                "INSERT IGNORE INTO saju_result (user_profile_id, fetched_at) VALUES (?, ?)",
+                "INSERT IGNORE INTO saju_result (user_profile_id, user_id, fetched_at) VALUES (?, ?, ?)",
                 sajuResult.getUserProfile().getId(),
+                sajuResult.getUser().getId(),
                 sajuResult.getFetchedAt()
         );
     }

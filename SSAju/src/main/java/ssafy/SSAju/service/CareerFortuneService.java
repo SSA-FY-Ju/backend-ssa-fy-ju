@@ -17,6 +17,9 @@ import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.exception.UserNotFoundException;
+import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -35,14 +38,17 @@ public class CareerFortuneService {
     private final CareerFortuneAnalyzer careerFortuneAnalyzer;
     private final SajuResultMapper sajuResultMapper;
     private final SajuValidator sajuValidator;
+    private final UserRepository userRepository;
 
     /**
      * @Transactional 없음: FastAPI I/O 동안 DB 커넥션을 점유하지 않도록 트랜잭션을 분리.
      * 각 DB 작업은 하위 컴포넌트의 @Transactional에 의해 개별 트랜잭션으로 실행됨.
      */
-    public CareerTimingResponse analyzeCareerTiming(LocalDate birthDate, LocalTime birthTime) {
+    public CareerTimingResponse analyzeCareerTiming(LocalDate birthDate, LocalTime birthTime, Long userId) {
         log.info("관운 분석 시작");
 
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
         UserProfile userProfile = userProfileProvider.findOrCreate(birthDate, birthTime);
 
         FastAPIResponse sajuData = sajuDataService.fetchSajuFromFastAPI(birthDate, birthTime);
@@ -62,7 +68,7 @@ public class CareerFortuneService {
         String reasoning = careerFortuneAnalyzer.buildReasoning(favoredPeriod, tenGodDistribution);
 
         SajuResult newResult = sajuResultMapper.buildSajuResult(
-                userProfile, sajuData, tenGodDistribution, hiddenStems,
+                userProfile, user, sajuData, tenGodDistribution, hiddenStems,
                 favoredPeriod, confidenceScore, reasoning);
 
         try {

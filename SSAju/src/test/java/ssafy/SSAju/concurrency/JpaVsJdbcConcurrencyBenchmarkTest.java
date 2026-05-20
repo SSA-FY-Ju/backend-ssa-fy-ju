@@ -10,6 +10,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.util.StopWatch;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.entity.enums.UserRole;
+import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
 import ssafy.SSAju.repository.SajuFullDataRepository;
@@ -17,8 +20,10 @@ import ssafy.SSAju.repository.SajuResultJdbcRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.TenGodDataRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
+import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -53,6 +58,9 @@ class JpaVsJdbcConcurrencyBenchmarkTest {
     @Autowired private HiddenStemDataRepository  hiddenStemDataRepository;
     @Autowired private CareerFortuneRepository   careerFortuneRepository;
     @Autowired private SajuFullDataRepository    sajuFullDataRepository;
+    @Autowired private UserRepository            userRepository;
+
+    private User testUser;
 
     @BeforeEach
     void cleanDb() {
@@ -62,6 +70,17 @@ class JpaVsJdbcConcurrencyBenchmarkTest {
         sajuFullDataRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
         userProfileRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
+
+        testUser = userRepository.save(User.builder()
+                .email("benchmark-test@test.com")
+                .passwordHash("hash")
+                .name("벤치마크테스트")
+                .role(UserRole.USER)
+                .status(UserStatus.ACTIVE)
+                .termsAgreedAt(LocalDateTime.now())
+                .privacyAgreedAt(LocalDateTime.now())
+                .build());
     }
 
     @Test
@@ -96,6 +115,7 @@ class JpaVsJdbcConcurrencyBenchmarkTest {
 
                     SajuResult result = SajuResult.builder()
                             .userProfile(sharedProfile)
+                            .user(testUser)
                             .build();
                     sajuResultRepository.save(result);
                     jpaSuccessCount.incrementAndGet();
@@ -153,6 +173,7 @@ class JpaVsJdbcConcurrencyBenchmarkTest {
 
                     SajuResult result = SajuResult.builder()
                             .userProfile(sharedProfile)
+                            .user(testUser)
                             .build();
                     sajuResultJdbcRepository.insertOrIgnore(result);
                     jdbcSuccessCount.incrementAndGet();

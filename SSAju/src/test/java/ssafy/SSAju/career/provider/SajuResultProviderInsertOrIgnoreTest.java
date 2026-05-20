@@ -9,14 +9,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.entity.enums.UserRole;
+import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
 import ssafy.SSAju.repository.SajuFullDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.TenGodDataRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
+import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -39,8 +44,10 @@ class SajuResultProviderInsertOrIgnoreTest {
     @Autowired private TenGodDataRepository tenGodDataRepository;
     @Autowired private HiddenStemDataRepository hiddenStemDataRepository;
     @Autowired private CareerFortuneRepository careerFortuneRepository;
-
     @Autowired private SajuFullDataRepository sajuFullDataRepository;
+    @Autowired private UserRepository userRepository;
+
+    private User testUser;
 
     @BeforeEach
     void cleanDb() {
@@ -50,6 +57,17 @@ class SajuResultProviderInsertOrIgnoreTest {
         sajuFullDataRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
         userProfileRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
+
+        testUser = userRepository.save(User.builder()
+                .email("provider-test@test.com")
+                .passwordHash("hash")
+                .name("테스트")
+                .role(UserRole.USER)
+                .status(UserStatus.ACTIVE)
+                .termsAgreedAt(LocalDateTime.now())
+                .privacyAgreedAt(LocalDateTime.now())
+                .build());
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -80,6 +98,7 @@ class SajuResultProviderInsertOrIgnoreTest {
                     startLatch.await();
                     SajuResult newResult = SajuResult.builder()
                             .userProfile(userProfile)
+                            .user(testUser)
                             .build();
                     sajuResultProvider.findOrCreate(userProfile, newResult);
                     successCount.incrementAndGet();

@@ -18,9 +18,6 @@ import ssafy.SSAju.dto.request.CompatibilityRequest;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.service.CompanyMatchingService;
-import ssafy.SSAju.service.UserService;
-
-import java.time.LocalTime;
 
 @Slf4j
 @RestController
@@ -29,10 +26,7 @@ import java.time.LocalTime;
 @Tag(name = "기업 궁합", description = "사용자 사주와 기업 설립일 기반 궁합 분석 API")
 public class CompatibilityController {
 
-    private static final LocalTime DEFAULT_BIRTH_TIME = LocalTime.of(12, 0);
-
     private final CompanyMatchingService companyMatchingService;
-    private final UserService userService;
 
     @PostMapping("/compatibility")
     @Operation(summary = "기업 궁합 분석", description = "사용자 사주와 기업 설립일의 십신+지장간 분석을 통한 호환성 점수 및 직군 적합도 반환")
@@ -47,16 +41,7 @@ public class CompatibilityController {
             @AuthenticationPrincipal Long userId
     ) {
         log.info("기업 궁합 분석 요청 수신: company={}", request.companyName());
-        CompatibilityResponse response = companyMatchingService.analyzeCompatibility(request);
-
-        if (userId != null) {
-            LocalTime birthTime = request.userBirthTime() != null
-                    ? request.userBirthTime() : DEFAULT_BIRTH_TIME;
-            userService.associateCompatibilityWithUser(userId,
-                    request.userBirthDate(), birthTime,
-                    request.companyName(), request.targetRole().category());
-        }
-
+        CompatibilityResponse response = companyMatchingService.analyzeCompatibility(request, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

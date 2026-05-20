@@ -18,7 +18,6 @@ import ssafy.SSAju.dto.request.CareerTimingRequest;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
 import ssafy.SSAju.service.CareerFortuneService;
-import ssafy.SSAju.service.UserService;
 
 @Slf4j
 @RestController
@@ -28,7 +27,6 @@ import ssafy.SSAju.service.UserService;
 public class CareerTimingController {
 
     private final CareerFortuneService careerFortuneService;
-    private final UserService userService;
 
     @PostMapping("/timing")
     @Operation(summary = "관운 분석", description = "생년월일시로부터 상반기(H1)/하반기(H2) 관운 판정, 신뢰도 점수 및 근거 반환")
@@ -43,12 +41,7 @@ public class CareerTimingController {
     ) {
         log.info("관운 분석 요청 수신");
         CareerTimingResponse response = careerFortuneService.analyzeCareerTiming(
-                request.birthDate(), request.birthTime());
-
-        if (userId != null) {
-            userService.associateSajuResultWithUser(userId, request.birthDate(), request.birthTime());
-        }
-
+                request.birthDate(), request.birthTime(), userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

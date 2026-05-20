@@ -15,14 +15,20 @@ import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.entity.enums.UserRole;
+import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
+import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,6 +45,7 @@ class CareerFortuneServiceTest {
     @Mock private UserProfileProvider userProfileProvider;
     @Mock private SajuResultWriteService sajuResultWriteService;
     @Mock private SajuResultMapper sajuResultMapper;
+    @Mock private UserRepository userRepository;
 
     private CareerFortuneService service;
 
@@ -49,6 +56,17 @@ class CareerFortuneServiceTest {
 
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 10, 10);
     private static final LocalTime BIRTH_TIME = LocalTime.of(14, 30);
+    private static final Long USER_ID = 1L;
+
+    private static final User MOCK_USER = User.builder()
+            .email("test@test.com")
+            .passwordHash("hash")
+            .name("테스트")
+            .role(UserRole.USER)
+            .status(UserStatus.ACTIVE)
+            .termsAgreedAt(LocalDateTime.now())
+            .privacyAgreedAt(LocalDateTime.now())
+            .build();
 
     // 일간: 己(土, 陰) / 월지: 戌 → H2 판정 / confidenceScore: 70 (지장간 포함 Analyzer 공식)
     private static final FastAPIResponse VALID_FASTAPI_RESPONSE = new FastAPIResponse(
@@ -63,7 +81,9 @@ class CareerFortuneServiceTest {
     void setUp() {
         service = new CareerFortuneService(
                 sajuDataService, userProfileProvider, sajuResultWriteService,
-                tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer, sajuResultMapper, sajuValidator);
+                tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer, sajuResultMapper, sajuValidator,
+                userRepository);
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
     }
 
     // ─────────────────────────────────────────
@@ -75,16 +95,16 @@ class CareerFortuneServiceTest {
     void shouldCreateProfileAndSaveResult_WhenNewUser() {
         // Given
         var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
-        var expectedResult = SajuResult.builder().userProfile(savedProfile).build();
+        var expectedResult = SajuResult.builder().userProfile(savedProfile).user(MOCK_USER).build();
 
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(savedProfile);
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(VALID_FASTAPI_RESPONSE);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(expectedResult);
 
         // When
-        var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
+        var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID);
 
         // Then — 고정 입력에 대한 구체적 기대값 (己 일간, 戌 월지 → H2)
         assertThat(result.favoredPeriod()).isEqualTo("H2");
@@ -100,16 +120,16 @@ class CareerFortuneServiceTest {
     void shouldReuseExistingProfile_WhenUserExists() {
         // Given
         var existingProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
-        var expectedResult = SajuResult.builder().userProfile(existingProfile).build();
+        var expectedResult = SajuResult.builder().userProfile(existingProfile).user(MOCK_USER).build();
 
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(existingProfile);
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(VALID_FASTAPI_RESPONSE);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(expectedResult);
 
         // When
-        service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
+        service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID);
 
         // Then
         verify(userProfileProvider).findOrCreate(BIRTH_DATE, BIRTH_TIME);
@@ -134,12 +154,12 @@ class CareerFortuneServiceTest {
         var savedProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(savedProfile);
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(h1Response);
-        var expectedResult = SajuResult.builder().userProfile(savedProfile).build();
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
+        var expectedResult = SajuResult.builder().userProfile(savedProfile).user(MOCK_USER).build();
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(expectedResult);
 
         // When
-        var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME);
+        var result = service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID);
 
         // Then
         assertThat(result.favoredPeriod()).isEqualTo("H1");
@@ -164,7 +184,7 @@ class CareerFortuneServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(badResponse);
 
         // When & Then
-        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME))
+        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID))
                 .isInstanceOf(InvalidSajuDataException.class)
                 .hasMessageContaining("천간");
     }
@@ -183,7 +203,7 @@ class CareerFortuneServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(badResponse);
 
         // When & Then
-        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME))
+        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID))
                 .isInstanceOf(InvalidSajuDataException.class)
                 .hasMessageContaining("지지");
     }
@@ -202,7 +222,7 @@ class CareerFortuneServiceTest {
                 .willThrow(new FastAPITimeoutException("FastAPI 요청 시간 초과"));
 
         // When & Then
-        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME))
+        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID))
                 .isInstanceOf(FastAPITimeoutException.class)
                 .hasMessageContaining("시간 초과");
     }
@@ -217,7 +237,7 @@ class CareerFortuneServiceTest {
                 .willThrow(new ExternalApiException("FastAPI 호출 실패"));
 
         // When & Then
-        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME))
+        assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID))
                 .isInstanceOf(ExternalApiException.class)
                 .isNotInstanceOf(FastAPITimeoutException.class);
     }
