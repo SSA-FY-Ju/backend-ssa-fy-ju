@@ -167,7 +167,8 @@ public class CompanyMatchingService {
         int inserted = companyCompatibilityJdbcRepository.insertOrIgnore(root);
 
         CompanyCompatibility saved = companyCompatibilityRepository
-                .findByUserProfile_IdAndCompanyNameAndTargetRoleCategory(
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategory(
+                        userId,
                         userProfile.getId(),
                         request.companyName(),
                         request.targetRole().category())

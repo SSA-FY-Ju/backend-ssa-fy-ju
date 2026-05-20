@@ -1,5 +1,6 @@
 package ssafy.SSAju.controller;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -77,6 +78,11 @@ class CompatibilityControllerTest {
                 .build();
     }
 
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
     @DisplayName("인증된 사용자 + 유효한 요청 → 200 OK + 궁합 점수 반환")
     void shouldReturn200_WhenAuthenticatedAndValidRequest() throws Exception {
@@ -105,8 +111,6 @@ class CompatibilityControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.compatibilityScore").value(78))
                 .andExpect(jsonPath("$.data.requestContext.companyName").value("현대오토에버"));
-
-        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -182,7 +186,5 @@ class CompatibilityControllerTest {
                                 """))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.success").value(false));
-
-        SecurityContextHolder.clearContext();
     }
 }

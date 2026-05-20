@@ -257,8 +257,8 @@ public class UserService {
         companyMatchingService.analyzeCompatibility(request, user.getId());
 
         CompanyCompatibility newCc = companyCompatibilityRepository
-                .findByUserProfile_IdAndCompanyNameAndTargetRoleCategory(
-                        profile.getId(), companyName, targetRole)
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategory(
+                        user.getId(), profile.getId(), companyName, targetRole)
                 .orElseThrow(() -> new SajuResultNotFoundException("재분석 결과를 찾을 수 없습니다."));
 
         log.info("기업 궁합 재분석 완료: userId={}, newId={}", user.getId(), newCc.getId());

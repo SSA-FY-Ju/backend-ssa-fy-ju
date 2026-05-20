@@ -16,6 +16,9 @@ public interface CompanyCompatibilityRepository extends JpaRepository<CompanyCom
     Optional<CompanyCompatibility> findByUserProfile_IdAndCompanyNameAndTargetRoleCategory(
             Long userProfileId, String companyName, JobCategoryEnum targetRoleCategory);
 
+    Optional<CompanyCompatibility> findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategory(
+            Long userId, Long userProfileId, String companyName, JobCategoryEnum targetRoleCategory);
+
     Optional<CompanyCompatibility> findByIdAndUser(Long id, User user);
 
     List<CompanyCompatibility> findByUser_IdOrderByAnalyzedAtDesc(Long userId);
