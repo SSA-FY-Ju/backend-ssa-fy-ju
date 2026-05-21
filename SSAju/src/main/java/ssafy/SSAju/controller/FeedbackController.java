@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.dto.request.SatisfactionFeedbackRequest;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.SatisfactionFeedbackResponse;
@@ -40,9 +39,6 @@ public class FeedbackController {
             @Valid @RequestBody SatisfactionFeedbackRequest request,
             @AuthenticationPrincipal Long userId
     ) {
-        if (userId == null) {
-            throw new AuthException("인증 정보를 찾을 수 없습니다.");
-        }
         log.info("만족도 피드백 요청 수신: userId={}", userId);
         SatisfactionFeedbackResponse response = feedbackService.saveFeedback(request, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
