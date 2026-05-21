@@ -76,8 +76,8 @@ public class SecurityConfig {
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler))
-            .addFilterBefore(new JwtExceptionFilter(objectMapper), UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(new JwtAuthenticationFilter(jwtUtil), JwtExceptionFilter.class)
+            .addFilterBefore(new JwtAuthenticationFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new JwtExceptionFilter(objectMapper), JwtAuthenticationFilter.class)
             // RefreshToken 검증 필터: /api/auth/refresh 엔드포인트 요청 시 RefreshToken 쿠키 유효성 검증
             .addFilterAfter(new TokenValidationFilter(refreshTokenRepository, objectMapper), JwtAuthenticationFilter.class)
             .httpBasic(Customizer.withDefaults());
