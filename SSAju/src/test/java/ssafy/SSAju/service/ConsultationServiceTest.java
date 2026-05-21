@@ -172,7 +172,7 @@ class ConsultationServiceTest {
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(userProfile, sajuResult)).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
-        given(consultationMapper.buildConsultation(any(), any(), any())).willReturn(consultation);
+        given(consultationMapper.buildConsultation(any(), any(), any(), any())).willReturn(consultation);
         given(careerConsultationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
         given(consultationMapper.buildAnalysisSummary(any(), any(), any(), any()))
                 .willReturn("己 일간 · 오행 火·金 강세 · 정관·편관 기운 기반 | 2026년 12개월 타임라인 + 관운 분석 (H1)");
@@ -237,7 +237,7 @@ class ConsultationServiceTest {
                 .willReturn(newSajuResult);
         given(sajuResultProvider.findOrCreate(userProfile, newSajuResult)).willReturn(newSajuResult);
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
-        given(consultationMapper.buildConsultation(any(), any(), any())).willReturn(consultation);
+        given(consultationMapper.buildConsultation(any(), any(), any(), any())).willReturn(consultation);
         given(careerConsultationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
         given(consultationMapper.buildAnalysisSummary(any(), any(), any(), any()))
                 .willReturn("己 일간 · 오행 火·金 강세 | H2");

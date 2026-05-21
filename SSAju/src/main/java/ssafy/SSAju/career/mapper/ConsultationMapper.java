@@ -19,10 +19,12 @@ public class ConsultationMapper {
 
     public CareerConsultation buildConsultation(SajuResult sajuResult,
                                                 CareerAdviceResponse advice,
-                                                String modelVersion) {
+                                                String modelVersion,
+                                                String consultationMonth) {
         CareerConsultation consultation = CareerConsultation.builder()
                 .sajuResult(sajuResult)
                 .openaiModelVersion(modelVersion)
+                .consultationMonth(consultationMonth)
                 .build();
 
         consultation.assignIndustries(toIndustryList(consultation, advice.industries()));

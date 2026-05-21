@@ -15,7 +15,11 @@ import java.util.List;
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 @Entity
-@Table(name = "career_consultation")
+@Table(name = "career_consultation",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_career_consultation_result_month",
+                columnNames = {"saju_result_id", "consultation_month"}
+        ))
 public class CareerConsultation {
 
     @Id
@@ -28,6 +32,9 @@ public class CareerConsultation {
 
     @Column(name = "openai_model_version")
     private String openaiModelVersion;
+
+    @Column(name = "consultation_month", nullable = false, length = 7)
+    private String consultationMonth;
 
     @CreatedDate
     @Column(name = "generated_at", nullable = false, updatable = false)
@@ -46,9 +53,10 @@ public class CareerConsultation {
     private List<Strength> strengths = new ArrayList<>();
 
     @Builder
-    public CareerConsultation(SajuResult sajuResult, String openaiModelVersion) {
+    public CareerConsultation(SajuResult sajuResult, String openaiModelVersion, String consultationMonth) {
         this.sajuResult = sajuResult;
         this.openaiModelVersion = openaiModelVersion;
+        this.consultationMonth = consultationMonth;
     }
 
     public void assignIndustries(List<Industry> list) {
