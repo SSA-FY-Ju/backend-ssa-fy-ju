@@ -17,6 +17,8 @@ public interface SajuResultRepository extends JpaRepository<SajuResult, Long> {
 
     Optional<SajuResult> findByIdAndUser(Long id, User user);
 
+    Optional<SajuResult> findByIdAndUser_Id(Long id, Long userId);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM SajuResult s WHERE s.userProfile = :userProfile")

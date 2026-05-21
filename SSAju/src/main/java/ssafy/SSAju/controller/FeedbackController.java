@@ -9,10 +9,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.dto.request.SatisfactionFeedbackRequest;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.SatisfactionFeedbackResponse;
@@ -35,11 +37,14 @@ public class FeedbackController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 SajuResult", content = @Content(schema = @Schema(hidden = true)))
     })
     public ResponseEntity<ApiResponse<SatisfactionFeedbackResponse>> submitFeedback(
-            @Valid @RequestBody SatisfactionFeedbackRequest request
-            // TODO: Phase 2 로그인 추가 시 @AuthenticationPrincipal UserPrincipal user 추가
+            @Valid @RequestBody SatisfactionFeedbackRequest request,
+            @AuthenticationPrincipal Long userId
     ) {
-        log.info("만족도 피드백 요청 수신");
-        SatisfactionFeedbackResponse response = feedbackService.saveFeedback(request);
+        if (userId == null) {
+            throw new AuthException("인증 정보를 찾을 수 없습니다.");
+        }
+        log.info("만족도 피드백 요청 수신: userId={}", userId);
+        SatisfactionFeedbackResponse response = feedbackService.saveFeedback(request, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
