@@ -1,6 +1,5 @@
 package ssafy.SSAju.service;
 
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -9,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.dto.request.LoginRequest;
 import ssafy.SSAju.dto.request.SignupRequest;
+import ssafy.SSAju.dto.response.AuthTokenPair;
 import ssafy.SSAju.dto.response.AuthTokenResponse;
 import ssafy.SSAju.dto.response.SignupResponse;
 import ssafy.SSAju.entity.RefreshToken;
@@ -24,7 +24,6 @@ import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.RefreshTokenRepository;
 import ssafy.SSAju.repository.UserRepository;
-import ssafy.SSAju.util.CookieUtil;
 import ssafy.SSAju.util.JwtUtil;
 
 import java.nio.charset.StandardCharsets;
@@ -61,7 +60,6 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final CookieUtil cookieUtil;
     private final ApplicationEventPublisher eventPublisher;
     private final AnalysisResultMaskingService analysisMaskingService;
 
@@ -145,7 +143,7 @@ public class AuthService {
      * @throws AuthException 이메일 미존재 또는 비밀번호 불일치
      */
     @Transactional
-    public AuthTokenResponse login(LoginRequest request, String clientIp, HttpServletResponse response) {
+    public AuthTokenPair login(LoginRequest request, String clientIp) {
         Optional<User> userOpt = userRepository.findByEmail(request.email());
 
         if (userOpt.isEmpty()) {
@@ -171,12 +169,11 @@ public class AuthService {
         refreshTokenRepository.save(refreshToken);
 
         user.updateLastLoginAt();
-        cookieUtil.setRefreshTokenCookie(response, refreshTokenValue);
         publishLoginEvent(request.email(), true, LoginFailureReason.SUCCESS, clientIp);
 
         log.info("로그인 성공: userId={}", user.getId());
 
-        return new AuthTokenResponse(accessToken, jwtUtil.getAccessTokenExpirationSeconds());
+        return new AuthTokenPair(accessToken, refreshTokenValue, jwtUtil.getAccessTokenExpirationSeconds());
     }
 
     /**
@@ -197,14 +194,12 @@ public class AuthService {
      * @param response HTTP 응답 (쿠키 제거용)
      */
     @Transactional
-    public void logout(Long userId, String refreshTokenValue, HttpServletResponse response) {
+    public void logout(Long userId, String refreshTokenValue) {
         if (refreshTokenValue != null) {
             refreshTokenRepository.findByTokenHash(hashToken(refreshTokenValue))
                     .filter(rt -> rt.getUser().getId().equals(userId))
                     .ifPresent(RefreshToken::revoke);
         }
-
-        cookieUtil.clearRefreshTokenCookie(response);
         log.info("로그아웃 완료: userId={}", userId);
     }
 
@@ -227,7 +222,7 @@ public class AuthService {
      * @throws AuthException 비밀번호가 일치하지 않는 경우
      */
     @Transactional
-    public void deleteUser(Long userId, String password, HttpServletResponse response) {
+    public void deleteUser(Long userId, String password) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
@@ -241,8 +236,6 @@ public class AuthService {
 
         user.softDelete();
         userRepository.save(user);
-
-        cookieUtil.clearRefreshTokenCookie(response);
         log.info("회원 탈퇴 완료: userId={}", userId);
     }
 

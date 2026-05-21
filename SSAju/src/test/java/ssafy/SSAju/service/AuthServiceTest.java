@@ -1,6 +1,5 @@
 package ssafy.SSAju.service;
 
-import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import ssafy.SSAju.dto.response.AuthTokenResponse;
+import ssafy.SSAju.dto.response.AuthTokenPair;
 import ssafy.SSAju.entity.RefreshToken;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
@@ -17,7 +17,6 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.repository.RefreshTokenRepository;
 import ssafy.SSAju.repository.UserRepository;
-import ssafy.SSAju.util.CookieUtil;
 import ssafy.SSAju.util.JwtUtil;
 
 import java.lang.reflect.Field;
@@ -39,7 +38,6 @@ class AuthServiceTest {
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtUtil jwtUtil;
-    @Mock private CookieUtil cookieUtil;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
@@ -147,30 +145,25 @@ class AuthServiceTest {
     @Test
     void logout_유효한토큰_revoke처리() {
         // Given
-        HttpServletResponse response = mock(HttpServletResponse.class);
         String tokenValue = "valid-token";
         given(refreshTokenRepository.findByTokenHash(anyString())).willReturn(Optional.of(validRefreshToken));
 
         // When
-        authService.logout(1L, tokenValue, response);
+        authService.logout(1L, tokenValue);
 
         // Then: revoke 호출 확인 (side effect: revokedAt이 설정됨)
         assertThat(validRefreshToken.isRevoked()).isTrue();
     }
 
     @Test
-    void logout_토큰없음_예외없이쿠키만제거() {
-        // Given
-        HttpServletResponse response = mock(HttpServletResponse.class);
-
+    void logout_토큰없음_예외없이정상종료() {
         // When & Then: 예외 없이 정상 종료
-        authService.logout(1L, null, response);
+        authService.logout(1L, null);
     }
 
     @Test
     void logout_다른사용자소유토큰_revoke미처리() {
         // Given: 토큰의 소유자 userId는 2L이지만, 요청 userId는 1L
-        HttpServletResponse response = mock(HttpServletResponse.class);
         String tokenValue = "other-user-token";
 
         User otherUser = User.builder()
@@ -199,7 +192,7 @@ class AuthServiceTest {
         given(refreshTokenRepository.findByTokenHash(anyString())).willReturn(Optional.of(otherUserToken));
 
         // When
-        authService.logout(1L, tokenValue, response);
+        authService.logout(1L, tokenValue);
 
         // Then: 다른 사용자 토큰은 revoke되지 않음
         assertThat(otherUserToken.isRevoked()).isFalse();

@@ -33,6 +33,8 @@ public class UserController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final ssafy.SSAju.util.CookieUtil cookieUtil;
+
 
     @DeleteMapping("/api/users/me")
     public ResponseEntity<ApiResponse<Void>> deleteUser(
@@ -40,7 +42,8 @@ public class UserController {
             @AuthenticationPrincipal Long userId,
             HttpServletResponse response) {
         requireAuth(userId);
-        authService.deleteUser(userId, request.password(), response);
+        authService.deleteUser(userId, request.password());
+        cookieUtil.clearRefreshTokenCookie(response);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
