@@ -139,7 +139,7 @@ public class UserService {
     // ─────────────────────────────────────────
 
     private AnalysisDetailResponse buildSajuDetail(User user, Long analysisId) {
-        SajuResult sajuResult = sajuResultRepository.findByIdAndUser(analysisId, user)
+        SajuResult sajuResult = sajuResultRepository.findByIdAndUser_Id(analysisId, user.getId())
                 .orElseThrow(() -> new SajuResultNotFoundException("사주 분석 결과를 찾을 수 없습니다."));
 
         UserProfile profile = sajuResult.getUserProfile();
@@ -200,7 +200,7 @@ public class UserService {
     // ─────────────────────────────────────────
 
     private ReanalyzeResponse reanalyzeSaju(User user, Long analysisId) {
-        SajuResult existing = sajuResultRepository.findByIdAndUser(analysisId, user)
+        SajuResult existing = sajuResultRepository.findByIdAndUser_Id(analysisId, user.getId())
                 .orElseThrow(() -> new SajuResultNotFoundException("사주 분석 결과를 찾을 수 없습니다."));
 
         UserProfile profile = existing.getUserProfile();
