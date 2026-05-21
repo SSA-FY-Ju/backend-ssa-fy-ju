@@ -2,6 +2,7 @@
 SSAju/src/main/resources/application-local.yaml
 .env
 *.properties
+ARCHITECTURE_REVIEW_MERGED.md
 
 # IDE
 .idea/
