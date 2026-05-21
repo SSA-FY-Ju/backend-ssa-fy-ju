@@ -21,7 +21,6 @@ import ssafy.SSAju.dto.response.AnalysisDetailResponse;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.MyPageResponse;
 import ssafy.SSAju.dto.response.ReanalyzeResponse;
-import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.service.AuthService;
 import ssafy.SSAju.service.UserService;
 
@@ -41,7 +40,6 @@ public class UserController {
             @Valid @RequestBody DeleteUserRequest request,
             @AuthenticationPrincipal Long userId,
             HttpServletResponse response) {
-        requireAuth(userId);
         authService.deleteUser(userId, request.password());
         cookieUtil.clearRefreshTokenCookie(response);
         return ResponseEntity.ok(ApiResponse.success(null));
@@ -53,7 +51,6 @@ public class UserController {
             @RequestParam(required = false) AnalysisType type,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "10") @Min(1) int size) {
-        requireAuth(userId);
         MyPageResponse response = userService.getMyPage(userId, type, page, size);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -63,7 +60,6 @@ public class UserController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long analysisId,
             @RequestParam AnalysisType type) {
-        requireAuth(userId);
         AnalysisDetailResponse response = userService.getAnalysisDetail(userId, analysisId, type);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -73,14 +69,7 @@ public class UserController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long analysisId,
             @RequestParam AnalysisType type) {
-        requireAuth(userId);
         ReanalyzeResponse response = userService.reanalyze(userId, analysisId, type);
         return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    private void requireAuth(Long userId) {
-        if (userId == null) {
-            throw new AuthException("인증 정보를 찾을 수 없습니다.");
-        }
     }
 }
