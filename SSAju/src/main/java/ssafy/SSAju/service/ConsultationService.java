@@ -2,6 +2,7 @@ package ssafy.SSAju.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -40,6 +41,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ConsultationService {
+
+    private static final String CONSULTATION_MONTH_UNIQUE_CONSTRAINT = "uq_career_consultation_result_month";
 
     private final ConsultationOpenAICaller openAICaller;
     private final SajuDataService sajuDataService;
@@ -98,6 +101,9 @@ public class ConsultationService {
         try {
             careerConsultationRepository.save(consultation);
         } catch (DataIntegrityViolationException e) {
+            if (!isConstraintViolation(e, CONSULTATION_MONTH_UNIQUE_CONSTRAINT)) {
+                throw e;
+            }
             log.info("이번 달 컨설팅 결과 이미 존재, 저장 건너뜀: sajuResultId={}, month={}", sajuResult.getId(), consultationMonth);
         }
 
@@ -147,4 +153,11 @@ public class ConsultationService {
         );
     }
 
+    /**
+     * DataIntegrityViolationException이 지정된 제약 위반인지 확인합니다.
+     */
+    private boolean isConstraintViolation(DataIntegrityViolationException e, String constraintName) {
+        return e.getCause() instanceof ConstraintViolationException cve
+                && constraintName.equals(cve.getConstraintName());
+    }
 }
