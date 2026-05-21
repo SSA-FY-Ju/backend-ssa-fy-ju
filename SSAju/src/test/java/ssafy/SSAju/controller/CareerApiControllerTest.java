@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
@@ -179,7 +180,7 @@ class CareerApiControllerTest {
     @DisplayName("T089-3: POST /api/feedback/satisfaction - 유효한 피드백 → feedbackId 반환")
     void us4_feedback_validRequest_returnsFeedbackId() throws Exception {
         // Given
-        given(feedbackService.saveFeedback(any()))
+        given(feedbackService.saveFeedback(any(), anyLong()))
                 .willReturn(new SatisfactionFeedbackResponse(1L, LocalDateTime.now(), "좋은 상담이었습니다"));
 
         // When & Then

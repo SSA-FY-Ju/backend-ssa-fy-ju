@@ -64,11 +64,11 @@ class FeedbackServiceTest {
                 .feedbackContent("좋았습니다")
                 .build();
 
-        given(sajuResultRepository.findById(1L)).willReturn(Optional.of(SAJU_RESULT));
+        given(sajuResultRepository.findByIdAndUser_Id(1L, 1L)).willReturn(Optional.of(SAJU_RESULT));
         given(feedbackRepository.save(any(UserSatisfactionFeedback.class))).willReturn(savedFeedback);
 
         // When
-        SatisfactionFeedbackResponse response = service.saveFeedback(request);
+        SatisfactionFeedbackResponse response = service.saveFeedback(request, 1L);
 
         // Then
         assertThat(response.feedbackContent()).isEqualTo("좋았습니다");
@@ -89,11 +89,11 @@ class FeedbackServiceTest {
                 .feedbackContent(null)
                 .build();
 
-        given(sajuResultRepository.findById(1L)).willReturn(Optional.of(SAJU_RESULT));
+        given(sajuResultRepository.findByIdAndUser_Id(1L, 1L)).willReturn(Optional.of(SAJU_RESULT));
         given(feedbackRepository.save(any(UserSatisfactionFeedback.class))).willReturn(savedFeedback);
 
         // When
-        SatisfactionFeedbackResponse response = service.saveFeedback(request);
+        SatisfactionFeedbackResponse response = service.saveFeedback(request, 1L);
 
         // Then
         assertThat(response.feedbackContent()).isNull();
@@ -107,10 +107,10 @@ class FeedbackServiceTest {
         var request = new SatisfactionFeedbackRequest(
                 999L, FeedbackType.CAREER_TIMING, SatisfactionStatus.SATISFIED, null);
 
-        given(sajuResultRepository.findById(999L)).willReturn(Optional.empty());
+        given(sajuResultRepository.findByIdAndUser_Id(999L, 1L)).willReturn(Optional.empty());
 
         // When & Then
-        assertThatThrownBy(() -> service.saveFeedback(request))
+        assertThatThrownBy(() -> service.saveFeedback(request, 1L))
                 .isInstanceOf(SajuResultNotFoundException.class);
     }
 }

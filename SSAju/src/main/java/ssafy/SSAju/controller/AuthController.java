@@ -16,6 +16,7 @@ import ssafy.SSAju.dto.request.EmailCheckRequest;
 import ssafy.SSAju.dto.request.LoginRequest;
 import ssafy.SSAju.dto.request.SignupRequest;
 import ssafy.SSAju.dto.response.ApiResponse;
+import ssafy.SSAju.dto.response.AuthTokenPair;
 import ssafy.SSAju.dto.response.AuthTokenResponse;
 import ssafy.SSAju.dto.response.SignupResponse;
 import ssafy.SSAju.exception.AuthException;
@@ -39,6 +40,7 @@ import ssafy.SSAju.util.CookieUtil;
 public class AuthController {
 
     private final AuthService authService;
+    private final CookieUtil cookieUtil;
 
     /**
      * 회원가입 요청을 처리합니다.
@@ -94,8 +96,11 @@ public class AuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
         String clientIp = ClientIpUtil.getClientIp(httpRequest);
-        AuthTokenResponse response = authService.login(request, clientIp, httpResponse);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        AuthTokenPair tokenPair = authService.login(request, clientIp);
+        cookieUtil.setRefreshTokenCookie(httpResponse, tokenPair.refreshTokenValue());
+        httpResponse.setHeader("Authorization", "Bearer " + tokenPair.accessToken());
+        return ResponseEntity.ok(ApiResponse.success(
+                new AuthTokenResponse(tokenPair.expiresIn())));
     }
 
     /**
@@ -120,7 +125,8 @@ public class AuthController {
             HttpServletResponse response) {
         Long userId = getCurrentUserId();
         String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
-        authService.logout(userId, refreshToken, response);
+        authService.logout(userId, refreshToken);
+        cookieUtil.clearRefreshTokenCookie(response);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -135,10 +141,12 @@ public class AuthController {
      * @throws ssafy.SSAju.exception.InvalidTokenException RefreshToken이 유효하지 않은 경우
      */
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<AuthTokenResponse>> refresh(HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<AuthTokenResponse>> refresh(HttpServletRequest request,
+                                                                   HttpServletResponse response) {
         String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
-        AuthTokenResponse tokenResponse = authService.refreshAccessToken(refreshToken);
-        return ResponseEntity.ok(ApiResponse.success(tokenResponse));
+        AuthTokenPair tokenPair = authService.refreshAccessToken(refreshToken);
+        response.setHeader("Authorization", "Bearer " + tokenPair.accessToken());
+        return ResponseEntity.ok(ApiResponse.success(new AuthTokenResponse(tokenPair.expiresIn())));
     }
 
     /**

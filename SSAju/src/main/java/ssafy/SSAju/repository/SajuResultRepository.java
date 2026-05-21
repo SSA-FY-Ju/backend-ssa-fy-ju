@@ -7,7 +7,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
-import ssafy.SSAju.entity.User;
 
 import java.util.Optional;
 
@@ -15,7 +14,7 @@ public interface SajuResultRepository extends JpaRepository<SajuResult, Long> {
 
     Optional<SajuResult> findByUserProfile(UserProfile userProfile);
 
-    Optional<SajuResult> findByIdAndUser(Long id, User user);
+    Optional<SajuResult> findByIdAndUser_Id(Long id, Long userId);
 
     @Modifying
     @Transactional
