@@ -30,6 +30,8 @@ import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
 
+import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -92,7 +94,14 @@ public class ConsultationService {
         CareerAdviceResponse advice = openAICaller.call(sajuData, tenGodDistribution, hiddenStems, dayMaster);
 
         CareerConsultation consultation = consultationMapper.buildConsultation(sajuResult, advice, modelVersion);
-        careerConsultationRepository.save(consultation);
+        YearMonth currentMonth = YearMonth.now();
+        LocalDateTime monthStart = currentMonth.atDay(1).atStartOfDay();
+        LocalDateTime monthEnd = currentMonth.atEndOfMonth().atTime(23, 59, 59);
+        if (!careerConsultationRepository.existsBySajuResultAndGeneratedAtBetween(sajuResult, monthStart, monthEnd)) {
+            careerConsultationRepository.save(consultation);
+        } else {
+            log.info("이번 달 컨설팅 결과 이미 존재, 저장 건너뜀: sajuResultId={}", sajuResult.getId());
+        }
 
         Map<String, String> tenGodCharacteristics = tenGodDistribution.asMap().keySet().stream()
                 .collect(Collectors.toMap(
