@@ -8,7 +8,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import ssafy.SSAju.dto.response.AuthTokenResponse;
 import ssafy.SSAju.dto.response.AuthTokenPair;
 import ssafy.SSAju.entity.RefreshToken;
 import ssafy.SSAju.entity.User;
@@ -81,11 +80,11 @@ class AuthServiceTest {
         given(jwtUtil.getAccessTokenExpirationSeconds()).willReturn(3600L);
 
         // When
-        AuthTokenResponse result = authService.refreshAccessToken(tokenValue);
+        AuthTokenPair result = authService.refreshAccessToken(tokenValue);
 
         // Then
         assertThat(result.accessToken()).isEqualTo("new-access-token");
-        assertThat(result.accessTokenExpiresIn()).isEqualTo(3600L);
+        assertThat(result.expiresIn()).isEqualTo(3600L);
     }
 
     @Test

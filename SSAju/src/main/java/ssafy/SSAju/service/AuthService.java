@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.dto.request.LoginRequest;
 import ssafy.SSAju.dto.request.SignupRequest;
 import ssafy.SSAju.dto.response.AuthTokenPair;
-import ssafy.SSAju.dto.response.AuthTokenResponse;
 import ssafy.SSAju.dto.response.SignupResponse;
 import ssafy.SSAju.entity.RefreshToken;
 import ssafy.SSAju.entity.User;
@@ -258,7 +257,7 @@ public class AuthService {
      * @throws InvalidTokenException RefreshToken이 유효하지 않은 경우
      */
     @Transactional(readOnly = true)
-    public AuthTokenResponse refreshAccessToken(String refreshTokenValue) {
+    public AuthTokenPair refreshAccessToken(String refreshTokenValue) {
         if (refreshTokenValue == null || refreshTokenValue.isBlank()) {
             throw new InvalidTokenException("유효하지 않은 리프레시 토큰입니다.");
         }
@@ -274,7 +273,7 @@ public class AuthService {
         String newAccessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail());
 
         log.info("AccessToken 갱신 완료: userId={}", user.getId());
-        return new AuthTokenResponse(newAccessToken, jwtUtil.getAccessTokenExpirationSeconds());
+        return new AuthTokenPair(newAccessToken, refreshTokenValue, jwtUtil.getAccessTokenExpirationSeconds());
     }
 
     /**

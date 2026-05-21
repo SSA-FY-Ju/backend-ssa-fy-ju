@@ -98,8 +98,9 @@ public class AuthController {
         String clientIp = ClientIpUtil.getClientIp(httpRequest);
         AuthTokenPair tokenPair = authService.login(request, clientIp);
         cookieUtil.setRefreshTokenCookie(httpResponse, tokenPair.refreshTokenValue());
+        httpResponse.setHeader("Authorization", "Bearer " + tokenPair.accessToken());
         return ResponseEntity.ok(ApiResponse.success(
-                new AuthTokenResponse(tokenPair.accessToken(), tokenPair.expiresIn())));
+                new AuthTokenResponse(tokenPair.expiresIn())));
     }
 
     /**
@@ -140,10 +141,12 @@ public class AuthController {
      * @throws ssafy.SSAju.exception.InvalidTokenException RefreshToken이 유효하지 않은 경우
      */
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<AuthTokenResponse>> refresh(HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<AuthTokenResponse>> refresh(HttpServletRequest request,
+                                                                   HttpServletResponse response) {
         String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
-        AuthTokenResponse tokenResponse = authService.refreshAccessToken(refreshToken);
-        return ResponseEntity.ok(ApiResponse.success(tokenResponse));
+        AuthTokenPair tokenPair = authService.refreshAccessToken(refreshToken);
+        response.setHeader("Authorization", "Bearer " + tokenPair.accessToken());
+        return ResponseEntity.ok(ApiResponse.success(new AuthTokenResponse(tokenPair.expiresIn())));
     }
 
     /**
