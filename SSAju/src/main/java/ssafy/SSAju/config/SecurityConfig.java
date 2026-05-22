@@ -4,17 +4,12 @@ import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -34,12 +29,6 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-
-    @Value("${swagger.auth.username}")
-    private String swaggerUsername;
-
-    @Value("${swagger.auth.password}")
-    private String swaggerPassword;
 
     @Value("${cors.allowed-origins}")
     private String corsAllowedOrigins;
@@ -67,7 +56,7 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth ->
                 auth
-                    .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").authenticated()
+                    .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
                     .requestMatchers("/api/auth/check-email", "/api/auth/signup", "/api/auth/login", "/api/auth/refresh").permitAll()
                     .requestMatchers("/api/auth/**").authenticated()
                     .requestMatchers("/api/career/**", "/api/feedback/**", "/api/company/**").authenticated()
@@ -80,19 +69,9 @@ public class SecurityConfig {
             .addFilterBefore(new JwtExceptionFilter(objectMapper), JwtAuthenticationFilter.class)
             // RefreshToken 검증 필터: /api/auth/refresh 엔드포인트 요청 시 RefreshToken 쿠키 유효성 검증
             .addFilterAfter(new TokenValidationFilter(refreshTokenRepository, objectMapper), JwtAuthenticationFilter.class)
-            .httpBasic(Customizer.withDefaults());
+            .httpBasic(AbstractHttpConfigurer::disable);
 
         return http.build();
-    }
-
-    @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
-        UserDetails user = User.builder()
-            .username(swaggerUsername)
-            .password(passwordEncoder.encode(swaggerPassword))
-            .roles("USER")
-            .build();
-        return new InMemoryUserDetailsManager(user);
     }
 
     @Bean
