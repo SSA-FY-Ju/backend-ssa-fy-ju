@@ -12,6 +12,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -44,22 +45,24 @@ public class JwtUtil {
         return buildToken(userId, null, TOKEN_TYPE_REFRESH, refreshTokenExpirationMs);
     }
 
-    public boolean validateToken(String token) {
+    public record ParsedToken(Long userId, String email) {}
+
+    /**
+     * JWT 토큰을 검증하고 userId, email을 한 번의 파싱으로 추출합니다.
+     *
+     * @param token JWT 문자열
+     * @return 유효한 경우 ParsedToken, 유효하지 않은 경우 empty
+     */
+    public Optional<ParsedToken> validateAndParse(String token) {
         try {
-            parseClaims(token);
-            return true;
+            Claims claims = parseClaims(token);
+            Long userId = claims.get(CLAIM_USER_ID, Long.class);
+            String email = claims.get(CLAIM_EMAIL, String.class);
+            return Optional.of(new ParsedToken(userId, email));
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("유효하지 않은 JWT 토큰: {}", e.getClass().getSimpleName());
-            return false;
+            return Optional.empty();
         }
-    }
-
-    public Long getUserIdFromToken(String token) {
-        return parseClaims(token).get(CLAIM_USER_ID, Long.class);
-    }
-
-    public String getEmailFromToken(String token) {
-        return parseClaims(token).get(CLAIM_EMAIL, String.class);
     }
 
     /**

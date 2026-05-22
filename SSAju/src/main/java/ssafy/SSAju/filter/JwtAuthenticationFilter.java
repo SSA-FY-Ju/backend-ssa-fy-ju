@@ -32,23 +32,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String token = extractToken(request);
 
-        if (StringUtils.hasText(token) && jwtUtil.validateToken(token)) {
-            try {
-                Long userId = jwtUtil.getUserIdFromToken(token);
-                String email = jwtUtil.getEmailFromToken(token);
-
+        if (StringUtils.hasText(token)) {
+            jwtUtil.validateAndParse(token).ifPresent(parsed -> {
                 var auth = new UsernamePasswordAuthenticationToken(
-                        userId,
+                        parsed.userId(),
                         null,
                         List.of(new SimpleGrantedAuthority("ROLE_USER"))
                 );
-                auth.setDetails(email);
+                auth.setDetails(parsed.email());
                 SecurityContextHolder.getContext().setAuthentication(auth);
-                log.debug("JWT 인증 성공: userId={}", userId);
-            } catch (Exception e) {
-                log.warn("JWT 클레임 추출 실패: {}", e.getClass().getSimpleName());
-                SecurityContextHolder.clearContext();
-            }
+                log.debug("JWT 인증 성공: userId={}", parsed.userId());
+            });
         }
 
         filterChain.doFilter(request, response);
