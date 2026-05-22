@@ -6,6 +6,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.request.LoginRequest;
 import ssafy.SSAju.dto.request.SignupRequest;
 import ssafy.SSAju.dto.response.AuthTokenPair;
@@ -18,6 +19,7 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.event.LoginAttemptEvent;
 import org.springframework.dao.DataIntegrityViolationException;
 import ssafy.SSAju.exception.AuthException;
+import ssafy.SSAju.exception.ConsentRequiredException;
 import ssafy.SSAju.exception.DuplicateEmailException;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.UserNotFoundException;
@@ -87,7 +89,7 @@ public class AuthService {
         checkEmailAvailability(request.email());
 
         if (!Boolean.TRUE.equals(request.termsAgreed()) || !Boolean.TRUE.equals(request.privacyAgreed())) {
-            throw new AuthException("이용약관 및 개인정보 수집에 동의해야 합니다.");
+            throw new ConsentRequiredException(ErrorMessageConstants.TERMS_AGREEMENT_REQUIRED.getMessage());
         }
 
         LocalDateTime now = LocalDateTime.now();

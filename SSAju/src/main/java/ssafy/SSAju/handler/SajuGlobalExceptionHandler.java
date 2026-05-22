@@ -13,6 +13,7 @@ import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.ErrorInfo;
 import ssafy.SSAju.exception.AuthException;
+import ssafy.SSAju.exception.ConsentRequiredException;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.DailyLimitExceededException;
@@ -73,9 +74,28 @@ public class SajuGlobalExceptionHandler {
     }
 
     /**
+     * 약관 미동의 예외를 처리합니다.
+     *
+     * <p>회원가입 시 이용약관 또는 개인정보 수집에 미동의한 경우 발생합니다.
+     *
+     * @param e ConsentRequiredException
+     * @param request HTTP 요청
+     * @return 403 Forbidden, 에러 코드: TERMS_AGREEMENT_REQUIRED
+     */
+    @ExceptionHandler(ConsentRequiredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConsentRequired(
+            ConsentRequiredException e, HttpServletRequest request) {
+        log.warn("약관 미동의: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.TERMS_AGREEMENT_REQUIRED.getCode(),
+                        ErrorMessageConstants.TERMS_AGREEMENT_REQUIRED.getMessage(), generateRequestId())));
+    }
+
+    /**
      * 인증 예외를 처리합니다.
      *
-     * <p>로그인 실패(이메일 미존재, 비밀번호 불일치), 약관 미동의 등의 인증 관련 오류입니다.
+     * <p>로그인 실패(이메일 미존재, 비밀번호 불일치) 등의 인증 관련 오류입니다.
      * User Enumeration 공격 방지를 위해 로그인 실패 시 구체적인 실패 원인을 공개하지 않습니다.
      *
      * @param e AuthException
