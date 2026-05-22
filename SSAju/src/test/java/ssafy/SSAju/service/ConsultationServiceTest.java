@@ -212,7 +212,7 @@ class ConsultationServiceTest {
         assertThat(result.analysisSummary()).contains("己");
         assertThat(result.analysisSummary()).contains("H1");
 
-        verify(consultationSaveService).save(any(), any(), any(), any());
+        verify(consultationSaveService).saveOrUpdate(any(), any(), any(), any());
         verify(sajuResultProvider).findOrCreate(userProfile, sajuResult);
     }
 
@@ -248,7 +248,7 @@ class ConsultationServiceTest {
         assertThat(result.openaiModelVersion()).isEqualTo("gpt-4o-mini");
         assertThat(result.sajuProfile()).isNotNull();
         verify(sajuResultProvider).findOrCreate(userProfile, newSajuResult);
-        verify(consultationSaveService).save(any(), any(), any(), any());
+        verify(consultationSaveService).saveOrUpdate(any(), any(), any(), any());
     }
 
     // ─────────────────────────────────────────

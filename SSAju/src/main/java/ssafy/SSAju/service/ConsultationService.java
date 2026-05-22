@@ -122,7 +122,7 @@ public class ConsultationService {
                 sajuData, tenGodDistribution, hiddenStems, dayMaster);
 
         // ─── 5. 저장 (C-7: @Transactional 보장) ─────────────────────────────────
-        consultationSaveService.save(sajuResult, advice, modelVersion, consultationMonth);
+        consultationSaveService.saveOrUpdate(sajuResult, advice, modelVersion, consultationMonth);
 
         log.info("커리어 컨설팅 완료: sajuResultId={}, favoredPeriod={}", sajuResult.getId(), favoredPeriod);
         return buildResponse(sajuData, tenGodDistribution, dayMaster, favoredPeriod,
