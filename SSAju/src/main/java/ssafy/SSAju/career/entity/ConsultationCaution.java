@@ -9,15 +9,13 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 @Entity
-@Table(name = "industry")
-public class Industry {
+@Table(name = "consultation_caution")
+public class ConsultationCaution {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,34 +25,23 @@ public class Industry {
     @JoinColumn(name = "career_consultation_id", nullable = false)
     private CareerConsultation careerConsultation;
 
-    @Column(name = "industry_name", nullable = false)
-    private String industryName;
-
-    @Column(name = "reason", columnDefinition = "text")
-    private String reason;
-
-    @OneToMany(mappedBy = "industry", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<IndustryRecommendedRole> recommendedRoles = new ArrayList<>();
+    @Column(name = "content", columnDefinition = "text", nullable = false)
+    private String content;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public Industry(CareerConsultation careerConsultation, String industryName, String reason) {
+    public ConsultationCaution(CareerConsultation careerConsultation, String content) {
         this.careerConsultation = careerConsultation;
-        this.industryName = industryName;
-        this.reason = reason;
-    }
-
-    public void assignRecommendedRoles(List<IndustryRecommendedRole> list) {
-        this.recommendedRoles = list;
+        this.content = content;
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof Industry that)) return false;
+        if (!(o instanceof ConsultationCaution that)) return false;
         return id != null && id.equals(that.id);
     }
 

@@ -53,7 +53,7 @@ class CareerTimingControllerTest {
                 new UsernamePasswordAuthenticationToken(userId, null, List.of()));
 
         given(careerFortuneService.analyzeCareerTiming(any(LocalDate.class), any(LocalTime.class), eq(userId)))
-                .willReturn(new CareerTimingResponse("H1", 75, "상반기가 취업에 유리합니다."));
+                .willReturn(new CareerTimingResponse(null, "H1", 75, "상반기가 취업에 유리합니다."));
 
         mockMvc.perform(post("/api/career/timing")
                         .contentType(MediaType.APPLICATION_JSON)

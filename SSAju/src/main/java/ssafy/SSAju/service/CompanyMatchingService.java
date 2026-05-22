@@ -286,6 +286,7 @@ public class CompanyMatchingService {
                 cautionRepository.findByCompanyCompatibility_Id(saved.getId());
 
         return new CompatibilityResponse(
+                saved.getId(),
                 buildRequestContext(saved, request),
                 saved.getCompatibilityScore(),
                 saved.getSummary(),
@@ -308,6 +309,7 @@ public class CompanyMatchingService {
                                                      CompatibilityAnalysisData data) {
         CompatibilityAnalysisData.StrategyInfo s = data.strategy();
         return new CompatibilityResponse(
+                saved.getId(),
                 buildRequestContext(saved, request),
                 saved.getCompatibilityScore(),
                 saved.getSummary(),

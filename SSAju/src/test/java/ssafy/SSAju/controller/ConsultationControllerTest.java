@@ -38,6 +38,7 @@ class ConsultationControllerTest {
     private MockMvc mockMvc;
 
     private static final ConsultationResponse MOCK_RESPONSE = new ConsultationResponse(
+            null,
             List.of(new CareerAdviceResponse.IndustryRecommendation(
                     "금융/핀테크", "오행 金 강세", List.of("백엔드 개발자"))),
             List.of("일관성 있는 자기소개 준비", "데이터 기반 성과 강조"),

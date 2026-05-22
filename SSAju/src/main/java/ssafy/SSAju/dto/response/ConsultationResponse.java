@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 public record ConsultationResponse(
+        Long sajuResultId,
+
         // AI 커리어 조언
         List<CareerAdviceResponse.IndustryRecommendation> industries,
         List<String> interviewTips,
