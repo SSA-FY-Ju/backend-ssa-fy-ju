@@ -30,6 +30,9 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    @Value("${springdoc.swagger-ui.path}")
+    private String swaggerUiPath;
+
     @Value("${cors.allowed-origins}")
     private String corsAllowedOrigins;
 
@@ -56,7 +59,7 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth ->
                 auth
-                    .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
+                    .requestMatchers("/swagger-ui/**", swaggerUiPath, "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
                     .requestMatchers("/api/auth/check-email", "/api/auth/signup", "/api/auth/login", "/api/auth/refresh").permitAll()
                     .requestMatchers("/api/auth/**").authenticated()
                     .requestMatchers("/api/career/**", "/api/feedback/**", "/api/company/**").authenticated()

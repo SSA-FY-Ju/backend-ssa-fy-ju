@@ -27,17 +27,13 @@ spring:
 
 springdoc:
   swagger-ui:
-    path: /swagger-ui.html
+    path: ${SWAGGER_UI_PATH}
+    supported-submit-methods: []
     enabled: true
     doc-expansion: list
   api-docs:
     path: /v3/api-docs
     enabled: true
-
-swagger:
-  auth:
-    username: ${SWAGGER_USERNAME}
-    password: ${SWAGGER_PASSWORD}
 
 jwt:
   secret: ${JWT_SECRET}
