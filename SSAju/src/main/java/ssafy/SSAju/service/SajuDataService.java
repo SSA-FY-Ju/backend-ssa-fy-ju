@@ -15,6 +15,8 @@ import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.validator.RequestValidator;
 import ssafy.SSAju.dto.external.FastApiRequest;
 import ssafy.SSAju.dto.external.FastAPIResponse;
+import ssafy.SSAju.exception.ExternalApiException;
+import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.time.LocalDate;
@@ -79,6 +81,12 @@ public class SajuDataService {
                                                        LocalDate birthDate,
                                                        LocalTime birthTime) {
         log.error("FastAPI 호출 재시도 후 최종 실패", ex);
+        if (ex instanceof ResourceAccessException) {
+            throw new FastAPITimeoutException("FastAPI 응답 시간 초과", ex);
+        }
+        if (ex instanceof HttpServerErrorException) {
+            throw new ExternalApiException("FastAPI 서버 오류", ex);
+        }
         throw new InvalidSajuDataException(ErrorMessageConstants.FASTAPI_CALL_FAILED.getMessage(), ex);
     }
 
