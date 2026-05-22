@@ -13,11 +13,16 @@ import ssafy.SSAju.career.enums.FeedbackType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.dto.request.SatisfactionFeedbackRequest;
 import ssafy.SSAju.dto.response.SatisfactionFeedbackResponse;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.entity.enums.UserRole;
+import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.repository.SajuResultRepository;
+import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.repository.UserSatisfactionFeedbackRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Optional;
 
@@ -33,8 +38,19 @@ class FeedbackServiceTest {
 
     @Mock private SajuResultRepository sajuResultRepository;
     @Mock private UserSatisfactionFeedbackRepository feedbackRepository;
+    @Mock private UserRepository userRepository;
 
     private FeedbackService service;
+
+    private static final User MOCK_USER = User.builder()
+            .email("test@test.com")
+            .passwordHash("hash")
+            .name("테스트")
+            .role(UserRole.USER)
+            .status(UserStatus.ACTIVE)
+            .termsAgreedAt(LocalDateTime.now())
+            .privacyAgreedAt(LocalDateTime.now())
+            .build();
 
     private static final UserProfile PROFILE = UserProfile.builder()
             .birthDate(LocalDate.of(1990, 10, 10))
@@ -47,7 +63,7 @@ class FeedbackServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new FeedbackService(sajuResultRepository, feedbackRepository);
+        service = new FeedbackService(sajuResultRepository, feedbackRepository, userRepository);
     }
 
     @Test
@@ -64,6 +80,7 @@ class FeedbackServiceTest {
                 .feedbackContent("좋았습니다")
                 .build();
 
+        given(userRepository.findById(1L)).willReturn(Optional.of(MOCK_USER));
         given(sajuResultRepository.findByIdAndUser_Id(1L, 1L)).willReturn(Optional.of(SAJU_RESULT));
         given(feedbackRepository.save(any(UserSatisfactionFeedback.class))).willReturn(savedFeedback);
 
@@ -89,6 +106,7 @@ class FeedbackServiceTest {
                 .feedbackContent(null)
                 .build();
 
+        given(userRepository.findById(1L)).willReturn(Optional.of(MOCK_USER));
         given(sajuResultRepository.findByIdAndUser_Id(1L, 1L)).willReturn(Optional.of(SAJU_RESULT));
         given(feedbackRepository.save(any(UserSatisfactionFeedback.class))).willReturn(savedFeedback);
 
@@ -107,6 +125,7 @@ class FeedbackServiceTest {
         var request = new SatisfactionFeedbackRequest(
                 999L, FeedbackType.CAREER_TIMING, SatisfactionStatus.SATISFIED, null);
 
+        given(userRepository.findById(1L)).willReturn(Optional.of(MOCK_USER));
         given(sajuResultRepository.findByIdAndUser_Id(999L, 1L)).willReturn(Optional.empty());
 
         // When & Then

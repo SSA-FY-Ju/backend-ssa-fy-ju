@@ -76,6 +76,11 @@ public class ConsultationOpenAICaller {
                                         HiddenStems hiddenStems,
                                         String dayMaster) {
         log.error("OpenAI API 재시도 후 최종 실패");
+        if (ex instanceof HttpServerErrorException hse) {
+            throw new OpenAIApiException(
+                    ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(),
+                    hse.getStatusCode().value(), ex);
+        }
         throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), ex);
     }
 

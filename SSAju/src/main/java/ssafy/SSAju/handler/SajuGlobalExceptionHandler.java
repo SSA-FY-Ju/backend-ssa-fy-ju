@@ -204,12 +204,19 @@ public class SajuGlobalExceptionHandler {
     @ExceptionHandler(OpenAIApiException.class)
     public ResponseEntity<ApiResponse<Void>> handleOpenAIApiException(
             OpenAIApiException e, HttpServletRequest request) {
-        log.error("OpenAI API error: {}", e.getMessage());
-        // TODO: Phase 3.2 (ConsultationService) - Differentiate OpenAIApiException types by status code:
-        // 401 -> UNAUTHORIZED (인증 오류)
-        // 429 -> TOO_MANY_REQUESTS (할당량 초과)
-        // 5xx -> GATEWAY_TIMEOUT (서버 오류)
-        // Current implementation maps all to 504 GATEWAY_TIMEOUT
+        log.error("OpenAI API error: statusCode={}, message={}", e.getStatusCode(), e.getMessage());
+        if (e.getStatusCode() == 401) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.failure(new ErrorInfo(
+                            ErrorMessageConstants.OPENAI_UNAUTHORIZED.getCode(),
+                            ErrorMessageConstants.OPENAI_UNAUTHORIZED.getMessage(), generateRequestId())));
+        }
+        if (e.getStatusCode() == 429) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(ApiResponse.failure(new ErrorInfo(
+                            ErrorMessageConstants.OPENAI_RATE_LIMIT.getCode(),
+                            ErrorMessageConstants.OPENAI_RATE_LIMIT.getMessage(), generateRequestId())));
+        }
         return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.OPENAI_API_TIMEOUT.getCode(),

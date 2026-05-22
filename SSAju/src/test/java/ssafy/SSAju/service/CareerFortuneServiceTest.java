@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
+import ssafy.SSAju.career.provider.SajuAnalysisFacade;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
@@ -52,6 +53,7 @@ class CareerFortuneServiceTest {
     private final TenGodCalculator tenGodCalculator = new TenGodCalculator();
     private final HiddenStemCalculator hiddenStemCalculator = new HiddenStemCalculator();
     private final CareerFortuneAnalyzer careerFortuneAnalyzer = new CareerFortuneAnalyzer(tenGodCalculator);
+    private final SajuAnalysisFacade sajuAnalysisFacade = new SajuAnalysisFacade(tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer);
     private final SajuValidator sajuValidator = new SajuValidator();
 
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 10, 10);
@@ -81,8 +83,7 @@ class CareerFortuneServiceTest {
     void setUp() {
         service = new CareerFortuneService(
                 sajuDataService, userProfileProvider, sajuResultWriteService,
-                tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer, sajuResultMapper, sajuValidator,
-                userRepository);
+                sajuAnalysisFacade, sajuResultMapper, sajuValidator, userRepository);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
     }
 

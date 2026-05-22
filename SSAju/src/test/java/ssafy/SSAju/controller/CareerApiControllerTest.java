@@ -31,7 +31,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -307,23 +306,17 @@ class CareerApiControllerTest {
     // ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("T089-6: Swagger API Docs는 Basic Auth로 인증 보호됨")
-    void swaggerDocs_authenticationRequired() throws Exception {
-        // Given: 무인증 요청 → 401
+    @DisplayName("T089-6: Swagger API Docs는 인증 없이 접근 가능 (Nginx IP 화이트리스트로 보호)")
+    void swaggerDocs_publiclyAccessible() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
-                .andExpect(status().isUnauthorized());
-
-        // Given: BasicAuth 인증 요청 → 200
-        mockMvc.perform(get("/v3/api-docs")
-                        .with(httpBasic("admin", "swagger1234")))
                 .andExpect(status().isOk());
     }
 
     @Test
-    @DisplayName("T089-6a: Swagger YAML Docs도 무인증 시 401 반환")
-    void swaggerYamlDocs_withoutAuth_returns401() throws Exception {
+    @DisplayName("T089-6a: Swagger YAML Docs도 인증 없이 접근 가능")
+    void swaggerYamlDocs_publiclyAccessible() throws Exception {
         mockMvc.perform(get("/v3/api-docs.yaml"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
     }
 
     @Test

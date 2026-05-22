@@ -143,34 +143,16 @@ public class SajuResultWriteService {
     }
 
     private boolean isDuplicateKeyViolation(DataIntegrityViolationException ex) {
-        // 1. Spring이 이미 친절하게 '중복 키 에러'라고 번역해준 경우 (가장 깔끔함)
         if (ex instanceof DuplicateKeyException) {
             return true;
         }
 
         Throwable cause = ex.getCause();
         while (cause != null) {
-            String msg = cause.getMessage();
-            if (msg != null) {
-                // MySQL + H2 메시지 포맷 모두 처리
-                if (msg.contains("Duplicate entry") || msg.contains("duplicate key")
-                        || msg.contains("Unique index or primary key violation")) {
-                    return true;
-                }
-            }
-
-            if (cause instanceof SQLException) {
-                SQLException sqlEx = (SQLException) cause;
-                String sqlState = sqlEx.getSQLState();
-                int errorCode = sqlEx.getErrorCode();
-
-                // H2의 중복 키 SQLState (23505)
-                if ("23505".equals(sqlState)) {
-                    return true;
-                }
-                // MySQL의 중복 키 Error Code (1062)
-                // 주의: SQLState "23000"은 Not Null, FK 에러도 포함하므로 사용하면 안 됨!
-                if (errorCode == 1062) {
+            if (cause instanceof SQLException sqlEx) {
+                // H2: SQLState "23505", MySQL: errorCode 1062
+                // SQLState "23000"은 NOT NULL, FK 위반도 포함하므로 사용 금지
+                if ("23505".equals(sqlEx.getSQLState()) || sqlEx.getErrorCode() == 1062) {
                     return true;
                 }
             }

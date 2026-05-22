@@ -19,6 +19,7 @@ import ssafy.SSAju.career.entity.TargetRoleAnalysis;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.AnalysisResponseBuilder;
+import ssafy.SSAju.service.CompatibilityChildReadService;
 import ssafy.SSAju.career.util.CompatibilityScoreCalculator;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.JobCategoryEnum;
@@ -89,6 +90,7 @@ class CompanyMatchingServiceTest {
     @Mock private MonthlyForecastRepository monthlyForecastRepository;
     @Mock private CautionRepository cautionRepository;
     @Mock private CompatibilityChildSaveService childSaveService;
+    @Mock private CompatibilityChildReadService childReadService;
     @Mock private UserRepository userRepository;
 
     private CompanyMatchingService service;
@@ -127,13 +129,8 @@ class CompanyMatchingServiceTest {
                 sajuDataService, companyInfoService, userProfileProvider, sajuValidator,
                 tenGodCalculator, hiddenStemCalculator,
                 compatibilityScoreCalculator, jobRoleAnalyzer, analysisResponseBuilder,
-                companyCompatibilityRepository, companyCompatibilityJdbcRepository, childSaveService,
-                userRepository,
-                targetRoleAnalysisRepository, fiveElementsAnalysisRepository,
-                analysisBreakdownRepository, actionableStrategyRepository,
-                actionableKeywordRepository, luckyDayRepository,
-                expectedInterviewQuestionRepository, roleCompatibilityRepository,
-                monthlyForecastRepository, cautionRepository
+                companyCompatibilityRepository, companyCompatibilityJdbcRepository,
+                childSaveService, childReadService, userRepository
         );
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
 
