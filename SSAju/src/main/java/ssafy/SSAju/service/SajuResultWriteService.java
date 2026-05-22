@@ -20,6 +20,7 @@ import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.sql.SQLException;
 import java.util.List;
+import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
@@ -43,6 +44,7 @@ public class SajuResultWriteService {
     private final TenGodDataRepository tenGodDataRepository;
     private final HiddenStemDataRepository hiddenStemDataRepository;
     private final CareerFortuneRepository careerFortuneRepository;
+    private final CareerConsultationRepository careerConsultationRepository;
 
     /**
      * 기존 SajuResult 삭제 후 새 SajuResult 저장.
@@ -63,6 +65,7 @@ public class SajuResultWriteService {
         }
         sajuResultRepository.findByUserProfile(userProfile).ifPresent(existing -> {
             Long existingId = existing.getId();
+            careerConsultationRepository.deleteBySajuResultId(existingId);
             tenGodDataRepository.deleteBySajuResultId(existingId);
             hiddenStemDataRepository.deleteBySajuResultId(existingId);
             careerFortuneRepository.deleteBySajuResultId(existingId);
@@ -100,7 +103,7 @@ public class SajuResultWriteService {
                         .tenGodName(e.getTenGodName())
                         .score(e.getScore())
                         .build())
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
 
         List<HiddenStemData> hiddenStems = source.getHiddenStemDataList().stream()
                 .map(e -> HiddenStemData.builder()
@@ -108,7 +111,7 @@ public class SajuResultWriteService {
                         .earthlyBranch(e.getEarthlyBranch())
                         .hiddenStem(e.getHiddenStem())
                         .build())
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
 
         saved.assignTenGodData(tenGods);
         saved.assignHiddenStemData(hiddenStems);
