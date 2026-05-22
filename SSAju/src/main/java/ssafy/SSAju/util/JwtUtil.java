@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Date;
 
 @Slf4j
@@ -65,10 +65,10 @@ public class JwtUtil {
     /**
      * RefreshToken 만료 시간을 계산합니다.
      *
-     * @return 현재 시각으로부터 RefreshToken 유효 기간만큼 더한 LocalDateTime (7일)
+     * @return 현재 시각으로부터 RefreshToken 유효 기간만큼 더한 Instant (7일)
      */
-    public LocalDateTime getRefreshTokenExpiration() {
-        return LocalDateTime.now().plusSeconds(refreshTokenExpirationMs / 1000);
+    public Instant getRefreshTokenExpiration() {
+        return Instant.now().plusSeconds(refreshTokenExpirationMs / 1000);
     }
 
     /**
