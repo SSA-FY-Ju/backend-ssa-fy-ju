@@ -30,11 +30,15 @@ public class ConsultationSaveService {
 
     /**
      * CareerConsultation을 트랜잭션 내에서 저장.
-     * 같은 달 UNIQUE 제약 위반 시 중복 저장 건너뜀 (정상 흐름).
      *
-     * @param sajuResult       저장 대상 SajuResult
-     * @param advice           OpenAI 응답
-     * @param modelVersion     사용 모델 버전
+     * <ul>
+     *   <li>동일 달 데이터가 없으면 신규 저장</li>
+     *   <li>UNIQUE 제약 위반 시: 모델 버전이 다르면 기존 데이터를 update, 같으면 건너뜀</li>
+     * </ul>
+     *
+     * @param sajuResult        저장 대상 SajuResult
+     * @param advice            OpenAI 응답
+     * @param modelVersion      사용 모델 버전
      * @param consultationMonth 대상 월 (yyyy-MM)
      */
     @Transactional
@@ -49,8 +53,29 @@ public class ConsultationSaveService {
             if (!isConsultationMonthConstraintViolation(e)) {
                 throw e;
             }
-            log.info("이번 달 컨설팅 결과 이미 존재, 저장 건너뜀: sajuResultId={}, month={}", sajuResult.getId(), consultationMonth);
+            updateIfModelChanged(sajuResult, advice, modelVersion, consultationMonth);
         }
+    }
+
+    /**
+     * UNIQUE 제약 위반 시 모델 버전을 비교해 변경된 경우에만 기존 데이터를 갱신합니다.
+     */
+    private void updateIfModelChanged(SajuResult sajuResult, CareerAdviceResponse advice,
+                                      String modelVersion, String consultationMonth) {
+        careerConsultationRepository
+                .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth)
+                .ifPresent(existing -> {
+                    if (existing.getOpenaiModelVersion().equals(modelVersion)) {
+                        log.info("같은 모델 버전 — 기존 컨설팅 결과 유지: sajuResultId={}, month={}",
+                                sajuResult.getId(), consultationMonth);
+                        return;
+                    }
+                    log.info("모델 버전 변경 감지 — 기존 컨설팅 결과 업데이트: " +
+                                    "sajuResultId={}, month={}, 구버전={}, 신버전={}",
+                            sajuResult.getId(), consultationMonth,
+                            existing.getOpenaiModelVersion(), modelVersion);
+                    consultationMapper.updateConsultation(existing, advice, modelVersion);
+                });
     }
 
     private boolean isConsultationMonthConstraintViolation(DataIntegrityViolationException e) {

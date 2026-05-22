@@ -50,6 +50,28 @@ public class ConsultationMapper {
     }
 
     /**
+     * 모델 버전 변경 시 기존 CareerConsultation을 새 분석 결과로 갱신.
+     * 모든 자식 컬렉션/엔티티를 교체하고 기본 텍스트 필드를 업데이트합니다.
+     */
+    public void updateConsultation(CareerConsultation existing, CareerAdviceResponse advice, String modelVersion) {
+        existing.updateData(modelVersion, advice.dayMasterDescription(), advice.fiveElementsAnalysis());
+        existing.assignIndustries(toIndustryList(existing, advice.industries()));
+        existing.assignInterviewTips(toInterviewTipList(existing, advice.interviewTips()));
+        existing.assignStrengths(toStrengthList(existing, advice.strengths()));
+        existing.assignCautions(toCautionList(existing, advice.cautions()));
+        existing.assignKeyTenGods(toKeyTenGodList(existing, advice.keyTenGods()));
+        existing.assignWealthStyle(toWealthStyle(existing, advice.wealthStyle()));
+        existing.assignRoadmap(toRoadmap(existing, advice.longTermRoadmap()));
+        existing.assignPersonalBranding(toPersonalBranding(existing, advice.personalBranding()));
+        existing.assignPowerKeywords(toPowerKeywords(existing, advice.powerKeywords()));
+        existing.assignMentalCare(toMentalCare(existing, advice.mentalCare()));
+        existing.assignEnvironmentFit(toEnvironmentFit(existing, advice.environmentFit()));
+        existing.assignWorkStyle(toWorkStyle(existing, advice.workStyle()));
+        existing.assignRelationshipStrategy(toRelationshipStrategy(existing, advice.relationshipStrategy()));
+        existing.assignCareerTimeline(toCareerTimeline(existing, advice.careerTimeline()));
+    }
+
+    /**
      * 저장된 CareerConsultation에서 CareerAdviceResponse 복원 (캐시 히트 시 사용).
      */
     public CareerAdviceResponse restoreAdvice(CareerConsultation cc) {

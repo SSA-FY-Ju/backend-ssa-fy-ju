@@ -81,7 +81,7 @@ class CareerApiControllerTest {
     void us1_careerTiming_validRequest_returnsH1orH2() throws Exception {
         // Given
         given(careerFortuneService.analyzeCareerTiming(any(), any(), any()))
-                .willReturn(new CareerTimingResponse("H1", 75, "상반기가 취업에 유리합니다."));
+                .willReturn(new CareerTimingResponse(null, "H1", 75, "상반기가 취업에 유리합니다."));
 
         // When & Then
         mockMvc.perform(post("/api/career/timing")
@@ -363,6 +363,7 @@ class CareerApiControllerTest {
 
     private ConsultationResponse buildMockConsultationResponse() {
         return new ConsultationResponse(
+                null,
                 List.of(new CareerAdviceResponse.IndustryRecommendation(
                         "금융/핀테크", "오행 金 강세", List.of("백엔드 개발자"))),
                 List.of("일관성 있는 자기소개 준비"),
@@ -409,6 +410,7 @@ class CareerApiControllerTest {
 
     private CompatibilityResponse buildMockCompatibilityResponse() {
         return new CompatibilityResponse(
+                null,
                 new CompatibilityResponse.RequestContext(
                         "Samsung",
                         new CompatibilityResponse.TargetRoleInfo(JobCategoryEnum.TECH_BACKEND, "Spring Boot 개발자")

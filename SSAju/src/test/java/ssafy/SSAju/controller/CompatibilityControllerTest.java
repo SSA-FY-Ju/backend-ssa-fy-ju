@@ -45,6 +45,7 @@ class CompatibilityControllerTest {
     // - 연관 실패: 분석 결과는 정상 반환되는지 검증
 
     private static final CompatibilityResponse MOCK_RESPONSE = new CompatibilityResponse(
+            null,
             new CompatibilityResponse.RequestContext(
                     "현대오토에버",
                     new CompatibilityResponse.TargetRoleInfo(JobCategoryEnum.TECH_BACKEND, "백엔드 개발자")

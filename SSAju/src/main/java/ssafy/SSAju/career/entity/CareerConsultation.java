@@ -30,7 +30,7 @@ public class CareerConsultation {
     @JoinColumn(name = "saju_result_id", nullable = false)
     private SajuResult sajuResult;
 
-    @Column(name = "openai_model_version")
+    @Column(name = "openai_model_version", nullable = false)
     private String openaiModelVersion;
 
     @Column(name = "consultation_month", nullable = false, length = 7)
@@ -111,11 +111,31 @@ public class CareerConsultation {
 
     // ─── assign methods ─────────────────────────────────────────────────────────
 
-    public void assignIndustries(List<Industry> list) { this.industries = list; }
-    public void assignInterviewTips(List<InterviewTip> list) { this.interviewTips = list; }
-    public void assignStrengths(List<Strength> list) { this.strengths = list; }
-    public void assignCautions(List<ConsultationCaution> list) { this.cautions = list; }
-    public void assignKeyTenGods(List<ConsultationKeyTenGod> list) { this.keyTenGods = list; }
+    public void assignIndustries(List<Industry> list) {
+        this.industries.clear();
+        if (list != null) this.industries.addAll(list);
+    }
+
+    public void assignInterviewTips(List<InterviewTip> list) {
+        this.interviewTips.clear();
+        if (list != null) this.interviewTips.addAll(list);
+    }
+
+    public void assignStrengths(List<Strength> list) {
+        this.strengths.clear();
+        if (list != null) this.strengths.addAll(list);
+    }
+
+    public void assignCautions(List<ConsultationCaution> list) {
+        this.cautions.clear();
+        if (list != null) this.cautions.addAll(list);
+    }
+
+    public void assignKeyTenGods(List<ConsultationKeyTenGod> list) {
+        this.keyTenGods.clear();
+        if (list != null) this.keyTenGods.addAll(list);
+    }
+
     public void assignWealthStyle(ConsultationWealthStyle ws) { this.wealthStyle = ws; }
     public void assignRoadmap(ConsultationRoadmap rm) { this.roadmap = rm; }
     public void assignPersonalBranding(ConsultationPersonalBranding pb) { this.personalBranding = pb; }
@@ -125,6 +145,17 @@ public class CareerConsultation {
     public void assignWorkStyle(ConsultationWorkStyle ws) { this.workStyle = ws; }
     public void assignRelationshipStrategy(ConsultationRelationshipStrategy rs) { this.relationshipStrategy = rs; }
     public void assignCareerTimeline(ConsultationCareerTimeline ct) { this.careerTimeline = ct; }
+
+    /**
+     * 모델 버전 변경 시 기본 텍스트 필드를 갱신합니다.
+     * 자식 컬렉션/엔티티는 ConsultationMapper.updateConsultation()이 담당합니다.
+     */
+    public void updateData(String newModelVersion, String newDayMasterDescription,
+                           String newFiveElementsAnalysis) {
+        this.openaiModelVersion = newModelVersion;
+        this.dayMasterDescription = newDayMasterDescription;
+        this.fiveElementsAnalysis = newFiveElementsAnalysis;
+    }
 
     @Override
     public boolean equals(Object o) {
