@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
         name = "company_compatibility",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_user_company_role_version",
-                columnNames = {"user_id", "company_name", "target_role_category", "version"}
+                columnNames = {"user_id", "user_profile_id", "company_name", "target_role_category", "version"}
         )
 )
 public class CompanyCompatibility {

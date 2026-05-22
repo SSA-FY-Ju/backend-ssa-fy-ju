@@ -57,9 +57,10 @@ public class PromptProvider {
                 - %d년 기준 12개월 월별 운세 및 전환점(pivotPoints: 점수 8 이상인 달만)
                 - 일간(%s) 기반 성향 분석 및 핵심 십신 2~3개 선별
 
-                [중요] careerTimeline.months의 각 달은 반드시 객체 형식으로 응답:
-                올바른 예: "January": {"type": "적극기", "description": "면접 기회가 많은 시기"}
-                잘못된 예: "January": "좋음" 또는 "January": 3
+                [중요] careerTimeline의 날짜 키는 반드시 "YYYY-MM" 형식 사용 (예: "%d-01", "%d-12"):
+                올바른 예: "%d-01": {"type": "적극기", "description": "면접 기회가 많은 시기"}
+                잘못된 예: "January": {...} 또는 "1월": {...}
+                pivotPoints의 month 필드도 동일하게 "YYYY-MM" 형식으로 응답
                 """.formatted(
                 dayMaster,
                 sajuData.heavenlyStems(),
@@ -68,7 +69,8 @@ public class PromptProvider {
                 hiddenStems,
                 tenGodDistribution,
                 currentYear,
-                dayMaster
+                dayMaster,
+                currentYear, currentYear, currentYear
         );
     }
 }
