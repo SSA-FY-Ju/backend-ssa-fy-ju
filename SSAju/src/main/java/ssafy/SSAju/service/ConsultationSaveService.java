@@ -27,13 +27,15 @@ public class ConsultationSaveService {
 
     private final ConsultationMapper consultationMapper;
     private final CareerConsultationRepository careerConsultationRepository;
+    private final ConsultationUpdateService consultationUpdateService;
 
     /**
      * CareerConsultation을 트랜잭션 내에서 저장.
      *
      * <ul>
      *   <li>동일 달 데이터가 없으면 신규 저장</li>
-     *   <li>UNIQUE 제약 위반 시: 모델 버전이 다르면 기존 데이터를 update, 같으면 건너뜀</li>
+     *   <li>UNIQUE 제약 위반 시: Tainted Session 방지를 위해 새 트랜잭션(REQUIRES_NEW)에서
+     *       모델 버전을 비교 후 다르면 업데이트, 같으면 건너뜀</li>
      * </ul>
      *
      * @param sajuResult        저장 대상 SajuResult
@@ -53,29 +55,9 @@ public class ConsultationSaveService {
             if (!isConsultationMonthConstraintViolation(e)) {
                 throw e;
             }
-            updateIfModelChanged(sajuResult, advice, modelVersion, consultationMonth);
+            // UNIQUE 제약 위반: Tainted Session 방지를 위해 새 트랜잭션에서 업데이트 처리
+            consultationUpdateService.updateIfModelChanged(sajuResult, advice, modelVersion, consultationMonth);
         }
-    }
-
-    /**
-     * UNIQUE 제약 위반 시 모델 버전을 비교해 변경된 경우에만 기존 데이터를 갱신합니다.
-     */
-    private void updateIfModelChanged(SajuResult sajuResult, CareerAdviceResponse advice,
-                                      String modelVersion, String consultationMonth) {
-        careerConsultationRepository
-                .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth)
-                .ifPresent(existing -> {
-                    if (existing.getOpenaiModelVersion().equals(modelVersion)) {
-                        log.info("같은 모델 버전 — 기존 컨설팅 결과 유지: sajuResultId={}, month={}",
-                                sajuResult.getId(), consultationMonth);
-                        return;
-                    }
-                    log.info("모델 버전 변경 감지 — 기존 컨설팅 결과 업데이트: " +
-                                    "sajuResultId={}, month={}, 구버전={}, 신버전={}",
-                            sajuResult.getId(), consultationMonth,
-                            existing.getOpenaiModelVersion(), modelVersion);
-                    consultationMapper.updateConsultation(existing, advice, modelVersion);
-                });
     }
 
     private boolean isConsultationMonthConstraintViolation(DataIntegrityViolationException e) {
