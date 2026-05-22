@@ -1,19 +1,26 @@
 package ssafy.SSAju.config;
 
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-/**
- * 비동기 처리 설정.
- *
- * {@code @Async} 어노테이션을 통한 비동기 메서드 실행을 활성화합니다.
- * 로그인 시도 기록, 메일 발송 등 블로킹 작업을 비동기로 처리하여
- * 메인 요청 흐름을 방해하지 않도록 합니다.
- *
- * @see org.springframework.scheduling.annotation.Async
- * @see ssafy.SSAju.event.LoginAttemptEventListener
- */
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
+
 @Configuration
 @EnableAsync
 public class AsyncConfig {
+
+    @Bean(name = "loginAuditExecutor")
+    public Executor loginAuditExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(5);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("login-audit-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
 }
