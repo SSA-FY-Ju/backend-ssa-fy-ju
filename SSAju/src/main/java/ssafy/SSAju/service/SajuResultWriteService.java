@@ -16,6 +16,7 @@ import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.TenGodData;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.sql.SQLException;
@@ -81,7 +82,11 @@ public class SajuResultWriteService {
      * 자식 저장 실패 시 롤백되어 root만 남는 불일치 상태를 방지.
      */
     @Transactional
-    public SajuResult saveNewResultWithChildren(SajuResult saved, SajuResult source) {
+    public SajuResult saveNewResultWithChildren(SajuResult detached, SajuResult source) {
+        // 트랜잭션 내에서 재조회 → managed 엔티티 확보 (detached 엔티티의 PersistentBag 조작 방지)
+        SajuResult saved = sajuResultRepository.findById(detached.getId())
+                .orElseThrow(() -> new DataAccessException(ErrorMessageConstants.SAJU_RESULT_ACCESS_FAILED.getMessage()));
+
         SajuFullData srcFullData = source.getSajuFullData();
         if (srcFullData != null) {
             saved.assignSajuFullData(SajuFullData.builder()
