@@ -47,15 +47,24 @@ public class ConsultationCareerTimeline {
     }
 
     public void assignMonthFortunes(List<ConsultationMonthFortune> list) {
-        this.monthFortunes = list;
+        this.monthFortunes.clear();
+        if (list != null) {
+            this.monthFortunes.addAll(list);
+        }
     }
 
     public void assignPivotPoints(List<ConsultationPivotPoint> list) {
-        this.pivotPoints = list;
+        this.pivotPoints.clear();
+        if (list != null) {
+            this.pivotPoints.addAll(list);
+        }
     }
 
     public void assignWarningMonths(List<ConsultationWarningMonth> list) {
-        this.warningMonths = list;
+        this.warningMonths.clear();
+        if (list != null) {
+            this.warningMonths.addAll(list);
+        }
     }
 
     @Override

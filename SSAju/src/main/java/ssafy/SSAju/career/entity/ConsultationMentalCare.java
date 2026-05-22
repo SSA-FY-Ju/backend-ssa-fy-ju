@@ -44,11 +44,17 @@ public class ConsultationMentalCare {
     }
 
     public void assignStressFactors(List<ConsultationMentalStressFactor> list) {
-        this.stressFactors = list;
+        this.stressFactors.clear();
+        if (list != null) {
+            this.stressFactors.addAll(list);
+        }
     }
 
     public void assignRechargeMethods(List<ConsultationMentalRechargeMethod> list) {
-        this.rechargeMethods = list;
+        this.rechargeMethods.clear();
+        if (list != null) {
+            this.rechargeMethods.addAll(list);
+        }
     }
 
     @Override

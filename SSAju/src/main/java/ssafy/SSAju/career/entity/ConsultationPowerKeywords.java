@@ -44,11 +44,17 @@ public class ConsultationPowerKeywords {
     }
 
     public void assignKeywords(List<ConsultationPowerKeyword> list) {
-        this.keywords = list;
+        this.keywords.clear();
+        if (list != null) {
+            this.keywords.addAll(list);
+        }
     }
 
     public void assignUsageTips(List<ConsultationPowerKeywordUsageTip> list) {
-        this.usageTips = list;
+        this.usageTips.clear();
+        if (list != null) {
+            this.usageTips.addAll(list);
+        }
     }
 
     @Override

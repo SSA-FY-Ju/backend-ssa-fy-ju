@@ -122,6 +122,9 @@ public class AuthController {
             HttpServletResponse response) {
         Long userId = getCurrentUserId();
         String refreshToken = request.getHeader("Refresh-Token");
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new AuthException("리프레시 토큰이 없습니다.");
+        }
         authService.logout(userId, refreshToken);
         return ResponseEntity.ok(ApiResponse.success(null));
     }

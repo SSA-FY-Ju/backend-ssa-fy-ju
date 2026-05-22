@@ -105,11 +105,16 @@ public class ConsultationService {
                 .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth);
 
         if (cached.isPresent()) {
-            log.info("이번 달 컨설팅 캐시 히트 — OpenAI 호출 생략: sajuResultId={}, month={}",
-                    sajuResult.getId(), consultationMonth);
-            CareerAdviceResponse cachedAdvice = consultationMapper.restoreAdvice(cached.get());
-            return buildResponse(sajuData, tenGodDistribution, dayMaster, favoredPeriod,
-                    confidenceScore, reasoning, sajuResult, cachedAdvice);
+            CareerConsultation cachedData = cached.get();
+            if (cachedData.getOpenaiModelVersion().equals(modelVersion)) {
+                log.info("이번 달 컨설팅 캐시 히트 — OpenAI 호출 생략: sajuResultId={}, month={}",
+                        sajuResult.getId(), consultationMonth);
+                CareerAdviceResponse cachedAdvice = consultationMapper.restoreAdvice(cachedData);
+                return buildResponse(sajuData, tenGodDistribution, dayMaster, favoredPeriod,
+                        confidenceScore, reasoning, sajuResult, cachedAdvice);
+            }
+            log.info("캐시 모델 버전 불일치(캐시={}, 현재={}) — 재분석: sajuResultId={}",
+                    cachedData.getOpenaiModelVersion(), modelVersion, sajuResult.getId());
         }
 
         // ─── 4. OpenAI 호출 (캐시 미스, 외부 I/O) ───────────────────────────────

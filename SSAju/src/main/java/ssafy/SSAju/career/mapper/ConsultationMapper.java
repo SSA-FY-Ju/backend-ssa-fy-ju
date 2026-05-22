@@ -310,26 +310,22 @@ public class ConsultationMapper {
                 .avoidanceTip(pk.avoidanceTip())
                 .build();
 
-        if (pk.keywords() != null) {
-            entity.assignKeywords(pk.keywords().stream()
-                    .map(k -> ConsultationPowerKeyword.builder()
-                            .consultationPowerKeywords(entity)
-                            .keyword(k.keyword())
-                            .element(k.element())
-                            .description(k.description())
-                            .usageExample(k.usageExample())
-                            .context(k.context())
-                            .build())
-                    .toList());
-        }
-        if (pk.usageTips() != null) {
-            entity.assignUsageTips(pk.usageTips().stream()
-                    .map(tip -> ConsultationPowerKeywordUsageTip.builder()
-                            .consultationPowerKeywords(entity)
-                            .tip(tip)
-                            .build())
-                    .toList());
-        }
+        entity.assignKeywords(pk.validKeywords().stream()
+                .map(k -> ConsultationPowerKeyword.builder()
+                        .consultationPowerKeywords(entity)
+                        .keyword(k.keyword())
+                        .element(k.element())
+                        .description(k.description())
+                        .usageExample(k.usageExample())
+                        .context(k.context())
+                        .build())
+                .toList());
+        entity.assignUsageTips(pk.validUsageTips().stream()
+                .map(tip -> ConsultationPowerKeywordUsageTip.builder()
+                        .consultationPowerKeywords(entity)
+                        .tip(tip)
+                        .build())
+                .toList());
         return entity;
     }
 
@@ -342,18 +338,14 @@ public class ConsultationMapper {
                 .emergencyTactic(mc.emergencyTactic())
                 .build();
 
-        if (mc.stressVulnerability() != null) {
-            entity.assignStressFactors(mc.stressVulnerability().stream()
-                    .map(s -> ConsultationMentalStressFactor.builder()
-                            .consultationMentalCare(entity).content(s).build())
-                    .toList());
-        }
-        if (mc.rechargeMethod() != null) {
-            entity.assignRechargeMethods(mc.rechargeMethod().stream()
-                    .map(r -> ConsultationMentalRechargeMethod.builder()
-                            .consultationMentalCare(entity).content(r).build())
-                    .toList());
-        }
+        entity.assignStressFactors(mc.validStressVulnerability().stream()
+                .map(s -> ConsultationMentalStressFactor.builder()
+                        .consultationMentalCare(entity).content(s).build())
+                .toList());
+        entity.assignRechargeMethods(mc.validRechargeMethod().stream()
+                .map(r -> ConsultationMentalRechargeMethod.builder()
+                        .consultationMentalCare(entity).content(r).build())
+                .toList());
         return entity;
     }
 
@@ -405,33 +397,27 @@ public class ConsultationMapper {
                 .warningDescription(ct.warningDescription())
                 .build();
 
-        if (ct.months() != null) {
-            entity.assignMonthFortunes(ct.months().entrySet().stream()
-                    .map(e -> ConsultationMonthFortune.builder()
-                            .consultationCareerTimeline(entity)
-                            .monthKey(e.getKey())
-                            .type(e.getValue().type())
-                            .description(e.getValue().description())
-                            .build())
-                    .toList());
-        }
-        if (ct.pivotPoints() != null) {
-            entity.assignPivotPoints(ct.pivotPoints().stream()
-                    .map(pp -> ConsultationPivotPoint.builder()
-                            .consultationCareerTimeline(entity)
-                            .month(pp.month())
-                            .type(pp.type())
-                            .score(pp.score())
-                            .description(pp.description())
-                            .build())
-                    .toList());
-        }
-        if (ct.warningMonths() != null) {
-            entity.assignWarningMonths(ct.warningMonths().stream()
-                    .map(m -> ConsultationWarningMonth.builder()
-                            .consultationCareerTimeline(entity).month(m).build())
-                    .toList());
-        }
+        entity.assignMonthFortunes(ct.validMonths().entrySet().stream()
+                .map(e -> ConsultationMonthFortune.builder()
+                        .consultationCareerTimeline(entity)
+                        .monthKey(e.getKey())
+                        .type(e.getValue().type())
+                        .description(e.getValue().description())
+                        .build())
+                .toList());
+        entity.assignPivotPoints(ct.validPivotPoints().stream()
+                .map(pp -> ConsultationPivotPoint.builder()
+                        .consultationCareerTimeline(entity)
+                        .month(pp.month())
+                        .type(pp.type())
+                        .score(pp.score())
+                        .description(pp.description())
+                        .build())
+                .toList());
+        entity.assignWarningMonths(ct.validWarningMonths().stream()
+                .map(m -> ConsultationWarningMonth.builder()
+                        .consultationCareerTimeline(entity).month(m).build())
+                .toList());
         return entity;
     }
 }
