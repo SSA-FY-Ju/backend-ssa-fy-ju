@@ -11,7 +11,7 @@ import ssafy.SSAju.repository.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 /**
  * 기업 궁합 자식 엔티티 저장 및 완료 상태 관리를 담당합니다.
@@ -125,60 +125,74 @@ public class CompatibilityChildSaveService {
                 .preferredTime(s.preferredTime())
                 .build());
 
-        AtomicInteger order = new AtomicInteger(0);
-        s.keywords().forEach(kw -> actionableKeywordRepository.save(ActionableKeyword.builder()
-                .actionableStrategy(strategy)
-                .keyword(kw)
-                .displayOrder(order.getAndIncrement())
-                .build()));
+        List<String> keywords = s.keywords();
+        actionableKeywordRepository.saveAll(
+                IntStream.range(0, keywords.size())
+                        .mapToObj(i -> ActionableKeyword.builder()
+                                .actionableStrategy(strategy)
+                                .keyword(keywords.get(i))
+                                .displayOrder(i)
+                                .build())
+                        .toList());
 
-        order.set(0);
-        s.luckyDays().forEach(day -> luckyDayRepository.save(LuckyDay.builder()
-                .actionableStrategy(strategy)
-                .luckyDay(day)
-                .displayOrder(order.getAndIncrement())
-                .build()));
+        List<String> luckyDays = s.luckyDays();
+        luckyDayRepository.saveAll(
+                IntStream.range(0, luckyDays.size())
+                        .mapToObj(i -> LuckyDay.builder()
+                                .actionableStrategy(strategy)
+                                .luckyDay(luckyDays.get(i))
+                                .displayOrder(i)
+                                .build())
+                        .toList());
     }
 
     private void saveInterviewQuestions(CompanyCompatibility saved,
                                         List<CompatibilityAnalysisData.InterviewQuestion> questions) {
-        questions.forEach(q -> expectedInterviewQuestionRepository.save(
-                ExpectedInterviewQuestion.builder()
-                        .companyCompatibility(saved)
-                        .question(q.question())
-                        .intent(q.intent())
-                        .build()));
+        expectedInterviewQuestionRepository.saveAll(
+                questions.stream()
+                        .map(q -> ExpectedInterviewQuestion.builder()
+                                .companyCompatibility(saved)
+                                .question(q.question())
+                                .intent(q.intent())
+                                .build())
+                        .toList());
     }
 
     private void saveRoleCompatibilities(CompanyCompatibility saved,
                                           List<CompatibilityAnalysisData.RoleCompatibility> roles) {
-        roles.forEach(r -> roleCompatibilityRepository.save(
-                RoleCompatibility.builder()
-                        .companyCompatibility(saved)
-                        .roleName(r.roleName())
-                        .score(r.score())
-                        .reason(r.reason())
-                        .tag(r.tag())
-                        .build()));
+        roleCompatibilityRepository.saveAll(
+                roles.stream()
+                        .map(r -> RoleCompatibility.builder()
+                                .companyCompatibility(saved)
+                                .roleName(r.roleName())
+                                .score(r.score())
+                                .reason(r.reason())
+                                .tag(r.tag())
+                                .build())
+                        .toList());
     }
 
     private void saveMonthlyForecasts(CompanyCompatibility saved,
                                        List<CompatibilityAnalysisData.MonthlyForecast> forecasts) {
-        forecasts.forEach(f -> monthlyForecastRepository.save(
-                MonthlyForecast.builder()
-                        .companyCompatibility(saved)
-                        .month(f.month())
-                        .score(f.score())
-                        .status(f.status())
-                        .advice(f.advice())
-                        .build()));
+        monthlyForecastRepository.saveAll(
+                forecasts.stream()
+                        .map(f -> MonthlyForecast.builder()
+                                .companyCompatibility(saved)
+                                .month(f.month())
+                                .score(f.score())
+                                .status(f.status())
+                                .advice(f.advice())
+                                .build())
+                        .toList());
     }
 
     private void saveCautions(CompanyCompatibility saved, List<String> cautions) {
-        cautions.forEach(c -> cautionRepository.save(
-                Caution.builder()
-                        .companyCompatibility(saved)
-                        .content(c)
-                        .build()));
+        cautionRepository.saveAll(
+                cautions.stream()
+                        .map(c -> Caution.builder()
+                                .companyCompatibility(saved)
+                                .content(c)
+                                .build())
+                        .toList());
     }
 }
