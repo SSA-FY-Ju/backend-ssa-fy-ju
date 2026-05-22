@@ -162,6 +162,7 @@ public class ConsultationService {
                 dayMaster, tenGodDistribution, sajuData.fiveElements(), favoredPeriod);
 
         return new ConsultationResponse(
+                sajuResult.getId(),
                 advice.industries(),
                 advice.interviewTips(),
                 advice.strengths(),

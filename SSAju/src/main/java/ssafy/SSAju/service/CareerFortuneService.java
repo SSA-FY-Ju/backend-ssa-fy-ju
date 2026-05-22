@@ -82,7 +82,7 @@ public class CareerFortuneService {
         }
 
         log.info("관운 분석 완료: favoredPeriod={}", favoredPeriod);
-        return new CareerTimingResponse(favoredPeriod, confidenceScore, reasoning);
+        return new CareerTimingResponse(newResult.getId(), favoredPeriod, confidenceScore, reasoning);
     }
 
 }

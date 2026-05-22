@@ -6,6 +6,7 @@ import ssafy.SSAju.career.util.JobCategoryEnum;
 import java.util.List;
 
 public record CompatibilityResponse(
+        Long compatibilityId,
         RequestContext requestContext,
         Integer compatibilityScore,
         String summary,
