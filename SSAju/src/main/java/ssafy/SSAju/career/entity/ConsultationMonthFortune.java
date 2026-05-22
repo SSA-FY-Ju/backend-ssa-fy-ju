@@ -20,10 +20,7 @@ public class ConsultationMonthFortune {
     @JoinColumn(name = "consultation_career_timeline_id", nullable = false)
     private ConsultationCareerTimeline consultationCareerTimeline;
 
-    /**
-     * months Map의 key (예: "2026-01")
-     */
-    @Column(name = "month_key", nullable = false, length = 7)
+    @Column(name = "month_key", nullable = false, length = 20)
     private String monthKey;
 
     @Column(name = "type")
