@@ -16,12 +16,9 @@ import ssafy.SSAju.entity.RefreshToken;
 import ssafy.SSAju.repository.RefreshTokenRepository;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
+import ssafy.SSAju.util.TokenHashUtil;
 
 /**
  * RefreshToken 헤더 검증 필터.
@@ -86,7 +83,7 @@ public class TokenValidationFilter extends OncePerRequestFilter {
             return;
         }
 
-        Optional<RefreshToken> tokenOpt = refreshTokenRepository.findByTokenHash(hashToken(tokenValue));
+        Optional<RefreshToken> tokenOpt = refreshTokenRepository.findByTokenHash(TokenHashUtil.sha256(tokenValue));
 
         if (tokenOpt.isEmpty() || tokenOpt.get().isRevoked() || tokenOpt.get().isExpired()) {
             log.warn("유효하지 않은 RefreshToken으로 갱신 시도");
@@ -95,16 +92,6 @@ public class TokenValidationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    private static String hashToken(String token) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 알고리즘을 사용할 수 없습니다.", e);
-        }
     }
 
     private void sendErrorResponse(HttpServletResponse response, String message) throws IOException {
