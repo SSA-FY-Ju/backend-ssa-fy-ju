@@ -22,7 +22,6 @@ import ssafy.SSAju.dto.response.SignupResponse;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.service.AuthService;
 import ssafy.SSAju.util.ClientIpUtil;
-import ssafy.SSAju.util.CookieUtil;
 
 /**
  * 인증 관련 REST 컨트롤러.
@@ -40,7 +39,6 @@ import ssafy.SSAju.util.CookieUtil;
 public class AuthController {
 
     private final AuthService authService;
-    private final CookieUtil cookieUtil;
 
     /**
      * 회원가입 요청을 처리합니다.
@@ -73,7 +71,7 @@ public class AuthController {
      *   <li>이메일로 사용자 조회</li>
      *   <li>비밀번호 일치 확인</li>
      *   <li>AccessToken (1시간) 및 RefreshToken (7일) 생성</li>
-     *   <li>RefreshToken을 HttpOnly 쿠키에 설정</li>
+     *   <li>AccessToken은 Authorization 헤더, RefreshToken은 Refresh-Token 헤더로 전달</li>
      *   <li>로그인 시도 이벤트 발행 (비동기)</li>
      * </ul>
      *
@@ -97,8 +95,8 @@ public class AuthController {
             HttpServletResponse httpResponse) {
         String clientIp = ClientIpUtil.getClientIp(httpRequest);
         AuthTokenPair tokenPair = authService.login(request, clientIp);
-        cookieUtil.setRefreshTokenCookie(httpResponse, tokenPair.refreshTokenValue());
         httpResponse.setHeader("Authorization", "Bearer " + tokenPair.accessToken());
+        httpResponse.setHeader("Refresh-Token", tokenPair.refreshTokenValue());
         return ResponseEntity.ok(ApiResponse.success(
                 new AuthTokenResponse(tokenPair.expiresIn())));
     }
@@ -109,9 +107,8 @@ public class AuthController {
      * <p><b>프로세스:</b>
      * <ul>
      *   <li>SecurityContext에서 현재 사용자 ID 추출</li>
-     *   <li>RefreshToken 쿠키에서 토큰값 추출</li>
+     *   <li>Refresh-Token 요청 헤더에서 토큰값 추출</li>
      *   <li>RefreshToken을 revoked 상태로 표시</li>
-     *   <li>RefreshToken 쿠키 제거</li>
      * </ul>
      *
      * @param request HTTP 요청 (RefreshToken 쿠키 추출용)
@@ -124,9 +121,8 @@ public class AuthController {
             HttpServletRequest request,
             HttpServletResponse response) {
         Long userId = getCurrentUserId();
-        String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
+        String refreshToken = request.getHeader("Refresh-Token");
         authService.logout(userId, refreshToken);
-        cookieUtil.clearRefreshTokenCookie(response);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -136,16 +132,17 @@ public class AuthController {
      * <p>{@link ssafy.SSAju.filter.TokenValidationFilter}에서 RefreshToken의 유효성을
      * 이미 검증한 후 이 엔드포인트에 도달합니다.
      *
-     * @param request HTTP 요청 (RefreshToken 쿠키 추출용)
+     * @param request HTTP 요청 (Refresh-Token 헤더 추출용)
      * @return 200 OK, 새 AccessToken 및 만료 시간
      * @throws ssafy.SSAju.exception.InvalidTokenException RefreshToken이 유효하지 않은 경우
      */
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthTokenResponse>> refresh(HttpServletRequest request,
                                                                    HttpServletResponse response) {
-        String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
+        String refreshToken = request.getHeader("Refresh-Token");
         AuthTokenPair tokenPair = authService.refreshAccessToken(refreshToken);
         response.setHeader("Authorization", "Bearer " + tokenPair.accessToken());
+        response.setHeader("Refresh-Token", tokenPair.refreshTokenValue());
         return ResponseEntity.ok(ApiResponse.success(new AuthTokenResponse(tokenPair.expiresIn())));
     }
 

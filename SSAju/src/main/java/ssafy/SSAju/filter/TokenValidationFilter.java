@@ -14,7 +14,6 @@ import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.ErrorInfo;
 import ssafy.SSAju.entity.RefreshToken;
 import ssafy.SSAju.repository.RefreshTokenRepository;
-import ssafy.SSAju.util.CookieUtil;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -25,9 +24,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * RefreshToken 쿠키 검증 필터.
+ * RefreshToken 헤더 검증 필터.
  *
- * {@code /api/auth/refresh} 엔드포인트 요청에 대해 RefreshToken 유효성을 검증합니다.
+ * {@code /api/auth/refresh} 엔드포인트 요청에 대해 Refresh-Token 헤더로부터 RefreshToken 유효성을 검증합니다.
  * 토큰이 없거나, revoked, 또는 expired 상태면 401 Unauthorized JSON 응답을 반환합니다.
  *
  * <p><b>필터 체인 위치:</b>
@@ -58,11 +57,11 @@ public class TokenValidationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * RefreshToken 쿠키를 검증하고 필터 체인을 진행합니다.
+     * RefreshToken 헤더를 검증하고 필터 체인을 진행합니다.
      *
      * <p><b>검증 로직:</b>
      * <ol>
-     *   <li>쿠키에서 RefreshToken 추출</li>
+     *   <li>Refresh-Token 요청 헤더에서 RefreshToken 추출</li>
      *   <li>토큰 존재 여부 확인</li>
      *   <li>데이터베이스에서 토큰 조회</li>
      *   <li>revoked 상태 확인</li>
@@ -80,7 +79,7 @@ public class TokenValidationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String tokenValue = CookieUtil.getRefreshTokenFromCookie(request);
+        String tokenValue = request.getHeader("Refresh-Token");
 
         if (tokenValue == null) {
             sendErrorResponse(response, "리프레시 토큰이 없습니다.");
