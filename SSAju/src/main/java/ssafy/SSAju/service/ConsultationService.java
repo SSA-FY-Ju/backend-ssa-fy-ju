@@ -10,15 +10,12 @@ import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
-import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.enums.TenGodConstants;
 import ssafy.SSAju.career.mapper.ConsultationMapper;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
+import ssafy.SSAju.career.provider.SajuAnalysisFacade;
 import ssafy.SSAju.career.provider.SajuResultProvider;
 import ssafy.SSAju.career.provider.UserProfileProvider;
-import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
-import ssafy.SSAju.career.util.HiddenStemCalculator;
-import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
@@ -35,6 +32,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.time.YearMonth;
+import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.domain.TenGodDistribution;
 
 @Slf4j
 @Service
@@ -43,9 +42,7 @@ public class ConsultationService {
 
     private final ConsultationOpenAICaller openAICaller;
     private final SajuDataService sajuDataService;
-    private final TenGodCalculator tenGodCalculator;
-    private final HiddenStemCalculator hiddenStemCalculator;
-    private final CareerFortuneAnalyzer careerFortuneAnalyzer;
+    private final SajuAnalysisFacade sajuAnalysisFacade;
     private final UserProfileProvider userProfileProvider;
     private final SajuResultProvider sajuResultProvider;
     private final SajuResultMapper sajuResultMapper;
@@ -79,17 +76,13 @@ public class ConsultationService {
                 request.birthDate(), request.birthTime());
         sajuValidator.validateWithFiveElements(sajuData);
 
-        List<String> heavenlyStems = sajuData.heavenlyStems();
-        List<String> earthlyBranches = sajuData.earthlyBranches();
-        TenGodDistribution tenGodDistribution = tenGodCalculator.calculate(heavenlyStems);
-        HiddenStems hiddenStems = hiddenStemCalculator.calculate(earthlyBranches);
-
-        String dayMaster = heavenlyStems.get(SajuPillarIndex.DAY_INDEX);
-        String favoredPeriod = careerFortuneAnalyzer.analyzeFavoredPeriod(
-                tenGodDistribution, hiddenStems, dayMaster, earthlyBranches);
-        int confidenceScore = careerFortuneAnalyzer.calculateConfidenceScore(
-                tenGodDistribution, hiddenStems, dayMaster);
-        String reasoning = careerFortuneAnalyzer.buildReasoning(favoredPeriod, tenGodDistribution);
+        SajuAnalysisFacade.SajuAnalysisContext ctx = sajuAnalysisFacade.analyze(sajuData);
+        TenGodDistribution tenGodDistribution = ctx.tenGodDistribution();
+        HiddenStems hiddenStems = ctx.hiddenStems();
+        String dayMaster = ctx.dayMaster();
+        String favoredPeriod = ctx.favoredPeriod();
+        int confidenceScore = ctx.confidenceScore();
+        String reasoning = ctx.reasoning();
 
         // ─── 2. UserProfile / SajuResult 조회·생성 ───────────────────────────────
         UserProfile userProfile = userProfileProvider.findOrCreate(
