@@ -36,9 +36,18 @@ public class CareerConsultation {
     @Column(name = "consultation_month", nullable = false, length = 7)
     private String consultationMonth;
 
+    // OpenAI 응답 중 단순 String 필드
+    @Column(name = "day_master_description", columnDefinition = "text")
+    private String dayMasterDescription;
+
+    @Column(name = "five_elements_analysis", columnDefinition = "text")
+    private String fiveElementsAnalysis;
+
     @CreatedDate
     @Column(name = "generated_at", nullable = false, updatable = false)
     private LocalDateTime generatedAt;
+
+    // ─── 기존 OneToMany ─────────────────────────────────────────────────────────
 
     @OneToMany(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("createdAt ASC")
@@ -52,24 +61,70 @@ public class CareerConsultation {
     @OrderBy("createdAt ASC")
     private List<Strength> strengths = new ArrayList<>();
 
+    // ─── 신규 OneToMany ─────────────────────────────────────────────────────────
+
+    @OneToMany(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ConsultationCaution> cautions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ConsultationKeyTenGod> keyTenGods = new ArrayList<>();
+
+    // ─── 신규 OneToOne ──────────────────────────────────────────────────────────
+
+    @OneToOne(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private ConsultationWealthStyle wealthStyle;
+
+    @OneToOne(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private ConsultationRoadmap roadmap;
+
+    @OneToOne(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private ConsultationPersonalBranding personalBranding;
+
+    @OneToOne(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private ConsultationPowerKeywords powerKeywords;
+
+    @OneToOne(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private ConsultationMentalCare mentalCare;
+
+    @OneToOne(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private ConsultationEnvironmentFit environmentFit;
+
+    @OneToOne(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private ConsultationWorkStyle workStyle;
+
+    @OneToOne(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private ConsultationRelationshipStrategy relationshipStrategy;
+
+    @OneToOne(mappedBy = "careerConsultation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private ConsultationCareerTimeline careerTimeline;
+
     @Builder
-    public CareerConsultation(SajuResult sajuResult, String openaiModelVersion, String consultationMonth) {
+    public CareerConsultation(SajuResult sajuResult, String openaiModelVersion,
+                               String consultationMonth, String dayMasterDescription,
+                               String fiveElementsAnalysis) {
         this.sajuResult = sajuResult;
         this.openaiModelVersion = openaiModelVersion;
         this.consultationMonth = consultationMonth;
+        this.dayMasterDescription = dayMasterDescription;
+        this.fiveElementsAnalysis = fiveElementsAnalysis;
     }
 
-    public void assignIndustries(List<Industry> list) {
-        this.industries = list;
-    }
+    // ─── assign methods ─────────────────────────────────────────────────────────
 
-    public void assignInterviewTips(List<InterviewTip> list) {
-        this.interviewTips = list;
-    }
-
-    public void assignStrengths(List<Strength> list) {
-        this.strengths = list;
-    }
+    public void assignIndustries(List<Industry> list) { this.industries = list; }
+    public void assignInterviewTips(List<InterviewTip> list) { this.interviewTips = list; }
+    public void assignStrengths(List<Strength> list) { this.strengths = list; }
+    public void assignCautions(List<ConsultationCaution> list) { this.cautions = list; }
+    public void assignKeyTenGods(List<ConsultationKeyTenGod> list) { this.keyTenGods = list; }
+    public void assignWealthStyle(ConsultationWealthStyle ws) { this.wealthStyle = ws; }
+    public void assignRoadmap(ConsultationRoadmap rm) { this.roadmap = rm; }
+    public void assignPersonalBranding(ConsultationPersonalBranding pb) { this.personalBranding = pb; }
+    public void assignPowerKeywords(ConsultationPowerKeywords pk) { this.powerKeywords = pk; }
+    public void assignMentalCare(ConsultationMentalCare mc) { this.mentalCare = mc; }
+    public void assignEnvironmentFit(ConsultationEnvironmentFit ef) { this.environmentFit = ef; }
+    public void assignWorkStyle(ConsultationWorkStyle ws) { this.workStyle = ws; }
+    public void assignRelationshipStrategy(ConsultationRelationshipStrategy rs) { this.relationshipStrategy = rs; }
+    public void assignCareerTimeline(ConsultationCareerTimeline ct) { this.careerTimeline = ct; }
 
     @Override
     public boolean equals(Object o) {

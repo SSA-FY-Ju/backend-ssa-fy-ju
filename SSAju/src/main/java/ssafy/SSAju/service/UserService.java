@@ -24,12 +24,9 @@ import ssafy.SSAju.repository.AnalysisHistoryRepository;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
-import ssafy.SSAju.repository.UserProfileRepository;
 import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.repository.UserSatisfactionFeedbackRepository;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
 @Slf4j
@@ -42,7 +39,6 @@ public class UserService {
     private final SajuResultRepository sajuResultRepository;
     private final CareerFortuneRepository careerFortuneRepository;
     private final CompanyCompatibilityRepository companyCompatibilityRepository;
-    private final UserProfileRepository userProfileRepository;
     private final UserSatisfactionFeedbackRepository feedbackRepository;
     private final CareerFortuneService careerFortuneService;
     private final CompanyMatchingService companyMatchingService;
@@ -101,39 +97,6 @@ public class UserService {
         };
     }
 
-    // TODO(리팩토링): UserService 분리 시 제거 예정 - user_id가 생성 시점에 설정되므로 이 메서드는 불필요
-    @Transactional
-    public void associateSajuResultWithUser(Long userId, LocalDate birthDate, LocalTime birthTime) {
-        userProfileRepository.findByBirthDateAndBirthTime(birthDate, birthTime)
-                .flatMap(sajuResultRepository::findByUserProfile)
-                .ifPresent(sr -> {
-                    if (sr.getUser() == null) {
-                        userRepository.findById(userId).ifPresent(user -> {
-                            sr.assignUser(user);
-                            sajuResultRepository.save(sr);
-                        });
-                    }
-                });
-    }
-
-    // TODO(리팩토링): UserService 분리 시 제거 예정 - user_id가 생성 시점에 설정되므로 이 메서드는 불필요
-    @Transactional
-    public void associateCompatibilityWithUser(Long userId, LocalDate birthDate, LocalTime birthTime,
-                                               String companyName, JobCategoryEnum targetRoleCategory) {
-        userProfileRepository.findByBirthDateAndBirthTime(birthDate, birthTime)
-                .ifPresent(profile ->
-                        companyCompatibilityRepository.findByUserProfile_IdAndCompanyNameAndTargetRoleCategory(
-                                        profile.getId(), companyName, targetRoleCategory)
-                                .ifPresent(cc -> {
-                                    if (cc.getUser() == null) {
-                                        userRepository.findById(userId).ifPresent(user -> {
-                                            cc.assignUser(user);
-                                            companyCompatibilityRepository.save(cc);
-                                        });
-                                    }
-                                }));
-    }
-
     // ─────────────────────────────────────────
     // private: detail builders
     // ─────────────────────────────────────────
@@ -144,7 +107,7 @@ public class UserService {
 
         UserProfile profile = sajuResult.getUserProfile();
         UserSatisfactionFeedback feedback =
-                feedbackRepository.findBySajuResult_IdAndUser(analysisId, user).orElse(null);
+                feedbackRepository.findBySajuResult_IdAndUser_Id(analysisId, user.getId()).orElse(null);
 
         CareerFortune cf = sajuResult.getCareerFortune();
         AnalysisDetailResponse.CareerFortuneDetail cfDetail = cf == null ? null :

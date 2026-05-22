@@ -61,6 +61,7 @@ class ConsultationServiceTest {
     @Mock private SajuResultMapper sajuResultMapper;
     @Mock private ConsultationMapper consultationMapper;
     @Mock private CareerConsultationRepository careerConsultationRepository;
+    @Mock private ConsultationSaveService consultationSaveService;
     @Mock private UserRepository userRepository;
 
     private ConsultationService service;
@@ -139,7 +140,7 @@ class ConsultationServiceTest {
         service = new ConsultationService(
                 openAICaller, sajuDataService, tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer,
                 userProfileProvider, sajuResultProvider, sajuResultMapper, consultationMapper,
-                careerConsultationRepository, new SajuValidator(), userRepository);
+                careerConsultationRepository, consultationSaveService, new SajuValidator(), userRepository);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
         try {
             var field = ConsultationService.class.getDeclaredField("modelVersion");
@@ -171,9 +172,9 @@ class ConsultationServiceTest {
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(userProfile, sajuResult)).willReturn(sajuResult);
+        given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
+                .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
-        given(consultationMapper.buildConsultation(any(), any(), any(), any())).willReturn(consultation);
-        given(careerConsultationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
         given(consultationMapper.buildAnalysisSummary(any(), any(), any(), any()))
                 .willReturn("己 일간 · 오행 火·金 강세 · 정관·편관 기운 기반 | 2026년 12개월 타임라인 + 관운 분석 (H1)");
 
@@ -211,7 +212,7 @@ class ConsultationServiceTest {
         assertThat(result.analysisSummary()).contains("己");
         assertThat(result.analysisSummary()).contains("H1");
 
-        verify(careerConsultationRepository).save(any());
+        verify(consultationSaveService).save(any(), any(), any(), any());
         verify(sajuResultProvider).findOrCreate(userProfile, sajuResult);
     }
 
@@ -236,9 +237,9 @@ class ConsultationServiceTest {
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(newSajuResult);
         given(sajuResultProvider.findOrCreate(userProfile, newSajuResult)).willReturn(newSajuResult);
+        given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
+                .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
-        given(consultationMapper.buildConsultation(any(), any(), any(), any())).willReturn(consultation);
-        given(careerConsultationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
         given(consultationMapper.buildAnalysisSummary(any(), any(), any(), any()))
                 .willReturn("己 일간 · 오행 火·金 강세 | H2");
 
@@ -247,7 +248,7 @@ class ConsultationServiceTest {
         assertThat(result.openaiModelVersion()).isEqualTo("gpt-4o-mini");
         assertThat(result.sajuProfile()).isNotNull();
         verify(sajuResultProvider).findOrCreate(userProfile, newSajuResult);
-        verify(careerConsultationRepository).save(any());
+        verify(consultationSaveService).save(any(), any(), any(), any());
     }
 
     // ─────────────────────────────────────────
