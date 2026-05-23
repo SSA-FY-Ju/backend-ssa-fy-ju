@@ -103,6 +103,7 @@ public class ConsultationMapper {
                                             int confidenceScore,
                                             String reasoning,
                                             SajuResult sajuResult,
+                                            Long consultationId,
                                             CareerAdviceResponse advice,
                                             String modelVersion) {
         Map<String, String> tenGodCharacteristics = buildTenGodCharacteristics(tenGodDistribution);
@@ -120,6 +121,7 @@ public class ConsultationMapper {
 
         return new ConsultationResponse(
                 sajuResult.getId(),
+                consultationId,
                 advice.industries(),
                 advice.interviewTips(),
                 advice.strengths(),
@@ -265,7 +267,7 @@ public class ConsultationMapper {
                 ? Collections.emptyMap()
                 : ct.getMonthFortunes().stream()
                         .collect(Collectors.toMap(
-                                ConsultationMonthFortune::getMonthKey,
+                                mf -> String.valueOf(mf.getMonthKey()),
                                 mf -> new CareerAdviceResponse.MonthFortune(mf.getType(), mf.getDescription()),
                                 (a, b) -> a
                         ));
@@ -480,7 +482,7 @@ public class ConsultationMapper {
         entity.assignMonthFortunes(ct.validMonths().entrySet().stream()
                 .map(e -> ConsultationMonthFortune.builder()
                         .consultationCareerTimeline(entity)
-                        .monthKey(e.getKey())
+                        .monthKey(Integer.parseInt(e.getKey()))
                         .type(e.getValue().type())
                         .description(e.getValue().description())
                         .build())

@@ -48,7 +48,7 @@ public class LoginAttemptEventListener {
      * @param event 로그인 시도 이벤트
      */
     @EventListener
-    @Async("loginAuditExecutor")
+    @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onLoginAttempt(LoginAttemptEvent event) {
         try {
