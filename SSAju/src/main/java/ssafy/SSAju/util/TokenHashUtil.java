@@ -1,5 +1,7 @@
 package ssafy.SSAju.util;
 
+import ssafy.SSAju.exception.TokenHashException;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -14,7 +16,7 @@ public final class TokenHashUtil {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 알고리즘을 사용할 수 없습니다.", e);
+            throw new TokenHashException(TokenHashException.ErrorCode.ALGORITHM_NOT_AVAILABLE, e);
         }
     }
 }

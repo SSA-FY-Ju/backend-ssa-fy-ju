@@ -14,6 +14,7 @@ import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.ErrorInfo;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.exception.ConsentRequiredException;
+import ssafy.SSAju.exception.FeedbackNotAllowedException;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.DailyLimitExceededException;
@@ -170,6 +171,15 @@ public class SajuGlobalExceptionHandler {
                         ErrorMessageConstants.DAILY_LIMIT_EXCEEDED.getMessage(), generateRequestId())));
     }
 
+    @ExceptionHandler(FeedbackNotAllowedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFeedbackNotAllowed(
+            FeedbackNotAllowedException e, HttpServletRequest request) {
+        log.warn("피드백 불가 요청: {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        "FEEDBACK_NOT_ALLOWED", e.getMessage(), generateRequestId())));
+    }
+
     @ExceptionHandler(SajuResultNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleSajuResultNotFound(
             SajuResultNotFoundException e, HttpServletRequest request) {
@@ -205,14 +215,16 @@ public class SajuGlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleOpenAIApiException(
             OpenAIApiException e, HttpServletRequest request) {
         log.error("OpenAI API error: statusCode={}, message={}", e.getStatusCode(), e.getMessage());
-        if (e.getStatusCode() == 401) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        if (e.getStatusCode() == 401 || e.getStatusCode() == 403) {
+            // 서버의 API Key 설정 문제 → 클라이언트에 인증 오류를 노출하지 않음
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.failure(new ErrorInfo(
                             ErrorMessageConstants.OPENAI_UNAUTHORIZED.getCode(),
-                            ErrorMessageConstants.OPENAI_UNAUTHORIZED.getMessage(), generateRequestId())));
+                            "서버 설정 오류로 요청을 처리할 수 없습니다.", generateRequestId())));
         }
         if (e.getStatusCode() == 429) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            // OpenAI rate limit → 일시적 서비스 불가 (클라이언트 잘못 아님)
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(ApiResponse.failure(new ErrorInfo(
                             ErrorMessageConstants.OPENAI_RATE_LIMIT.getCode(),
                             ErrorMessageConstants.OPENAI_RATE_LIMIT.getMessage(), generateRequestId())));
