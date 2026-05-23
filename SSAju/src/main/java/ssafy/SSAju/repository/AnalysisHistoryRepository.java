@@ -31,14 +31,14 @@ public class AnalysisHistoryRepository {
 
             UNION ALL
 
-            SELECT 'CAREER_FORTUNE' AS type, cf.id AS analysis_id, u.name AS target_name,
-                   up.birth_date, cf.created_at
-            FROM career_fortune cf
-            JOIN saju_result sr ON cf.saju_result_id = sr.id
+            SELECT 'CAREER_CONSULTATION' AS type, cc.id AS analysis_id, u.name AS target_name,
+                   up.birth_date, cc.generated_at AS created_at
+            FROM career_consultation cc
+            JOIN saju_result sr ON cc.saju_result_id = sr.id
             JOIN user_profile up ON sr.user_profile_id = up.id
             JOIN users u ON sr.user_id = u.id
             WHERE sr.user_id = ?
-              AND cf.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+              AND cc.generated_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
 
             UNION ALL
 
@@ -58,16 +58,16 @@ public class AnalysisHistoryRepository {
 
                 UNION ALL
 
-                SELECT cf.id FROM career_fortune cf
-                JOIN saju_result sr ON cf.saju_result_id = sr.id
+                SELECT cc.id FROM career_consultation cc
+                JOIN saju_result sr ON cc.saju_result_id = sr.id
                 WHERE sr.user_id = ?
-                  AND cf.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+                  AND cc.generated_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
 
                 UNION ALL
 
-                SELECT cc.id FROM company_compatibility cc
-                WHERE cc.user_id = ?
-                  AND cc.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+                SELECT compat.id FROM company_compatibility compat
+                WHERE compat.user_id = ?
+                  AND compat.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
             ) total
             """;
 
@@ -79,16 +79,16 @@ public class AnalysisHistoryRepository {
 
                 UNION ALL
 
-                SELECT cf.id, 'CAREER_FORTUNE' FROM career_fortune cf
-                JOIN saju_result sr ON cf.saju_result_id = sr.id
+                SELECT cc.id, 'CAREER_CONSULTATION' AS type FROM career_consultation cc
+                JOIN saju_result sr ON cc.saju_result_id = sr.id
                 WHERE sr.user_id = ?
-                  AND cf.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+                  AND cc.generated_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
 
                 UNION ALL
 
-                SELECT cc.id, 'COMPANY_COMPATIBILITY' FROM company_compatibility cc
-                WHERE cc.user_id = ?
-                  AND cc.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+                SELECT compat.id, 'COMPANY_COMPATIBILITY' AS type FROM company_compatibility compat
+                WHERE compat.user_id = ?
+                  AND compat.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
             ) filtered WHERE filtered.type = ?
             """;
 
