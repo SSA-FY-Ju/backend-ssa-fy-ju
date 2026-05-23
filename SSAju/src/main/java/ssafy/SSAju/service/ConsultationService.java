@@ -98,7 +98,8 @@ public class ConsultationService {
                         sajuResult.getId(), consultationMonth);
                 CareerAdviceResponse cachedAdvice = consultationMapper.restoreAdvice(cachedData);
                 return consultationMapper.toResponse(sajuData, tenGodDistribution, dayMaster,
-                        favoredPeriod, confidenceScore, reasoning, sajuResult, cachedAdvice, modelVersion);
+                        favoredPeriod, confidenceScore, reasoning, sajuResult,
+                        cachedData.getId(), cachedAdvice, modelVersion);
             }
             log.info("캐시 모델 버전 불일치(캐시={}, 현재={}) — 재분석: sajuResultId={}",
                     cachedData.getOpenaiModelVersion(), modelVersion, sajuResult.getId());
@@ -109,10 +110,10 @@ public class ConsultationService {
                 sajuData, tenGodDistribution, hiddenStems, dayMaster);
 
         // ─── 5. 저장 (C-7: @Transactional 보장) ─────────────────────────────────
-        consultationSaveService.saveOrUpdate(sajuResult, advice, modelVersion, consultationMonth);
+        Long consultationId = consultationSaveService.saveOrUpdate(sajuResult, advice, modelVersion, consultationMonth);
 
         log.info("커리어 컨설팅 완료: sajuResultId={}, favoredPeriod={}", sajuResult.getId(), favoredPeriod);
         return consultationMapper.toResponse(sajuData, tenGodDistribution, dayMaster,
-                favoredPeriod, confidenceScore, reasoning, sajuResult, advice, modelVersion);
+                favoredPeriod, confidenceScore, reasoning, sajuResult, consultationId, advice, modelVersion);
     }
 }

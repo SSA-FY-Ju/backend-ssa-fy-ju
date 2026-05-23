@@ -14,8 +14,7 @@ public class APIUsageInterceptor implements HandlerInterceptor {
     private static final List<String> LIMITED_API_PATHS = List.of(
             "/api/career/consultation",
             "/api/career/timing",
-            "/api/career/compatibility",
-            "/api/mypage/reanalyze"
+            "/api/career/compatibility"
     );
 
     private final DailyApiUsageService dailyApiUsageService;
