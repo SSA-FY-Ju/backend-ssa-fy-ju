@@ -188,8 +188,8 @@ class CareerApiControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sajuResultId": 1,
-                                  "feedbackType": "CAREER_TIMING",
+                                  "analysisId": 1,
+                                  "feedbackType": "CONSULTATION",
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "좋은 상담이었습니다"
                                 }
@@ -202,14 +202,14 @@ class CareerApiControllerTest {
     }
 
     @Test
-    @DisplayName("T089-3a: POST /api/feedback/satisfaction - sajuResultId 누락 → 400 Bad Request")
-    void us4_feedback_missingSajuResultId_returns400() throws Exception {
+    @DisplayName("T089-3a: POST /api/feedback/satisfaction - analysisId 누락 → 400 Bad Request")
+    void us4_feedback_missingAnalysisId_returns400() throws Exception {
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "feedbackType": "CAREER_TIMING",
+                                  "feedbackType": "CONSULTATION",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))
@@ -356,6 +356,7 @@ class CareerApiControllerTest {
 
     private ConsultationResponse buildMockConsultationResponse() {
         return new ConsultationResponse(
+                null,
                 null,
                 List.of(new CareerAdviceResponse.IndustryRecommendation(
                         "금융/핀테크", "오행 金 강세", List.of("백엔드 개발자"))),

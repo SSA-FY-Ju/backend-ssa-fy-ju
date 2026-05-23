@@ -22,6 +22,7 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
+import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
@@ -45,6 +46,7 @@ class CareerFortuneServiceTest {
     @Mock private SajuDataService sajuDataService;
     @Mock private UserProfileProvider userProfileProvider;
     @Mock private SajuResultWriteService sajuResultWriteService;
+    @Mock private SajuResultRepository sajuResultRepository;
     @Mock private SajuResultMapper sajuResultMapper;
     @Mock private UserRepository userRepository;
 
@@ -82,7 +84,7 @@ class CareerFortuneServiceTest {
     @BeforeEach
     void setUp() {
         service = new CareerFortuneService(
-                sajuDataService, userProfileProvider, sajuResultWriteService,
+                sajuDataService, userProfileProvider, sajuResultWriteService, sajuResultRepository,
                 sajuAnalysisFacade, sajuResultMapper, sajuValidator, userRepository);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
     }
@@ -102,6 +104,8 @@ class CareerFortuneServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(VALID_FASTAPI_RESPONSE);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(expectedResult);
+        given(sajuResultWriteService.replaceForUserProfile(savedProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When
@@ -127,6 +131,8 @@ class CareerFortuneServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(VALID_FASTAPI_RESPONSE);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(expectedResult);
+        given(sajuResultWriteService.replaceForUserProfile(existingProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When
@@ -157,6 +163,8 @@ class CareerFortuneServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(h1Response);
         var expectedResult = SajuResult.builder().userProfile(savedProfile).user(MOCK_USER).build();
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(expectedResult);
+        given(sajuResultWriteService.replaceForUserProfile(savedProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When
