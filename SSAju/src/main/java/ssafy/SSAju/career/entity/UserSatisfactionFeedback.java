@@ -12,6 +12,7 @@ import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.entity.User;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -61,6 +62,10 @@ public class UserSatisfactionFeedback {
                                     FeedbackType feedbackType,
                                     SatisfactionStatus satisfactionStatus,
                                     String feedbackContent) {
+        if ((companyCompatibility == null) == (careerConsultation == null)) {
+            throw new IllegalArgumentException(
+                    "피드백 대상은 회사 궁합 또는 커리어 컨설팅 중 정확히 하나만 지정해야 합니다.");
+        }
         this.user = user;
         this.companyCompatibility = companyCompatibility;
         this.careerConsultation = careerConsultation;

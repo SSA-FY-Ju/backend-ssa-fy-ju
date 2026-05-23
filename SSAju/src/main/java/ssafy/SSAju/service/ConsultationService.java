@@ -26,6 +26,7 @@ import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.time.YearMonth;
 import java.time.LocalDate;
@@ -95,7 +96,7 @@ public class ConsultationService {
 
         if (cached.isPresent()) {
             CareerConsultation cachedData = cached.get();
-            if (cachedData.getOpenaiModelVersion().equals(modelVersion)) {
+            if (Objects.equals(cachedData.getOpenaiModelVersion(), modelVersion)) {
                 log.info("이번 달 컨설팅 캐시 히트 — OpenAI 호출 생략: sajuResultId={}, month={}",
                         sajuResult.getId(), consultationMonth);
                 CareerAdviceResponse cachedAdvice = consultationMapper.restoreAdvice(cachedData);
