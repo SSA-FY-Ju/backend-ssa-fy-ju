@@ -19,8 +19,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
     name = "user_satisfaction_feedback",
-    indexes = @Index(name = "idx_feedback_saju_result_created", columnList = "saju_result_id, created_at"),
-    uniqueConstraints = @UniqueConstraint(name = "uk_feedback_saju_user", columnNames = {"saju_result_id", "user_id"})
+    indexes = @Index(name = "idx_feedback_created", columnList = "created_at")
 )
 public class UserSatisfactionFeedback {
 
@@ -33,8 +32,12 @@ public class UserSatisfactionFeedback {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "saju_result_id", nullable = false)
-    private SajuResult sajuResult;
+    @JoinColumn(name = "company_compatibility_id")
+    private CompanyCompatibility companyCompatibility;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "career_consultation_id")
+    private CareerConsultation careerConsultation;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "feedback_type", nullable = false)
@@ -52,10 +55,15 @@ public class UserSatisfactionFeedback {
     private LocalDateTime createdAt;
 
     @Builder
-    public UserSatisfactionFeedback(User user, SajuResult sajuResult, FeedbackType feedbackType,
-                                    SatisfactionStatus satisfactionStatus, String feedbackContent) {
+    public UserSatisfactionFeedback(User user,
+                                    CompanyCompatibility companyCompatibility,
+                                    CareerConsultation careerConsultation,
+                                    FeedbackType feedbackType,
+                                    SatisfactionStatus satisfactionStatus,
+                                    String feedbackContent) {
         this.user = user;
-        this.sajuResult = sajuResult;
+        this.companyCompatibility = companyCompatibility;
+        this.careerConsultation = careerConsultation;
         this.feedbackType = feedbackType;
         this.satisfactionStatus = satisfactionStatus;
         this.feedbackContent = feedbackContent;
