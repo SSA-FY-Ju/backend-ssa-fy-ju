@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ssafy.SSAju.career.entity.CareerConsultation;
+import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
@@ -13,11 +15,19 @@ import ssafy.SSAju.career.enums.FeedbackType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.dto.request.SatisfactionFeedbackRequest;
 import ssafy.SSAju.dto.response.SatisfactionFeedbackResponse;
+import ssafy.SSAju.entity.User;
+import ssafy.SSAju.entity.enums.UserRole;
+import ssafy.SSAju.entity.enums.UserStatus;
+import ssafy.SSAju.exception.FeedbackNotAllowedException;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
-import ssafy.SSAju.repository.SajuResultRepository;
+import ssafy.SSAju.exception.UserNotFoundException;
+import ssafy.SSAju.repository.CareerConsultationRepository;
+import ssafy.SSAju.repository.CompanyCompatibilityRepository;
+import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.repository.UserSatisfactionFeedbackRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Optional;
 
@@ -25,92 +35,135 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FeedbackService 단위 테스트")
 class FeedbackServiceTest {
 
-    @Mock private SajuResultRepository sajuResultRepository;
+    @Mock private CompanyCompatibilityRepository compatibilityRepository;
+    @Mock private CareerConsultationRepository consultationRepository;
     @Mock private UserSatisfactionFeedbackRepository feedbackRepository;
+    @Mock private UserRepository userRepository;
 
     private FeedbackService service;
 
-    private static final UserProfile PROFILE = UserProfile.builder()
-            .birthDate(LocalDate.of(1990, 10, 10))
-            .birthTime(LocalTime.of(14, 30))
-            .build();
-
-    private static final SajuResult SAJU_RESULT = SajuResult.builder()
-            .userProfile(PROFILE)
+    private static final Long USER_ID = 1L;
+    private static final User MOCK_USER = User.builder()
+            .email("test@test.com")
+            .passwordHash("hash")
+            .name("테스트")
+            .role(UserRole.USER)
+            .status(UserStatus.ACTIVE)
+            .termsAgreedAt(LocalDateTime.now())
+            .privacyAgreedAt(LocalDateTime.now())
             .build();
 
     @BeforeEach
     void setUp() {
-        service = new FeedbackService(sajuResultRepository, feedbackRepository);
+        service = new FeedbackService(compatibilityRepository, consultationRepository,
+                feedbackRepository, userRepository);
     }
 
     @Test
-    @DisplayName("유효한 피드백 요청 → 피드백 저장 후 응답 반환")
-    void shouldSaveFeedback_WhenValidRequest() {
-        // Given
+    @DisplayName("COMPATIBILITY 피드백 → 저장 후 응답 반환")
+    void shouldSaveFeedback_WhenCompatibilityType() {
         var request = new SatisfactionFeedbackRequest(
-                1L, FeedbackType.CAREER_TIMING, SatisfactionStatus.SATISFIED, "좋았습니다");
+                1L, FeedbackType.COMPATIBILITY, SatisfactionStatus.SATISFIED, "좋았습니다");
+
+        CompanyCompatibility compatibility = CompanyCompatibility.builder()
+                .userProfile(UserProfile.builder()
+                        .birthDate(LocalDate.of(1990, 10, 10))
+                        .birthTime(LocalTime.of(14, 30))
+                        .build())
+                .user(MOCK_USER)
+                .companyName("테스트 기업")
+                .build();
 
         var savedFeedback = UserSatisfactionFeedback.builder()
-                .sajuResult(SAJU_RESULT)
-                .feedbackType(FeedbackType.CAREER_TIMING)
+                .user(MOCK_USER)
+                .companyCompatibility(compatibility)
+                .feedbackType(FeedbackType.COMPATIBILITY)
                 .satisfactionStatus(SatisfactionStatus.SATISFIED)
                 .feedbackContent("좋았습니다")
                 .build();
 
-        given(sajuResultRepository.findByIdAndUser_Id(1L, 1L)).willReturn(Optional.of(SAJU_RESULT));
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
+        given(compatibilityRepository.findByIdAndUser(1L, MOCK_USER)).willReturn(Optional.of(compatibility));
         given(feedbackRepository.save(any(UserSatisfactionFeedback.class))).willReturn(savedFeedback);
 
-        // When
-        SatisfactionFeedbackResponse response = service.saveFeedback(request, 1L);
+        SatisfactionFeedbackResponse response = service.saveFeedback(request, USER_ID);
 
-        // Then
         assertThat(response.feedbackContent()).isEqualTo("좋았습니다");
         verify(feedbackRepository).save(any(UserSatisfactionFeedback.class));
     }
 
     @Test
-    @DisplayName("feedbackContent 없이 피드백 저장 → null로 정상 저장")
-    void shouldSaveFeedback_WhenFeedbackContentIsNull() {
-        // Given
+    @DisplayName("CONSULTATION 피드백 → 저장 후 응답 반환")
+    void shouldSaveFeedback_WhenConsultationType() {
         var request = new SatisfactionFeedbackRequest(
                 1L, FeedbackType.CONSULTATION, SatisfactionStatus.DISSATISFIED, null);
 
+        User mockUserWithId = mock(User.class);
+        given(mockUserWithId.getId()).willReturn(USER_ID);
+        SajuResult mockSajuResult = mock(SajuResult.class);
+        given(mockSajuResult.getUser()).willReturn(mockUserWithId);
+        CareerConsultation consultation = mock(CareerConsultation.class);
+        given(consultation.getSajuResult()).willReturn(mockSajuResult);
+
         var savedFeedback = UserSatisfactionFeedback.builder()
-                .sajuResult(SAJU_RESULT)
+                .user(MOCK_USER)
+                .careerConsultation(consultation)
                 .feedbackType(FeedbackType.CONSULTATION)
                 .satisfactionStatus(SatisfactionStatus.DISSATISFIED)
                 .feedbackContent(null)
                 .build();
 
-        given(sajuResultRepository.findByIdAndUser_Id(1L, 1L)).willReturn(Optional.of(SAJU_RESULT));
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
+        given(consultationRepository.findById(1L)).willReturn(Optional.of(consultation));
         given(feedbackRepository.save(any(UserSatisfactionFeedback.class))).willReturn(savedFeedback);
 
-        // When
-        SatisfactionFeedbackResponse response = service.saveFeedback(request, 1L);
+        SatisfactionFeedbackResponse response = service.saveFeedback(request, USER_ID);
 
-        // Then
         assertThat(response.feedbackContent()).isNull();
         verify(feedbackRepository).save(any(UserSatisfactionFeedback.class));
     }
 
     @Test
-    @DisplayName("존재하지 않는 sajuResultId → SajuResultNotFoundException 발생")
-    void shouldThrowSajuResultNotFoundException_WhenSajuResultNotFound() {
-        // Given
+    @DisplayName("CAREER_TIMING 피드백 요청 → FeedbackNotAllowedException 발생")
+    void shouldThrowFeedbackNotAllowedException_WhenCareerTimingType() {
         var request = new SatisfactionFeedbackRequest(
-                999L, FeedbackType.CAREER_TIMING, SatisfactionStatus.SATISFIED, null);
+                1L, FeedbackType.CAREER_TIMING, SatisfactionStatus.SATISFIED, null);
 
-        given(sajuResultRepository.findByIdAndUser_Id(999L, 1L)).willReturn(Optional.empty());
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
 
-        // When & Then
-        assertThatThrownBy(() -> service.saveFeedback(request, 1L))
+        assertThatThrownBy(() -> service.saveFeedback(request, USER_ID))
+                .isInstanceOf(FeedbackNotAllowedException.class);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자 ID → UserNotFoundException 발생")
+    void shouldThrowUserNotFoundException_WhenUserNotFound() {
+        var request = new SatisfactionFeedbackRequest(
+                1L, FeedbackType.COMPATIBILITY, SatisfactionStatus.SATISFIED, null);
+
+        given(userRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.saveFeedback(request, 999L))
+                .isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 compatibilityId → SajuResultNotFoundException 발생")
+    void shouldThrowSajuResultNotFoundException_WhenCompatibilityNotFound() {
+        var request = new SatisfactionFeedbackRequest(
+                999L, FeedbackType.COMPATIBILITY, SatisfactionStatus.SATISFIED, null);
+
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
+        given(compatibilityRepository.findByIdAndUser(999L, MOCK_USER)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.saveFeedback(request, USER_ID))
                 .isInstanceOf(SajuResultNotFoundException.class);
     }
 }

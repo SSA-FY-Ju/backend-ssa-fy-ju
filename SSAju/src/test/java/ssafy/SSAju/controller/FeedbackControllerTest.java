@@ -60,7 +60,7 @@ class FeedbackControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sajuResultId": 1,
+                                  "analysisId": 1,
                                   "feedbackType": "CAREER_TIMING",
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "좋았습니다"
@@ -83,7 +83,7 @@ class FeedbackControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sajuResultId": 1,
+                                  "analysisId": 1,
                                   "feedbackType": "CONSULTATION",
                                   "satisfactionStatus": "DISSATISFIED"
                                 }
@@ -117,7 +117,7 @@ class FeedbackControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sajuResultId": 1,
+                                  "analysisId": 1,
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))
@@ -133,7 +133,7 @@ class FeedbackControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sajuResultId": 1,
+                                  "analysisId": 1,
                                   "feedbackType": "CAREER_TIMING"
                                 }
                                 """))
@@ -152,7 +152,7 @@ class FeedbackControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sajuResultId": 999,
+                                  "analysisId": 999,
                                   "feedbackType": "CAREER_TIMING",
                                   "satisfactionStatus": "SATISFIED"
                                 }
@@ -170,7 +170,7 @@ class FeedbackControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sajuResultId": 1,
+                                  "analysisId": 1,
                                   "feedbackType": "INVALID_TYPE",
                                   "satisfactionStatus": "SATISFIED"
                                 }

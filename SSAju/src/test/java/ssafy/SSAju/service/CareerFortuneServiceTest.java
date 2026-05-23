@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
+import ssafy.SSAju.career.provider.SajuAnalysisFacade;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
@@ -21,6 +22,7 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
+import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
@@ -44,6 +46,7 @@ class CareerFortuneServiceTest {
     @Mock private SajuDataService sajuDataService;
     @Mock private UserProfileProvider userProfileProvider;
     @Mock private SajuResultWriteService sajuResultWriteService;
+    @Mock private SajuResultRepository sajuResultRepository;
     @Mock private SajuResultMapper sajuResultMapper;
     @Mock private UserRepository userRepository;
 
@@ -52,6 +55,7 @@ class CareerFortuneServiceTest {
     private final TenGodCalculator tenGodCalculator = new TenGodCalculator();
     private final HiddenStemCalculator hiddenStemCalculator = new HiddenStemCalculator();
     private final CareerFortuneAnalyzer careerFortuneAnalyzer = new CareerFortuneAnalyzer(tenGodCalculator);
+    private final SajuAnalysisFacade sajuAnalysisFacade = new SajuAnalysisFacade(tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer);
     private final SajuValidator sajuValidator = new SajuValidator();
 
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 10, 10);
@@ -80,9 +84,8 @@ class CareerFortuneServiceTest {
     @BeforeEach
     void setUp() {
         service = new CareerFortuneService(
-                sajuDataService, userProfileProvider, sajuResultWriteService,
-                tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer, sajuResultMapper, sajuValidator,
-                userRepository);
+                sajuDataService, userProfileProvider, sajuResultWriteService, sajuResultRepository,
+                sajuAnalysisFacade, sajuResultMapper, sajuValidator, userRepository);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
     }
 
@@ -101,6 +104,8 @@ class CareerFortuneServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(VALID_FASTAPI_RESPONSE);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(expectedResult);
+        given(sajuResultWriteService.replaceForUserProfile(savedProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When
@@ -126,6 +131,8 @@ class CareerFortuneServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME))
                 .willReturn(VALID_FASTAPI_RESPONSE);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(expectedResult);
+        given(sajuResultWriteService.replaceForUserProfile(existingProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When
@@ -156,6 +163,8 @@ class CareerFortuneServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(h1Response);
         var expectedResult = SajuResult.builder().userProfile(savedProfile).user(MOCK_USER).build();
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(expectedResult);
+        given(sajuResultWriteService.replaceForUserProfile(savedProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When

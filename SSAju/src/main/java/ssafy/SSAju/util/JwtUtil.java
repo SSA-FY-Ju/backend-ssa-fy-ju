@@ -1,17 +1,27 @@
 package ssafy.SSAju.util;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.SignatureException;
+import ssafy.SSAju.exception.InvalidTokenException;
+import ssafy.SSAju.exception.TokenExpiredException;
+import ssafy.SSAju.util.TokenType;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -19,8 +29,6 @@ public class JwtUtil {
 
     private static final String CLAIM_USER_ID = "userId";
     private static final String CLAIM_EMAIL = "email";
-    private static final String TOKEN_TYPE_ACCESS = "access";
-    private static final String TOKEN_TYPE_REFRESH = "refresh";
     private static final String CLAIM_TYPE = "type";
 
     private final SecretKey secretKey;
@@ -37,38 +45,60 @@ public class JwtUtil {
     }
 
     public String generateAccessToken(Long userId, String email) {
-        return buildToken(userId, email, TOKEN_TYPE_ACCESS, accessTokenExpirationMs);
+        return buildToken(userId, email, TokenType.ACCESS.getValue(), accessTokenExpirationMs);
     }
 
     public String generateRefreshToken(Long userId) {
-        return buildToken(userId, null, TOKEN_TYPE_REFRESH, refreshTokenExpirationMs);
+        return buildToken(userId, null, TokenType.REFRESH.getValue(), refreshTokenExpirationMs);
     }
 
-    public boolean validateToken(String token) {
+    public record ParsedToken(Long userId, String email) {}
+
+    /**
+     * JWT 토큰을 파싱하고 Claims를 반환합니다. 만료/위조 여부를 구체적인 예외로 구분합니다.
+     */
+    public Claims parseAndValidateClaims(String token) {
+        if (!StringUtils.hasText(token)) {
+            throw new InvalidTokenException("토큰이 제공되지 않았습니다.");
+        }
         try {
-            parseClaims(token);
-            return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            log.warn("유효하지 않은 JWT 토큰: {}", e.getClass().getSimpleName());
-            return false;
+            return parseClaims(token);
+        } catch (ExpiredJwtException ex) {
+            throw new TokenExpiredException("Access token이 만료되었습니다. 새로 발급해 주세요.");
+        } catch (SignatureException | MalformedJwtException ex) {
+            throw new InvalidTokenException("위조되거나 손상된 토큰입니다.");
+        } catch (UnsupportedJwtException ex) {
+            throw new InvalidTokenException("지원하지 않는 토큰 형식입니다.");
+        } catch (JwtException ex) {
+            throw new InvalidTokenException("유효하지 않은 토큰입니다.");
         }
     }
 
-    public Long getUserIdFromToken(String token) {
-        return parseClaims(token).get(CLAIM_USER_ID, Long.class);
-    }
-
-    public String getEmailFromToken(String token) {
-        return parseClaims(token).get(CLAIM_EMAIL, String.class);
+    /**
+     * JWT 토큰을 검증하고 userId, email을 한 번의 파싱으로 추출합니다.
+     *
+     * @param token JWT 문자열
+     * @return 유효한 경우 ParsedToken, 유효하지 않은 경우 empty
+     */
+    public Optional<ParsedToken> validateAndParse(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            Long userId = claims.get(CLAIM_USER_ID, Long.class);
+            String email = claims.get(CLAIM_EMAIL, String.class);
+            return Optional.of(new ParsedToken(userId, email));
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("유효하지 않은 JWT 토큰: {}", e.getClass().getSimpleName());
+            return Optional.empty();
+        }
     }
 
     /**
      * RefreshToken 만료 시간을 계산합니다.
      *
-     * @return 현재 시각으로부터 RefreshToken 유효 기간만큼 더한 LocalDateTime (7일)
+     * @return 현재 시각으로부터 RefreshToken 유효 기간만큼 더한 Instant (7일)
      */
-    public LocalDateTime getRefreshTokenExpiration() {
-        return LocalDateTime.now().plusSeconds(refreshTokenExpirationMs / 1000);
+    public Instant getRefreshTokenExpiration() {
+        return Instant.now().plus(Duration.ofMillis(refreshTokenExpirationMs));
     }
 
     /**

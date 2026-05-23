@@ -31,7 +31,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -189,8 +188,8 @@ class CareerApiControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sajuResultId": 1,
-                                  "feedbackType": "CAREER_TIMING",
+                                  "analysisId": 1,
+                                  "feedbackType": "CONSULTATION",
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "좋은 상담이었습니다"
                                 }
@@ -203,14 +202,14 @@ class CareerApiControllerTest {
     }
 
     @Test
-    @DisplayName("T089-3a: POST /api/feedback/satisfaction - sajuResultId 누락 → 400 Bad Request")
-    void us4_feedback_missingSajuResultId_returns400() throws Exception {
+    @DisplayName("T089-3a: POST /api/feedback/satisfaction - analysisId 누락 → 400 Bad Request")
+    void us4_feedback_missingAnalysisId_returns400() throws Exception {
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .with(authentication(AUTH_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "feedbackType": "CAREER_TIMING",
+                                  "feedbackType": "CONSULTATION",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))
@@ -307,23 +306,17 @@ class CareerApiControllerTest {
     // ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("T089-6: Swagger API Docs는 Basic Auth로 인증 보호됨")
-    void swaggerDocs_authenticationRequired() throws Exception {
-        // Given: 무인증 요청 → 401
+    @DisplayName("T089-6: Swagger API Docs는 인증 없이 접근 가능 (Nginx IP 화이트리스트로 보호)")
+    void swaggerDocs_publiclyAccessible() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
-                .andExpect(status().isUnauthorized());
-
-        // Given: BasicAuth 인증 요청 → 200
-        mockMvc.perform(get("/v3/api-docs")
-                        .with(httpBasic("admin", "swagger1234")))
                 .andExpect(status().isOk());
     }
 
     @Test
-    @DisplayName("T089-6a: Swagger YAML Docs도 무인증 시 401 반환")
-    void swaggerYamlDocs_withoutAuth_returns401() throws Exception {
+    @DisplayName("T089-6a: Swagger YAML Docs도 인증 없이 접근 가능")
+    void swaggerYamlDocs_publiclyAccessible() throws Exception {
         mockMvc.perform(get("/v3/api-docs.yaml"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -401,9 +394,9 @@ class CareerApiControllerTest {
                         "조력자", "깊이 있는 관계", "go-to person", "데이터 논의", "전문가 네트워크"),
                 new CareerAdviceResponse.CareerTimeline(
                         2026,
-                        Map.of("March", new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
-                        List.of(new CareerAdviceResponse.PivotPoint("March", "적극기", 9, "정관 절정")),
-                        List.of("May"), "급하게 결정하지 말 것"),
+                        Map.of(3, new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
+                        List.of(new CareerAdviceResponse.PivotPoint(3, "적극기", 9, "정관 절정")),
+                        List.of(5), "급하게 결정하지 말 것"),
                 "己 일간 · 정관 기운 기반 | 2026년 관운 분석 (H1)"
         );
     }

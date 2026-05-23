@@ -34,10 +34,14 @@ saju:
     timeout-seconds: 5
     max-retries: 1
 
-swagger:
-  auth:
-    username: admin
-    password: swagger1234
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    supported-submit-methods: []
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
 
 jwt:
   secret: test-secret-key-must-be-at-least-256-bits-long-for-hmac-sha256

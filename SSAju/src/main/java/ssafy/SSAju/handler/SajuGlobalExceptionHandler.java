@@ -13,6 +13,8 @@ import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.ErrorInfo;
 import ssafy.SSAju.exception.AuthException;
+import ssafy.SSAju.exception.ConsentRequiredException;
+import ssafy.SSAju.exception.FeedbackNotAllowedException;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.DailyLimitExceededException;
@@ -73,9 +75,28 @@ public class SajuGlobalExceptionHandler {
     }
 
     /**
+     * 약관 미동의 예외를 처리합니다.
+     *
+     * <p>회원가입 시 이용약관 또는 개인정보 수집에 미동의한 경우 발생합니다.
+     *
+     * @param e ConsentRequiredException
+     * @param request HTTP 요청
+     * @return 403 Forbidden, 에러 코드: TERMS_AGREEMENT_REQUIRED
+     */
+    @ExceptionHandler(ConsentRequiredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConsentRequired(
+            ConsentRequiredException e, HttpServletRequest request) {
+        log.warn("약관 미동의: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.TERMS_AGREEMENT_REQUIRED.getCode(),
+                        ErrorMessageConstants.TERMS_AGREEMENT_REQUIRED.getMessage(), generateRequestId())));
+    }
+
+    /**
      * 인증 예외를 처리합니다.
      *
-     * <p>로그인 실패(이메일 미존재, 비밀번호 불일치), 약관 미동의 등의 인증 관련 오류입니다.
+     * <p>로그인 실패(이메일 미존재, 비밀번호 불일치) 등의 인증 관련 오류입니다.
      * User Enumeration 공격 방지를 위해 로그인 실패 시 구체적인 실패 원인을 공개하지 않습니다.
      *
      * @param e AuthException
@@ -150,6 +171,15 @@ public class SajuGlobalExceptionHandler {
                         ErrorMessageConstants.DAILY_LIMIT_EXCEEDED.getMessage(), generateRequestId())));
     }
 
+    @ExceptionHandler(FeedbackNotAllowedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFeedbackNotAllowed(
+            FeedbackNotAllowedException e, HttpServletRequest request) {
+        log.warn("피드백 불가 요청: {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        "FEEDBACK_NOT_ALLOWED", e.getMessage(), generateRequestId())));
+    }
+
     @ExceptionHandler(SajuResultNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleSajuResultNotFound(
             SajuResultNotFoundException e, HttpServletRequest request) {
@@ -184,12 +214,21 @@ public class SajuGlobalExceptionHandler {
     @ExceptionHandler(OpenAIApiException.class)
     public ResponseEntity<ApiResponse<Void>> handleOpenAIApiException(
             OpenAIApiException e, HttpServletRequest request) {
-        log.error("OpenAI API error: {}", e.getMessage());
-        // TODO: Phase 3.2 (ConsultationService) - Differentiate OpenAIApiException types by status code:
-        // 401 -> UNAUTHORIZED (인증 오류)
-        // 429 -> TOO_MANY_REQUESTS (할당량 초과)
-        // 5xx -> GATEWAY_TIMEOUT (서버 오류)
-        // Current implementation maps all to 504 GATEWAY_TIMEOUT
+        log.error("OpenAI API error: statusCode={}, message={}", e.getStatusCode(), e.getMessage());
+        if (e.getStatusCode() == 401 || e.getStatusCode() == 403) {
+            // 서버의 API Key 설정 문제 → 클라이언트에 인증 오류를 노출하지 않음
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.failure(new ErrorInfo(
+                            ErrorMessageConstants.OPENAI_UNAUTHORIZED.getCode(),
+                            "서버 설정 오류로 요청을 처리할 수 없습니다.", generateRequestId())));
+        }
+        if (e.getStatusCode() == 429) {
+            // OpenAI rate limit → 일시적 서비스 불가 (클라이언트 잘못 아님)
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(ApiResponse.failure(new ErrorInfo(
+                            ErrorMessageConstants.OPENAI_RATE_LIMIT.getCode(),
+                            ErrorMessageConstants.OPENAI_RATE_LIMIT.getMessage(), generateRequestId())));
+        }
         return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.OPENAI_API_TIMEOUT.getCode(),

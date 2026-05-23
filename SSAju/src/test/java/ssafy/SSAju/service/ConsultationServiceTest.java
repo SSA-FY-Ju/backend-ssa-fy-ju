@@ -14,11 +14,9 @@ import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.mapper.ConsultationMapper;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
+import ssafy.SSAju.career.provider.SajuAnalysisFacade;
 import ssafy.SSAju.career.provider.SajuResultProvider;
 import ssafy.SSAju.career.provider.UserProfileProvider;
-import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
-import ssafy.SSAju.career.util.HiddenStemCalculator;
-import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
@@ -42,7 +40,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -53,16 +50,15 @@ class ConsultationServiceTest {
 
     @Mock private ConsultationOpenAICaller openAICaller;
     @Mock private SajuDataService sajuDataService;
-    @Mock private TenGodCalculator tenGodCalculator;
-    @Mock private HiddenStemCalculator hiddenStemCalculator;
-    @Mock private CareerFortuneAnalyzer careerFortuneAnalyzer;
+    @Mock private SajuAnalysisFacade sajuAnalysisFacade;
     @Mock private UserProfileProvider userProfileProvider;
     @Mock private SajuResultProvider sajuResultProvider;
     @Mock private SajuResultMapper sajuResultMapper;
-    @Mock private ConsultationMapper consultationMapper;
     @Mock private CareerConsultationRepository careerConsultationRepository;
     @Mock private ConsultationSaveService consultationSaveService;
     @Mock private UserRepository userRepository;
+
+    private final ConsultationMapper consultationMapper = new ConsultationMapper();
 
     private ConsultationService service;
 
@@ -95,6 +91,11 @@ class ConsultationServiceTest {
             new HiddenStems(Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
                    "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
 
+    private static final SajuAnalysisFacade.SajuAnalysisContext MOCK_CTX_H1 =
+            new SajuAnalysisFacade.SajuAnalysisContext("己", TEN_GOD, HIDDEN_STEMS, "H1", 80, "상반기가 취업에 유리합니다.");
+    private static final SajuAnalysisFacade.SajuAnalysisContext MOCK_CTX_H2 =
+            new SajuAnalysisFacade.SajuAnalysisContext("己", TEN_GOD, HIDDEN_STEMS, "H2", 60, "하반기가 취업에 유리합니다.");
+
     private static final CareerAdviceResponse MOCK_ADVICE = new CareerAdviceResponse(
             List.of(new CareerAdviceResponse.IndustryRecommendation(
                     "금융/핀테크", "오행 金 강세로 재무 분야 적합", List.of("백엔드 개발자", "데이터 엔지니어"))),
@@ -126,9 +127,9 @@ class ConsultationServiceTest {
                     "조력자 스타일", "깊이 있는 관계 구축", "go-to person", "데이터 기반 논의", "전문가 네트워크"),
             new CareerAdviceResponse.CareerTimeline(
                     2026,
-                    Map.of("March", new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
-                    List.of(new CareerAdviceResponse.PivotPoint("March", "적극기", 9, "정관 기운의 절정")),
-                    List.of("May", "July"),
+                    Map.of(3, new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
+                    List.of(new CareerAdviceResponse.PivotPoint(3, "적극기", 9, "정관 기운의 절정")),
+                    List.of(5, 7),
                     "이 기간엔 급하게 결정하지 말 것"),
             List.of("정관", "편관"),
             "己土(기토) - 수용적이고 꼼꼼한 성향",
@@ -138,7 +139,7 @@ class ConsultationServiceTest {
     @BeforeEach
     void setUp() {
         service = new ConsultationService(
-                openAICaller, sajuDataService, tenGodCalculator, hiddenStemCalculator, careerFortuneAnalyzer,
+                openAICaller, sajuDataService, sajuAnalysisFacade,
                 userProfileProvider, sajuResultProvider, sajuResultMapper, consultationMapper,
                 careerConsultationRepository, consultationSaveService, new SajuValidator(), userRepository);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
@@ -160,14 +161,9 @@ class ConsultationServiceTest {
     void shouldReturnConsultation_WhenSajuResultExists() {
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         var sajuResult = mock(SajuResult.class);
-        var consultation = mock(CareerConsultation.class);
 
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
-        given(tenGodCalculator.calculate(MOCK_SAJU.heavenlyStems())).willReturn(TEN_GOD);
-        given(hiddenStemCalculator.calculate(MOCK_SAJU.earthlyBranches())).willReturn(HIDDEN_STEMS);
-        given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
-        given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(80);
-        given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
+        given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
@@ -175,12 +171,9 @@ class ConsultationServiceTest {
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
-        given(consultationMapper.buildAnalysisSummary(any(), any(), any(), any()))
-                .willReturn("己 일간 · 오행 火·金 강세 · 정관·편관 기운 기반 | 2026년 12개월 타임라인 + 관운 분석 (H1)");
 
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
-        // 기존 필드 검증
         assertThat(result.industries()).hasSize(1);
         assertThat(result.industries().get(0).recommendedRoles()).contains("백엔드 개발자");
         assertThat(result.interviewTips()).hasSize(2);
@@ -190,7 +183,6 @@ class ConsultationServiceTest {
         assertThat(result.confidenceScore()).isEqualTo(80);
         assertThat(result.reasoning()).isNotBlank();
 
-        // 신규 필드 검증
         assertThat(result.sajuProfile()).isNotNull();
         assertThat(result.sajuProfile().dayMaster()).isEqualTo("己");
         assertThat(result.sajuProfile().fiveElements()).containsKey("木");
@@ -208,7 +200,6 @@ class ConsultationServiceTest {
         assertThat(result.relationshipStrategy()).isNotNull();
         assertThat(result.careerTimeline()).isNotNull();
         assertThat(result.careerTimeline().year()).isEqualTo(2026);
-        assertThat(result.analysisSummary()).isNotBlank();
         assertThat(result.analysisSummary()).contains("己");
         assertThat(result.analysisSummary()).contains("H1");
 
@@ -225,14 +216,9 @@ class ConsultationServiceTest {
     void shouldReturnConsultation_WhenSajuResultCreated() {
         var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
         var newSajuResult = mock(SajuResult.class);
-        var consultation = mock(CareerConsultation.class);
 
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
-        given(tenGodCalculator.calculate(MOCK_SAJU.heavenlyStems())).willReturn(TEN_GOD);
-        given(hiddenStemCalculator.calculate(MOCK_SAJU.earthlyBranches())).willReturn(HIDDEN_STEMS);
-        given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H2");
-        given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(60);
-        given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("하반기가 취업에 유리합니다.");
+        given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H2);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(newSajuResult);
@@ -240,8 +226,6 @@ class ConsultationServiceTest {
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
-        given(consultationMapper.buildAnalysisSummary(any(), any(), any(), any()))
-                .willReturn("己 일간 · 오행 火·金 강세 | H2");
 
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
@@ -262,11 +246,7 @@ class ConsultationServiceTest {
         var sajuResult = mock(SajuResult.class);
 
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
-        given(tenGodCalculator.calculate(any())).willReturn(TEN_GOD);
-        given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
-        given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
-        given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
-        given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
+        given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
@@ -279,10 +259,6 @@ class ConsultationServiceTest {
                 .hasMessageContaining("OpenAI API 호출 실패");
     }
 
-    // ─────────────────────────────────────────
-    // OpenAI 응답 null
-    // ─────────────────────────────────────────
-
     @Test
     @DisplayName("OpenAI 응답 null → OpenAIApiException (ConsultationOpenAICaller에서 발생)")
     void shouldThrow_WhenOpenAIReturnsNull() {
@@ -290,11 +266,7 @@ class ConsultationServiceTest {
         var sajuResult = mock(SajuResult.class);
 
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
-        given(tenGodCalculator.calculate(any())).willReturn(TEN_GOD);
-        given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
-        given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
-        given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
-        given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
+        given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
@@ -314,11 +286,7 @@ class ConsultationServiceTest {
         var sajuResult = mock(SajuResult.class);
 
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
-        given(tenGodCalculator.calculate(any())).willReturn(TEN_GOD);
-        given(hiddenStemCalculator.calculate(any())).willReturn(HIDDEN_STEMS);
-        given(careerFortuneAnalyzer.analyzeFavoredPeriod(any(), any(), any(), any())).willReturn("H1");
-        given(careerFortuneAnalyzer.calculateConfidenceScore(any(), any(), any())).willReturn(70);
-        given(careerFortuneAnalyzer.buildReasoning(anyString(), any())).willReturn("상반기가 취업에 유리합니다.");
+        given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);

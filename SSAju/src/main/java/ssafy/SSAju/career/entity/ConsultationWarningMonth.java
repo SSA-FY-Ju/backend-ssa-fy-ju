@@ -20,11 +20,11 @@ public class ConsultationWarningMonth {
     @JoinColumn(name = "consultation_career_timeline_id", nullable = false)
     private ConsultationCareerTimeline consultationCareerTimeline;
 
-    @Column(name = "month", nullable = false, length = 7)
-    private String month;
+    @Column(name = "month", nullable = false)
+    private Integer month;
 
     @Builder
-    public ConsultationWarningMonth(ConsultationCareerTimeline consultationCareerTimeline, String month) {
+    public ConsultationWarningMonth(ConsultationCareerTimeline consultationCareerTimeline, Integer month) {
         this.consultationCareerTimeline = consultationCareerTimeline;
         this.month = month;
     }

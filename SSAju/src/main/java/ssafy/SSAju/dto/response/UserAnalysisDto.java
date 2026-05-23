@@ -8,6 +8,5 @@ public record UserAnalysisDto(
         Long analysisId,
         String targetName,
         LocalDate birthDate,
-        LocalDateTime createdAt,
-        String satisfactionStatus
+        LocalDateTime createdAt
 ) {}

@@ -63,11 +63,13 @@ public class SajuResult {
     }
 
     public void assignTenGodData(List<TenGodData> list) {
-        this.tenGodDataList = list;
+        this.tenGodDataList.clear();
+        this.tenGodDataList.addAll(list);
     }
 
     public void assignHiddenStemData(List<HiddenStemData> list) {
-        this.hiddenStemDataList = list;
+        this.hiddenStemDataList.clear();
+        this.hiddenStemDataList.addAll(list);
     }
 
     public void assignCareerFortune(CareerFortune fortune) {

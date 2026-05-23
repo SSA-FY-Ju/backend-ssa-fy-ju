@@ -6,8 +6,8 @@ import ssafy.SSAju.career.enums.FeedbackType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 
 public record SatisfactionFeedbackRequest(
-        @NotNull(message = "sajuResultId는 필수입니다")
-        Long sajuResultId,
+        @NotNull(message = "analysisId는 필수입니다")
+        Long analysisId,
 
         @NotNull(message = "feedbackType은 필수입니다")
         FeedbackType feedbackType,

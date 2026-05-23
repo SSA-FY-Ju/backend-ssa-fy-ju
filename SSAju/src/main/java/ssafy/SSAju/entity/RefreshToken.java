@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -30,7 +31,7 @@ public class RefreshToken {
     private String tokenHash;
 
     @Column(name = "expires_at", nullable = false)
-    private LocalDateTime expiresAt;
+    private Instant expiresAt;
 
     @Column(name = "revoked_at")
     private LocalDateTime revokedAt;
@@ -40,7 +41,7 @@ public class RefreshToken {
     private LocalDateTime createdAt;
 
     @Builder
-    public RefreshToken(User user, String tokenHash, LocalDateTime expiresAt) {
+    public RefreshToken(User user, String tokenHash, Instant expiresAt) {
         this.user = user;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
@@ -51,7 +52,7 @@ public class RefreshToken {
     }
 
     public boolean isExpired() {
-        return !LocalDateTime.now().isBefore(expiresAt);
+        return !Instant.now().isBefore(expiresAt);
     }
 
     public void revoke() {

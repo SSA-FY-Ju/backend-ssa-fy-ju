@@ -12,6 +12,7 @@ import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.entity.User;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -19,8 +20,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
     name = "user_satisfaction_feedback",
-    indexes = @Index(name = "idx_feedback_saju_result_created", columnList = "saju_result_id, created_at"),
-    uniqueConstraints = @UniqueConstraint(name = "uk_feedback_saju_user", columnNames = {"saju_result_id", "user_id"})
+    indexes = @Index(name = "idx_feedback_created", columnList = "created_at")
 )
 public class UserSatisfactionFeedback {
 
@@ -33,8 +33,12 @@ public class UserSatisfactionFeedback {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "saju_result_id", nullable = false)
-    private SajuResult sajuResult;
+    @JoinColumn(name = "company_compatibility_id")
+    private CompanyCompatibility companyCompatibility;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "career_consultation_id")
+    private CareerConsultation careerConsultation;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "feedback_type", nullable = false)
@@ -52,10 +56,19 @@ public class UserSatisfactionFeedback {
     private LocalDateTime createdAt;
 
     @Builder
-    public UserSatisfactionFeedback(User user, SajuResult sajuResult, FeedbackType feedbackType,
-                                    SatisfactionStatus satisfactionStatus, String feedbackContent) {
+    public UserSatisfactionFeedback(User user,
+                                    CompanyCompatibility companyCompatibility,
+                                    CareerConsultation careerConsultation,
+                                    FeedbackType feedbackType,
+                                    SatisfactionStatus satisfactionStatus,
+                                    String feedbackContent) {
+        if ((companyCompatibility == null) == (careerConsultation == null)) {
+            throw new IllegalArgumentException(
+                    "피드백 대상은 회사 궁합 또는 커리어 컨설팅 중 정확히 하나만 지정해야 합니다.");
+        }
         this.user = user;
-        this.sajuResult = sajuResult;
+        this.companyCompatibility = companyCompatibility;
+        this.careerConsultation = careerConsultation;
         this.feedbackType = feedbackType;
         this.satisfactionStatus = satisfactionStatus;
         this.feedbackContent = feedbackContent;

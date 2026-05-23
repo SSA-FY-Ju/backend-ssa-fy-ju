@@ -15,6 +15,8 @@ import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.validator.RequestValidator;
 import ssafy.SSAju.dto.external.FastApiRequest;
 import ssafy.SSAju.dto.external.FastAPIResponse;
+import ssafy.SSAju.exception.ExternalApiException;
+import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.time.LocalDate;
@@ -69,16 +71,24 @@ public class SajuDataService {
         }
     }
 
-    /**
-     * 최대 재시도 횟수 초과 시 실행: 인프라 예외 → InvalidSajuDataException 으로 변환.
-     *
-     * OpenAI Caller와 일관되게 도메인 예외로 래핑하여 호출자가 인프라 예외에 직접 의존하지 않도록 합니다.
-     */
     @Recover
-    public FastAPIResponse recoverFetchSajuFromFastAPI(RuntimeException ex,
-                                                       LocalDate birthDate,
-                                                       LocalTime birthTime) {
-        log.error("FastAPI 호출 재시도 후 최종 실패", ex);
+    public FastAPIResponse recoverFromTimeout(ResourceAccessException ex,
+                                              LocalDate birthDate, LocalTime birthTime) {
+        log.error("FastAPI 타임아웃: 재시도 후 최종 실패", ex);
+        throw new FastAPITimeoutException("FastAPI 응답 시간 초과", ex);
+    }
+
+    @Recover
+    public FastAPIResponse recoverFromServerError(HttpServerErrorException ex,
+                                                   LocalDate birthDate, LocalTime birthTime) {
+        log.error("FastAPI 서버 오류: 재시도 후 최종 실패 statusCode={}", ex.getStatusCode(), ex);
+        throw new ExternalApiException("FastAPI 서버 오류", ex);
+    }
+
+    @Recover
+    public FastAPIResponse recoverFromOtherError(RuntimeException ex,
+                                                  LocalDate birthDate, LocalTime birthTime) {
+        log.error("FastAPI 호출 실패 (재시도 불가)", ex);
         throw new InvalidSajuDataException(ErrorMessageConstants.FASTAPI_CALL_FAILED.getMessage(), ex);
     }
 

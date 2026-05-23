@@ -9,6 +9,7 @@ import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
@@ -31,10 +32,10 @@ public class ConsultationOpenAICaller {
      *
      * 재시도 정책 (Spring Retry):
      * - ResourceAccessException (네트워크/타임아웃): 재시도
-     * - HttpServerErrorException (5xx 서버 오류): 재시도
-     * - OpenAIApiException (검증 실패): 재시도 안 함 (noRetryFor)
-     * - HttpMessageConversionException (역직렬화/스키마 불일치): 재시도 안 함 (noRetryFor)
-     * 최대 2회 재시도 (총 3회 시도)
+     * - HttpServerErrorException (5xx): 재시도
+     * - 4xx (401 인증 실패, 429 rate limit 등): OpenAIApiException으로 변환 후 재시도 안 함
+     * - OpenAIApiException (검증 실패/4xx): 재시도 안 함 (noRetryFor)
+     * - HttpMessageConversionException (역직렬화 실패): 재시도 안 함 (noRetryFor)
      */
     @Retryable(
             retryFor = {ResourceAccessException.class, HttpServerErrorException.class},
@@ -55,9 +56,18 @@ public class ConsultationOpenAICaller {
                     .entity(CareerAdviceResponse.class);
         } catch (OpenAIApiException e) {
             throw e;
-        } catch (ResourceAccessException | HttpServerErrorException e) {
-            log.error("OpenAI API 호출 실패, 재시도 예정");
+        } catch (ResourceAccessException e) {
+            log.error("OpenAI API 타임아웃, 재시도 예정");
             throw e;
+        } catch (HttpServerErrorException e) {
+            log.error("OpenAI API 5xx 오류 statusCode={}, 재시도 예정", e.getStatusCode());
+            throw e;
+        } catch (HttpStatusCodeException e) {
+            // 4xx (401 인증 실패, 429 rate limit 등): 재시도 불가
+            log.error("OpenAI API 클라이언트 오류 statusCode={}", e.getStatusCode());
+            throw new OpenAIApiException(
+                    ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(),
+                    e.getStatusCode().value(), e);
         } catch (Exception e) {
             log.error("OpenAI API 응답 처리 실패 (재시도 불가)");
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
@@ -66,17 +76,35 @@ public class ConsultationOpenAICaller {
         return response;
     }
 
-    /**
-     * 최대 재시도 횟수 초과 시 실행: RuntimeException → OpenAIApiException으로 변환.
-     */
     @Recover
-    public CareerAdviceResponse recover(RuntimeException ex,
-                                        FastAPIResponse sajuData,
-                                        TenGodDistribution tenGodDistribution,
-                                        HiddenStems hiddenStems,
-                                        String dayMaster) {
-        log.error("OpenAI API 재시도 후 최종 실패");
+    public CareerAdviceResponse recoverFromTimeout(ResourceAccessException ex,
+                                                   FastAPIResponse sajuData,
+                                                   TenGodDistribution tenGodDistribution,
+                                                   HiddenStems hiddenStems,
+                                                   String dayMaster) {
+        log.error("OpenAI API 타임아웃: 재시도 후 최종 실패");
         throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), ex);
+    }
+
+    @Recover
+    public CareerAdviceResponse recoverFromServerError(HttpServerErrorException ex,
+                                                       FastAPIResponse sajuData,
+                                                       TenGodDistribution tenGodDistribution,
+                                                       HiddenStems hiddenStems,
+                                                       String dayMaster) {
+        log.error("OpenAI API 5xx 오류: 재시도 후 최종 실패 statusCode={}", ex.getStatusCode());
+        throw new OpenAIApiException(
+                ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(),
+                ex.getStatusCode().value(), ex);
+    }
+
+    @Recover
+    public CareerAdviceResponse recoverFromOtherError(OpenAIApiException ex,
+                                                      FastAPIResponse sajuData,
+                                                      TenGodDistribution tenGodDistribution,
+                                                      HiddenStems hiddenStems,
+                                                      String dayMaster) {
+        throw ex;
     }
 
     private void validate(CareerAdviceResponse response) {

@@ -10,15 +10,11 @@ import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
-import ssafy.SSAju.career.enums.SajuPillarIndex;
-import ssafy.SSAju.career.enums.TenGodConstants;
 import ssafy.SSAju.career.mapper.ConsultationMapper;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
+import ssafy.SSAju.career.provider.SajuAnalysisFacade;
 import ssafy.SSAju.career.provider.SajuResultProvider;
 import ssafy.SSAju.career.provider.UserProfileProvider;
-import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
-import ssafy.SSAju.career.util.HiddenStemCalculator;
-import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
@@ -30,11 +26,10 @@ import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
 
-import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.time.YearMonth;
+import java.time.LocalDate;
 
 @Slf4j
 @Service
@@ -43,9 +38,7 @@ public class ConsultationService {
 
     private final ConsultationOpenAICaller openAICaller;
     private final SajuDataService sajuDataService;
-    private final TenGodCalculator tenGodCalculator;
-    private final HiddenStemCalculator hiddenStemCalculator;
-    private final CareerFortuneAnalyzer careerFortuneAnalyzer;
+    private final SajuAnalysisFacade sajuAnalysisFacade;
     private final UserProfileProvider userProfileProvider;
     private final SajuResultProvider sajuResultProvider;
     private final SajuResultMapper sajuResultMapper;
@@ -79,17 +72,13 @@ public class ConsultationService {
                 request.birthDate(), request.birthTime());
         sajuValidator.validateWithFiveElements(sajuData);
 
-        List<String> heavenlyStems = sajuData.heavenlyStems();
-        List<String> earthlyBranches = sajuData.earthlyBranches();
-        TenGodDistribution tenGodDistribution = tenGodCalculator.calculate(heavenlyStems);
-        HiddenStems hiddenStems = hiddenStemCalculator.calculate(earthlyBranches);
-
-        String dayMaster = heavenlyStems.get(SajuPillarIndex.DAY_INDEX);
-        String favoredPeriod = careerFortuneAnalyzer.analyzeFavoredPeriod(
-                tenGodDistribution, hiddenStems, dayMaster, earthlyBranches);
-        int confidenceScore = careerFortuneAnalyzer.calculateConfidenceScore(
-                tenGodDistribution, hiddenStems, dayMaster);
-        String reasoning = careerFortuneAnalyzer.buildReasoning(favoredPeriod, tenGodDistribution);
+        SajuAnalysisFacade.SajuAnalysisContext ctx = sajuAnalysisFacade.analyze(sajuData);
+        TenGodDistribution tenGodDistribution = ctx.tenGodDistribution();
+        HiddenStems hiddenStems = ctx.hiddenStems();
+        String dayMaster = ctx.dayMaster();
+        String favoredPeriod = ctx.favoredPeriod();
+        int confidenceScore = ctx.confidenceScore();
+        String reasoning = ctx.reasoning();
 
         // ─── 2. UserProfile / SajuResult 조회·생성 ───────────────────────────────
         UserProfile userProfile = userProfileProvider.findOrCreate(
@@ -100,18 +89,20 @@ public class ConsultationService {
         SajuResult sajuResult = sajuResultProvider.findOrCreate(userProfile, newResult);
 
         // ─── 3. 캐시 조회 (M-9) ─────────────────────────────────────────────────
-        String consultationMonth = YearMonth.now().toString();
+        YearMonth now = YearMonth.now();
+        Integer consultationMonth = now.getYear() * 100 + now.getMonthValue();
         Optional<CareerConsultation> cached = careerConsultationRepository
                 .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth);
 
         if (cached.isPresent()) {
             CareerConsultation cachedData = cached.get();
-            if (cachedData.getOpenaiModelVersion().equals(modelVersion)) {
+            if (Objects.equals(cachedData.getOpenaiModelVersion(), modelVersion)) {
                 log.info("이번 달 컨설팅 캐시 히트 — OpenAI 호출 생략: sajuResultId={}, month={}",
                         sajuResult.getId(), consultationMonth);
                 CareerAdviceResponse cachedAdvice = consultationMapper.restoreAdvice(cachedData);
-                return buildResponse(sajuData, tenGodDistribution, dayMaster, favoredPeriod,
-                        confidenceScore, reasoning, sajuResult, cachedAdvice);
+                return consultationMapper.toResponse(sajuData, tenGodDistribution, dayMaster,
+                        favoredPeriod, confidenceScore, reasoning, sajuResult,
+                        cachedData.getId(), cachedAdvice, modelVersion);
             }
             log.info("캐시 모델 버전 불일치(캐시={}, 현재={}) — 재분석: sajuResultId={}",
                     cachedData.getOpenaiModelVersion(), modelVersion, sajuResult.getId());
@@ -122,66 +113,10 @@ public class ConsultationService {
                 sajuData, tenGodDistribution, hiddenStems, dayMaster);
 
         // ─── 5. 저장 (C-7: @Transactional 보장) ─────────────────────────────────
-        consultationSaveService.saveOrUpdate(sajuResult, advice, modelVersion, consultationMonth);
+        Long consultationId = consultationSaveService.saveOrUpdate(sajuResult, advice, modelVersion, consultationMonth);
 
         log.info("커리어 컨설팅 완료: sajuResultId={}, favoredPeriod={}", sajuResult.getId(), favoredPeriod);
-        return buildResponse(sajuData, tenGodDistribution, dayMaster, favoredPeriod,
-                confidenceScore, reasoning, sajuResult, advice);
-    }
-
-    // ─── private: 응답 조립 ──────────────────────────────────────────────────────
-
-    private ConsultationResponse buildResponse(FastAPIResponse sajuData,
-                                                TenGodDistribution tenGodDistribution,
-                                                String dayMaster,
-                                                String favoredPeriod,
-                                                int confidenceScore,
-                                                String reasoning,
-                                                SajuResult sajuResult,
-                                                CareerAdviceResponse advice) {
-        Map<String, String> tenGodCharacteristics = tenGodDistribution.asMap().keySet().stream()
-                .collect(Collectors.toMap(
-                        name -> name,
-                        name -> {
-                            TenGodConstants tg = TenGodConstants.fromName(name);
-                            return tg != null ? tg.getCharacteristics() : "";
-                        }
-                ));
-
-        ConsultationResponse.SajuProfile sajuProfile = new ConsultationResponse.SajuProfile(
-                dayMaster,
-                advice.dayMasterDescription(),
-                sajuData.fiveElements(),
-                advice.fiveElementsAnalysis(),
-                tenGodDistribution.asMap(),
-                advice.keyTenGods(),
-                tenGodCharacteristics
-        );
-
-        String analysisSummary = consultationMapper.buildAnalysisSummary(
-                dayMaster, tenGodDistribution, sajuData.fiveElements(), favoredPeriod);
-
-        return new ConsultationResponse(
-                sajuResult.getId(),
-                advice.industries(),
-                advice.interviewTips(),
-                advice.strengths(),
-                modelVersion,
-                favoredPeriod,
-                confidenceScore,
-                reasoning,
-                sajuProfile,
-                advice.cautions(),
-                advice.wealthStyle(),
-                advice.longTermRoadmap(),
-                advice.personalBranding(),
-                advice.powerKeywords(),
-                advice.mentalCare(),
-                advice.environmentFit(),
-                advice.workStyle(),
-                advice.relationshipStrategy(),
-                advice.careerTimeline(),
-                analysisSummary
-        );
+        return consultationMapper.toResponse(sajuData, tenGodDistribution, dayMaster,
+                favoredPeriod, confidenceScore, reasoning, sajuResult, consultationId, advice, modelVersion);
     }
 }

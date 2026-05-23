@@ -81,10 +81,11 @@ public class User {
     }
 
     public void softDelete() {
+        LocalDateTime now = LocalDateTime.now();
         this.name = "탈퇴한 사용자";
-        this.email = "deleted_" + this.id + "_" + System.currentTimeMillis() + "@deleted.local";
+        this.email = "deleted_" + this.id + "_" + now.toEpochSecond(java.time.ZoneOffset.UTC) + "@deleted.local";
         this.status = UserStatus.INACTIVE;
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = now;
     }
 
     @Override

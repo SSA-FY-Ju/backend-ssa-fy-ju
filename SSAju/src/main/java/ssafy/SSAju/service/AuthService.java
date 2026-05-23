@@ -6,6 +6,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.request.LoginRequest;
 import ssafy.SSAju.dto.request.SignupRequest;
 import ssafy.SSAju.dto.response.AuthTokenPair;
@@ -18,6 +19,7 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.event.LoginAttemptEvent;
 import org.springframework.dao.DataIntegrityViolationException;
 import ssafy.SSAju.exception.AuthException;
+import ssafy.SSAju.exception.ConsentRequiredException;
 import ssafy.SSAju.exception.DuplicateEmailException;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.UserNotFoundException;
@@ -25,12 +27,9 @@ import ssafy.SSAju.repository.RefreshTokenRepository;
 import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.util.JwtUtil;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.HexFormat;
 import java.util.Optional;
+import ssafy.SSAju.util.TokenHashUtil;
 
 /**
  * 인증 비즈니스 로직 서비스.
@@ -90,7 +89,7 @@ public class AuthService {
         checkEmailAvailability(request.email());
 
         if (!Boolean.TRUE.equals(request.termsAgreed()) || !Boolean.TRUE.equals(request.privacyAgreed())) {
-            throw new AuthException("이용약관 및 개인정보 수집에 동의해야 합니다.");
+            throw new ConsentRequiredException(ErrorMessageConstants.TERMS_AGREEMENT_REQUIRED.getMessage());
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -162,7 +161,7 @@ public class AuthService {
 
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
-                .tokenHash(hashToken(refreshTokenValue))
+                .tokenHash(TokenHashUtil.sha256(refreshTokenValue))
                 .expiresAt(jwtUtil.getRefreshTokenExpiration())
                 .build();
         refreshTokenRepository.save(refreshToken);
@@ -195,7 +194,7 @@ public class AuthService {
     @Transactional
     public void logout(Long userId, String refreshTokenValue) {
         if (refreshTokenValue != null) {
-            refreshTokenRepository.findByTokenHash(hashToken(refreshTokenValue))
+            refreshTokenRepository.findByTokenHash(TokenHashUtil.sha256(refreshTokenValue))
                     .filter(rt -> rt.getUser().getId().equals(userId))
                     .ifPresent(RefreshToken::revoke);
         }
@@ -262,7 +261,7 @@ public class AuthService {
             throw new InvalidTokenException("유효하지 않은 리프레시 토큰입니다.");
         }
 
-        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hashToken(refreshTokenValue))
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(TokenHashUtil.sha256(refreshTokenValue))
                 .orElseThrow(() -> new InvalidTokenException("유효하지 않은 리프레시 토큰입니다."));
 
         if (refreshToken.isRevoked() || refreshToken.isExpired()) {
@@ -309,22 +308,4 @@ public class AuthService {
         eventPublisher.publishEvent(new LoginAttemptEvent(email, success, reason, clientIp, LocalDateTime.now()));
     }
 
-    /**
-     * 토큰 값을 SHA-256으로 해시합니다.
-     *
-     * <p>RefreshToken은 DB에 원본값이 아닌 해시값으로 저장됩니다.
-     * DB 유출 시 원본 토큰이 노출되는 것을 방지하기 위한 보안 조치입니다.
-     *
-     * @param token 해시할 토큰 원본값
-     * @return SHA-256 해시 (16진수 문자열)
-     */
-    private static String hashToken(String token) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 알고리즘을 사용할 수 없습니다.", e);
-        }
-    }
 }

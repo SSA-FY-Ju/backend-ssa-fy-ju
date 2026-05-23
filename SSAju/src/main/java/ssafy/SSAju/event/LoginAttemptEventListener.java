@@ -61,7 +61,7 @@ public class LoginAttemptEventListener {
                     .build();
             loginAttemptRepository.saveAndFlush(attempt);
         } catch (Exception e) {
-            log.error("로그인 시도 기록 저장 실패: {}", e.getMessage());
+            log.error("로그인 시도 기록 저장 실패 (비동기 무시됨)", e);
         }
     }
 }

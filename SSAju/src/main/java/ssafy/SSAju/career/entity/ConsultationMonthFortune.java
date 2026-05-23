@@ -20,11 +20,8 @@ public class ConsultationMonthFortune {
     @JoinColumn(name = "consultation_career_timeline_id", nullable = false)
     private ConsultationCareerTimeline consultationCareerTimeline;
 
-    /**
-     * months Map의 key (예: "2026-01")
-     */
-    @Column(name = "month_key", nullable = false, length = 7)
-    private String monthKey;
+    @Column(name = "month_key", nullable = false)
+    private Integer monthKey;
 
     @Column(name = "type")
     private String type;
@@ -34,7 +31,7 @@ public class ConsultationMonthFortune {
 
     @Builder
     public ConsultationMonthFortune(ConsultationCareerTimeline consultationCareerTimeline,
-                                    String monthKey, String type, String description) {
+                                    Integer monthKey, String type, String description) {
         this.consultationCareerTimeline = consultationCareerTimeline;
         this.monthKey = monthKey;
         this.type = type;

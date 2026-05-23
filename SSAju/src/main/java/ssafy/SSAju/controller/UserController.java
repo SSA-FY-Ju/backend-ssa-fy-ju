@@ -20,7 +20,6 @@ import ssafy.SSAju.dto.request.DeleteUserRequest;
 import ssafy.SSAju.dto.response.AnalysisDetailResponse;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.MyPageResponse;
-import ssafy.SSAju.dto.response.ReanalyzeResponse;
 import ssafy.SSAju.service.AuthService;
 import ssafy.SSAju.service.UserService;
 
@@ -64,12 +63,4 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @PostMapping("/api/mypage/reanalyze/{analysisId}")
-    public ResponseEntity<ApiResponse<ReanalyzeResponse>> reanalyze(
-            @AuthenticationPrincipal Long userId,
-            @PathVariable Long analysisId,
-            @RequestParam AnalysisType type) {
-        ReanalyzeResponse response = userService.reanalyze(userId, analysisId, type);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
 }

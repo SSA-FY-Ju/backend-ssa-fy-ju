@@ -52,6 +52,8 @@ public enum ErrorMessageConstants {
     FASTAPI_CALL_FAILED("EXTERNAL_API_ERROR", "FastAPI 호출 실패"),
 
     // === OpenAI 예외 메시지 ===
+    OPENAI_UNAUTHORIZED("OPENAI_UNAUTHORIZED", "OpenAI API 인증 실패 - API 키를 확인해주세요."),
+    OPENAI_RATE_LIMIT("OPENAI_RATE_LIMIT", "OpenAI API 사용량 초과 - 잠시 후 다시 시도해주세요."),
     OPENAI_CALL_FAILED("OPENAI_API_ERROR", "OpenAI API 호출 실패"),
     OPENAI_EMPTY_RESPONSE("OPENAI_INVALID_RESPONSE", "OpenAI 응답이 비어있습니다"),
     OPENAI_MISSING_INDUSTRIES("OPENAI_INVALID_RESPONSE", "산업 추천 정보가 누락되었습니다"),

@@ -132,7 +132,7 @@ public record CareerAdviceResponse(
     ) {}
 
     public record PivotPoint(
-            String month,
+            Integer month,
             String type,
             int score,
             String description
@@ -140,13 +140,13 @@ public record CareerAdviceResponse(
 
     public record CareerTimeline(
             int year,
-            Map<String, MonthFortune> months,
+            Map<Integer, MonthFortune> months,
             List<PivotPoint> pivotPoints,
-            List<String> warningMonths,
+            List<Integer> warningMonths,
             String warningDescription
     ) {
         /** null value가 포함된 month 항목을 제거한 안전한 맵을 반환합니다. */
-        public Map<String, MonthFortune> validMonths() {
+        public Map<Integer, MonthFortune> validMonths() {
             if (months == null) return Map.of();
             return months.entrySet().stream()
                     .filter(e -> e.getValue() != null)
@@ -160,7 +160,7 @@ public record CareerAdviceResponse(
         }
 
         /** null 요소가 제거된 warningMonths 목록을 반환합니다. */
-        public List<String> validWarningMonths() {
+        public List<Integer> validWarningMonths() {
             if (warningMonths == null) return List.of();
             return warningMonths.stream().filter(m -> m != null).toList();
         }

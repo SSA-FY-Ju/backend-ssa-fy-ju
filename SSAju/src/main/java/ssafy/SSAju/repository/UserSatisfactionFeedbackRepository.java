@@ -13,8 +13,7 @@ public interface UserSatisfactionFeedbackRepository extends JpaRepository<UserSa
 
     List<UserSatisfactionFeedback> findAllByUser(User user);
 
-    Optional<UserSatisfactionFeedback> findBySajuResult_IdAndUser(Long sajuResultId, User user);
+    Optional<UserSatisfactionFeedback> findByCompanyCompatibility_IdAndUser_Id(Long compatibilityId, Long userId);
 
-    /** Mi-12: User 엔티티 전달 불필요 — userId만으로 조회 */
-    Optional<UserSatisfactionFeedback> findBySajuResult_IdAndUser_Id(Long sajuResultId, Long userId);
+    Optional<UserSatisfactionFeedback> findByCareerConsultation_IdAndUser_Id(Long consultationId, Long userId);
 }

@@ -10,6 +10,7 @@ import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.mapper.ConsultationMapper;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
+import ssafy.SSAju.exception.ConsultationRecoveryFailedException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 
 import java.util.Optional;
@@ -42,23 +43,23 @@ public class ConsultationSaveService {
      * @param sajuResult        저장 대상 SajuResult
      * @param advice            OpenAI 응답
      * @param modelVersion      사용 모델 버전
-     * @param consultationMonth 대상 월 (yyyy-MM)
+     * @param consultationMonth 대상 월 (YYYYMM 형식 정수, 예: 202605)
      */
     @Transactional
-    public void saveOrUpdate(SajuResult sajuResult, CareerAdviceResponse advice,
-                             String modelVersion, String consultationMonth) {
+    public Long saveOrUpdate(SajuResult sajuResult, CareerAdviceResponse advice,
+                             String modelVersion, Integer consultationMonth) {
         Optional<CareerConsultation> existingOpt = careerConsultationRepository
                 .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth);
 
         if (existingOpt.isPresent()) {
-            updateIfModelChanged(existingOpt.get(), sajuResult, advice, modelVersion, consultationMonth);
+            return updateIfModelChanged(existingOpt.get(), sajuResult, advice, modelVersion, consultationMonth);
         } else {
-            insertOrRecoverOnConflict(sajuResult, advice, modelVersion, consultationMonth);
+            return insertOrRecoverOnConflict(sajuResult, advice, modelVersion, consultationMonth);
         }
     }
 
-    private void updateIfModelChanged(CareerConsultation existing, SajuResult sajuResult,
-                                      CareerAdviceResponse advice, String modelVersion, String consultationMonth) {
+    private Long updateIfModelChanged(CareerConsultation existing, SajuResult sajuResult,
+                                      CareerAdviceResponse advice, String modelVersion, Integer consultationMonth) {
         if (!existing.getOpenaiModelVersion().equals(modelVersion)) {
             log.info("모델 버전 변경 감지 — 기존 컨설팅 결과 업데이트: " +
                             "sajuResultId={}, month={}, 구버전={}, 신버전={}",
@@ -69,28 +70,31 @@ public class ConsultationSaveService {
             log.info("같은 모델 버전 — 기존 컨설팅 결과 유지: sajuResultId={}, month={}",
                     sajuResult.getId(), consultationMonth);
         }
+        return existing.getId();
     }
 
-    private void insertOrRecoverOnConflict(SajuResult sajuResult, CareerAdviceResponse advice,
-                                           String modelVersion, String consultationMonth) {
+    private Long insertOrRecoverOnConflict(SajuResult sajuResult, CareerAdviceResponse advice,
+                                           String modelVersion, Integer consultationMonth) {
         try {
             CareerConsultation newConsultation = consultationMapper.buildConsultation(
                     sajuResult, advice, modelVersion, consultationMonth);
-            // saveAndFlush: UNIQUE 제약 위반을 즉시 감지하기 위해 flush 강제 실행
-            careerConsultationRepository.saveAndFlush(newConsultation);
+            CareerConsultation saved = careerConsultationRepository.saveAndFlush(newConsultation);
             log.info("새 CareerConsultation 저장 완료: sajuResultId={}, month={}",
                     sajuResult.getId(), consultationMonth);
+            return saved.getId();
         } catch (DataIntegrityViolationException e) {
             if (findConstraintViolation(e).isEmpty()) {
                 throw e;
             }
-            // 동시 경합: 다른 스레드가 먼저 삽입 → 재조회 후 버전 비교
             log.warn("CareerConsultation 동시 insert 경합 — 기존 결과 재조회: sajuResultId={}, month={}",
                     sajuResult.getId(), consultationMonth);
-            careerConsultationRepository
+            return careerConsultationRepository
                     .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth)
-                    .ifPresent(existing -> updateIfModelChanged(
-                            existing, sajuResult, advice, modelVersion, consultationMonth));
+                    .map(existing -> updateIfModelChanged(
+                            existing, sajuResult, advice, modelVersion, consultationMonth))
+                    .orElseThrow(() -> new ConsultationRecoveryFailedException(
+                            "CareerConsultation 동시 경합 복구 실패: sajuResultId=" +
+                            sajuResult.getId() + ", month=" + consultationMonth));
         }
     }
 

@@ -19,6 +19,7 @@ import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.util.JwtUtil;
 
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -65,7 +66,7 @@ class AuthServiceTest {
         validRefreshToken = RefreshToken.builder()
                 .user(testUser)
                 .tokenHash("hashed-token")
-                .expiresAt(LocalDateTime.now().plusDays(7))
+                .expiresAt(Instant.now().plusSeconds(7L * 24 * 60 * 60))
                 .build();
     }
 
@@ -185,7 +186,7 @@ class AuthServiceTest {
         RefreshToken otherUserToken = RefreshToken.builder()
                 .user(otherUser)
                 .tokenHash("hashed-other-token")
-                .expiresAt(LocalDateTime.now().plusDays(7))
+                .expiresAt(Instant.now().plusSeconds(7L * 24 * 60 * 60))
                 .build();
 
         given(refreshTokenRepository.findByTokenHash(anyString())).willReturn(Optional.of(otherUserToken));

@@ -158,54 +158,40 @@ class CareerApiIntegrationTest {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // 피드백 저장 영속화 검증 (SajuResult → Feedback 연쇄)
+    // 피드백 저장 영속화 검증
     // ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("T090-3: 관운 분석 후 피드백 저장 → SajuResult 연결 검증")
-    void saveFeedback_afterCareerTiming_persistsFeedbackLinkedToSajuResult() throws Exception {
-        // Given: 먼저 관운 분석으로 SajuResult 생성
-        mockMvc.perform(post("/api/career/timing")
-                        .header("Authorization", authHeader)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"birthDate": "1990-10-10", "birthTime": "14:30"}
-                                """))
-                .andExpect(status().isOk());
-
-        Long savedSajuResultId = sajuResultRepository.findAll().get(0).getId();
-
-        // When: 피드백 저장
+    @DisplayName("T090-3: CAREER_TIMING 피드백 시도 → 400 FeedbackNotAllowedException")
+    void saveFeedback_withCareerTimingType_returns400() throws Exception {
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .header("Authorization", authHeader)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sajuResultId": %d,
+                                  "analysisId": 1,
                                   "feedbackType": "CAREER_TIMING",
                                   "satisfactionStatus": "SATISFIED",
-                                  "feedbackContent": "매우 유익했습니다"
+                                  "feedbackContent": "테스트"
                                 }
-                                """.formatted(savedSajuResultId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.feedbackId").isNumber())
-                .andExpect(jsonPath("$.data.feedbackContent").value("매우 유익했습니다"));
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
 
-        // Then: 피드백이 DB에 저장됐는지 검증
-        assertThat(feedbackRepository.count()).isEqualTo(1);
+        // Then: 피드백이 저장되지 않음
+        assertThat(feedbackRepository.count()).isZero();
     }
 
     @Test
-    @DisplayName("T090-4: 존재하지 않는 SajuResultId로 피드백 저장 → 404 Not Found")
-    void saveFeedback_withNonExistentSajuResultId_returns404() throws Exception {
+    @DisplayName("T090-4: 존재하지 않는 analysisId로 피드백 저장 → 404 Not Found")
+    void saveFeedback_withNonExistentAnalysisId_returns404() throws Exception {
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .header("Authorization", authHeader)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sajuResultId": 999999,
-                                  "feedbackType": "CAREER_TIMING",
+                                  "analysisId": 999999,
+                                  "feedbackType": "COMPATIBILITY",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))

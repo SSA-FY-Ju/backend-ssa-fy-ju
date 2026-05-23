@@ -19,6 +19,7 @@ import ssafy.SSAju.career.entity.TargetRoleAnalysis;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.AnalysisResponseBuilder;
+import ssafy.SSAju.service.CompatibilityChildReadService;
 import ssafy.SSAju.career.util.CompatibilityScoreCalculator;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.JobCategoryEnum;
@@ -89,6 +90,7 @@ class CompanyMatchingServiceTest {
     @Mock private MonthlyForecastRepository monthlyForecastRepository;
     @Mock private CautionRepository cautionRepository;
     @Mock private CompatibilityChildSaveService childSaveService;
+    @Mock private CompatibilityChildReadService childReadService;
     @Mock private UserRepository userRepository;
 
     private CompanyMatchingService service;
@@ -127,13 +129,8 @@ class CompanyMatchingServiceTest {
                 sajuDataService, companyInfoService, userProfileProvider, sajuValidator,
                 tenGodCalculator, hiddenStemCalculator,
                 compatibilityScoreCalculator, jobRoleAnalyzer, analysisResponseBuilder,
-                companyCompatibilityRepository, companyCompatibilityJdbcRepository, childSaveService,
-                userRepository,
-                targetRoleAnalysisRepository, fiveElementsAnalysisRepository,
-                analysisBreakdownRepository, actionableStrategyRepository,
-                actionableKeywordRepository, luckyDayRepository,
-                expectedInterviewQuestionRepository, roleCompatibilityRepository,
-                monthlyForecastRepository, cautionRepository
+                companyCompatibilityRepository, companyCompatibilityJdbcRepository,
+                childSaveService, childReadService, userRepository
         );
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
 
@@ -225,6 +222,48 @@ class CompanyMatchingServiceTest {
         assertThat(response.fiveElements()).isNotNull();
         assertThat(response.analysisBreakdown()).isNotNull();
         assertThat(response.actionableStrategy()).isNotNull();
+    }
+
+    // ─────────────────────────────────────────
+    // Race Condition: 완료된 캐시 재사용 (completed=true)
+    // ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("INSERT IGNORE 0 + completed=true → childReadService.buildFromExisting 호출")
+    void shouldUseCachedResult_WhenInsertedZeroAndCompleted() {
+        // Given
+        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
+        HiddenStems mockHiddenStems = new HiddenStems(
+                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
+                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
+
+        CompanyCompatibility completedEntity = buildCompatibility(MOCK_USER_PROFILE);
+        completedEntity.markCompleted();
+
+        CompatibilityResponse cachedResponse = new CompatibilityResponse(
+                completedEntity.getId(), null, 78, "캐시 요약",
+                null, null, null, null, null, null, null, null
+        );
+
+        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
+        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
+        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
+        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
+                .willReturn(78);
+        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
+                .willReturn(new CompatibilityAnalysisData.RoleAnalysis(85, "시너지", "경고"));
+        given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(0);
+        given(companyCompatibilityRepository.findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
+                any(), any(), anyString(), any())).willReturn(Optional.of(completedEntity));
+        given(childReadService.buildFromExisting(completedEntity, request)).willReturn(cachedResponse);
+
+        // When
+        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
+
+        // Then: 캐시된 응답 반환 및 신규 자식 저장 없음
+        assertThat(response).isEqualTo(cachedResponse);
+        verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
+        verify(childReadService).buildFromExisting(completedEntity, request);
     }
 
     // ─────────────────────────────────────────

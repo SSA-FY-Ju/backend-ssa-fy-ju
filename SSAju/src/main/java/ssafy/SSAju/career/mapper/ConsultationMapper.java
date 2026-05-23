@@ -5,6 +5,7 @@ import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.*;
 import ssafy.SSAju.career.enums.TenGodConstants;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
+import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.response.ConsultationResponse;
 
 import java.time.LocalDate;
@@ -22,7 +23,7 @@ public class ConsultationMapper {
     public CareerConsultation buildConsultation(SajuResult sajuResult,
                                                 CareerAdviceResponse advice,
                                                 String modelVersion,
-                                                String consultationMonth) {
+                                                Integer consultationMonth) {
         CareerConsultation consultation = CareerConsultation.builder()
                 .sajuResult(sajuResult)
                 .openaiModelVersion(modelVersion)
@@ -93,6 +94,64 @@ public class ConsultationMapper {
                 cc.getDayMasterDescription(),
                 cc.getFiveElementsAnalysis()
         );
+    }
+
+    public ConsultationResponse toResponse(FastAPIResponse sajuData,
+                                            TenGodDistribution tenGodDistribution,
+                                            String dayMaster,
+                                            String favoredPeriod,
+                                            int confidenceScore,
+                                            String reasoning,
+                                            SajuResult sajuResult,
+                                            Long consultationId,
+                                            CareerAdviceResponse advice,
+                                            String modelVersion) {
+        Map<String, String> tenGodCharacteristics = buildTenGodCharacteristics(tenGodDistribution);
+        ConsultationResponse.SajuProfile sajuProfile = new ConsultationResponse.SajuProfile(
+                dayMaster,
+                advice.dayMasterDescription(),
+                sajuData.fiveElements(),
+                advice.fiveElementsAnalysis(),
+                tenGodDistribution.asMap(),
+                advice.keyTenGods(),
+                tenGodCharacteristics
+        );
+        String analysisSummary = buildAnalysisSummary(
+                dayMaster, tenGodDistribution, sajuData.fiveElements(), favoredPeriod);
+
+        return new ConsultationResponse(
+                consultationId,
+                advice.industries(),
+                advice.interviewTips(),
+                advice.strengths(),
+                modelVersion,
+                favoredPeriod,
+                confidenceScore,
+                reasoning,
+                sajuProfile,
+                advice.cautions(),
+                advice.wealthStyle(),
+                advice.longTermRoadmap(),
+                advice.personalBranding(),
+                advice.powerKeywords(),
+                advice.mentalCare(),
+                advice.environmentFit(),
+                advice.workStyle(),
+                advice.relationshipStrategy(),
+                advice.careerTimeline(),
+                analysisSummary
+        );
+    }
+
+    private Map<String, String> buildTenGodCharacteristics(TenGodDistribution tenGodDistribution) {
+        return tenGodDistribution.asMap().keySet().stream()
+                .collect(Collectors.toMap(
+                        name -> name,
+                        name -> {
+                            TenGodConstants tg = TenGodConstants.fromName(name);
+                            return tg != null ? tg.getCharacteristics() : "";
+                        }
+                ));
     }
 
     public String buildAnalysisSummary(String dayMaster,
@@ -203,7 +262,7 @@ public class ConsultationMapper {
     private CareerAdviceResponse.CareerTimeline toCareerTimelineDto(ConsultationCareerTimeline ct) {
         if (ct == null) return null;
 
-        Map<String, CareerAdviceResponse.MonthFortune> months = ct.getMonthFortunes() == null
+        Map<Integer, CareerAdviceResponse.MonthFortune> months = ct.getMonthFortunes() == null
                 ? Collections.emptyMap()
                 : ct.getMonthFortunes().stream()
                         .collect(Collectors.toMap(
@@ -219,7 +278,11 @@ public class ConsultationMapper {
                                 pp.getMonth(), pp.getType(), pp.getScore(), pp.getDescription()))
                         .toList();
 
-        List<String> warningMonths = toStringList(ct.getWarningMonths(), ConsultationWarningMonth::getMonth);
+        List<Integer> warningMonths = ct.getWarningMonths() == null
+                ? Collections.emptyList()
+                : ct.getWarningMonths().stream()
+                        .map(ConsultationWarningMonth::getMonth)
+                        .toList();
 
         return new CareerAdviceResponse.CareerTimeline(
                 ct.getYear(), months, pivotPoints, warningMonths, ct.getWarningDescription());

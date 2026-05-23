@@ -4,16 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import ssafy.SSAju.career.domain.HiddenStems;
-import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.SajuResult;
+import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.career.entity.UserProfile;
-import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
+import ssafy.SSAju.career.provider.SajuAnalysisFacade;
 import ssafy.SSAju.career.provider.UserProfileProvider;
-import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
-import ssafy.SSAju.career.util.HiddenStemCalculator;
-import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
@@ -24,7 +20,6 @@ import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
 
 @Slf4j
 @Service
@@ -34,9 +29,8 @@ public class CareerFortuneService {
     private final SajuDataService sajuDataService;
     private final UserProfileProvider userProfileProvider;
     private final SajuResultWriteService sajuResultWriteService;
-    private final TenGodCalculator tenGodCalculator;
-    private final HiddenStemCalculator hiddenStemCalculator;
-    private final CareerFortuneAnalyzer careerFortuneAnalyzer;
+    private final SajuResultRepository sajuResultRepository;
+    private final SajuAnalysisFacade sajuAnalysisFacade;
     private final SajuResultMapper sajuResultMapper;
     private final SajuValidator sajuValidator;
     private final UserRepository userRepository;
@@ -58,31 +52,24 @@ public class CareerFortuneService {
         FastAPIResponse sajuData = sajuDataService.fetchSajuFromFastAPI(birthDate, birthTime);
         sajuValidator.validate(sajuData);
 
-        List<String> heavenlyStems = sajuData.heavenlyStems();
-        List<String> earthlyBranches = sajuData.earthlyBranches();
-        TenGodDistribution tenGodDistribution = tenGodCalculator.calculate(heavenlyStems);
-        HiddenStems hiddenStems = hiddenStemCalculator.calculate(earthlyBranches);
-        log.debug("십신 분포: {}, 지장간: {}", tenGodDistribution, hiddenStems);
-
-        String dayMaster = heavenlyStems.get(SajuPillarIndex.DAY_INDEX);
-        String favoredPeriod = careerFortuneAnalyzer.analyzeFavoredPeriod(
-                tenGodDistribution, hiddenStems, dayMaster, earthlyBranches);
-        int confidenceScore = careerFortuneAnalyzer.calculateConfidenceScore(
-                tenGodDistribution, hiddenStems, dayMaster);
-        String reasoning = careerFortuneAnalyzer.buildReasoning(favoredPeriod, tenGodDistribution);
+        SajuAnalysisFacade.SajuAnalysisContext ctx = sajuAnalysisFacade.analyze(sajuData);
+        log.debug("십신 분포: {}, 지장간: {}", ctx.tenGodDistribution(), ctx.hiddenStems());
 
         SajuResult newResult = sajuResultMapper.buildSajuResult(
-                userProfile, user, sajuData, tenGodDistribution, hiddenStems,
-                favoredPeriod, confidenceScore, reasoning);
+                userProfile, user, sajuData, ctx.tenGodDistribution(), ctx.hiddenStems(),
+                ctx.favoredPeriod(), ctx.confidenceScore(), ctx.reasoning());
 
+        SajuResult savedResult;
         try {
-            sajuResultWriteService.replaceForUserProfile(userProfile, newResult);
+            savedResult = sajuResultWriteService.replaceForUserProfile(userProfile, newResult);
         } catch (DataIntegrityViolationException ex) {
             log.warn("SajuResult 동시 insert 경합, 기존 결과 유지 (userId={})", userProfile.getId());
+            savedResult = sajuResultRepository.findByUserProfile(userProfile)
+                    .orElse(newResult);
         }
 
-        log.info("관운 분석 완료: favoredPeriod={}", favoredPeriod);
-        return new CareerTimingResponse(newResult.getId(), favoredPeriod, confidenceScore, reasoning);
+        log.info("관운 분석 완료: favoredPeriod={}", ctx.favoredPeriod());
+        return new CareerTimingResponse(savedResult.getId(), ctx.favoredPeriod(), ctx.confidenceScore(), ctx.reasoning());
     }
 
 }

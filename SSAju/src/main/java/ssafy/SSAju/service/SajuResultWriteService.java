@@ -2,8 +2,8 @@ package ssafy.SSAju.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
@@ -16,10 +16,13 @@ import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.TenGodData;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Optional;
+import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
@@ -43,6 +46,7 @@ public class SajuResultWriteService {
     private final TenGodDataRepository tenGodDataRepository;
     private final HiddenStemDataRepository hiddenStemDataRepository;
     private final CareerFortuneRepository careerFortuneRepository;
+    private final CareerConsultationRepository careerConsultationRepository;
 
     /**
      * 기존 SajuResult 삭제 후 새 SajuResult 저장.
@@ -55,20 +59,20 @@ public class SajuResultWriteService {
             backoff = @Backoff(delay = 100)
     )
     @Transactional
-    public void replaceForUserProfile(UserProfile userProfile, SajuResult newResult) {
-        // 소유권 일관성: A의 결과를 지운 뒤 B의 결과를 저장하는 실수 방지
+    public SajuResult replaceForUserProfile(UserProfile userProfile, SajuResult newResult) {
         if (newResult.getUserProfile() != null
                 && !newResult.getUserProfile().equals(userProfile)) {
             throw new InvalidSajuDataException(ErrorMessageConstants.USER_PROFILE_MISMATCH.getMessage());
         }
         sajuResultRepository.findByUserProfile(userProfile).ifPresent(existing -> {
             Long existingId = existing.getId();
+            careerConsultationRepository.deleteBySajuResultId(existingId);
             tenGodDataRepository.deleteBySajuResultId(existingId);
             hiddenStemDataRepository.deleteBySajuResultId(existingId);
             careerFortuneRepository.deleteBySajuResultId(existingId);
             sajuResultRepository.deleteByUserProfileJpql(userProfile);
         });
-        sajuResultRepository.save(newResult);
+        return sajuResultRepository.saveAndFlush(newResult);
     }
 
     /**
@@ -78,7 +82,11 @@ public class SajuResultWriteService {
      * 자식 저장 실패 시 롤백되어 root만 남는 불일치 상태를 방지.
      */
     @Transactional
-    public SajuResult saveNewResultWithChildren(SajuResult saved, SajuResult source) {
+    public SajuResult saveNewResultWithChildren(SajuResult detached, SajuResult source) {
+        // 트랜잭션 내에서 재조회 → managed 엔티티 확보 (detached 엔티티의 PersistentBag 조작 방지)
+        SajuResult saved = sajuResultRepository.findById(detached.getId())
+                .orElseThrow(() -> new DataAccessException(ErrorMessageConstants.SAJU_RESULT_ACCESS_FAILED.getMessage()));
+
         SajuFullData srcFullData = source.getSajuFullData();
         if (srcFullData != null) {
             saved.assignSajuFullData(SajuFullData.builder()
@@ -100,7 +108,7 @@ public class SajuResultWriteService {
                         .tenGodName(e.getTenGodName())
                         .score(e.getScore())
                         .build())
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
 
         List<HiddenStemData> hiddenStems = source.getHiddenStemDataList().stream()
                 .map(e -> HiddenStemData.builder()
@@ -108,7 +116,7 @@ public class SajuResultWriteService {
                         .earthlyBranch(e.getEarthlyBranch())
                         .hiddenStem(e.getHiddenStem())
                         .build())
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
 
         saved.assignTenGodData(tenGods);
         saved.assignHiddenStemData(hiddenStems);
@@ -131,48 +139,22 @@ public class SajuResultWriteService {
      * 중복 키(동시성 경쟁)인 경우에만 무시. 그 외 실제 제약 위반은 재throw.
      */
     @Recover
-    public void recover(DataIntegrityViolationException ex, UserProfile userProfile, SajuResult newResult) {
+    public SajuResult recover(DataIntegrityViolationException ex, UserProfile userProfile, SajuResult newResult) {
         if (isDuplicateKeyViolation(ex)) {
-            log.debug("SajuResult 동시 생성 감지: userProfileId={} - 기존 결과 유지", userProfile.getId());
-            return;
+            log.debug("SajuResult 동시 생성 감지: userProfileId={} - 기존 결과 반환", userProfile.getId());
+            return sajuResultRepository.findByUserProfile(userProfile)
+                    .orElseThrow(() -> new DataAccessException(
+                            ErrorMessageConstants.SAJU_RESULT_ACCESS_FAILED.getMessage()));
         }
         throw ex;
     }
 
     private boolean isDuplicateKeyViolation(DataIntegrityViolationException ex) {
-        // 1. Spring이 이미 친절하게 '중복 키 에러'라고 번역해준 경우 (가장 깔끔함)
-        if (ex instanceof DuplicateKeyException) {
-            return true;
-        }
-
-        Throwable cause = ex.getCause();
-        while (cause != null) {
-            String msg = cause.getMessage();
-            if (msg != null) {
-                // MySQL + H2 메시지 포맷 모두 처리
-                if (msg.contains("Duplicate entry") || msg.contains("duplicate key")
-                        || msg.contains("Unique index or primary key violation")) {
-                    return true;
-                }
-            }
-
-            if (cause instanceof SQLException) {
-                SQLException sqlEx = (SQLException) cause;
-                String sqlState = sqlEx.getSQLState();
-                int errorCode = sqlEx.getErrorCode();
-
-                // H2의 중복 키 SQLState (23505)
-                if ("23505".equals(sqlState)) {
-                    return true;
-                }
-                // MySQL의 중복 키 Error Code (1062)
-                // 주의: SQLState "23000"은 Not Null, FK 에러도 포함하므로 사용하면 안 됨!
-                if (errorCode == 1062) {
-                    return true;
-                }
-            }
-            cause = cause.getCause();
-        }
-        return false;
+        Throwable rootCause = NestedExceptionUtils.getMostSpecificCause(ex);
+        return switch (rootCause) {
+            case SQLException sqlEx when sqlEx.getErrorCode() == 1062 -> true;  // MySQL
+            case SQLException sqlEx when "23505".equals(sqlEx.getSQLState()) -> true;  // H2/PostgreSQL
+            default -> false;
+        };
     }
 }

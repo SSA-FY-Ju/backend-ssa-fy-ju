@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
+import ssafy.SSAju.career.domain.FiveElements;
+import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.entity.*;
 import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.provider.UserProfileProvider;
@@ -17,7 +19,9 @@ import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.exception.PublicDataApiException;
 import ssafy.SSAju.exception.UserNotFoundException;
-import ssafy.SSAju.repository.*;
+import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
+import ssafy.SSAju.repository.CompanyCompatibilityRepository;
+import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -63,24 +67,13 @@ public class CompanyMatchingService {
     private final AnalysisResponseBuilder responseBuilder;
 
     // ─────────────────────────────────────────
-    // 레포지토리 / 자식 저장 서비스
+    // 레포지토리 / 자식 서비스
     // ─────────────────────────────────────────
     private final CompanyCompatibilityRepository companyCompatibilityRepository;
     private final CompanyCompatibilityJdbcRepository companyCompatibilityJdbcRepository;
     private final CompatibilityChildSaveService childSaveService;
+    private final CompatibilityChildReadService childReadService;
     private final UserRepository userRepository;
-
-    // 캐시 재사용 경로(buildResponseFromExisting)에서 자식 엔티티 조회용
-    private final TargetRoleAnalysisRepository targetRoleAnalysisRepository;
-    private final FiveElementsAnalysisRepository fiveElementsAnalysisRepository;
-    private final AnalysisBreakdownRepository analysisBreakdownRepository;
-    private final ActionableStrategyRepository actionableStrategyRepository;
-    private final ActionableKeywordRepository actionableKeywordRepository;
-    private final LuckyDayRepository luckyDayRepository;
-    private final ExpectedInterviewQuestionRepository expectedInterviewQuestionRepository;
-    private final RoleCompatibilityRepository roleCompatibilityRepository;
-    private final MonthlyForecastRepository monthlyForecastRepository;
-    private final CautionRepository cautionRepository;
 
     public CompatibilityResponse analyzeCompatibility(CompatibilityRequest request, Long userId) {
         log.info("기업 궁합 분석 시작");
@@ -179,7 +172,7 @@ public class CompanyMatchingService {
             if (saved.isCompleted()) {
                 // Option A: completed=true → 자식 데이터가 완전히 저장된 캐시만 재사용
                 log.info("완료된 궁합 분석 캐시 재사용 (compatibilityId={})", saved.getId());
-                return buildResponseFromExisting(saved, request);
+                return childReadService.buildFromExisting(saved, request);
             }
             // completed=false: 다른 요청이 자식 저장 진행 중 → 현재 계산 결과로 응답
             // (재계산 없이 이미 인메모리에 있는 결과를 그대로 반환, DB 저장은 진행 중인 요청에 위임)
@@ -235,74 +228,6 @@ public class CompanyMatchingService {
     // ─────────────────────────────────────────
     // private: 응답 빌드
     // ─────────────────────────────────────────
-
-    /**
-     * 캐시 재사용 경로: DB에서 모든 자식 엔티티를 로드하여 응답을 구성합니다.
-     * 첫 번째 요청과 두 번째 이후 요청이 동일한 응답 구조를 반환하도록 보장합니다.
-     */
-    private CompatibilityResponse buildResponseFromExisting(CompanyCompatibility saved,
-                                                              CompatibilityRequest request) {
-        CompatibilityResponse.TargetRoleAnalysis targetRoleAnalysis =
-                targetRoleAnalysisRepository.findByCompanyCompatibility_Id(saved.getId())
-                        .map(e -> new CompatibilityResponse.TargetRoleAnalysis(
-                                e.getMatchScore(), e.getSynergy(), e.getWarning()))
-                        .orElse(null);
-
-        CompatibilityResponse.FiveElements fiveElements =
-                fiveElementsAnalysisRepository.findByCompanyCompatibility_Id(saved.getId())
-                        .map(e -> new CompatibilityResponse.FiveElements(
-                                e.getUserDistribution(), e.getCompanyDistribution(), e.getSynergyDescription()))
-                        .orElse(null);
-
-        CompatibilityResponse.AnalysisBreakdown analysisBreakdown =
-                analysisBreakdownRepository.findByCompanyCompatibility_Id(saved.getId())
-                        .map(e -> new CompatibilityResponse.AnalysisBreakdown(
-                                e.getCharacterMatch(), e.getPotentialSynergy(), e.getLongTermStability()))
-                        .orElse(null);
-
-        CompatibilityResponse.ActionableStrategy actionableStrategy =
-                actionableStrategyRepository.findByCompanyCompatibility_Id(saved.getId())
-                        .map(e -> {
-                            List<String> keywords = actionableKeywordRepository
-                                    .findByActionableStrategy_IdOrderByDisplayOrderAsc(e.getId())
-                                    .stream().map(ActionableKeyword::getKeyword).toList();
-                            List<String> luckyDays = luckyDayRepository
-                                    .findByActionableStrategy_IdOrderByDisplayOrderAsc(e.getId())
-                                    .stream().map(LuckyDay::getLuckyDay).toList();
-                            return new CompatibilityResponse.ActionableStrategy(
-                                    keywords, e.getWeaknessDefense(),
-                                    new CompatibilityResponse.ActionableStrategy.BestTiming(
-                                            luckyDays, e.getPreferredTime()));
-                        })
-                        .orElse(null);
-
-        List<ExpectedInterviewQuestion> questions =
-                expectedInterviewQuestionRepository.findByCompanyCompatibility_Id(saved.getId());
-        List<RoleCompatibility> roles =
-                roleCompatibilityRepository.findByCompanyCompatibility_Id(saved.getId());
-        List<MonthlyForecast> forecasts =
-                monthlyForecastRepository.findByCompanyCompatibility_Id(saved.getId());
-        List<Caution> cautionList =
-                cautionRepository.findByCompanyCompatibility_Id(saved.getId());
-
-        return new CompatibilityResponse(
-                saved.getId(),
-                buildRequestContext(saved, request),
-                saved.getCompatibilityScore(),
-                saved.getSummary(),
-                targetRoleAnalysis,
-                fiveElements,
-                analysisBreakdown,
-                actionableStrategy,
-                questions.stream().map(q -> new CompatibilityResponse.InterviewQuestion(
-                        q.getQuestion(), q.getIntent())).toList(),
-                roles.stream().map(r -> new CompatibilityResponse.RoleCompatibility(
-                        r.getRoleName(), r.getScore(), r.getReason(), r.getTag())).toList(),
-                forecasts.stream().map(f -> new CompatibilityResponse.MonthlyForecast(
-                        f.getMonth(), f.getScore(), f.getStatus(), f.getAdvice())).toList(),
-                cautionList.stream().map(Caution::getContent).toList()
-        );
-    }
 
     private CompatibilityResponse buildNewResponse(CompanyCompatibility saved,
                                                      CompatibilityRequest request,
