@@ -22,37 +22,28 @@ public class AnalysisHistoryRepository {
 
     private static final String UNION_QUERY = """
             SELECT 'SAJU' AS type, sr.id AS analysis_id, u.name AS target_name,
-                   up.birth_date, sr.fetched_at AS created_at,
-                   usf.satisfaction_status
+                   up.birth_date, sr.fetched_at AS created_at
             FROM saju_result sr
             JOIN user_profile up ON sr.user_profile_id = up.id
             JOIN users u ON sr.user_id = u.id
-            LEFT JOIN user_satisfaction_feedback usf
-                ON usf.saju_result_id = sr.id
-                AND usf.user_id = sr.user_id
-                AND usf.feedback_type = 'SAJU'
             WHERE sr.user_id = ?
               AND sr.fetched_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
 
             UNION ALL
 
-            SELECT 'CAREER_FORTUNE', cf.id, u.name, up.birth_date,
-                   cf.created_at, usf.satisfaction_status
+            SELECT 'CAREER_FORTUNE' AS type, cf.id AS analysis_id, u.name AS target_name,
+                   up.birth_date, cf.created_at
             FROM career_fortune cf
             JOIN saju_result sr ON cf.saju_result_id = sr.id
             JOIN user_profile up ON sr.user_profile_id = up.id
             JOIN users u ON sr.user_id = u.id
-            LEFT JOIN user_satisfaction_feedback usf
-                ON usf.saju_result_id = cf.saju_result_id
-                AND usf.user_id = sr.user_id
-                AND usf.feedback_type = 'CAREER_FORTUNE'
             WHERE sr.user_id = ?
               AND cf.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
 
             UNION ALL
 
-            SELECT 'COMPANY_COMPATIBILITY', cc.id, cc.company_name, up.birth_date,
-                   cc.created_at, NULL
+            SELECT 'COMPANY_COMPATIBILITY' AS type, cc.id AS analysis_id,
+                   cc.company_name AS target_name, up.birth_date, cc.created_at
             FROM company_compatibility cc
             JOIN user_profile up ON cc.user_profile_id = up.id
             WHERE cc.user_id = ?
@@ -111,8 +102,7 @@ public class AnalysisHistoryRepository {
                         rs.getLong("analysis_id"),
                         rs.getString("target_name"),
                         rs.getDate("birth_date").toLocalDate(),
-                        rs.getTimestamp("created_at").toLocalDateTime(),
-                        rs.getString("satisfaction_status")
+                        rs.getTimestamp("created_at").toLocalDateTime()
                 ),
                 userId, userId, userId, size, offset);
     }
@@ -128,8 +118,7 @@ public class AnalysisHistoryRepository {
                         rs.getLong("analysis_id"),
                         rs.getString("target_name"),
                         rs.getDate("birth_date").toLocalDate(),
-                        rs.getTimestamp("created_at").toLocalDateTime(),
-                        rs.getString("satisfaction_status")
+                        rs.getTimestamp("created_at").toLocalDateTime()
                 ),
                 userId, userId, userId, type, size, offset);
     }
