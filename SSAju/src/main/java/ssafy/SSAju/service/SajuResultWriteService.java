@@ -2,8 +2,8 @@ package ssafy.SSAju.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
@@ -21,6 +21,7 @@ import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Optional;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.HiddenStemDataRepository;
@@ -58,8 +59,7 @@ public class SajuResultWriteService {
             backoff = @Backoff(delay = 100)
     )
     @Transactional
-    public void replaceForUserProfile(UserProfile userProfile, SajuResult newResult) {
-        // 소유권 일관성: A의 결과를 지운 뒤 B의 결과를 저장하는 실수 방지
+    public SajuResult replaceForUserProfile(UserProfile userProfile, SajuResult newResult) {
         if (newResult.getUserProfile() != null
                 && !newResult.getUserProfile().equals(userProfile)) {
             throw new InvalidSajuDataException(ErrorMessageConstants.USER_PROFILE_MISMATCH.getMessage());
@@ -72,7 +72,7 @@ public class SajuResultWriteService {
             careerFortuneRepository.deleteBySajuResultId(existingId);
             sajuResultRepository.deleteByUserProfileJpql(userProfile);
         });
-        sajuResultRepository.save(newResult);
+        return sajuResultRepository.saveAndFlush(newResult);
     }
 
     /**
@@ -139,30 +139,22 @@ public class SajuResultWriteService {
      * 중복 키(동시성 경쟁)인 경우에만 무시. 그 외 실제 제약 위반은 재throw.
      */
     @Recover
-    public void recover(DataIntegrityViolationException ex, UserProfile userProfile, SajuResult newResult) {
+    public SajuResult recover(DataIntegrityViolationException ex, UserProfile userProfile, SajuResult newResult) {
         if (isDuplicateKeyViolation(ex)) {
-            log.debug("SajuResult 동시 생성 감지: userProfileId={} - 기존 결과 유지", userProfile.getId());
-            return;
+            log.debug("SajuResult 동시 생성 감지: userProfileId={} - 기존 결과 반환", userProfile.getId());
+            return sajuResultRepository.findByUserProfile(userProfile)
+                    .orElseThrow(() -> new DataAccessException(
+                            ErrorMessageConstants.SAJU_RESULT_ACCESS_FAILED.getMessage()));
         }
         throw ex;
     }
 
     private boolean isDuplicateKeyViolation(DataIntegrityViolationException ex) {
-        if (ex instanceof DuplicateKeyException) {
-            return true;
-        }
-
-        Throwable cause = ex.getCause();
-        while (cause != null) {
-            if (cause instanceof SQLException sqlEx) {
-                // H2: SQLState "23505", MySQL: errorCode 1062
-                // SQLState "23000"은 NOT NULL, FK 위반도 포함하므로 사용 금지
-                if ("23505".equals(sqlEx.getSQLState()) || sqlEx.getErrorCode() == 1062) {
-                    return true;
-                }
-            }
-            cause = cause.getCause();
-        }
-        return false;
+        Throwable rootCause = NestedExceptionUtils.getMostSpecificCause(ex);
+        return switch (rootCause) {
+            case SQLException sqlEx when sqlEx.getErrorCode() == 1062 -> true;  // MySQL
+            case SQLException sqlEx when "23505".equals(sqlEx.getSQLState()) -> true;  // H2/PostgreSQL
+            default -> false;
+        };
     }
 }

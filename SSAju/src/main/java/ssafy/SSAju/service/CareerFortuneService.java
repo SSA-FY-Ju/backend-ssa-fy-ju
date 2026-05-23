@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import ssafy.SSAju.career.entity.SajuResult;
+import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
 import ssafy.SSAju.career.provider.SajuAnalysisFacade;
@@ -28,6 +29,7 @@ public class CareerFortuneService {
     private final SajuDataService sajuDataService;
     private final UserProfileProvider userProfileProvider;
     private final SajuResultWriteService sajuResultWriteService;
+    private final SajuResultRepository sajuResultRepository;
     private final SajuAnalysisFacade sajuAnalysisFacade;
     private final SajuResultMapper sajuResultMapper;
     private final SajuValidator sajuValidator;
@@ -57,14 +59,17 @@ public class CareerFortuneService {
                 userProfile, user, sajuData, ctx.tenGodDistribution(), ctx.hiddenStems(),
                 ctx.favoredPeriod(), ctx.confidenceScore(), ctx.reasoning());
 
+        SajuResult savedResult;
         try {
-            sajuResultWriteService.replaceForUserProfile(userProfile, newResult);
+            savedResult = sajuResultWriteService.replaceForUserProfile(userProfile, newResult);
         } catch (DataIntegrityViolationException ex) {
             log.warn("SajuResult 동시 insert 경합, 기존 결과 유지 (userId={})", userProfile.getId());
+            savedResult = sajuResultRepository.findByUserProfile(userProfile)
+                    .orElse(newResult);
         }
 
         log.info("관운 분석 완료: favoredPeriod={}", ctx.favoredPeriod());
-        return new CareerTimingResponse(newResult.getId(), ctx.favoredPeriod(), ctx.confidenceScore(), ctx.reasoning());
+        return new CareerTimingResponse(savedResult.getId(), ctx.favoredPeriod(), ctx.confidenceScore(), ctx.reasoning());
     }
 
 }
