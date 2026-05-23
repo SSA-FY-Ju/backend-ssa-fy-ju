@@ -9,6 +9,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.SignatureException;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.TokenExpiredException;
+import ssafy.SSAju.util.TokenType;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,8 +29,6 @@ public class JwtUtil {
 
     private static final String CLAIM_USER_ID = "userId";
     private static final String CLAIM_EMAIL = "email";
-    private static final String TOKEN_TYPE_ACCESS = "access";
-    private static final String TOKEN_TYPE_REFRESH = "refresh";
     private static final String CLAIM_TYPE = "type";
 
     private final SecretKey secretKey;
@@ -46,11 +45,11 @@ public class JwtUtil {
     }
 
     public String generateAccessToken(Long userId, String email) {
-        return buildToken(userId, email, TOKEN_TYPE_ACCESS, accessTokenExpirationMs);
+        return buildToken(userId, email, TokenType.ACCESS.getValue(), accessTokenExpirationMs);
     }
 
     public String generateRefreshToken(Long userId) {
-        return buildToken(userId, null, TOKEN_TYPE_REFRESH, refreshTokenExpirationMs);
+        return buildToken(userId, null, TokenType.REFRESH.getValue(), refreshTokenExpirationMs);
     }
 
     public record ParsedToken(Long userId, String email) {}

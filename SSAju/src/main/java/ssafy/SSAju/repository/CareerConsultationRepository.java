@@ -15,10 +15,10 @@ public interface CareerConsultationRepository extends JpaRepository<CareerConsul
     List<CareerConsultation> findBySajuResult(SajuResult sajuResult);
 
     /**
-     * M-9: 같은 달 캐시 히트 조회. consultationMonth 포맷은 "yyyy-MM" (예: "2026-05").
+     * M-9: 같은 달 캐시 히트 조회. consultationMonth 포맷은 YYYYMM 정수 (예: 202605).
      */
     Optional<CareerConsultation> findBySajuResultAndConsultationMonth(SajuResult sajuResult,
-                                                                       String consultationMonth);
+                                                                       Integer consultationMonth);
 
     /**
      * M-5: SajuResult 교체 시 연관된 CareerConsultation 전체 삭제 (FK 제약 위반 방지).

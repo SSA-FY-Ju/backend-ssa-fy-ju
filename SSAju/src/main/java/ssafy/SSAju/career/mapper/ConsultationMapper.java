@@ -23,7 +23,7 @@ public class ConsultationMapper {
     public CareerConsultation buildConsultation(SajuResult sajuResult,
                                                 CareerAdviceResponse advice,
                                                 String modelVersion,
-                                                String consultationMonth) {
+                                                Integer consultationMonth) {
         CareerConsultation consultation = CareerConsultation.builder()
                 .sajuResult(sajuResult)
                 .openaiModelVersion(modelVersion)
@@ -120,7 +120,6 @@ public class ConsultationMapper {
                 dayMaster, tenGodDistribution, sajuData.fiveElements(), favoredPeriod);
 
         return new ConsultationResponse(
-                sajuResult.getId(),
                 consultationId,
                 advice.industries(),
                 advice.interviewTips(),
@@ -263,11 +262,11 @@ public class ConsultationMapper {
     private CareerAdviceResponse.CareerTimeline toCareerTimelineDto(ConsultationCareerTimeline ct) {
         if (ct == null) return null;
 
-        Map<String, CareerAdviceResponse.MonthFortune> months = ct.getMonthFortunes() == null
+        Map<Integer, CareerAdviceResponse.MonthFortune> months = ct.getMonthFortunes() == null
                 ? Collections.emptyMap()
                 : ct.getMonthFortunes().stream()
                         .collect(Collectors.toMap(
-                                mf -> String.valueOf(mf.getMonthKey()),
+                                ConsultationMonthFortune::getMonthKey,
                                 mf -> new CareerAdviceResponse.MonthFortune(mf.getType(), mf.getDescription()),
                                 (a, b) -> a
                         ));
@@ -279,7 +278,11 @@ public class ConsultationMapper {
                                 pp.getMonth(), pp.getType(), pp.getScore(), pp.getDescription()))
                         .toList();
 
-        List<String> warningMonths = toStringList(ct.getWarningMonths(), ConsultationWarningMonth::getMonth);
+        List<Integer> warningMonths = ct.getWarningMonths() == null
+                ? Collections.emptyList()
+                : ct.getWarningMonths().stream()
+                        .map(ConsultationWarningMonth::getMonth)
+                        .toList();
 
         return new CareerAdviceResponse.CareerTimeline(
                 ct.getYear(), months, pivotPoints, warningMonths, ct.getWarningDescription());
@@ -482,7 +485,7 @@ public class ConsultationMapper {
         entity.assignMonthFortunes(ct.validMonths().entrySet().stream()
                 .map(e -> ConsultationMonthFortune.builder()
                         .consultationCareerTimeline(entity)
-                        .monthKey(Integer.parseInt(e.getKey()))
+                        .monthKey(e.getKey())
                         .type(e.getValue().type())
                         .description(e.getValue().description())
                         .build())

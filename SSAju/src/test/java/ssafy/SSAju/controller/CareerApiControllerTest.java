@@ -357,7 +357,6 @@ class CareerApiControllerTest {
     private ConsultationResponse buildMockConsultationResponse() {
         return new ConsultationResponse(
                 null,
-                null,
                 List.of(new CareerAdviceResponse.IndustryRecommendation(
                         "금융/핀테크", "오행 金 강세", List.of("백엔드 개발자"))),
                 List.of("일관성 있는 자기소개 준비"),
@@ -395,9 +394,9 @@ class CareerApiControllerTest {
                         "조력자", "깊이 있는 관계", "go-to person", "데이터 논의", "전문가 네트워크"),
                 new CareerAdviceResponse.CareerTimeline(
                         2026,
-                        Map.of("March", new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
-                        List.of(new CareerAdviceResponse.PivotPoint("March", "적극기", 9, "정관 절정")),
-                        List.of("May"), "급하게 결정하지 말 것"),
+                        Map.of(3, new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
+                        List.of(new CareerAdviceResponse.PivotPoint(3, "적극기", 9, "정관 절정")),
+                        List.of(5), "급하게 결정하지 말 것"),
                 "己 일간 · 정관 기운 기반 | 2026년 관운 분석 (H1)"
         );
     }

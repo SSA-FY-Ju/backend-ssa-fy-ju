@@ -33,8 +33,8 @@ public class CareerConsultation {
     @Column(name = "openai_model_version", nullable = false)
     private String openaiModelVersion;
 
-    @Column(name = "consultation_month", nullable = false, length = 7)
-    private String consultationMonth;
+    @Column(name = "consultation_month", nullable = false)
+    private Integer consultationMonth;
 
     // OpenAI 응답 중 단순 String 필드
     @Column(name = "day_master_description", columnDefinition = "text")
@@ -100,7 +100,7 @@ public class CareerConsultation {
 
     @Builder
     public CareerConsultation(SajuResult sajuResult, String openaiModelVersion,
-                               String consultationMonth, String dayMasterDescription,
+                               Integer consultationMonth, String dayMasterDescription,
                                String fiveElementsAnalysis) {
         this.sajuResult = sajuResult;
         this.openaiModelVersion = openaiModelVersion;

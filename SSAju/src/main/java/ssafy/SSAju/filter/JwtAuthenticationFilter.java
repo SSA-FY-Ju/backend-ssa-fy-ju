@@ -19,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.TokenExpiredException;
 import ssafy.SSAju.util.JwtUtil;
+import ssafy.SSAju.util.TokenType;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,21 +29,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
-
-    public enum TokenType {
-        ACCESS("access"),
-        REFRESH("refresh");
-
-        private final String value;
-
-        TokenType(String value) {
-            this.value = value;
-        }
-
-        public String getValue() {
-            return value;
-        }
-    }
 
     private final JwtUtil jwtUtil;
 

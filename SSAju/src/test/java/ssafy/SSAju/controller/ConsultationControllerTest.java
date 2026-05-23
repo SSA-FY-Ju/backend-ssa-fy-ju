@@ -39,7 +39,6 @@ class ConsultationControllerTest {
 
     private static final ConsultationResponse MOCK_RESPONSE = new ConsultationResponse(
             null,
-            null,
             List.of(new CareerAdviceResponse.IndustryRecommendation(
                     "금융/핀테크", "오행 金 강세", List.of("백엔드 개발자"))),
             List.of("일관성 있는 자기소개 준비", "데이터 기반 성과 강조"),
@@ -86,9 +85,9 @@ class ConsultationControllerTest {
                     "조력자 스타일", "깊이 있는 관계", "go-to person", "데이터 논의", "전문가 네트워크"),
             new CareerAdviceResponse.CareerTimeline(
                     2026,
-                    Map.of("March", new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
-                    List.of(new CareerAdviceResponse.PivotPoint("March", "적극기", 9, "정관 기운의 절정")),
-                    List.of("May", "July"),
+                    Map.of(3, new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
+                    List.of(new CareerAdviceResponse.PivotPoint(3, "적극기", 9, "정관 기운의 절정")),
+                    List.of(5, 7),
                     "이 기간엔 급하게 결정하지 말 것"),
             "己 일간 · 오행 火·金 강세 · 정관·편관 기운 기반 | 2026년 12개월 타임라인 + 관운 분석 (H1)"
     );

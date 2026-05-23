@@ -10,6 +10,7 @@ import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.mapper.ConsultationMapper;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
+import ssafy.SSAju.exception.ConsultationRecoveryFailedException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 
 import java.util.Optional;
@@ -42,11 +43,11 @@ public class ConsultationSaveService {
      * @param sajuResult        저장 대상 SajuResult
      * @param advice            OpenAI 응답
      * @param modelVersion      사용 모델 버전
-     * @param consultationMonth 대상 월 (yyyy-MM)
+     * @param consultationMonth 대상 월 (YYYYMM 형식 정수, 예: 202605)
      */
     @Transactional
     public Long saveOrUpdate(SajuResult sajuResult, CareerAdviceResponse advice,
-                             String modelVersion, String consultationMonth) {
+                             String modelVersion, Integer consultationMonth) {
         Optional<CareerConsultation> existingOpt = careerConsultationRepository
                 .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth);
 
@@ -58,7 +59,7 @@ public class ConsultationSaveService {
     }
 
     private Long updateIfModelChanged(CareerConsultation existing, SajuResult sajuResult,
-                                      CareerAdviceResponse advice, String modelVersion, String consultationMonth) {
+                                      CareerAdviceResponse advice, String modelVersion, Integer consultationMonth) {
         if (!existing.getOpenaiModelVersion().equals(modelVersion)) {
             log.info("모델 버전 변경 감지 — 기존 컨설팅 결과 업데이트: " +
                             "sajuResultId={}, month={}, 구버전={}, 신버전={}",
@@ -73,7 +74,7 @@ public class ConsultationSaveService {
     }
 
     private Long insertOrRecoverOnConflict(SajuResult sajuResult, CareerAdviceResponse advice,
-                                           String modelVersion, String consultationMonth) {
+                                           String modelVersion, Integer consultationMonth) {
         try {
             CareerConsultation newConsultation = consultationMapper.buildConsultation(
                     sajuResult, advice, modelVersion, consultationMonth);
@@ -91,7 +92,9 @@ public class ConsultationSaveService {
                     .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth)
                     .map(existing -> updateIfModelChanged(
                             existing, sajuResult, advice, modelVersion, consultationMonth))
-                    .orElse(null);
+                    .orElseThrow(() -> new ConsultationRecoveryFailedException(
+                            "CareerConsultation 동시 경합 복구 실패: sajuResultId=" +
+                            sajuResult.getId() + ", month=" + consultationMonth));
         }
     }
 

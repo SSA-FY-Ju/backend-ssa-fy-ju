@@ -20,8 +20,8 @@ public class ConsultationPivotPoint {
     @JoinColumn(name = "consultation_career_timeline_id", nullable = false)
     private ConsultationCareerTimeline consultationCareerTimeline;
 
-    @Column(name = "month", nullable = false, length = 7)
-    private String month;
+    @Column(name = "month", nullable = false)
+    private Integer month;
 
     @Column(name = "type")
     private String type;
@@ -34,7 +34,7 @@ public class ConsultationPivotPoint {
 
     @Builder
     public ConsultationPivotPoint(ConsultationCareerTimeline consultationCareerTimeline,
-                                  String month, String type, int score, String description) {
+                                  Integer month, String type, int score, String description) {
         this.consultationCareerTimeline = consultationCareerTimeline;
         this.month = month;
         this.type = type;

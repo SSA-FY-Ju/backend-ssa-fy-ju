@@ -127,9 +127,9 @@ class ConsultationServiceTest {
                     "조력자 스타일", "깊이 있는 관계 구축", "go-to person", "데이터 기반 논의", "전문가 네트워크"),
             new CareerAdviceResponse.CareerTimeline(
                     2026,
-                    Map.of("March", new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
-                    List.of(new CareerAdviceResponse.PivotPoint("March", "적극기", 9, "정관 기운의 절정")),
-                    List.of("May", "July"),
+                    Map.of(3, new CareerAdviceResponse.MonthFortune("적극기", "면접 기회 많음")),
+                    List.of(new CareerAdviceResponse.PivotPoint(3, "적극기", 9, "정관 기운의 절정")),
+                    List.of(5, 7),
                     "이 기간엔 급하게 결정하지 말 것"),
             List.of("정관", "편관"),
             "己土(기토) - 수용적이고 꼼꼼한 성향",

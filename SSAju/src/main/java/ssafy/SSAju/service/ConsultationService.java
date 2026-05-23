@@ -28,6 +28,7 @@ import ssafy.SSAju.repository.UserRepository;
 
 import java.util.Optional;
 import java.time.YearMonth;
+import java.time.LocalDate;
 
 @Slf4j
 @Service
@@ -87,7 +88,8 @@ public class ConsultationService {
         SajuResult sajuResult = sajuResultProvider.findOrCreate(userProfile, newResult);
 
         // ─── 3. 캐시 조회 (M-9) ─────────────────────────────────────────────────
-        String consultationMonth = YearMonth.now().toString();
+        YearMonth now = YearMonth.now();
+        Integer consultationMonth = now.getYear() * 100 + now.getMonthValue();
         Optional<CareerConsultation> cached = careerConsultationRepository
                 .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth);
 
