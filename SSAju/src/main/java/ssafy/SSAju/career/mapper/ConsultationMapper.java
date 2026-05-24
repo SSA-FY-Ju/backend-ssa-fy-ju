@@ -143,6 +143,66 @@ public class ConsultationMapper {
         );
     }
 
+    /**
+     * 마이페이지 상세 조회 전용: DB에 저장된 CareerConsultation 엔티티로 ConsultationResponse 복원.
+     * FastAPI 재호출 없이 SajuResult에 저장된 사주 데이터를 재사용합니다.
+     */
+    public ConsultationResponse toResponseFromEntity(CareerConsultation cc) {
+        SajuResult sajuResult = cc.getSajuResult();
+        SajuFullData sfd = sajuResult.getSajuFullData();
+        CareerFortune cf = sajuResult.getCareerFortune();
+
+        String dayMaster = sfd != null ? sfd.getDayMaster() : "";
+        Map<String, Integer> fiveElements = sfd != null ? sfd.getFiveElements() : Map.of();
+
+        Map<String, Integer> tenGodMap = sajuResult.getTenGodDataList().stream()
+                .collect(Collectors.toMap(TenGodData::getTenGodName, TenGodData::getScore,
+                        Integer::sum));
+        TenGodDistribution tenGodDistribution = new TenGodDistribution(tenGodMap);
+
+        String favoredPeriod = cf != null ? cf.getFavoredPeriod() : null;
+        int confidenceScore = cf != null ? cf.getConfidenceScore() : 0;
+        String reasoning = cf != null ? cf.getReasoning() : null;
+
+        CareerAdviceResponse advice = restoreAdvice(cc);
+
+        Map<String, String> tenGodCharacteristics = buildTenGodCharacteristics(tenGodDistribution);
+        ConsultationResponse.SajuProfile sajuProfile = new ConsultationResponse.SajuProfile(
+                dayMaster,
+                advice.dayMasterDescription(),
+                fiveElements,
+                advice.fiveElementsAnalysis(),
+                tenGodMap,
+                advice.keyTenGods(),
+                tenGodCharacteristics
+        );
+
+        String analysisSummary = buildAnalysisSummary(dayMaster, tenGodDistribution, fiveElements, favoredPeriod);
+
+        return new ConsultationResponse(
+                cc.getId(),
+                advice.industries(),
+                advice.interviewTips(),
+                advice.strengths(),
+                cc.getOpenaiModelVersion(),
+                favoredPeriod,
+                confidenceScore,
+                reasoning,
+                sajuProfile,
+                advice.cautions(),
+                advice.wealthStyle(),
+                advice.longTermRoadmap(),
+                advice.personalBranding(),
+                advice.powerKeywords(),
+                advice.mentalCare(),
+                advice.environmentFit(),
+                advice.workStyle(),
+                advice.relationshipStrategy(),
+                advice.careerTimeline(),
+                analysisSummary
+        );
+    }
+
     private Map<String, String> buildTenGodCharacteristics(TenGodDistribution tenGodDistribution) {
         return tenGodDistribution.asMap().keySet().stream()
                 .collect(Collectors.toMap(
