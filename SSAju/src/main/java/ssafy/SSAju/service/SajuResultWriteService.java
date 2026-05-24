@@ -16,6 +16,7 @@ import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.TenGodData;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.entity.User;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
@@ -49,8 +50,8 @@ public class SajuResultWriteService {
     private final CareerConsultationRepository careerConsultationRepository;
 
     /**
-     * 기존 SajuResult 삭제 후 새 SajuResult 저장.
-     * 첫 생성 시 race condition: 두 스레드가 동시에 findByUserProfile() → 없음 → save() → DIVE
+     * 해당 유저의 기존 SajuResult 삭제 후 새 SajuResult 저장.
+     * 첫 생성 시 race condition: 두 스레드가 동시에 findByUserAndUserProfile() → 없음 → save() → DIVE
      * @Retryable: DIVE 발생 시 100ms 대기 후 1회 재시도 (재시도 시 기존 row 발견 후 삭제+재저장)
      */
     @Retryable(
@@ -59,18 +60,18 @@ public class SajuResultWriteService {
             backoff = @Backoff(delay = 100)
     )
     @Transactional
-    public SajuResult replaceForUserProfile(UserProfile userProfile, SajuResult newResult) {
+    public SajuResult replaceForUser(User user, UserProfile userProfile, SajuResult newResult) {
         if (newResult.getUserProfile() != null
                 && !newResult.getUserProfile().equals(userProfile)) {
             throw new InvalidSajuDataException(ErrorMessageConstants.USER_PROFILE_MISMATCH.getMessage());
         }
-        sajuResultRepository.findByUserProfile(userProfile).ifPresent(existing -> {
+        sajuResultRepository.findByUserAndUserProfile(user, userProfile).ifPresent(existing -> {
             Long existingId = existing.getId();
             careerConsultationRepository.deleteBySajuResultId(existingId);
             tenGodDataRepository.deleteBySajuResultId(existingId);
             hiddenStemDataRepository.deleteBySajuResultId(existingId);
             careerFortuneRepository.deleteBySajuResultId(existingId);
-            sajuResultRepository.deleteByUserProfileJpql(userProfile);
+            sajuResultRepository.deleteByUserAndUserProfileJpql(user, userProfile);
         });
         return sajuResultRepository.saveAndFlush(newResult);
     }
@@ -139,10 +140,10 @@ public class SajuResultWriteService {
      * 중복 키(동시성 경쟁)인 경우에만 무시. 그 외 실제 제약 위반은 재throw.
      */
     @Recover
-    public SajuResult recover(DataIntegrityViolationException ex, UserProfile userProfile, SajuResult newResult) {
+    public SajuResult recover(DataIntegrityViolationException ex, User user, UserProfile userProfile, SajuResult newResult) {
         if (isDuplicateKeyViolation(ex)) {
-            log.debug("SajuResult 동시 생성 감지: userProfileId={} - 기존 결과 반환", userProfile.getId());
-            return sajuResultRepository.findByUserProfile(userProfile)
+            log.debug("SajuResult 동시 생성 감지: userId={} - 기존 결과 반환", user.getId());
+            return sajuResultRepository.findByUserAndUserProfile(user, userProfile)
                     .orElseThrow(() -> new DataAccessException(
                             ErrorMessageConstants.SAJU_RESULT_ACCESS_FAILED.getMessage()));
         }

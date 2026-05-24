@@ -15,14 +15,18 @@ import java.util.List;
 @Getter
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
 @Entity
-@Table(name = "saju_result")
+@Table(name = "saju_result",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_saju_result_user_profile",
+                columnNames = {"user_id", "user_profile_id"}
+        ))
 public class SajuResult {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_profile_id", nullable = false)
     private UserProfile userProfile;
 

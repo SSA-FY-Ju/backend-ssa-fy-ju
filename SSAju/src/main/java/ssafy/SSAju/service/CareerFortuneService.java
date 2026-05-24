@@ -61,10 +61,10 @@ public class CareerFortuneService {
 
         SajuResult savedResult;
         try {
-            savedResult = sajuResultWriteService.replaceForUserProfile(userProfile, newResult);
+            savedResult = sajuResultWriteService.replaceForUser(user, userProfile, newResult);
         } catch (DataIntegrityViolationException ex) {
-            log.warn("SajuResult 동시 insert 경합, 기존 결과 유지 (userId={})", userProfile.getId());
-            savedResult = sajuResultRepository.findByUserProfile(userProfile)
+            log.warn("SajuResult 동시 insert 경합, 기존 결과 유지 (userId={})", user.getId());
+            savedResult = sajuResultRepository.findByUserAndUserProfile(user, userProfile)
                     .orElse(newResult);
         }
 

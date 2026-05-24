@@ -105,7 +105,7 @@ class CareerFortuneServiceTest {
                 .willReturn(VALID_FASTAPI_RESPONSE);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(expectedResult);
-        given(sajuResultWriteService.replaceForUserProfile(savedProfile, expectedResult))
+        given(sajuResultWriteService.replaceForUser(MOCK_USER, savedProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When
@@ -117,7 +117,7 @@ class CareerFortuneServiceTest {
         assertThat(result.reasoning()).contains("하반기");
         verify(userProfileProvider).findOrCreate(BIRTH_DATE, BIRTH_TIME);
         // mapper → service → writer 배선 검증: 실제 expectedResult가 전달됐는지 확인
-        verify(sajuResultWriteService).replaceForUserProfile(savedProfile, expectedResult);
+        verify(sajuResultWriteService).replaceForUser(MOCK_USER, savedProfile, expectedResult);
     }
 
     @Test
@@ -132,7 +132,7 @@ class CareerFortuneServiceTest {
                 .willReturn(VALID_FASTAPI_RESPONSE);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(expectedResult);
-        given(sajuResultWriteService.replaceForUserProfile(existingProfile, expectedResult))
+        given(sajuResultWriteService.replaceForUser(MOCK_USER, existingProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When
@@ -140,7 +140,7 @@ class CareerFortuneServiceTest {
 
         // Then
         verify(userProfileProvider).findOrCreate(BIRTH_DATE, BIRTH_TIME);
-        verify(sajuResultWriteService).replaceForUserProfile(existingProfile, expectedResult);
+        verify(sajuResultWriteService).replaceForUser(MOCK_USER, existingProfile, expectedResult);
     }
 
     // ─────────────────────────────────────────
@@ -164,7 +164,7 @@ class CareerFortuneServiceTest {
         var expectedResult = SajuResult.builder().userProfile(savedProfile).user(MOCK_USER).build();
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(expectedResult);
-        given(sajuResultWriteService.replaceForUserProfile(savedProfile, expectedResult))
+        given(sajuResultWriteService.replaceForUser(MOCK_USER, savedProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When
