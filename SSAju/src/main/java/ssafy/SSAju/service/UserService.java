@@ -91,7 +91,7 @@ public class UserService {
                         cf.getFavoredPeriod(), cf.getConfidenceScore(), cf.getReasoning());
 
         return new AnalysisDetailResponse(
-                "SAJU", sajuResult.getId(), user.getName(), profile.getBirthDate(),
+                AnalysisType.SAJU.name(), sajuResult.getId(), user.getName(), profile.getBirthDate(),
                 sajuResult.getFetchedAt(), null, null, cfDetail, null, null);
     }
 
@@ -107,7 +107,7 @@ public class UserService {
         ConsultationResponse consultationDetail = consultationMapper.toResponseFromEntity(cc);
 
         return new AnalysisDetailResponse(
-                "CAREER_CONSULTATION", cc.getId(), user.getName(), profile.getBirthDate(),
+                AnalysisType.CAREER_CONSULTATION.name(), cc.getId(), user.getName(), profile.getBirthDate(),
                 cc.getGeneratedAt(), null, null, null, consultationDetail, null);
     }
 
@@ -119,7 +119,7 @@ public class UserService {
         CompatibilityResponse compatibilityDetail = compatibilityChildReadService.buildFromExisting(cc);
 
         return new AnalysisDetailResponse(
-                "COMPANY_COMPATIBILITY", cc.getId(), cc.getCompanyName(), profile.getBirthDate(),
+                AnalysisType.COMPANY_COMPATIBILITY.name(), cc.getId(), cc.getCompanyName(), profile.getBirthDate(),
                 cc.getCreatedAt(), null, null, null, null, compatibilityDetail);
     }
 
