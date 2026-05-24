@@ -65,7 +65,7 @@ public class UserService {
 
         return switch (type) {
             case SAJU -> buildSajuDetail(user, analysisId);
-            case CAREER_FORTUNE -> buildCareerFortuneDetail(user, analysisId);
+            case CAREER_CONSULTATION -> buildCareerConsultationDetail(user, analysisId);
             case COMPANY_COMPATIBILITY -> buildCompatibilityDetail(user, analysisId);
         };
     }
@@ -89,7 +89,7 @@ public class UserService {
                 sajuResult.getFetchedAt(), null, null, cfDetail, null);
     }
 
-    private AnalysisDetailResponse buildCareerFortuneDetail(User user, Long analysisId) {
+    private AnalysisDetailResponse buildCareerConsultationDetail(User user, Long analysisId) {
         CareerFortune cf = careerFortuneRepository.findById(analysisId)
                 .orElseThrow(() -> new SajuResultNotFoundException("관운 분석 결과를 찾을 수 없습니다."));
 
@@ -100,7 +100,7 @@ public class UserService {
 
         UserProfile profile = sajuResult.getUserProfile();
         return new AnalysisDetailResponse(
-                "CAREER_FORTUNE", cf.getId(), user.getName(), profile.getBirthDate(),
+                "CAREER_CONSULTATION", cf.getId(), user.getName(), profile.getBirthDate(),
                 cf.getCreatedAt(), null, null,
                 new AnalysisDetailResponse.CareerFortuneDetail(
                         cf.getFavoredPeriod(), cf.getConfidenceScore(), cf.getReasoning()),
