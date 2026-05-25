@@ -162,5 +162,7 @@ class ConsultationMapperTest {
         assertThat(result.favoredPeriod()).isNull();
         assertThat(result.confidenceScore()).isEqualTo(0);
         assertThat(result.reasoning()).isNull();
+        // analysisSummary에 "(null)" 문자열이 노출되지 않아야 함
+        assertThat(result.analysisSummary()).doesNotContain("(null)").contains("분석 미포함");
     }
 }

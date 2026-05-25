@@ -230,9 +230,11 @@ public class ConsultationMapper {
                 + tenGodDistribution.getScore("편관");
         String tenGodSummary = officerCount > 0 ? "정관·편관 기운" : "십신 종합";
 
+        // CareerFortune이 없는 경우(favoredPeriod=null) UI에 "(null)" 노출 방지
+        String periodInfo = (favoredPeriod != null) ? favoredPeriod : "분석 미포함";
         int currentYear = LocalDate.now().getYear();
         return "%s 일간 · 오행 %s 강세 · %s 기반 | %d년 12개월 타임라인 + 관운 분석 (%s)"
-                .formatted(dayMaster, dominantElements, tenGodSummary, currentYear, favoredPeriod);
+                .formatted(dayMaster, dominantElements, tenGodSummary, currentYear, periodInfo);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
