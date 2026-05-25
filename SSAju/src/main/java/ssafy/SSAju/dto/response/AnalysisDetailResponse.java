@@ -12,17 +12,12 @@ public record AnalysisDetailResponse(
         String satisfactionStatus,
         String feedbackContent,
         CareerFortuneDetail careerFortuneDetail,
-        CompanyCompatibilityDetail companyCompatibilityDetail
+        ConsultationResponse consultationDetail,
+        CompatibilityResponse compatibilityDetail
 ) {
     public record CareerFortuneDetail(
             String favoredPeriod,
             int confidenceScore,
             String reasoning
-    ) {}
-
-    public record CompanyCompatibilityDetail(
-            String companyName,
-            int compatibilityScore,
-            String summary
     ) {}
 }

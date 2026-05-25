@@ -10,6 +10,7 @@ import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
 import ssafy.SSAju.career.provider.SajuAnalysisFacade;
+import ssafy.SSAju.career.provider.SajuResultProvider;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
@@ -22,7 +23,6 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
-import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserRepository;
 
 import java.time.LocalDate;
@@ -45,8 +45,7 @@ class CareerFortuneServiceTest {
 
     @Mock private SajuDataService sajuDataService;
     @Mock private UserProfileProvider userProfileProvider;
-    @Mock private SajuResultWriteService sajuResultWriteService;
-    @Mock private SajuResultRepository sajuResultRepository;
+    @Mock private SajuResultProvider sajuResultProvider;
     @Mock private SajuResultMapper sajuResultMapper;
     @Mock private UserRepository userRepository;
 
@@ -84,7 +83,7 @@ class CareerFortuneServiceTest {
     @BeforeEach
     void setUp() {
         service = new CareerFortuneService(
-                sajuDataService, userProfileProvider, sajuResultWriteService, sajuResultRepository,
+                sajuDataService, userProfileProvider, sajuResultProvider,
                 sajuAnalysisFacade, sajuResultMapper, sajuValidator, userRepository);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
     }
@@ -105,7 +104,7 @@ class CareerFortuneServiceTest {
                 .willReturn(VALID_FASTAPI_RESPONSE);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(expectedResult);
-        given(sajuResultWriteService.replaceForUserProfile(savedProfile, expectedResult))
+        given(sajuResultProvider.findOrCreate(MOCK_USER, savedProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When
@@ -117,7 +116,7 @@ class CareerFortuneServiceTest {
         assertThat(result.reasoning()).contains("하반기");
         verify(userProfileProvider).findOrCreate(BIRTH_DATE, BIRTH_TIME);
         // mapper → service → writer 배선 검증: 실제 expectedResult가 전달됐는지 확인
-        verify(sajuResultWriteService).replaceForUserProfile(savedProfile, expectedResult);
+        verify(sajuResultProvider).findOrCreate(MOCK_USER, savedProfile, expectedResult);
     }
 
     @Test
@@ -132,7 +131,7 @@ class CareerFortuneServiceTest {
                 .willReturn(VALID_FASTAPI_RESPONSE);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(expectedResult);
-        given(sajuResultWriteService.replaceForUserProfile(existingProfile, expectedResult))
+        given(sajuResultProvider.findOrCreate(MOCK_USER, existingProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When
@@ -140,7 +139,7 @@ class CareerFortuneServiceTest {
 
         // Then
         verify(userProfileProvider).findOrCreate(BIRTH_DATE, BIRTH_TIME);
-        verify(sajuResultWriteService).replaceForUserProfile(existingProfile, expectedResult);
+        verify(sajuResultProvider).findOrCreate(MOCK_USER, existingProfile, expectedResult);
     }
 
     // ─────────────────────────────────────────
@@ -164,7 +163,7 @@ class CareerFortuneServiceTest {
         var expectedResult = SajuResult.builder().userProfile(savedProfile).user(MOCK_USER).build();
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(expectedResult);
-        given(sajuResultWriteService.replaceForUserProfile(savedProfile, expectedResult))
+        given(sajuResultProvider.findOrCreate(MOCK_USER, savedProfile, expectedResult))
                 .willReturn(expectedResult);
 
         // When

@@ -100,7 +100,7 @@ class SajuResultProviderInsertOrIgnoreTest {
                             .userProfile(userProfile)
                             .user(testUser)
                             .build();
-                    sajuResultProvider.findOrCreate(userProfile, newResult);
+                    sajuResultProvider.findOrCreate(testUser, userProfile, newResult);
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     errors.add(e.getClass().getSimpleName() + ": " + e.getMessage());

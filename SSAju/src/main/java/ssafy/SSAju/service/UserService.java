@@ -4,12 +4,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.CareerFortune;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.career.mapper.ConsultationMapper;
 import ssafy.SSAju.dto.response.AnalysisDetailResponse;
+import ssafy.SSAju.dto.response.CompatibilityResponse;
+import ssafy.SSAju.dto.response.ConsultationResponse;
 import ssafy.SSAju.dto.response.MyPageResponse;
 import ssafy.SSAju.dto.response.UserAnalysisDto;
 import ssafy.SSAju.entity.User;
@@ -17,7 +21,7 @@ import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.AnalysisHistoryRepository;
-import ssafy.SSAju.repository.CareerFortuneRepository;
+import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserRepository;
@@ -32,8 +36,10 @@ public class UserService {
     private final UserRepository userRepository;
     private final AnalysisHistoryRepository analysisHistoryRepository;
     private final SajuResultRepository sajuResultRepository;
-    private final CareerFortuneRepository careerFortuneRepository;
+    private final CareerConsultationRepository careerConsultationRepository;
     private final CompanyCompatibilityRepository companyCompatibilityRepository;
+    private final ConsultationMapper consultationMapper;
+    private final CompatibilityChildReadService compatibilityChildReadService;
 
     @Transactional(readOnly = true)
     public MyPageResponse getMyPage(Long userId, AnalysisType type, int page, int size) {
@@ -65,7 +71,7 @@ public class UserService {
 
         return switch (type) {
             case SAJU -> buildSajuDetail(user, analysisId);
-            case CAREER_FORTUNE -> buildCareerFortuneDetail(user, analysisId);
+            case CAREER_CONSULTATION -> buildCareerConsultationDetail(user, analysisId);
             case COMPANY_COMPATIBILITY -> buildCompatibilityDetail(user, analysisId);
         };
     }
@@ -85,26 +91,24 @@ public class UserService {
                         cf.getFavoredPeriod(), cf.getConfidenceScore(), cf.getReasoning());
 
         return new AnalysisDetailResponse(
-                "SAJU", sajuResult.getId(), user.getName(), profile.getBirthDate(),
-                sajuResult.getFetchedAt(), null, null, cfDetail, null);
+                AnalysisType.SAJU.name(), sajuResult.getId(), user.getName(), profile.getBirthDate(),
+                sajuResult.getFetchedAt(), null, null, cfDetail, null, null);
     }
 
-    private AnalysisDetailResponse buildCareerFortuneDetail(User user, Long analysisId) {
-        CareerFortune cf = careerFortuneRepository.findById(analysisId)
-                .orElseThrow(() -> new SajuResultNotFoundException("관운 분석 결과를 찾을 수 없습니다."));
+    private AnalysisDetailResponse buildCareerConsultationDetail(User user, Long analysisId) {
+        CareerConsultation cc = careerConsultationRepository.findById(analysisId)
+                .orElseThrow(() -> new SajuResultNotFoundException("커리어 컨설팅 결과를 찾을 수 없습니다."));
 
-        SajuResult sajuResult = cf.getSajuResult();
-        if (!user.equals(sajuResult.getUser())) {
+        if (!user.equals(cc.getSajuResult().getUser())) {
             throw new UnauthorizedException("접근 권한이 없습니다.");
         }
 
-        UserProfile profile = sajuResult.getUserProfile();
+        UserProfile profile = cc.getSajuResult().getUserProfile();
+        ConsultationResponse consultationDetail = consultationMapper.toResponseFromEntity(cc);
+
         return new AnalysisDetailResponse(
-                "CAREER_FORTUNE", cf.getId(), user.getName(), profile.getBirthDate(),
-                cf.getCreatedAt(), null, null,
-                new AnalysisDetailResponse.CareerFortuneDetail(
-                        cf.getFavoredPeriod(), cf.getConfidenceScore(), cf.getReasoning()),
-                null);
+                AnalysisType.CAREER_CONSULTATION.name(), cc.getId(), user.getName(), profile.getBirthDate(),
+                cc.getGeneratedAt(), null, null, null, consultationDetail, null);
     }
 
     private AnalysisDetailResponse buildCompatibilityDetail(User user, Long analysisId) {
@@ -112,12 +116,11 @@ public class UserService {
                 .orElseThrow(() -> new SajuResultNotFoundException("기업 궁합 분석 결과를 찾을 수 없습니다."));
 
         UserProfile profile = cc.getUserProfile();
+        CompatibilityResponse compatibilityDetail = compatibilityChildReadService.buildFromExisting(cc);
 
         return new AnalysisDetailResponse(
-                "COMPANY_COMPATIBILITY", cc.getId(), cc.getCompanyName(), profile.getBirthDate(),
-                cc.getCreatedAt(), null, null, null,
-                new AnalysisDetailResponse.CompanyCompatibilityDetail(
-                        cc.getCompanyName(), cc.getCompatibilityScore(), cc.getSummary()));
+                AnalysisType.COMPANY_COMPATIBILITY.name(), cc.getId(), cc.getCompanyName(), profile.getBirthDate(),
+                cc.getCreatedAt(), null, null, null, null, compatibilityDetail);
     }
 
 }

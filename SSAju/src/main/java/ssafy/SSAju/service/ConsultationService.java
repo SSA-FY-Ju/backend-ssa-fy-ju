@@ -86,7 +86,7 @@ public class ConsultationService {
         SajuResult newResult = sajuResultMapper.buildSajuResult(
                 userProfile, user, sajuData, tenGodDistribution, hiddenStems,
                 favoredPeriod, confidenceScore, reasoning);
-        SajuResult sajuResult = sajuResultProvider.findOrCreate(userProfile, newResult);
+        SajuResult sajuResult = sajuResultProvider.findOrCreate(user, userProfile, newResult);
 
         // ─── 3. 캐시 조회 (M-9) ─────────────────────────────────────────────────
         YearMonth now = YearMonth.now();

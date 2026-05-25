@@ -167,7 +167,7 @@ class ConsultationServiceTest {
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
-        given(sajuResultProvider.findOrCreate(userProfile, sajuResult)).willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
@@ -204,7 +204,7 @@ class ConsultationServiceTest {
         assertThat(result.analysisSummary()).contains("H1");
 
         verify(consultationSaveService).saveOrUpdate(any(), any(), any(), any());
-        verify(sajuResultProvider).findOrCreate(userProfile, sajuResult);
+        verify(sajuResultProvider).findOrCreate(MOCK_USER, userProfile, sajuResult);
     }
 
     // ─────────────────────────────────────────
@@ -222,7 +222,7 @@ class ConsultationServiceTest {
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(newSajuResult);
-        given(sajuResultProvider.findOrCreate(userProfile, newSajuResult)).willReturn(newSajuResult);
+        given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, newSajuResult)).willReturn(newSajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
@@ -231,7 +231,7 @@ class ConsultationServiceTest {
 
         assertThat(result.openaiModelVersion()).isEqualTo("gpt-4o-mini");
         assertThat(result.sajuProfile()).isNotNull();
-        verify(sajuResultProvider).findOrCreate(userProfile, newSajuResult);
+        verify(sajuResultProvider).findOrCreate(MOCK_USER, userProfile, newSajuResult);
         verify(consultationSaveService).saveOrUpdate(any(), any(), any(), any());
     }
 
@@ -250,7 +250,7 @@ class ConsultationServiceTest {
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
-        given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(any(), any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
                 .willThrow(new OpenAIApiException("OpenAI API 호출 실패: connection failed"));
 
@@ -270,7 +270,7 @@ class ConsultationServiceTest {
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
-        given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(any(), any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
                 .willThrow(new OpenAIApiException("OpenAI 응답이 비어있습니다"));
 
@@ -290,7 +290,7 @@ class ConsultationServiceTest {
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
-        given(sajuResultProvider.findOrCreate(any(), any())).willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(any(), any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
                 .willThrow(new OpenAIApiException("산업 추천 정보가 누락되었습니다"));
 

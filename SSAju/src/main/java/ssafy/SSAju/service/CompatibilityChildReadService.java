@@ -34,6 +34,31 @@ public class CompatibilityChildReadService {
     @Transactional(readOnly = true)
     public CompatibilityResponse buildFromExisting(CompanyCompatibility saved,
                                                     CompatibilityRequest request) {
+        CompatibilityResponse.RequestContext requestContext = buildRequestContext(saved, request);
+        return buildResponseWithContext(saved, requestContext);
+    }
+
+    /**
+     * 마이페이지 상세 조회 전용: CompatibilityRequest 없이 엔티티의 저장된 데이터로 응답 구성.
+     */
+    @Transactional(readOnly = true)
+    public CompatibilityResponse buildFromExisting(CompanyCompatibility saved) {
+        CompatibilityResponse.RequestContext requestContext = new CompatibilityResponse.RequestContext(
+                saved.getCompanyName(),
+                new CompatibilityResponse.TargetRoleInfo(
+                        saved.getTargetRoleCategory(),
+                        saved.getTargetRoleDetailName()
+                )
+        );
+        return buildResponseWithContext(saved, requestContext);
+    }
+
+    /**
+     * RequestContext를 제외한 공통 자식 엔티티 로드 및 응답 조립.
+     * 두 buildFromExisting 오버로드가 공유하는 핵심 로직.
+     */
+    private CompatibilityResponse buildResponseWithContext(CompanyCompatibility saved,
+                                                           CompatibilityResponse.RequestContext requestContext) {
         CompatibilityResponse.TargetRoleAnalysis targetRoleAnalysis =
                 targetRoleAnalysisRepository.findByCompanyCompatibility_Id(saved.getId())
                         .map(e -> new CompatibilityResponse.TargetRoleAnalysis(
@@ -83,7 +108,7 @@ public class CompatibilityChildReadService {
 
         return new CompatibilityResponse(
                 saved.getId(),
-                buildRequestContext(saved, request),
+                requestContext,
                 saved.getCompatibilityScore(),
                 saved.getSummary(),
                 targetRoleAnalysis,

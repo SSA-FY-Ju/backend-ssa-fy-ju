@@ -1,5 +1,5 @@
 package ssafy.SSAju.career.enums;
 
 public enum AnalysisType {
-    SAJU, CAREER_FORTUNE, COMPANY_COMPATIBILITY
+    SAJU, CAREER_CONSULTATION, COMPANY_COMPATIBILITY
 }

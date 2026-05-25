@@ -2,13 +2,12 @@ package ssafy.SSAju.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import ssafy.SSAju.career.entity.SajuResult;
-import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.mapper.SajuResultMapper;
 import ssafy.SSAju.career.provider.SajuAnalysisFacade;
+import ssafy.SSAju.career.provider.SajuResultProvider;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
@@ -28,8 +27,7 @@ public class CareerFortuneService {
 
     private final SajuDataService sajuDataService;
     private final UserProfileProvider userProfileProvider;
-    private final SajuResultWriteService sajuResultWriteService;
-    private final SajuResultRepository sajuResultRepository;
+    private final SajuResultProvider sajuResultProvider;
     private final SajuAnalysisFacade sajuAnalysisFacade;
     private final SajuResultMapper sajuResultMapper;
     private final SajuValidator sajuValidator;
@@ -38,6 +36,9 @@ public class CareerFortuneService {
     /**
      * @Transactional 없음: FastAPI I/O 동안 DB 커넥션을 점유하지 않도록 트랜잭션을 분리.
      * 각 DB 작업은 하위 컴포넌트의 @Transactional에 의해 개별 트랜잭션으로 실행됨.
+     *
+     * <p>사주(SajuResult)는 같은 (user, userProfile)에 대해 불변이므로 findOrCreate로 재사용.
+     * 동시성 경쟁(INSERT race)은 SajuResultProvider 내부의 insertOrIgnore + @Retryable/@Recover가 처리.
      */
     public CareerTimingResponse analyzeCareerTiming(LocalDate birthDate, LocalTime birthTime, Long userId) {
         if (userId == null) {
@@ -59,17 +60,9 @@ public class CareerFortuneService {
                 userProfile, user, sajuData, ctx.tenGodDistribution(), ctx.hiddenStems(),
                 ctx.favoredPeriod(), ctx.confidenceScore(), ctx.reasoning());
 
-        SajuResult savedResult;
-        try {
-            savedResult = sajuResultWriteService.replaceForUserProfile(userProfile, newResult);
-        } catch (DataIntegrityViolationException ex) {
-            log.warn("SajuResult 동시 insert 경합, 기존 결과 유지 (userId={})", userProfile.getId());
-            savedResult = sajuResultRepository.findByUserProfile(userProfile)
-                    .orElse(newResult);
-        }
+        SajuResult savedResult = sajuResultProvider.findOrCreate(user, userProfile, newResult);
 
         log.info("관운 분석 완료: favoredPeriod={}", ctx.favoredPeriod());
         return new CareerTimingResponse(savedResult.getId(), ctx.favoredPeriod(), ctx.confidenceScore(), ctx.reasoning());
     }
-
 }
