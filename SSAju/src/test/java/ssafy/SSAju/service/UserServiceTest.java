@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.CareerFortune;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
@@ -36,8 +37,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -58,18 +57,27 @@ class UserServiceTest {
     private UserService service;
 
     private static final Long USER_ID = 1L;
+    private static final Long OTHER_USER_ID = 999L;
     private static final Long ANALYSIS_ID = 10L;
     private static final LocalDate BIRTH_DATE = LocalDate.of(1995, 5, 20);
 
-    private static final User MOCK_USER = User.builder()
-            .email("test@test.com")
-            .passwordHash("hash")
-            .name("테스트유저")
-            .role(UserRole.USER)
-            .status(UserStatus.ACTIVE)
-            .termsAgreedAt(LocalDateTime.now())
-            .privacyAgreedAt(LocalDateTime.now())
-            .build();
+    // ReflectionTestUtils로 id를 고정하여 유저 격리 검증을 명확하게 합니다.
+    private static final User MOCK_USER = createUserWithId(USER_ID);
+    private static final User OTHER_USER = createUserWithId(OTHER_USER_ID);
+
+    private static User createUserWithId(Long id) {
+        User user = User.builder()
+                .email("test@test.com")
+                .passwordHash("hash")
+                .name("테스트유저")
+                .role(UserRole.USER)
+                .status(UserStatus.ACTIVE)
+                .termsAgreedAt(LocalDateTime.now())
+                .privacyAgreedAt(LocalDateTime.now())
+                .build();
+        ReflectionTestUtils.setField(user, "id", id);
+        return user;
+    }
 
     @BeforeEach
     void setUp() {
@@ -87,6 +95,7 @@ class UserServiceTest {
     @Test
     @DisplayName("SAJU 타입 상세 조회 → type이 AnalysisType.SAJU.name()으로 반환")
     void shouldReturnSajuDetail_WithCorrectTypeName() {
+        // Given
         var userProfile = mock(UserProfile.class);
         var careerFortune = mock(CareerFortune.class);
         var sajuResult = mock(SajuResult.class);
@@ -99,10 +108,14 @@ class UserServiceTest {
         given(sajuResult.getUserProfile()).willReturn(userProfile);
         given(sajuResult.getCareerFortune()).willReturn(careerFortune);
         given(sajuResult.getFetchedAt()).willReturn(LocalDateTime.now());
-        given(sajuResultRepository.findByIdAndUser_Id(eq(ANALYSIS_ID), any())).willReturn(Optional.of(sajuResult));
+        // USER_ID를 정확히 지정 — 다른 userId가 넘어오면 stub 불일치로 empty 반환
+        given(sajuResultRepository.findByIdAndUser_Id(eq(ANALYSIS_ID), eq(USER_ID)))
+                .willReturn(Optional.of(sajuResult));
 
+        // When
         AnalysisDetailResponse result = service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.SAJU);
 
+        // Then
         assertThat(result.type()).isEqualTo(AnalysisType.SAJU.name());
         assertThat(result.analysisId()).isEqualTo(ANALYSIS_ID);
         assertThat(result.targetName()).isEqualTo("테스트유저");
@@ -117,8 +130,11 @@ class UserServiceTest {
     @Test
     @DisplayName("SAJU 상세 조회 — SajuResult 없음 → SajuResultNotFoundException")
     void shouldThrow_WhenSajuResultNotFound() {
-        given(sajuResultRepository.findByIdAndUser_Id(eq(ANALYSIS_ID), any())).willReturn(Optional.empty());
+        // Given
+        given(sajuResultRepository.findByIdAndUser_Id(eq(ANALYSIS_ID), eq(USER_ID)))
+                .willReturn(Optional.empty());
 
+        // When & Then
         assertThatThrownBy(() -> service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.SAJU))
                 .isInstanceOf(SajuResultNotFoundException.class);
     }
@@ -130,12 +146,14 @@ class UserServiceTest {
     @Test
     @DisplayName("CAREER_CONSULTATION 타입 상세 조회 → type이 AnalysisType.CAREER_CONSULTATION.name()으로 반환")
     void shouldReturnCareerConsultationDetail_WithCorrectTypeName() {
+        // Given
         var userProfile = mock(UserProfile.class);
         var sajuResult = mock(SajuResult.class);
         var cc = mock(CareerConsultation.class);
         var mockResponse = mock(ConsultationResponse.class);
 
         given(userProfile.getBirthDate()).willReturn(BIRTH_DATE);
+        // MOCK_USER(id=1L)가 소유자임을 명확히 지정
         given(sajuResult.getUser()).willReturn(MOCK_USER);
         given(sajuResult.getUserProfile()).willReturn(userProfile);
         given(cc.getId()).willReturn(ANALYSIS_ID);
@@ -144,8 +162,10 @@ class UserServiceTest {
         given(careerConsultationRepository.findById(ANALYSIS_ID)).willReturn(Optional.of(cc));
         given(consultationMapper.toResponseFromEntity(cc)).willReturn(mockResponse);
 
+        // When
         AnalysisDetailResponse result = service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.CAREER_CONSULTATION);
 
+        // Then
         assertThat(result.type()).isEqualTo(AnalysisType.CAREER_CONSULTATION.name());
         assertThat(result.analysisId()).isEqualTo(ANALYSIS_ID);
         assertThat(result.consultationDetail()).isSameAs(mockResponse);
@@ -154,25 +174,17 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("CAREER_CONSULTATION 상세 조회 — 다른 유저의 데이터 접근 → UnauthorizedException")
+    @DisplayName("CAREER_CONSULTATION — 다른 유저(id=999L)의 데이터 접근 시도 → UnauthorizedException")
     void shouldThrow_WhenCareerConsultationBelongsToOtherUser() {
-        var otherUser = User.builder()
-                .email("other@test.com")
-                .passwordHash("hash")
-                .name("다른유저")
-                .role(UserRole.USER)
-                .status(UserStatus.ACTIVE)
-                .termsAgreedAt(LocalDateTime.now())
-                .privacyAgreedAt(LocalDateTime.now())
-                .build();
-
+        // Given — OTHER_USER(id=999L)가 소유자이고, MOCK_USER(id=1L)가 접근 시도
         var sajuResult = mock(SajuResult.class);
         var cc = mock(CareerConsultation.class);
 
-        given(sajuResult.getUser()).willReturn(otherUser);
+        given(sajuResult.getUser()).willReturn(OTHER_USER);  // id=999L 소유자
         given(cc.getSajuResult()).willReturn(sajuResult);
         given(careerConsultationRepository.findById(ANALYSIS_ID)).willReturn(Optional.of(cc));
 
+        // When & Then — MOCK_USER(id=1L)로 조회하면 권한 없음
         assertThatThrownBy(() -> service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.CAREER_CONSULTATION))
                 .isInstanceOf(UnauthorizedException.class);
     }
@@ -184,6 +196,7 @@ class UserServiceTest {
     @Test
     @DisplayName("COMPANY_COMPATIBILITY 타입 상세 조회 → type이 AnalysisType.COMPANY_COMPATIBILITY.name()으로 반환")
     void shouldReturnCompatibilityDetail_WithCorrectTypeName() {
+        // Given
         var userProfile = mock(UserProfile.class);
         var cc = mock(CompanyCompatibility.class);
         var mockResponse = mock(CompatibilityResponse.class);
@@ -193,11 +206,15 @@ class UserServiceTest {
         given(cc.getCompanyName()).willReturn("삼성전자");
         given(cc.getUserProfile()).willReturn(userProfile);
         given(cc.getCreatedAt()).willReturn(LocalDateTime.now());
-        given(companyCompatibilityRepository.findByIdAndUser(ANALYSIS_ID, MOCK_USER)).willReturn(Optional.of(cc));
+        // MOCK_USER(id=1L)를 정확히 지정 — 다른 user 객체가 넘어오면 empty 반환
+        given(companyCompatibilityRepository.findByIdAndUser(eq(ANALYSIS_ID), eq(MOCK_USER)))
+                .willReturn(Optional.of(cc));
         given(compatibilityChildReadService.buildFromExisting(cc)).willReturn(mockResponse);
 
+        // When
         AnalysisDetailResponse result = service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.COMPANY_COMPATIBILITY);
 
+        // Then
         assertThat(result.type()).isEqualTo(AnalysisType.COMPANY_COMPATIBILITY.name());
         assertThat(result.analysisId()).isEqualTo(ANALYSIS_ID);
         assertThat(result.targetName()).isEqualTo("삼성전자");
@@ -207,10 +224,13 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("COMPANY_COMPATIBILITY 상세 조회 — 존재하지 않는 ID → SajuResultNotFoundException")
+    @DisplayName("COMPANY_COMPATIBILITY — OTHER_USER(id=999L)로 조회하면 데이터 없음 → SajuResultNotFoundException")
     void shouldThrow_WhenCompatibilityNotFound() {
-        given(companyCompatibilityRepository.findByIdAndUser(ANALYSIS_ID, MOCK_USER)).willReturn(Optional.empty());
+        // Given — MOCK_USER(id=1L)에 대한 stub만 있고 OTHER_USER 접근은 empty
+        given(companyCompatibilityRepository.findByIdAndUser(eq(ANALYSIS_ID), eq(MOCK_USER)))
+                .willReturn(Optional.empty());
 
+        // When & Then
         assertThatThrownBy(() -> service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.COMPANY_COMPATIBILITY))
                 .isInstanceOf(SajuResultNotFoundException.class);
     }
@@ -222,8 +242,10 @@ class UserServiceTest {
     @Test
     @DisplayName("존재하지 않는 userId → UserNotFoundException")
     void shouldThrow_WhenUserNotFound() {
+        // Given
         given(userRepository.findById(99L)).willReturn(Optional.empty());
 
+        // When & Then
         assertThatThrownBy(() -> service.getAnalysisDetail(99L, ANALYSIS_ID, AnalysisType.SAJU))
                 .isInstanceOf(UserNotFoundException.class);
     }
