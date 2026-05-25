@@ -44,9 +44,9 @@ springdoc:
     enabled: true
 
 jwt:
-  secret: test-secret-key-must-be-at-least-256-bits-long-for-hmac-sha256
-  access-token-expiration: 3600000
-  refresh-token-expiration: 604800000
+  secret: ${JWT_SECRET:test-secret-key-must-be-at-least-256-bits-long-for-hmac-sha256}
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}     # 1시간 (ms)
+  refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000} # 7일 (ms)
 
 cors:
   allowed-origins: http://localhost:3000
