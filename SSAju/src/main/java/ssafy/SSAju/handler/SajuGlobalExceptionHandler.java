@@ -14,6 +14,7 @@ import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.ErrorInfo;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.exception.ConsentRequiredException;
+import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.FeedbackNotAllowedException;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidTokenException;
@@ -91,6 +92,26 @@ public class SajuGlobalExceptionHandler {
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.TERMS_AGREEMENT_REQUIRED.getCode(),
                         ErrorMessageConstants.TERMS_AGREEMENT_REQUIRED.getMessage(), generateRequestId())));
+    }
+
+    /**
+     * 접근 권한 예외를 처리합니다.
+     *
+     * <p>본인 소유가 아닌 분석 결과에 접근하려는 경우 등 권한이 없는 접근에서 발생합니다.
+     * AuthException 보다 먼저 등록하여 구체적인 핸들러가 우선 적용되도록 합니다.
+     *
+     * @param e UnauthorizedException
+     * @param request HTTP 요청
+     * @return 403 Forbidden, 에러 코드: ACCESS_DENIED
+     */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnauthorized(
+            UnauthorizedException e, HttpServletRequest request) {
+        log.warn("접근 권한 없음: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.ACCESS_DENIED.getCode(),
+                        ErrorMessageConstants.ACCESS_DENIED.getMessage(), generateRequestId())));
     }
 
     /**
@@ -296,6 +317,7 @@ public class SajuGlobalExceptionHandler {
             IllegalArgumentException e, HttpServletRequest request) {
         String requestId = generateRequestId();
         log.warn("잘못된 요청 파라미터: requestId={}", requestId);
+        log.debug("IllegalArgumentException 상세: requestId={}", requestId, e);
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.VALIDATION_FAILED.getCode(),
