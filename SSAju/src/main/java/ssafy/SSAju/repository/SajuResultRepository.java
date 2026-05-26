@@ -17,6 +17,17 @@ public interface SajuResultRepository extends JpaRepository<SajuResult, Long> {
 
     Optional<SajuResult> findByIdAndUser_Id(Long id, Long userId);
 
+    /**
+     * 마이페이지 상세 조회 전용: UserProfile과 CareerFortune을 한 번의 쿼리로 fetch join.
+     * UserService.buildSajuDetail()의 레이지 로딩 체인(3개 SELECT)을 1개 쿼리로 개선.
+     */
+    @Query("SELECT s FROM SajuResult s " +
+           "LEFT JOIN FETCH s.userProfile " +
+           "LEFT JOIN FETCH s.careerFortune " +
+           "WHERE s.id = :id AND s.user.id = :userId")
+    Optional<SajuResult> findByIdAndUser_IdWithProfileAndFortune(@Param("id") Long id,
+                                                                   @Param("userId") Long userId);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM SajuResult s WHERE s.user = :user AND s.userProfile = :userProfile")

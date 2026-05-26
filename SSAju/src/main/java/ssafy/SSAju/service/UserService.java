@@ -81,7 +81,8 @@ public class UserService {
     // ─────────────────────────────────────────
 
     private AnalysisDetailResponse buildSajuDetail(User user, Long analysisId) {
-        SajuResult sajuResult = sajuResultRepository.findByIdAndUser_Id(analysisId, user.getId())
+        SajuResult sajuResult = sajuResultRepository
+                .findByIdAndUser_IdWithProfileAndFortune(analysisId, user.getId())
                 .orElseThrow(() -> new SajuResultNotFoundException("사주 분석 결과를 찾을 수 없습니다."));
 
         UserProfile profile = sajuResult.getUserProfile();
@@ -96,7 +97,8 @@ public class UserService {
     }
 
     private AnalysisDetailResponse buildCareerConsultationDetail(User user, Long analysisId) {
-        CareerConsultation cc = careerConsultationRepository.findById(analysisId)
+        CareerConsultation cc = careerConsultationRepository
+                .findByIdWithSajuResultAndProfile(analysisId)
                 .orElseThrow(() -> new SajuResultNotFoundException("커리어 컨설팅 결과를 찾을 수 없습니다."));
 
         if (!user.equals(cc.getSajuResult().getUser())) {

@@ -109,7 +109,7 @@ class UserServiceTest {
         given(sajuResult.getCareerFortune()).willReturn(careerFortune);
         given(sajuResult.getFetchedAt()).willReturn(LocalDateTime.now());
         // USER_ID를 정확히 지정 — 다른 userId가 넘어오면 stub 불일치로 empty 반환
-        given(sajuResultRepository.findByIdAndUser_Id(eq(ANALYSIS_ID), eq(USER_ID)))
+        given(sajuResultRepository.findByIdAndUser_IdWithProfileAndFortune(eq(ANALYSIS_ID), eq(USER_ID)))
                 .willReturn(Optional.of(sajuResult));
 
         // When
@@ -131,7 +131,7 @@ class UserServiceTest {
     @DisplayName("SAJU 상세 조회 — SajuResult 없음 → SajuResultNotFoundException")
     void shouldThrow_WhenSajuResultNotFound() {
         // Given
-        given(sajuResultRepository.findByIdAndUser_Id(eq(ANALYSIS_ID), eq(USER_ID)))
+        given(sajuResultRepository.findByIdAndUser_IdWithProfileAndFortune(eq(ANALYSIS_ID), eq(USER_ID)))
                 .willReturn(Optional.empty());
 
         // When & Then
@@ -159,7 +159,7 @@ class UserServiceTest {
         given(cc.getId()).willReturn(ANALYSIS_ID);
         given(cc.getSajuResult()).willReturn(sajuResult);
         given(cc.getGeneratedAt()).willReturn(LocalDateTime.now());
-        given(careerConsultationRepository.findById(ANALYSIS_ID)).willReturn(Optional.of(cc));
+        given(careerConsultationRepository.findByIdWithSajuResultAndProfile(ANALYSIS_ID)).willReturn(Optional.of(cc));
         given(consultationMapper.toResponseFromEntity(cc)).willReturn(mockResponse);
 
         // When
@@ -182,7 +182,7 @@ class UserServiceTest {
 
         given(sajuResult.getUser()).willReturn(OTHER_USER);  // id=999L 소유자
         given(cc.getSajuResult()).willReturn(sajuResult);
-        given(careerConsultationRepository.findById(ANALYSIS_ID)).willReturn(Optional.of(cc));
+        given(careerConsultationRepository.findByIdWithSajuResultAndProfile(ANALYSIS_ID)).willReturn(Optional.of(cc));
 
         // When & Then — MOCK_USER(id=1L)로 조회하면 권한 없음
         assertThatThrownBy(() -> service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.CAREER_CONSULTATION))
