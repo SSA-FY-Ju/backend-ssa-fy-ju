@@ -3,6 +3,7 @@ package ssafy.SSAju.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ public class ConsultationSaveService {
 
     private final ConsultationMapper consultationMapper;
     private final CareerConsultationRepository careerConsultationRepository;
+    private final ConsultationInsertService consultationInsertService;
 
     /**
      * CareerConsultation을 저장하거나 기존 데이터를 업데이트.
@@ -73,17 +75,28 @@ public class ConsultationSaveService {
         return existing.getId();
     }
 
+    /**
+     * CareerConsultation 신규 삽입을 시도하고, 동시 요청 경합 시 기존 데이터를 재조회합니다.
+     *
+     * <p>삽입은 {@link ConsultationInsertService#insert(CareerConsultation)}에 위임하여
+     * REQUIRES_NEW 독립 트랜잭션에서 실행합니다. UNIQUE 제약 위반이 발생해도
+     * 현재 트랜잭션(@Transactional)은 rollback-only로 마킹되지 않으므로,
+     * catch block에서 재조회 후 정상 커밋이 가능합니다.
+     */
     private Long insertOrRecoverOnConflict(SajuResult sajuResult, CareerAdviceResponse advice,
                                            String modelVersion, Integer consultationMonth) {
         try {
             CareerConsultation newConsultation = consultationMapper.buildConsultation(
                     sajuResult, advice, modelVersion, consultationMonth);
-            CareerConsultation saved = careerConsultationRepository.saveAndFlush(newConsultation);
+            Long savedId = consultationInsertService.insert(newConsultation);
             log.info("새 CareerConsultation 저장 완료: sajuResultId={}, month={}",
                     sajuResult.getId(), consultationMonth);
-            return saved.getId();
+            return savedId;
         } catch (DataIntegrityViolationException e) {
-            if (findConstraintViolation(e).isEmpty()) {
+            // NestedExceptionUtils로 루트 원인을 추출하여 월별 UNIQUE 제약 위반인지 확인
+            Throwable rootCause = NestedExceptionUtils.getRootCause(e);
+            if (!(rootCause instanceof ConstraintViolationException cve)
+                    || !CONSULTATION_MONTH_UNIQUE_CONSTRAINT.equals(cve.getConstraintName())) {
                 throw e;
             }
             log.warn("CareerConsultation 동시 insert 경합 — 기존 결과 재조회: sajuResultId={}, month={}",
@@ -96,17 +109,5 @@ public class ConsultationSaveService {
                             "CareerConsultation 동시 경합 복구 실패: sajuResultId=" +
                             sajuResult.getId() + ", month=" + consultationMonth));
         }
-    }
-
-    private Optional<ConstraintViolationException> findConstraintViolation(Throwable e) {
-        Throwable cause = e;
-        while (cause != null) {
-            if (cause instanceof ConstraintViolationException cve
-                    && CONSULTATION_MONTH_UNIQUE_CONSTRAINT.equals(cve.getConstraintName())) {
-                return Optional.of(cve);
-            }
-            cause = cause.getCause();
-        }
-        return Optional.empty();
     }
 }
