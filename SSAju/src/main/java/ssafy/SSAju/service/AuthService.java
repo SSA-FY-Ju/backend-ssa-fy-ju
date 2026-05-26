@@ -17,7 +17,9 @@ import ssafy.SSAju.entity.enums.LoginFailureReason;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.event.LoginAttemptEvent;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.core.NestedExceptionUtils;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.exception.ConsentRequiredException;
 import ssafy.SSAju.exception.DuplicateEmailException;
@@ -106,7 +108,14 @@ public class AuthService {
         try {
             userRepository.save(user);
         } catch (DataIntegrityViolationException e) {
-            throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
+            // NestedExceptionUtils로 루트 원인을 추출하여 이메일 UNIQUE 제약 위반인지 확인.
+            // checkEmailAvailability()를 먼저 호출했음에도 발생하는 경우는 동시 요청 race condition임.
+            // 다른 DB 제약 위반(FK 등)은 그대로 재던져 DataAccessException 핸들러가 처리하도록 함.
+            Throwable rootCause = NestedExceptionUtils.getRootCause(e);
+            if (rootCause instanceof ConstraintViolationException) {
+                throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
+            }
+            throw e;
         }
         log.info("회원가입 완료: userId={}", user.getId());
 
