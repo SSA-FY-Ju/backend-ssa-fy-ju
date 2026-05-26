@@ -19,8 +19,8 @@ import java.time.LocalDateTime;
 @Table(
         name = "company_compatibility",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_user_company_role_version",
-                columnNames = {"user_id", "user_profile_id", "company_name", "target_role_category", "version"}
+                name = "uk_user_company_role_month",
+                columnNames = {"user_id", "user_profile_id", "company_name", "target_role_category", "compatibility_month"}
         )
 )
 public class CompanyCompatibility {
@@ -63,8 +63,14 @@ public class CompanyCompatibility {
     @Column(name = "completed", nullable = false)
     private boolean completed = false;
 
-    @Column(name = "version", nullable = false)
-    private Integer version;
+    /**
+     * 분석이 수행된 월을 YYYYMM 형식의 정수로 저장합니다 (예: 202605 = 2026년 5월).
+     * UNIQUE(user_id, user_profile_id, company_name, target_role_category, compatibility_month) 제약으로
+     * 동일 사용자가 같은 달에 동일 기업/직무를 중복 분석하는 것을 방지합니다.
+     * 새로운 달이 되면 신규 분석을 허용합니다 (월별 캐시 패턴).
+     */
+    @Column(name = "compatibility_month", nullable = false)
+    private Integer compatibilityMonth;
 
     @Column(name = "analyzed_at", nullable = false, updatable = false)
     private LocalDateTime analyzedAt;
@@ -76,7 +82,7 @@ public class CompanyCompatibility {
     @Builder
     public CompanyCompatibility(UserProfile userProfile, User user, String companyName,
                                  JobCategoryEnum targetRoleCategory, String targetRoleDetailName,
-                                 Integer compatibilityScore, String summary) {
+                                 Integer compatibilityScore, String summary, Integer compatibilityMonth) {
         this.userProfile = userProfile;
         this.user = user;
         this.companyName = companyName;
@@ -84,8 +90,8 @@ public class CompanyCompatibility {
         this.targetRoleDetailName = targetRoleDetailName;
         this.compatibilityScore = compatibilityScore;
         this.summary = summary;
+        this.compatibilityMonth = compatibilityMonth;
         this.completed = false;
-        this.version = 1;
         this.analyzedAt = LocalDateTime.now();
     }
 

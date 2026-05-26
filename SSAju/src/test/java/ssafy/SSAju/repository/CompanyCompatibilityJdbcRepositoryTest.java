@@ -21,6 +21,7 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -187,6 +188,8 @@ class CompanyCompatibilityJdbcRepositoryTest {
 
     private CompanyCompatibility buildEntity(UserProfile profile, String companyName,
                                               JobCategoryEnum category) {
+        YearMonth now = YearMonth.now();
+        int compatibilityMonth = now.getYear() * 100 + now.getMonthValue();
         return CompanyCompatibility.builder()
                 .userProfile(profile)
                 .user(testUser)
@@ -195,6 +198,7 @@ class CompanyCompatibilityJdbcRepositoryTest {
                 .targetRoleDetailName("테스트 직무")
                 .compatibilityScore(75)
                 .summary("테스트 요약")
+                .compatibilityMonth(compatibilityMonth)
                 .build();
     }
 }
