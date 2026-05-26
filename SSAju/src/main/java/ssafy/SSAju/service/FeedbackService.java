@@ -3,6 +3,7 @@ package ssafy.SSAju.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
@@ -28,6 +29,7 @@ public class FeedbackService {
     private final UserSatisfactionFeedbackRepository feedbackRepository;
     private final UserRepository userRepository;
 
+    @Transactional
     public SatisfactionFeedbackResponse saveFeedback(SatisfactionFeedbackRequest request, Long userId) {
         log.info("피드백 저장 요청: analysisId={}, type={}", request.analysisId(), request.feedbackType());
 
@@ -50,9 +52,11 @@ public class FeedbackService {
                         .build();
             }
             case CONSULTATION -> {
+                // C-4: DB 레벨 소유권 검증 — lazy loading chain(getSajuResult().getUser()) 제거.
+                // findByIdAndSajuResult_User_Id가 SQL JOIN으로 소유권을 확인하므로
+                // 트랜잭션 여부와 무관하게 안전하게 IDOR를 차단합니다.
                 CareerConsultation consultation = consultationRepository
-                        .findById(request.analysisId())
-                        .filter(c -> c.getSajuResult().getUser().getId().equals(userId))
+                        .findByIdAndSajuResult_User_Id(request.analysisId(), userId)
                         .orElseThrow(() -> new SajuResultNotFoundException(
                                 ErrorMessageConstants.SAJU_RESULT_NOT_FOUND.getMessage()
                                         + " id=" + request.analysisId()));

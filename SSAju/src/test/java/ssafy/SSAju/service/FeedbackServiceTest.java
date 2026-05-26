@@ -8,7 +8,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
-import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
 import ssafy.SSAju.career.enums.FeedbackType;
@@ -105,12 +104,7 @@ class FeedbackServiceTest {
         var request = new SatisfactionFeedbackRequest(
                 1L, FeedbackType.CONSULTATION, SatisfactionStatus.DISSATISFIED, null);
 
-        User mockUserWithId = mock(User.class);
-        given(mockUserWithId.getId()).willReturn(USER_ID);
-        SajuResult mockSajuResult = mock(SajuResult.class);
-        given(mockSajuResult.getUser()).willReturn(mockUserWithId);
         CareerConsultation consultation = mock(CareerConsultation.class);
-        given(consultation.getSajuResult()).willReturn(mockSajuResult);
 
         var savedFeedback = UserSatisfactionFeedback.builder()
                 .user(MOCK_USER)
@@ -121,13 +115,32 @@ class FeedbackServiceTest {
                 .build();
 
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
-        given(consultationRepository.findById(1L)).willReturn(Optional.of(consultation));
+        // C-4: DB 레벨 소유권 검증 메서드 사용
+        given(consultationRepository.findByIdAndSajuResult_User_Id(1L, USER_ID))
+                .willReturn(Optional.of(consultation));
         given(feedbackRepository.save(any(UserSatisfactionFeedback.class))).willReturn(savedFeedback);
 
         SatisfactionFeedbackResponse response = service.saveFeedback(request, USER_ID);
 
         assertThat(response.feedbackContent()).isNull();
         verify(feedbackRepository).save(any(UserSatisfactionFeedback.class));
+    }
+
+    @Test
+    @DisplayName("CONSULTATION — 다른 유저(id=999L)의 데이터 접근 시도 → SajuResultNotFoundException")
+    void shouldThrow_WhenConsultationBelongsToOtherUser() {
+        // Given — 요청 userId=1L이지만 consultationId=1L은 userId=1L 소유가 아님
+        var request = new SatisfactionFeedbackRequest(
+                1L, FeedbackType.CONSULTATION, SatisfactionStatus.SATISFIED, null);
+
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
+        // DB 레벨 소유권 검증: userId=1L로 조회 시 empty 반환 (다른 유저 소유)
+        given(consultationRepository.findByIdAndSajuResult_User_Id(1L, USER_ID))
+                .willReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> service.saveFeedback(request, USER_ID))
+                .isInstanceOf(SajuResultNotFoundException.class);
     }
 
     @Test
