@@ -114,8 +114,10 @@ public class JwtUtil {
     }
 
     private String buildToken(Long userId, String email, String type, long expirationMs) {
-        Date now = new Date();
-        Date expiry = new Date(now.getTime() + expirationMs);
+        // Instant 기반으로 생성하여 타임존 독립성 보장 (M-7).
+        Instant nowInstant = Instant.now();
+        Date now = Date.from(nowInstant);
+        Date expiry = Date.from(nowInstant.plusMillis(expirationMs));
 
         var builder = Jwts.builder()
                 .claim(CLAIM_USER_ID, userId)

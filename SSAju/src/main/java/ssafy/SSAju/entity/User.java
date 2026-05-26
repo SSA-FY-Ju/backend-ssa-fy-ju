@@ -12,6 +12,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -81,11 +82,12 @@ public class User {
     }
 
     public void softDelete() {
-        LocalDateTime now = LocalDateTime.now();
+        // Instant.now().getEpochSecond()으로 타임존 독립적인 고유 epoch 초 값을 생성합니다.
+        // LocalDateTime.toEpochSecond(ZoneOffset.UTC)는 로컬 시간을 UTC로 잘못 해석할 수 있음.
         this.name = "탈퇴한 사용자";
-        this.email = "deleted_" + this.id + "_" + now.toEpochSecond(java.time.ZoneOffset.UTC) + "@deleted.local";
+        this.email = "deleted_" + this.id + "_" + Instant.now().getEpochSecond() + "@deleted.local";
         this.status = UserStatus.INACTIVE;
-        this.deletedAt = now;
+        this.deletedAt = LocalDateTime.now();
     }
 
     @Override
