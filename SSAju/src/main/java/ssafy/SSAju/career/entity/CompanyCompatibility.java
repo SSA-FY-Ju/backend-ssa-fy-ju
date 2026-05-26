@@ -72,6 +72,24 @@ public class CompanyCompatibility {
     @Column(name = "compatibility_month", nullable = false)
     private Integer compatibilityMonth;
 
+    // ─────────────────────────────────────────
+    // 역방향 @OneToOne 매핑 (조회 전용 — FK 소유 안 함)
+    // CompatibilityChildReadService가 fetch join으로 한 번에 로드하기 위해 사용.
+    // 직접 접근 시 LAZY 프록시 초기화에 주의하세요.
+    // ─────────────────────────────────────────
+
+    @OneToOne(mappedBy = "companyCompatibility", fetch = FetchType.LAZY)
+    private TargetRoleAnalysis targetRoleAnalysis;
+
+    @OneToOne(mappedBy = "companyCompatibility", fetch = FetchType.LAZY)
+    private FiveElementsAnalysis fiveElementsAnalysis;
+
+    @OneToOne(mappedBy = "companyCompatibility", fetch = FetchType.LAZY)
+    private AnalysisBreakdown analysisBreakdown;
+
+    @OneToOne(mappedBy = "companyCompatibility", fetch = FetchType.LAZY)
+    private ActionableStrategy actionableStrategy;
+
     @Column(name = "analyzed_at", nullable = false, updatable = false)
     private LocalDateTime analyzedAt;
 

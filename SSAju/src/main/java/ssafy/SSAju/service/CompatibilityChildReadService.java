@@ -14,16 +14,20 @@ import java.util.List;
 /**
  * 기업 궁합 캐시 재사용 경로에서 자식 엔티티를 DB에서 로드하여 응답을 구성합니다.
  *
- * CompanyMatchingService에서 Repository 11개 직접 주입 문제(M-2)를 해결하기 위해 분리.
+ * <p><strong>쿼리 최적화 구조 (10개 → 7개 SELECT)</strong>:
+ * <ol>
+ *   <li>1개: {@link CompanyCompatibilityRepository#findByIdWithOneToOneChildren}로
+ *       TargetRoleAnalysis, FiveElementsAnalysis, AnalysisBreakdown, ActionableStrategy 동시 fetch join</li>
+ *   <li>2개: ActionableKeyword, LuckyDay (ActionableStrategy id 기준 각 1개)</li>
+ *   <li>4개: ExpectedInterviewQuestion, RoleCompatibility, MonthlyForecast, Caution
+ *       (다중 컬렉션 동시 JOIN FETCH는 Cartesian product 위험 → 개별 쿼리 유지)</li>
+ * </ol>
  */
 @Service
 @RequiredArgsConstructor
 public class CompatibilityChildReadService {
 
-    private final TargetRoleAnalysisRepository targetRoleAnalysisRepository;
-    private final FiveElementsAnalysisRepository fiveElementsAnalysisRepository;
-    private final AnalysisBreakdownRepository analysisBreakdownRepository;
-    private final ActionableStrategyRepository actionableStrategyRepository;
+    private final CompanyCompatibilityRepository companyCompatibilityRepository;
     private final ActionableKeywordRepository actionableKeywordRepository;
     private final LuckyDayRepository luckyDayRepository;
     private final ExpectedInterviewQuestionRepository expectedInterviewQuestionRepository;
@@ -55,48 +59,72 @@ public class CompatibilityChildReadService {
 
     /**
      * RequestContext를 제외한 공통 자식 엔티티 로드 및 응답 조립.
-     * 두 buildFromExisting 오버로드가 공유하는 핵심 로직.
+     *
+     * <p>1:1 자식 4개는 {@link CompanyCompatibilityRepository#findByIdWithOneToOneChildren}으로
+     * 단일 쿼리에서 fetch join하여 로드. 컬렉션 자식은 별도 쿼리로 조회.
      */
     private CompatibilityResponse buildResponseWithContext(CompanyCompatibility saved,
                                                            CompatibilityResponse.RequestContext requestContext) {
+        // ─── 1:1 자식 4개 단일 쿼리 fetch join ─────────────────────────────
+        CompanyCompatibility loaded = companyCompatibilityRepository
+                .findByIdWithOneToOneChildren(saved.getId())
+                .orElseThrow(() -> new DataAccessException(
+                        "CompanyCompatibility 재조회 실패: id=" + saved.getId()));
+
+        TargetRoleAnalysis targetRoleAnalysisEntity = loaded.getTargetRoleAnalysis();
+        if (targetRoleAnalysisEntity == null) {
+            throw new DataAccessException(
+                    "completed=true인데 TargetRoleAnalysis가 없음: id=" + saved.getId());
+        }
         CompatibilityResponse.TargetRoleAnalysis targetRoleAnalysis =
-                targetRoleAnalysisRepository.findByCompanyCompatibility_Id(saved.getId())
-                        .map(e -> new CompatibilityResponse.TargetRoleAnalysis(
-                                e.getMatchScore(), e.getSynergy(), e.getWarning()))
-                        .orElseThrow(() -> new DataAccessException(
-                                "completed=true인데 TargetRoleAnalysis가 없음: id=" + saved.getId()));
+                new CompatibilityResponse.TargetRoleAnalysis(
+                        targetRoleAnalysisEntity.getMatchScore(),
+                        targetRoleAnalysisEntity.getSynergy(),
+                        targetRoleAnalysisEntity.getWarning());
 
+        FiveElementsAnalysis fiveElementsEntity = loaded.getFiveElementsAnalysis();
+        if (fiveElementsEntity == null) {
+            throw new DataAccessException(
+                    "completed=true인데 FiveElementsAnalysis가 없음: id=" + saved.getId());
+        }
         CompatibilityResponse.FiveElements fiveElements =
-                fiveElementsAnalysisRepository.findByCompanyCompatibility_Id(saved.getId())
-                        .map(e -> new CompatibilityResponse.FiveElements(
-                                e.getUserDistribution(), e.getCompanyDistribution(), e.getSynergyDescription()))
-                        .orElseThrow(() -> new DataAccessException(
-                                "completed=true인데 FiveElementsAnalysis가 없음: id=" + saved.getId()));
+                new CompatibilityResponse.FiveElements(
+                        fiveElementsEntity.getUserDistribution(),
+                        fiveElementsEntity.getCompanyDistribution(),
+                        fiveElementsEntity.getSynergyDescription());
 
+        AnalysisBreakdown analysisBreakdownEntity = loaded.getAnalysisBreakdown();
+        if (analysisBreakdownEntity == null) {
+            throw new DataAccessException(
+                    "completed=true인데 AnalysisBreakdown이 없음: id=" + saved.getId());
+        }
         CompatibilityResponse.AnalysisBreakdown analysisBreakdown =
-                analysisBreakdownRepository.findByCompanyCompatibility_Id(saved.getId())
-                        .map(e -> new CompatibilityResponse.AnalysisBreakdown(
-                                e.getCharacterMatch(), e.getPotentialSynergy(), e.getLongTermStability()))
-                        .orElseThrow(() -> new DataAccessException(
-                                "completed=true인데 AnalysisBreakdown이 없음: id=" + saved.getId()));
+                new CompatibilityResponse.AnalysisBreakdown(
+                        analysisBreakdownEntity.getCharacterMatch(),
+                        analysisBreakdownEntity.getPotentialSynergy(),
+                        analysisBreakdownEntity.getLongTermStability());
+
+        ActionableStrategy strategyEntity = loaded.getActionableStrategy();
+        if (strategyEntity == null) {
+            throw new DataAccessException(
+                    "completed=true인데 ActionableStrategy가 없음: id=" + saved.getId());
+        }
+
+        // ─── ActionableStrategy 자식 컬렉션 (전략 id 기준 각 1개 쿼리) ─────
+        List<String> keywords = actionableKeywordRepository
+                .findByActionableStrategy_IdOrderByDisplayOrderAsc(strategyEntity.getId())
+                .stream().map(ActionableKeyword::getKeyword).toList();
+        List<String> luckyDays = luckyDayRepository
+                .findByActionableStrategy_IdOrderByDisplayOrderAsc(strategyEntity.getId())
+                .stream().map(LuckyDay::getLuckyDay).toList();
 
         CompatibilityResponse.ActionableStrategy actionableStrategy =
-                actionableStrategyRepository.findByCompanyCompatibility_Id(saved.getId())
-                        .map(e -> {
-                            List<String> keywords = actionableKeywordRepository
-                                    .findByActionableStrategy_IdOrderByDisplayOrderAsc(e.getId())
-                                    .stream().map(ActionableKeyword::getKeyword).toList();
-                            List<String> luckyDays = luckyDayRepository
-                                    .findByActionableStrategy_IdOrderByDisplayOrderAsc(e.getId())
-                                    .stream().map(LuckyDay::getLuckyDay).toList();
-                            return new CompatibilityResponse.ActionableStrategy(
-                                    keywords, e.getWeaknessDefense(),
-                                    new CompatibilityResponse.ActionableStrategy.BestTiming(
-                                            luckyDays, e.getPreferredTime()));
-                        })
-                        .orElseThrow(() -> new DataAccessException(
-                                "completed=true인데 ActionableStrategy가 없음: id=" + saved.getId()));
+                new CompatibilityResponse.ActionableStrategy(
+                        keywords, strategyEntity.getWeaknessDefense(),
+                        new CompatibilityResponse.ActionableStrategy.BestTiming(
+                                luckyDays, strategyEntity.getPreferredTime()));
 
+        // ─── CompanyCompatibility 직접 자식 컬렉션 (compatibility_id 기준 각 1개 쿼리) ─
         List<ExpectedInterviewQuestion> questions =
                 expectedInterviewQuestionRepository.findByCompanyCompatibility_Id(saved.getId());
         List<RoleCompatibility> roles =
