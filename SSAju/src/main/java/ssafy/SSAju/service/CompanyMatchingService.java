@@ -21,6 +21,7 @@ import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.UserRepository;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.YearMonth;
@@ -74,6 +75,8 @@ public class CompanyMatchingService {
     private final CompatibilityChildSaveService childSaveService;
     private final CompatibilityChildReadService childReadService;
     private final UserRepository userRepository;
+    /** KST 기준 현재 월 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
+    private final Clock clock;
 
     public CompatibilityResponse analyzeCompatibility(CompatibilityRequest request, Long userId) {
         log.info("기업 궁합 분석 시작");
@@ -86,7 +89,7 @@ public class CompanyMatchingService {
         UserProfile userProfile = userProfileProvider.findOrCreate(
                 request.userBirthDate(), userBirthTime);
 
-        YearMonth now = YearMonth.now();
+        YearMonth now = YearMonth.now(clock);
         Integer compatibilityMonth = now.getYear() * 100 + now.getMonthValue();
 
         Optional<CompanyCompatibility> cachedOpt = companyCompatibilityRepository

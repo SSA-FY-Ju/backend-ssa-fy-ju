@@ -32,10 +32,13 @@ import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.UserRepository;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -72,6 +75,13 @@ class CompanyMatchingServiceTest {
 
     private CompanyMatchingService service;
 
+    /** 테스트 고정 날짜: 2026-05-27 KST → compatibilityMonth = 202605 */
+    private static final int TEST_COMPATIBILITY_MONTH = 202605;
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-05-27T01:00:00Z"),  // UTC 01:00 = KST 10:00
+            ZoneId.of("Asia/Seoul")
+    );
+
     private static final Long USER_ID = 1L;
     private static final User MOCK_USER = User.builder()
             .email("test@test.com")
@@ -107,7 +117,8 @@ class CompanyMatchingServiceTest {
                 tenGodCalculator, hiddenStemCalculator,
                 compatibilityScoreCalculator, jobRoleAnalyzer, analysisResponseBuilder,
                 companyCompatibilityRepository, companyCompatibilityJdbcRepository,
-                childSaveService, childReadService, userRepository
+                childSaveService, childReadService, userRepository,
+                FIXED_CLOCK
         );
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
 
@@ -356,8 +367,6 @@ class CompanyMatchingServiceTest {
     }
 
     private CompanyCompatibility buildCompatibility(UserProfile profile, JobCategoryEnum category) {
-        YearMonth now = YearMonth.now();
-        int month = now.getYear() * 100 + now.getMonthValue();
         return CompanyCompatibility.builder()
                 .userProfile(profile)
                 .user(MOCK_USER)
@@ -366,7 +375,7 @@ class CompanyMatchingServiceTest {
                 .targetRoleDetailName("개발자")
                 .compatibilityScore(78)
                 .summary("테스트 요약")
-                .compatibilityMonth(month)
+                .compatibilityMonth(TEST_COMPATIBILITY_MONTH)
                 .build();
     }
 }
