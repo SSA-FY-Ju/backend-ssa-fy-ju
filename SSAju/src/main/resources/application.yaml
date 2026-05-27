@@ -10,8 +10,7 @@ spring:
 
   jackson:
     time-zone: Asia/Seoul
-    serialization:
-      write-dates-as-timestamps: false  # Instant → ISO-8601 문자열 (예: 2026-05-27T15:07:31+09:00)
+    # write-dates-as-timestamps 제거: Jackson 3.x SerializationFeature에서 삭제됨 → JacksonConfig 참고
 
   jpa:
     hibernate:
