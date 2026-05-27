@@ -15,7 +15,7 @@ import ssafy.SSAju.dto.response.SatisfactionFeedbackResponse;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.service.FeedbackService;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -53,7 +53,7 @@ class FeedbackControllerTest {
     @DisplayName("유효한 피드백 요청 → 200 OK + feedbackId 반환")
     void shouldReturn200_WhenValidRequest() throws Exception {
         given(feedbackService.saveFeedback(any(), anyLong()))
-                .willReturn(new SatisfactionFeedbackResponse(1L, LocalDateTime.now(), "좋았습니다"));
+                .willReturn(new SatisfactionFeedbackResponse(1L, Instant.now(), "좋았습니다"));
 
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .with(authentication(AUTH))
@@ -76,7 +76,7 @@ class FeedbackControllerTest {
     @DisplayName("feedbackContent 없이 요청 → 200 OK")
     void shouldReturn200_WhenFeedbackContentMissing() throws Exception {
         given(feedbackService.saveFeedback(any(), anyLong()))
-                .willReturn(new SatisfactionFeedbackResponse(2L, LocalDateTime.now(), null));
+                .willReturn(new SatisfactionFeedbackResponse(2L, Instant.now(), null));
 
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .with(authentication(AUTH))

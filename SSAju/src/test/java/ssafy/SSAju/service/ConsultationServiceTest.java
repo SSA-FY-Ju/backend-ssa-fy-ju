@@ -29,8 +29,8 @@ import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
@@ -69,8 +69,8 @@ class ConsultationServiceTest {
             .name("테스트")
             .role(UserRole.USER)
             .status(UserStatus.ACTIVE)
-            .termsAgreedAt(LocalDateTime.now())
-            .privacyAgreedAt(LocalDateTime.now())
+            .termsAgreedAt(Instant.now())
+            .privacyAgreedAt(Instant.now())
             .build();
 
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 10, 10);

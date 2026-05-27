@@ -25,8 +25,8 @@ import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.repository.UserSatisfactionFeedbackRepository;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Optional;
 
@@ -55,8 +55,8 @@ class FeedbackServiceTest {
             .name("테스트")
             .role(UserRole.USER)
             .status(UserStatus.ACTIVE)
-            .termsAgreedAt(LocalDateTime.now())
-            .privacyAgreedAt(LocalDateTime.now())
+            .termsAgreedAt(Instant.now())
+            .privacyAgreedAt(Instant.now())
             .build();
 
     @BeforeEach

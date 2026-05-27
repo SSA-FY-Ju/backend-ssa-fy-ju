@@ -35,7 +35,6 @@ import ssafy.SSAju.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -89,8 +88,8 @@ class CompanyMatchingServiceTest {
             .name("테스트")
             .role(UserRole.USER)
             .status(UserStatus.ACTIVE)
-            .termsAgreedAt(LocalDateTime.now())
-            .privacyAgreedAt(LocalDateTime.now())
+            .termsAgreedAt(Instant.now())
+            .privacyAgreedAt(Instant.now())
             .build();
 
     private static final LocalDate USER_BIRTH_DATE = LocalDate.of(1998, 5, 7);

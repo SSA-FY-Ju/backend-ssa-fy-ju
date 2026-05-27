@@ -18,8 +18,8 @@ import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.List;
@@ -100,8 +100,8 @@ class CompanyCompatibilityJdbcRepositoryTest {
                 .name("테스트")
                 .role(UserRole.USER)
                 .status(UserStatus.ACTIVE)
-                .termsAgreedAt(LocalDateTime.now())
-                .privacyAgreedAt(LocalDateTime.now())
+                .termsAgreedAt(Instant.now())
+                .privacyAgreedAt(Instant.now())
                 .build());
 
         savedProfile = userProfileRepository.save(
