@@ -17,7 +17,9 @@ import ssafy.SSAju.entity.enums.LoginFailureReason;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.event.LoginAttemptEvent;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.core.NestedExceptionUtils;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.exception.ConsentRequiredException;
 import ssafy.SSAju.exception.DuplicateEmailException;
@@ -25,11 +27,12 @@ import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.RefreshTokenRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.util.DatabaseConstraints;
 import ssafy.SSAju.util.JwtUtil;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
 import ssafy.SSAju.util.TokenHashUtil;
+
+import java.time.Instant;
+import java.util.Optional;
 
 /**
  * 인증 비즈니스 로직 서비스.
@@ -92,7 +95,7 @@ public class AuthService {
             throw new ConsentRequiredException(ErrorMessageConstants.TERMS_AGREEMENT_REQUIRED.getMessage());
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         User user = User.builder()
                 .email(request.email())
                 .passwordHash(passwordEncoder.encode(request.password()))
@@ -106,7 +109,16 @@ public class AuthService {
         try {
             userRepository.save(user);
         } catch (DataIntegrityViolationException e) {
-            throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
+            // checkEmailAvailability()를 먼저 호출했음에도 발생하는 경우는 동시 요청 race condition임.
+            // ConstraintViolationException의 제약 이름을 확인하여 이메일 UNIQUE 위반만 DuplicateEmailException으로 변환.
+            // FK 위반 등 다른 제약 위반은 그대로 재던져 DataAccessException 핸들러가 처리하도록 함.
+            Throwable rootCause = NestedExceptionUtils.getRootCause(e);
+            if (rootCause instanceof ConstraintViolationException cve &&
+                    cve.getConstraintName() != null &&
+                    cve.getConstraintName().contains(DatabaseConstraints.USER_EMAIL_UNIQUE)) {
+                throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
+            }
+            throw e;
         }
         log.info("회원가입 완료: userId={}", user.getId());
 
@@ -305,7 +317,7 @@ public class AuthService {
      * @see LoginAttemptEventListener#onLoginAttempt
      */
     private void publishLoginEvent(String email, boolean success, LoginFailureReason reason, String clientIp) {
-        eventPublisher.publishEvent(new LoginAttemptEvent(email, success, reason, clientIp, LocalDateTime.now()));
+        eventPublisher.publishEvent(new LoginAttemptEvent(email, success, reason, clientIp, Instant.now()));
     }
 
 }

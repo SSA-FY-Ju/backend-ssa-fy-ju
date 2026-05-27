@@ -9,7 +9,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Getter
@@ -34,11 +33,11 @@ public class RefreshToken {
     private Instant expiresAt;
 
     @Column(name = "revoked_at")
-    private LocalDateTime revokedAt;
+    private Instant revokedAt;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Builder
     public RefreshToken(User user, String tokenHash, Instant expiresAt) {
@@ -56,7 +55,7 @@ public class RefreshToken {
     }
 
     public void revoke() {
-        this.revokedAt = LocalDateTime.now();
+        this.revokedAt = Instant.now();
     }
 
     @Override

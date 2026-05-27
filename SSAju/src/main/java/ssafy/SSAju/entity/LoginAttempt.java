@@ -7,7 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import ssafy.SSAju.entity.enums.LoginFailureReason;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 
 @Getter
@@ -34,11 +34,11 @@ public class LoginAttempt {
     private LoginFailureReason failureReason;
 
     @Column(name = "attempted_at", nullable = false)
-    private LocalDateTime attemptedAt;
+    private Instant attemptedAt;
 
     @Builder
     public LoginAttempt(String email, boolean success, String ipAddress,
-                        LoginFailureReason failureReason, LocalDateTime attemptedAt) {
+                        LoginFailureReason failureReason, Instant attemptedAt) {
         this.email = email;
         this.success = success;
         this.ipAddress = ipAddress;

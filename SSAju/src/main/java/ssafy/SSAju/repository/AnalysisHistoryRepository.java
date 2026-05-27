@@ -102,7 +102,7 @@ public class AnalysisHistoryRepository {
                         rs.getLong("analysis_id"),
                         rs.getString("target_name"),
                         rs.getDate("birth_date").toLocalDate(),
-                        rs.getTimestamp("created_at").toLocalDateTime()
+                        rs.getTimestamp("created_at").toInstant()
                 ),
                 userId, userId, userId, size, offset);
     }
@@ -118,7 +118,7 @@ public class AnalysisHistoryRepository {
                         rs.getLong("analysis_id"),
                         rs.getString("target_name"),
                         rs.getDate("birth_date").toLocalDate(),
-                        rs.getTimestamp("created_at").toLocalDateTime()
+                        rs.getTimestamp("created_at").toInstant()
                 ),
                 userId, userId, userId, type, size, offset);
     }

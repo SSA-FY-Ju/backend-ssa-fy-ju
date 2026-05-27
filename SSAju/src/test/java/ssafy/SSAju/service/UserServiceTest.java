@@ -31,8 +31,8 @@ import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserRepository;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -72,8 +72,8 @@ class UserServiceTest {
                 .name("테스트유저")
                 .role(UserRole.USER)
                 .status(UserStatus.ACTIVE)
-                .termsAgreedAt(LocalDateTime.now())
-                .privacyAgreedAt(LocalDateTime.now())
+                .termsAgreedAt(Instant.now())
+                .privacyAgreedAt(Instant.now())
                 .build();
         ReflectionTestUtils.setField(user, "id", id);
         return user;
@@ -107,9 +107,9 @@ class UserServiceTest {
         given(sajuResult.getId()).willReturn(ANALYSIS_ID);
         given(sajuResult.getUserProfile()).willReturn(userProfile);
         given(sajuResult.getCareerFortune()).willReturn(careerFortune);
-        given(sajuResult.getFetchedAt()).willReturn(LocalDateTime.now());
+        given(sajuResult.getFetchedAt()).willReturn(Instant.now());
         // USER_ID를 정확히 지정 — 다른 userId가 넘어오면 stub 불일치로 empty 반환
-        given(sajuResultRepository.findByIdAndUser_Id(eq(ANALYSIS_ID), eq(USER_ID)))
+        given(sajuResultRepository.findByIdAndUser_IdWithProfileAndFortune(eq(ANALYSIS_ID), eq(USER_ID)))
                 .willReturn(Optional.of(sajuResult));
 
         // When
@@ -131,7 +131,7 @@ class UserServiceTest {
     @DisplayName("SAJU 상세 조회 — SajuResult 없음 → SajuResultNotFoundException")
     void shouldThrow_WhenSajuResultNotFound() {
         // Given
-        given(sajuResultRepository.findByIdAndUser_Id(eq(ANALYSIS_ID), eq(USER_ID)))
+        given(sajuResultRepository.findByIdAndUser_IdWithProfileAndFortune(eq(ANALYSIS_ID), eq(USER_ID)))
                 .willReturn(Optional.empty());
 
         // When & Then
@@ -158,8 +158,8 @@ class UserServiceTest {
         given(sajuResult.getUserProfile()).willReturn(userProfile);
         given(cc.getId()).willReturn(ANALYSIS_ID);
         given(cc.getSajuResult()).willReturn(sajuResult);
-        given(cc.getGeneratedAt()).willReturn(LocalDateTime.now());
-        given(careerConsultationRepository.findById(ANALYSIS_ID)).willReturn(Optional.of(cc));
+        given(cc.getGeneratedAt()).willReturn(Instant.now());
+        given(careerConsultationRepository.findByIdWithSajuResultAndProfile(ANALYSIS_ID)).willReturn(Optional.of(cc));
         given(consultationMapper.toResponseFromEntity(cc)).willReturn(mockResponse);
 
         // When
@@ -182,7 +182,7 @@ class UserServiceTest {
 
         given(sajuResult.getUser()).willReturn(OTHER_USER);  // id=999L 소유자
         given(cc.getSajuResult()).willReturn(sajuResult);
-        given(careerConsultationRepository.findById(ANALYSIS_ID)).willReturn(Optional.of(cc));
+        given(careerConsultationRepository.findByIdWithSajuResultAndProfile(ANALYSIS_ID)).willReturn(Optional.of(cc));
 
         // When & Then — MOCK_USER(id=1L)로 조회하면 권한 없음
         assertThatThrownBy(() -> service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.CAREER_CONSULTATION))
@@ -205,7 +205,7 @@ class UserServiceTest {
         given(cc.getId()).willReturn(ANALYSIS_ID);
         given(cc.getCompanyName()).willReturn("삼성전자");
         given(cc.getUserProfile()).willReturn(userProfile);
-        given(cc.getCreatedAt()).willReturn(LocalDateTime.now());
+        given(cc.getCreatedAt()).willReturn(Instant.now());
         // MOCK_USER(id=1L)를 정확히 지정 — 다른 user 객체가 넘어오면 empty 반환
         given(companyCompatibilityRepository.findByIdAndUser(eq(ANALYSIS_ID), eq(MOCK_USER)))
                 .willReturn(Optional.of(cc));

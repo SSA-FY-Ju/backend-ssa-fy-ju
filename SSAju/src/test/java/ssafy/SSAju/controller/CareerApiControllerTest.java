@@ -23,7 +23,7 @@ import ssafy.SSAju.service.CompanyMatchingService;
 import ssafy.SSAju.service.ConsultationService;
 import ssafy.SSAju.service.FeedbackService;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -180,7 +180,7 @@ class CareerApiControllerTest {
     void us4_feedback_validRequest_returnsFeedbackId() throws Exception {
         // Given
         given(feedbackService.saveFeedback(any(), anyLong()))
-                .willReturn(new SatisfactionFeedbackResponse(1L, LocalDateTime.now(), "좋은 상담이었습니다"));
+                .willReturn(new SatisfactionFeedbackResponse(1L, Instant.now(), "좋은 상담이었습니다"));
 
         // When & Then
         mockMvc.perform(post("/api/feedback/satisfaction")

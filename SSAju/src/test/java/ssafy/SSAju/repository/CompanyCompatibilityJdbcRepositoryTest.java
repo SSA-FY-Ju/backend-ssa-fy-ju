@@ -18,8 +18,8 @@ import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -36,6 +36,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @DisplayName("CompanyCompatibilityJdbcRepository INSERT IGNORE 테스트")
 class CompanyCompatibilityJdbcRepositoryTest {
+
+    /** 자정 경계에서 월이 바뀌어 중복 키 검증이 흔들리는 현상 방지용 고정값 */
+    private static final int FIXED_COMPATIBILITY_MONTH = 202605;
 
     @Container
     static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0");
@@ -99,8 +102,8 @@ class CompanyCompatibilityJdbcRepositoryTest {
                 .name("테스트")
                 .role(UserRole.USER)
                 .status(UserStatus.ACTIVE)
-                .termsAgreedAt(LocalDateTime.now())
-                .privacyAgreedAt(LocalDateTime.now())
+                .termsAgreedAt(Instant.now())
+                .privacyAgreedAt(Instant.now())
                 .build());
 
         savedProfile = userProfileRepository.save(
@@ -195,6 +198,7 @@ class CompanyCompatibilityJdbcRepositoryTest {
                 .targetRoleDetailName("테스트 직무")
                 .compatibilityScore(75)
                 .summary("테스트 요약")
+                .compatibilityMonth(FIXED_COMPATIBILITY_MONTH)
                 .build();
     }
 }

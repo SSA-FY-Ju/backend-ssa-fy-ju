@@ -10,7 +10,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import ssafy.SSAju.career.converter.IntegerMapConverter;
 import ssafy.SSAju.career.converter.ObjectMapConverter;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Map;
 
 /**
@@ -75,7 +75,7 @@ public class SajuFullData {
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Builder
     public SajuFullData(SajuResult sajuResult,

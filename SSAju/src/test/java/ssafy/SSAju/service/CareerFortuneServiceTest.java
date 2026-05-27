@@ -25,8 +25,8 @@ import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.repository.UserRepository;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
@@ -67,8 +67,8 @@ class CareerFortuneServiceTest {
             .name("테스트")
             .role(UserRole.USER)
             .status(UserStatus.ACTIVE)
-            .termsAgreedAt(LocalDateTime.now())
-            .privacyAgreedAt(LocalDateTime.now())
+            .termsAgreedAt(Instant.now())
+            .privacyAgreedAt(Instant.now())
             .build();
 
     // 일간: 己(土, 陰) / 월지: 戌 → H2 판정 / confidenceScore: 70 (지장간 포함 Analyzer 공식)

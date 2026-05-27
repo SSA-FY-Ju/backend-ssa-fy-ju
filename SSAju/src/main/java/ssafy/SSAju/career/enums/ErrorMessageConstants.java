@@ -103,7 +103,8 @@ public enum ErrorMessageConstants {
     TOKEN_EXPIRED("TOKEN_EXPIRED", "만료된 토큰입니다."),
     DAILY_LIMIT_EXCEEDED("DAILY_LIMIT_EXCEEDED", "하루 3회 분석 제한에 도달했습니다."),
     TERMS_AGREEMENT_REQUIRED("TERMS_AGREEMENT_REQUIRED", "이용약관 및 개인정보 수집에 동의해야 합니다."),
-    UNAUTHORIZED("UNAUTHORIZED", "인증이 필요합니다.");
+    UNAUTHORIZED("UNAUTHORIZED", "인증이 필요합니다."),
+    ACCESS_DENIED("ACCESS_DENIED", "접근 권한이 없습니다.");
 
     private final String code;
     private final String message;

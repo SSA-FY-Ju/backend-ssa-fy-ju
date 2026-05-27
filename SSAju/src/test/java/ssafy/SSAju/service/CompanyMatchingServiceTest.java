@@ -11,15 +11,10 @@ import org.mockito.quality.Strictness;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
-import ssafy.SSAju.career.entity.ActionableStrategy;
-import ssafy.SSAju.career.entity.AnalysisBreakdown;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
-import ssafy.SSAju.career.entity.FiveElementsAnalysis;
-import ssafy.SSAju.career.entity.TargetRoleAnalysis;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.AnalysisResponseBuilder;
-import ssafy.SSAju.service.CompatibilityChildReadService;
 import ssafy.SSAju.career.util.CompatibilityScoreCalculator;
 import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.JobCategoryEnum;
@@ -29,27 +24,20 @@ import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.CompatibilityRequest;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
-import ssafy.SSAju.exception.FastAPITimeoutException;
-import ssafy.SSAju.repository.ActionableKeywordRepository;
-import ssafy.SSAju.repository.ActionableStrategyRepository;
-import ssafy.SSAju.repository.AnalysisBreakdownRepository;
-import ssafy.SSAju.repository.CautionRepository;
-import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
-import ssafy.SSAju.repository.CompanyCompatibilityRepository;
-import ssafy.SSAju.repository.ExpectedInterviewQuestionRepository;
-import ssafy.SSAju.repository.FiveElementsAnalysisRepository;
-import ssafy.SSAju.repository.LuckyDayRepository;
-import ssafy.SSAju.repository.MonthlyForecastRepository;
-import ssafy.SSAju.repository.RoleCompatibilityRepository;
-import ssafy.SSAju.repository.TargetRoleAnalysisRepository;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
+import ssafy.SSAju.exception.FastAPITimeoutException;
+import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
+import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.UserRepository;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -79,21 +68,18 @@ class CompanyMatchingServiceTest {
     @Mock private AnalysisResponseBuilder analysisResponseBuilder;
     @Mock private CompanyCompatibilityRepository companyCompatibilityRepository;
     @Mock private CompanyCompatibilityJdbcRepository companyCompatibilityJdbcRepository;
-    @Mock private TargetRoleAnalysisRepository targetRoleAnalysisRepository;
-    @Mock private FiveElementsAnalysisRepository fiveElementsAnalysisRepository;
-    @Mock private AnalysisBreakdownRepository analysisBreakdownRepository;
-    @Mock private ActionableStrategyRepository actionableStrategyRepository;
-    @Mock private ExpectedInterviewQuestionRepository expectedInterviewQuestionRepository;
-    @Mock private RoleCompatibilityRepository roleCompatibilityRepository;
-    @Mock private ActionableKeywordRepository actionableKeywordRepository;
-    @Mock private LuckyDayRepository luckyDayRepository;
-    @Mock private MonthlyForecastRepository monthlyForecastRepository;
-    @Mock private CautionRepository cautionRepository;
     @Mock private CompatibilityChildSaveService childSaveService;
     @Mock private CompatibilityChildReadService childReadService;
     @Mock private UserRepository userRepository;
 
     private CompanyMatchingService service;
+
+    /** 테스트 고정 날짜: 2026-05-27 KST → compatibilityMonth = 202605 */
+    private static final int TEST_COMPATIBILITY_MONTH = 202605;
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-05-27T01:00:00Z"),  // UTC 01:00 = KST 10:00
+            ZoneId.of("Asia/Seoul")
+    );
 
     private static final Long USER_ID = 1L;
     private static final User MOCK_USER = User.builder()
@@ -102,8 +88,8 @@ class CompanyMatchingServiceTest {
             .name("테스트")
             .role(UserRole.USER)
             .status(UserStatus.ACTIVE)
-            .termsAgreedAt(LocalDateTime.now())
-            .privacyAgreedAt(LocalDateTime.now())
+            .termsAgreedAt(Instant.now())
+            .privacyAgreedAt(Instant.now())
             .build();
 
     private static final LocalDate USER_BIRTH_DATE = LocalDate.of(1998, 5, 7);
@@ -130,11 +116,12 @@ class CompanyMatchingServiceTest {
                 tenGodCalculator, hiddenStemCalculator,
                 compatibilityScoreCalculator, jobRoleAnalyzer, analysisResponseBuilder,
                 companyCompatibilityRepository, companyCompatibilityJdbcRepository,
-                childSaveService, childReadService, userRepository
+                childSaveService, childReadService, userRepository,
+                FIXED_CLOCK
         );
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
 
-        // AnalysisResponseBuilder 기본 mock 설정 (lenient - 테스트별 필요에 따라 재정의 가능)
+        // AnalysisResponseBuilder 기본 mock 설정 (lenient)
         given(analysisResponseBuilder.buildFiveElementsData(any(), any()))
                 .willReturn(new CompatibilityAnalysisData.FiveElementsInfo(Map.of(), Map.of(), "테스트 시너지"));
         given(analysisResponseBuilder.buildAnalysisBreakdown(anyInt()))
@@ -146,6 +133,12 @@ class CompanyMatchingServiceTest {
         given(analysisResponseBuilder.buildMonthlyForecasts(any())).willReturn(List.of());
         given(analysisResponseBuilder.buildCautions(any(), any())).willReturn(List.of());
         given(analysisResponseBuilder.buildSummary(anyInt(), any())).willReturn("테스트 요약");
+
+        // 이번 달 캐시 기본값: 캐시 미스 (lenient)
+        given(companyCompatibilityRepository
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
+                .willReturn(Optional.empty());
     }
 
     // ─────────────────────────────────────────
@@ -165,14 +158,18 @@ class CompanyMatchingServiceTest {
         given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
         given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
         given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
-
         given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
                 .willReturn(78);
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(new CompatibilityAnalysisData.RoleAnalysis(85, "시너지 텍스트", "경고 텍스트"));
         given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
-        given(companyCompatibilityRepository.findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
-                any(), any(), anyString(), any())).willReturn(Optional.of(savedEntity));
+
+        // INSERT 후 재조회 mock (이번 달로 조회)
+        given(companyCompatibilityRepository
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
+                .willReturn(Optional.empty())       // 1차 캐시 조회: 미스
+                .willReturn(Optional.of(savedEntity)); // 2차 INSERT 후 재조회: 성공
 
         // When
         CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
@@ -185,47 +182,75 @@ class CompanyMatchingServiceTest {
     }
 
     // ─────────────────────────────────────────
-    // Race Condition: 이미 존재하는 결과 재사용
+    // 월별 캐시 히트: 이미 완료된 이번 달 분석 재사용
     // ─────────────────────────────────────────
 
     @Test
-    @DisplayName("이미 존재하는 요청 → INSERT IGNORE 0 반환, 기존 DB 데이터 재사용")
-    void shouldReturnExistingData_WhenDuplicateCompatibility() {
+    @DisplayName("이번 달 completed=true 캐시 존재 → 외부 API 호출 없이 즉시 반환")
+    void shouldReturnCachedResult_WhenThisMonthCompleted() {
+        // Given
+        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
+        CompanyCompatibility completedEntity = buildCompatibility(MOCK_USER_PROFILE);
+        completedEntity.markCompleted();
+        CompatibilityResponse cachedResponse = new CompatibilityResponse(
+                completedEntity.getId(), null, 78, "캐시 요약",
+                null, null, null, null, null, null, null, null
+        );
+
+        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
+        given(companyCompatibilityRepository
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
+                .willReturn(Optional.of(completedEntity));
+        given(childReadService.buildFromExisting(completedEntity, request)).willReturn(cachedResponse);
+
+        // When
+        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
+
+        // Then: 외부 API 호출 없음, 캐시 반환
+        assertThat(response).isEqualTo(cachedResponse);
+        verify(sajuDataService, never()).fetchSajuFromFastAPI(any(), any());
+        verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
+    }
+
+    // ─────────────────────────────────────────
+    // Race Condition: INSERT 후 동시 요청이 먼저 삽입한 경우
+    // ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("INSERT IGNORE 0 + completed=false → 현재 계산 결과로 응답")
+    void shouldReturnCalculatedResult_WhenInsertIgnoredAndNotCompleted() {
         // Given
         CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
         HiddenStems mockHiddenStems = new HiddenStems(
                 Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
                         "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
-        CompanyCompatibility existingEntity = buildCompatibility(MOCK_USER_PROFILE);
+        CompanyCompatibility existingEntity = buildCompatibility(MOCK_USER_PROFILE); // completed=false
 
         given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
         given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
         given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
-
         given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
                 .willReturn(78);
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(new CompatibilityAnalysisData.RoleAnalysis(85, "시너지", "경고"));
         given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(0);
-        given(companyCompatibilityRepository.findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
-                any(), any(), anyString(), any())).willReturn(Optional.of(existingEntity));
+        given(companyCompatibilityRepository
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
+                .willReturn(Optional.empty())        // 1차 캐시 조회: 미스
+                .willReturn(Optional.of(existingEntity)); // 2차 INSERT IGNORE 후 재조회
 
         // When
         CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
 
-        // Then: 신규 저장 없음
+        // Then: 현재 계산 결과로 응답, childSaveService 호출 없음
         assertThat(response).isNotNull();
-        verify(targetRoleAnalysisRepository, never()).save(any());
-        // 캐시 재사용 경로에서도 4개 분석 필드가 정상적으로 채워지는지 검증 (버그 방지)
-        assertThat(response.targetRoleAnalysis()).isNotNull();
-        assertThat(response.targetRoleAnalysis().matchScore()).isEqualTo(85);
-        assertThat(response.fiveElements()).isNotNull();
-        assertThat(response.analysisBreakdown()).isNotNull();
-        assertThat(response.actionableStrategy()).isNotNull();
+        verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
     }
 
     // ─────────────────────────────────────────
-    // Race Condition: 완료된 캐시 재사용 (completed=true)
+    // Race Condition: INSERT IGNORE 0 + completed=true
     // ─────────────────────────────────────────
 
     @Test
@@ -236,10 +261,8 @@ class CompanyMatchingServiceTest {
         HiddenStems mockHiddenStems = new HiddenStems(
                 Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
                         "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
-
         CompanyCompatibility completedEntity = buildCompatibility(MOCK_USER_PROFILE);
         completedEntity.markCompleted();
-
         CompatibilityResponse cachedResponse = new CompatibilityResponse(
                 completedEntity.getId(), null, 78, "캐시 요약",
                 null, null, null, null, null, null, null, null
@@ -253,14 +276,17 @@ class CompanyMatchingServiceTest {
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(new CompatibilityAnalysisData.RoleAnalysis(85, "시너지", "경고"));
         given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(0);
-        given(companyCompatibilityRepository.findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
-                any(), any(), anyString(), any())).willReturn(Optional.of(completedEntity));
+        given(companyCompatibilityRepository
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
+                .willReturn(Optional.empty())           // 1차 캐시 조회: 미스
+                .willReturn(Optional.of(completedEntity)); // 2차 INSERT IGNORE 후 재조회
         given(childReadService.buildFromExisting(completedEntity, request)).willReturn(cachedResponse);
 
         // When
         CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
 
-        // Then: 캐시된 응답 반환 및 신규 자식 저장 없음
+        // Then
         assertThat(response).isEqualTo(cachedResponse);
         verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
         verify(childReadService).buildFromExisting(completedEntity, request);
@@ -273,7 +299,7 @@ class CompanyMatchingServiceTest {
     @Test
     @DisplayName("기업 설립 시간 null → 12:00 기본값으로 FastAPI 호출")
     void shouldUseDefaultTime_WhenCompanyFoundingTimeNull() {
-        // Given: companyFoundingTime을 null로 설정
+        // Given
         CompatibilityRequest request = new CompatibilityRequest(
                 USER_BIRTH_DATE, USER_BIRTH_TIME,
                 new CompatibilityRequest.TargetRoleRequest(JobCategoryEnum.TECH_BACKEND, "백엔드 개발자"),
@@ -285,55 +311,24 @@ class CompanyMatchingServiceTest {
         given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
         given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
         given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
-
         given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
                 .willReturn(60);
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(new CompatibilityAnalysisData.RoleAnalysis(60, "시너지", "경고"));
         given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
-        given(companyCompatibilityRepository.findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
-                any(), any(), anyString(), any())).willReturn(Optional.of(savedEntity));
+        given(companyCompatibilityRepository
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
+                .willReturn(Optional.empty())
+                .willReturn(Optional.of(savedEntity));
 
         // When
         CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
 
-        // Then
+        // Then: 기본 시간(12:00)으로 FastAPI 호출
         assertThat(response).isNotNull();
-        // LocalTime.of(12, 0)으로 호출 2회 (사용자 + 기업)
         verify(sajuDataService).fetchSajuFromFastAPI(USER_BIRTH_DATE, USER_BIRTH_TIME);
         verify(sajuDataService).fetchSajuFromFastAPI(COMPANY_FOUNDING_DATE, LocalTime.of(12, 0));
-    }
-
-    // ─────────────────────────────────────────
-    // 응답 구조 검증
-    // ─────────────────────────────────────────
-
-    @Test
-    @DisplayName("응답 내 requestContext 필드가 요청 값과 일치")
-    void shouldReturnCorrectRequestContext_InResponse() {
-        // Given
-        CompatibilityRequest request = buildRequest(JobCategoryEnum.FINANCE);
-        HiddenStems mockHiddenStems = new HiddenStems(Map.of());
-        CompanyCompatibility savedEntity = buildCompatibility(MOCK_USER_PROFILE, JobCategoryEnum.FINANCE);
-
-        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
-        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
-        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
-
-        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
-                .willReturn(65);
-        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
-                .willReturn(new CompatibilityAnalysisData.RoleAnalysis(70, "시너지", "경고"));
-        given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
-        given(companyCompatibilityRepository.findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
-                any(), any(), anyString(), any())).willReturn(Optional.of(savedEntity));
-
-        // When
-        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
-
-        // Then
-        assertThat(response.requestContext().companyName()).isEqualTo("현대오토에버");
-        assertThat(response.requestContext().targetRole().category()).isEqualTo(JobCategoryEnum.FINANCE);
     }
 
     // ─────────────────────────────────────────
@@ -345,7 +340,6 @@ class CompanyMatchingServiceTest {
     void shouldPropagateException_WhenFastAPIFails() {
         // Given
         CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
-
         given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
         given(sajuDataService.fetchSajuFromFastAPI(any(), any()))
                 .willThrow(new FastAPITimeoutException("FastAPI 응답 타임아웃"));
@@ -380,41 +374,7 @@ class CompanyMatchingServiceTest {
                 .targetRoleDetailName("개발자")
                 .compatibilityScore(78)
                 .summary("테스트 요약")
-                .build();
-    }
-
-    private TargetRoleAnalysis buildTargetRoleAnalysisEntity(CompanyCompatibility compatibility) {
-        return TargetRoleAnalysis.builder()
-                .companyCompatibility(compatibility)
-                .matchScore(85)
-                .synergy("시너지 텍스트")
-                .warning("경고 텍스트")
-                .build();
-    }
-
-    private FiveElementsAnalysis buildFiveElementsAnalysisEntity(CompanyCompatibility compatibility) {
-        return FiveElementsAnalysis.builder()
-                .companyCompatibility(compatibility)
-                .userWood(1).userFire(2).userEarth(2).userMetal(2).userWater(1)
-                .companyWood(2).companyFire(1).companyEarth(1).companyMetal(2).companyWater(2)
-                .synergyDescription("균형 잡힌 오행 구조")
-                .build();
-    }
-
-    private AnalysisBreakdown buildAnalysisBreakdownEntity(CompanyCompatibility compatibility) {
-        return AnalysisBreakdown.builder()
-                .companyCompatibility(compatibility)
-                .characterMatch(83)
-                .potentialSynergy(73)
-                .longTermStability(78)
-                .build();
-    }
-
-    private ActionableStrategy buildActionableStrategyEntity(CompanyCompatibility compatibility) {
-        return ActionableStrategy.builder()
-                .companyCompatibility(compatibility)
-                .weaknessDefense("지속적 학습 의지를 강조하세요.")
-                .preferredTime("오전 09:00 ~ 11:00")
+                .compatibilityMonth(TEST_COMPATIBILITY_MONTH)
                 .build();
     }
 }

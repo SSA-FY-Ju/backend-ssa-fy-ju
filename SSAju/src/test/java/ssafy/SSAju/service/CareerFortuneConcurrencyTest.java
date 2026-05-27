@@ -23,8 +23,8 @@ import ssafy.SSAju.repository.TenGodDataRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 import ssafy.SSAju.repository.UserRepository;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.LongSummaryStatistics;
@@ -103,8 +103,8 @@ class CareerFortuneConcurrencyTest {
                 .name("동시성테스트")
                 .role(UserRole.USER)
                 .status(UserStatus.ACTIVE)
-                .termsAgreedAt(LocalDateTime.now())
-                .privacyAgreedAt(LocalDateTime.now())
+                .termsAgreedAt(Instant.now())
+                .privacyAgreedAt(Instant.now())
                 .build());
         testUserId = testUser.getId();
     }

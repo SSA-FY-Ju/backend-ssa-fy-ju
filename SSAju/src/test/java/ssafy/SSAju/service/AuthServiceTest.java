@@ -20,7 +20,6 @@ import ssafy.SSAju.util.JwtUtil;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,8 +53,8 @@ class AuthServiceTest {
                 .name("테스트유저")
                 .role(UserRole.USER)
                 .status(UserStatus.ACTIVE)
-                .termsAgreedAt(LocalDateTime.now())
-                .privacyAgreedAt(LocalDateTime.now())
+                .termsAgreedAt(Instant.now())
+                .privacyAgreedAt(Instant.now())
                 .build();
 
         // 리플렉션으로 id 설정 (테스트용)
@@ -172,8 +171,8 @@ class AuthServiceTest {
                 .name("다른유저")
                 .role(UserRole.USER)
                 .status(UserStatus.ACTIVE)
-                .termsAgreedAt(LocalDateTime.now())
-                .privacyAgreedAt(LocalDateTime.now())
+                .termsAgreedAt(Instant.now())
+                .privacyAgreedAt(Instant.now())
                 .build();
         try {
             Field idField = User.class.getDeclaredField("id");

@@ -1,6 +1,6 @@
 package ssafy.SSAju.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 public record MyPageResponse(
@@ -12,8 +12,8 @@ public record MyPageResponse(
             Long id,
             String name,
             String email,
-            LocalDateTime createdAt,
-            LocalDateTime lastLoginAt
+            Instant createdAt,
+            Instant lastLoginAt
     ) {}
 
     public record PaginationInfo(

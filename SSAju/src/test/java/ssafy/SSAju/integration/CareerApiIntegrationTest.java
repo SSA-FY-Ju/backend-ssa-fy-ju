@@ -23,7 +23,7 @@ import ssafy.SSAju.service.DailyApiUsageService;
 import ssafy.SSAju.service.SajuDataService;
 import ssafy.SSAju.util.JwtUtil;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -95,8 +95,8 @@ class CareerApiIntegrationTest {
                 .name("통합테스트")
                 .role(UserRole.USER)
                 .status(UserStatus.ACTIVE)
-                .termsAgreedAt(LocalDateTime.now())
-                .privacyAgreedAt(LocalDateTime.now())
+                .termsAgreedAt(Instant.now())
+                .privacyAgreedAt(Instant.now())
                 .build());
         String token = jwtUtil.generateAccessToken(testUser.getId(), testUser.getEmail());
         authHeader = "Bearer " + token;

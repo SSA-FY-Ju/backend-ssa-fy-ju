@@ -6,8 +6,6 @@ import org.springframework.stereotype.Service;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
-import ssafy.SSAju.career.domain.FiveElements;
-import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.entity.*;
 import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.provider.UserProfileProvider;
@@ -23,9 +21,12 @@ import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.UserRepository;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 기업/직무 궁합 분석 오케스트레이션 서비스.
@@ -74,6 +75,8 @@ public class CompanyMatchingService {
     private final CompatibilityChildSaveService childSaveService;
     private final CompatibilityChildReadService childReadService;
     private final UserRepository userRepository;
+    /** KST 기준 현재 월 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
+    private final Clock clock;
 
     public CompatibilityResponse analyzeCompatibility(CompatibilityRequest request, Long userId) {
         log.info("기업 궁합 분석 시작");
@@ -81,11 +84,25 @@ public class CompanyMatchingService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
-        // ─── 사용자 사주 계산 ──────────────────────────────────────
+        // ─── 이번 달 캐시 조회 (FastAPI 호출 이전에 확인) ──────────────
         LocalTime userBirthTime = resolveUserBirthTime(request);
         UserProfile userProfile = userProfileProvider.findOrCreate(
                 request.userBirthDate(), userBirthTime);
 
+        YearMonth now = YearMonth.now(clock);
+        Integer compatibilityMonth = now.getYear() * 100 + now.getMonthValue();
+
+        Optional<CompanyCompatibility> cachedOpt = companyCompatibilityRepository
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                        userId, userProfile.getId(),
+                        request.companyName(), request.targetRole().category(), compatibilityMonth);
+
+        if (cachedOpt.isPresent() && cachedOpt.get().isCompleted()) {
+            log.info("이번 달 궁합 분석 캐시 히트 (compatibilityId={})", cachedOpt.get().getId());
+            return childReadService.buildFromExisting(cachedOpt.get(), request);
+        }
+
+        // ─── 사용자 사주 계산 ──────────────────────────────────────
         FastAPIResponse userSaju = sajuDataService.fetchSajuFromFastAPI(
                 request.userBirthDate(), userBirthTime);
         sajuValidator.validate(userSaju);
@@ -123,29 +140,12 @@ public class CompanyMatchingService {
         String summary = responseBuilder.buildSummary(compatibilityScore, request.targetRole().category());
 
         // ───────────────────────────────────────────────────────────────────
-        // INSERT IGNORE: DB 제약(UNIQUE) 기반 동시 요청 안전 처리
+        // 캐시 미스: INSERT IGNORE로 root 엔티티 삽입
         //
-        // 설계 의도:
-        // 1. JDBC로 root 엔티티만 먼저 삽입 (즉시 자동 커밋)
-        //    - UNIQUE(user_profile_id, company_name, target_role_category) 제약 위반 시 반환값 0
-        // 2. inserted 값에 따라 신규(1) vs 기존(0) 분기 처리
-        // 3. 신규이면 자식 엔티티들을 각 Repository 트랜잭션으로 저장
-        //
-        // 레이스 컨디션 시나리오:
-        // 시간순서 | 요청 A              | 요청 B
-        // ────────┼──────────────────────┼──────────────────────
-        // T1     | INSERT IGNORE 실행    |
-        // T2     | root 커밋 (inserted=1)|
-        // T3     |                       | INSERT IGNORE 실행
-        // T4     |                       | UNIQUE 제약 위반, inserted=0 반환
-        // T5     |                       | buildResponseFromExisting() 호출
-        // T6     | saveAllChildren() 시작|
-        // T7     |                       | 자식 엔티티들이 아직 저장 중 → 불완전한 응답 반환 위험
-        // T8     | 자식 엔티티들 저장 완료|
-        //
-        // 위 시나리오는 아래 두 가지로 해결됩니다:
-        // - Option A: completed 플래그 → inserted==0 + completed==false 시 캐시 차단
-        // - Option B: CompatibilityChildSaveService(@Transactional REQUIRES_NEW) → 자식 원자적 저장
+        // - inserted=1: 신규 → 자식 엔티티들 저장
+        // - inserted=0: 동시 요청이 먼저 삽입함 → 재조회 후 분기
+        //   - completed=true: 자식 저장 완료된 캐시 재사용
+        //   - completed=false: 자식 저장 진행 중 → 현재 계산 결과로 응답
         // ───────────────────────────────────────────────────────────────────
         CompanyCompatibility root = CompanyCompatibility.builder()
                 .userProfile(userProfile)
@@ -155,34 +155,31 @@ public class CompanyMatchingService {
                 .targetRoleDetailName(request.targetRole().detailName())
                 .compatibilityScore(compatibilityScore)
                 .summary(summary)
+                .compatibilityMonth(compatibilityMonth)
                 .build();
 
         int inserted = companyCompatibilityJdbcRepository.insertOrIgnore(root);
 
         CompanyCompatibility saved = companyCompatibilityRepository
-                .findFirstByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryOrderByVersionDesc(
-                        userId,
-                        userProfile.getId(),
-                        request.companyName(),
-                        request.targetRole().category())
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                        userId, userProfile.getId(),
+                        request.companyName(), request.targetRole().category(), compatibilityMonth)
                 .orElseThrow(() -> new ssafy.SSAju.exception.DataAccessException(
                         "CompanyCompatibility 조회 실패"));
 
         if (inserted == 0) {
             if (saved.isCompleted()) {
-                // Option A: completed=true → 자식 데이터가 완전히 저장된 캐시만 재사용
+                // completed=true → 자식 데이터가 완전히 저장된 캐시만 재사용
                 log.info("완료된 궁합 분석 캐시 재사용 (compatibilityId={})", saved.getId());
                 return childReadService.buildFromExisting(saved, request);
             }
             // completed=false: 다른 요청이 자식 저장 진행 중 → 현재 계산 결과로 응답
-            // (재계산 없이 이미 인메모리에 있는 결과를 그대로 반환, DB 저장은 진행 중인 요청에 위임)
             log.info("자식 저장 진행 중인 기존 레코드 감지 (compatibilityId={}), 현재 계산 결과로 응답",
                     saved.getId());
             return buildNewResponse(saved, request, analysisData);
         }
 
-        // Option B: 자식 엔티티 전체 저장을 단일 트랜잭션(REQUIRES_NEW)으로 위임
-        // 실패 시 모든 자식이 롤백되어 부분 저장 방지
+        // 자식 엔티티 전체 저장을 단일 트랜잭션(REQUIRES_NEW)으로 위임
         childSaveService.saveAllAndMarkCompleted(saved, analysisData);
 
         log.info("기업 궁합 분석 완료: compatibilityScore={}", compatibilityScore);
