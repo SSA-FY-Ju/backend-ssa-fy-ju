@@ -8,7 +8,7 @@ import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,7 +35,7 @@ public class SajuResult {
     private User user;
 
     @Column(name = "fetched_at", nullable = false)
-    private LocalDateTime fetchedAt;
+    private Instant fetchedAt;
 
     @OneToOne(mappedBy = "sajuResult", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private SajuFullData sajuFullData;
@@ -53,7 +53,7 @@ public class SajuResult {
     public SajuResult(UserProfile userProfile, User user) {
         this.userProfile = userProfile;
         this.user = user;
-        this.fetchedAt = LocalDateTime.now();
+        this.fetchedAt = Instant.now();
     }
 
     public void assignSajuFullData(SajuFullData data) {

@@ -1,10 +1,10 @@
 package ssafy.SSAju.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record SatisfactionFeedbackResponse(
         Long feedbackId,
-        LocalDateTime createdAt,
+        Instant createdAt,
         String feedbackContent
 ) {
 }

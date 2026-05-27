@@ -2,7 +2,7 @@ package ssafy.SSAju.event;
 
 import ssafy.SSAju.entity.enums.LoginFailureReason;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 로그인 시도 이벤트.
@@ -26,5 +26,5 @@ public record LoginAttemptEvent(
         boolean success,
         LoginFailureReason failureReason,
         String ipAddress,
-        LocalDateTime attemptedAt
+        Instant attemptedAt
 ) {}

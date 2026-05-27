@@ -10,7 +10,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import ssafy.SSAju.career.util.JobCategoryEnum;
 import ssafy.SSAju.entity.User;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -91,11 +91,11 @@ public class CompanyCompatibility {
     private ActionableStrategy actionableStrategy;
 
     @Column(name = "analyzed_at", nullable = false, updatable = false)
-    private LocalDateTime analyzedAt;
+    private Instant analyzedAt;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Builder
     public CompanyCompatibility(UserProfile userProfile, User user, String companyName,
@@ -110,7 +110,7 @@ public class CompanyCompatibility {
         this.summary = summary;
         this.compatibilityMonth = compatibilityMonth;
         this.completed = false;
-        this.analyzedAt = LocalDateTime.now();
+        this.analyzedAt = Instant.now();
     }
 
     /**

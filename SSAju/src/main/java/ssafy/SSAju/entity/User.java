@@ -13,7 +13,6 @@ import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Getter
@@ -46,28 +45,28 @@ public class User {
     private UserStatus status;
 
     @Column(name = "last_login_at")
-    private LocalDateTime lastLoginAt;
+    private Instant lastLoginAt;
 
     @Column(name = "terms_agreed_at", nullable = false)
-    private LocalDateTime termsAgreedAt;
+    private Instant termsAgreedAt;
 
     @Column(name = "privacy_agreed_at", nullable = false)
-    private LocalDateTime privacyAgreedAt;
+    private Instant privacyAgreedAt;
 
     @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    private Instant deletedAt;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     @Builder
     public User(String email, String passwordHash, String name, UserRole role, UserStatus status,
-                LocalDateTime termsAgreedAt, LocalDateTime privacyAgreedAt) {
+                Instant termsAgreedAt, Instant privacyAgreedAt) {
         this.email = email;
         this.passwordHash = passwordHash;
         this.name = name;
@@ -78,16 +77,16 @@ public class User {
     }
 
     public void updateLastLoginAt() {
-        this.lastLoginAt = LocalDateTime.now();
+        this.lastLoginAt = Instant.now();
     }
 
     public void softDelete() {
-        // Instant.now().getEpochSecond()으로 타임존 독립적인 고유 epoch 초 값을 생성합니다.
-        // LocalDateTime.toEpochSecond(ZoneOffset.UTC)는 로컬 시간을 UTC로 잘못 해석할 수 있음.
+        // Instant 기반으로 통일: 타임존 독립적인 고유 epoch 초 값 + deletedAt 일관성 보장
+        Instant now = Instant.now();
         this.name = "탈퇴한 사용자";
-        this.email = "deleted_" + this.id + "_" + Instant.now().getEpochSecond() + "@deleted.local";
+        this.email = "deleted_" + this.id + "_" + now.getEpochSecond() + "@deleted.local";
         this.status = UserStatus.INACTIVE;
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = now;
     }
 
     @Override

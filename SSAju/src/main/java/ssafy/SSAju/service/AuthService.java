@@ -31,7 +31,7 @@ import ssafy.SSAju.util.DatabaseConstraints;
 import ssafy.SSAju.util.JwtUtil;
 import ssafy.SSAju.util.TokenHashUtil;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -95,7 +95,7 @@ public class AuthService {
             throw new ConsentRequiredException(ErrorMessageConstants.TERMS_AGREEMENT_REQUIRED.getMessage());
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         User user = User.builder()
                 .email(request.email())
                 .passwordHash(passwordEncoder.encode(request.password()))
@@ -317,7 +317,7 @@ public class AuthService {
      * @see LoginAttemptEventListener#onLoginAttempt
      */
     private void publishLoginEvent(String email, boolean success, LoginFailureReason reason, String clientIp) {
-        eventPublisher.publishEvent(new LoginAttemptEvent(email, success, reason, clientIp, LocalDateTime.now()));
+        eventPublisher.publishEvent(new LoginAttemptEvent(email, success, reason, clientIp, Instant.now()));
     }
 
 }

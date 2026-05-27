@@ -11,7 +11,7 @@ import ssafy.SSAju.career.enums.FeedbackType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.entity.User;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 
 @Getter
@@ -53,7 +53,7 @@ public class UserSatisfactionFeedback {
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Builder
     public UserSatisfactionFeedback(User user,

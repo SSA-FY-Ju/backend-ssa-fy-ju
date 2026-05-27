@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 지원 전략의 행운의 날짜.
@@ -37,7 +37,7 @@ public class LuckyDay {
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Builder
     public LuckyDay(ActionableStrategy actionableStrategy, String luckyDay, Integer displayOrder) {
