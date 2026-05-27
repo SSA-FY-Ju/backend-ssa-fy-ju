@@ -64,7 +64,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/auth/**").authenticated()
                     .requestMatchers("/api/career/**", "/api/feedback/**", "/api/company/**").authenticated()
                     .requestMatchers("/api/mypage/**", "/api/users/**").authenticated()
-                    .anyRequest().permitAll())
+                    .anyRequest().authenticated())
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler))
