@@ -3,6 +3,9 @@ package ssafy.SSAju.career.mapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import ssafy.SSAju.career.entity.*;
+
+import java.time.Clock;
+import java.time.ZoneId;
 import ssafy.SSAju.dto.response.ConsultationResponse;
 
 import java.util.List;
@@ -15,7 +18,7 @@ import static org.mockito.Mockito.mock;
 @DisplayName("ConsultationMapper.toResponseFromEntity() 단위 테스트")
 class ConsultationMapperTest {
 
-    private final ConsultationMapper mapper = new ConsultationMapper();
+    private final ConsultationMapper mapper = new ConsultationMapper(Clock.system(ZoneId.of("Asia/Seoul")));
 
     @Test
     @DisplayName("CareerConsultation 엔티티 → ConsultationResponse 정상 복원")

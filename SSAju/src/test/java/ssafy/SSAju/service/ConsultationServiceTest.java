@@ -30,9 +30,11 @@ import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.service.DailyApiUsageService;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -60,7 +62,9 @@ class ConsultationServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private DailyApiUsageService dailyApiUsageService;
 
-    private final ConsultationMapper consultationMapper = new ConsultationMapper();
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-05-27T01:00:00Z"), ZoneId.of("Asia/Seoul"));
+    private final ConsultationMapper consultationMapper = new ConsultationMapper(FIXED_CLOCK);
 
     private ConsultationService service;
 
@@ -144,7 +148,7 @@ class ConsultationServiceTest {
                 openAICaller, sajuDataService, sajuAnalysisFacade,
                 userProfileProvider, sajuResultProvider, sajuResultMapper, consultationMapper,
                 careerConsultationRepository, consultationSaveService, new SajuValidator(), userRepository,
-                dailyApiUsageService);
+                dailyApiUsageService, FIXED_CLOCK);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
         try {
             var field = ConsultationService.class.getDeclaredField("modelVersion");
