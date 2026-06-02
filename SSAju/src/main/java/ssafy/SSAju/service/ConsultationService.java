@@ -25,6 +25,7 @@ import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -47,6 +48,7 @@ public class ConsultationService {
     private final ConsultationSaveService consultationSaveService;
     private final SajuValidator sajuValidator;
     private final UserRepository userRepository;
+    private final DailyApiUsageService dailyApiUsageService;
 
     @Value("${spring.ai.openai.chat.options.model}")
     private String modelVersion;
@@ -109,6 +111,8 @@ public class ConsultationService {
         }
 
         // ─── 4. OpenAI 호출 (캐시 미스, 외부 I/O) ───────────────────────────────
+        // 캐시 히트 경로는 위에서 이미 반환 → 여기까지 온 경우만 신규 OpenAI 호출, 차감
+        dailyApiUsageService.checkAndIncrementDailyUsage(userId);
         CareerAdviceResponse advice = openAICaller.call(
                 sajuData, tenGodDistribution, hiddenStems, dayMaster);
 

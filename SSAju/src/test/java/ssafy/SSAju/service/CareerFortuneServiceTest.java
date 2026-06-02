@@ -24,6 +24,7 @@ import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -48,6 +49,7 @@ class CareerFortuneServiceTest {
     @Mock private SajuResultProvider sajuResultProvider;
     @Mock private SajuResultMapper sajuResultMapper;
     @Mock private UserRepository userRepository;
+    @Mock private DailyApiUsageService dailyApiUsageService;
 
     private CareerFortuneService service;
 
@@ -84,7 +86,8 @@ class CareerFortuneServiceTest {
     void setUp() {
         service = new CareerFortuneService(
                 sajuDataService, userProfileProvider, sajuResultProvider,
-                sajuAnalysisFacade, sajuResultMapper, sajuValidator, userRepository);
+                sajuAnalysisFacade, sajuResultMapper, sajuValidator, userRepository,
+                dailyApiUsageService);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
     }
 

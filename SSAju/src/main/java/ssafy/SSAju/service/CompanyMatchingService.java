@@ -20,6 +20,7 @@ import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -77,6 +78,7 @@ public class CompanyMatchingService {
     private final UserRepository userRepository;
     /** KST 기준 현재 월 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
     private final Clock clock;
+    private final DailyApiUsageService dailyApiUsageService;
 
     public CompatibilityResponse analyzeCompatibility(CompatibilityRequest request, Long userId) {
         log.info("기업 궁합 분석 시작");
@@ -103,6 +105,8 @@ public class CompanyMatchingService {
         }
 
         // ─── 사용자 사주 계산 ──────────────────────────────────────
+        // 이른 캐시 히트(completed=true) 경로는 위에서 반환됨 → 여기서부터는 FastAPI 호출이 발생하는 신규 분석
+        dailyApiUsageService.checkAndIncrementDailyUsage(userId);
         FastAPIResponse userSaju = sajuDataService.fetchSajuFromFastAPI(
                 request.userBirthDate(), userBirthTime);
         sajuValidator.validate(userSaju);

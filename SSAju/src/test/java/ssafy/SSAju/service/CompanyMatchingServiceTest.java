@@ -31,6 +31,7 @@ import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -71,6 +72,7 @@ class CompanyMatchingServiceTest {
     @Mock private CompatibilityChildSaveService childSaveService;
     @Mock private CompatibilityChildReadService childReadService;
     @Mock private UserRepository userRepository;
+    @Mock private DailyApiUsageService dailyApiUsageService;
 
     private CompanyMatchingService service;
 
@@ -117,7 +119,7 @@ class CompanyMatchingServiceTest {
                 compatibilityScoreCalculator, jobRoleAnalyzer, analysisResponseBuilder,
                 companyCompatibilityRepository, companyCompatibilityJdbcRepository,
                 childSaveService, childReadService, userRepository,
-                FIXED_CLOCK
+                FIXED_CLOCK, dailyApiUsageService
         );
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
 

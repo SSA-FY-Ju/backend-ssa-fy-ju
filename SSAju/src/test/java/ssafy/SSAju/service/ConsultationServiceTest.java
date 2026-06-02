@@ -28,6 +28,7 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -57,6 +58,7 @@ class ConsultationServiceTest {
     @Mock private CareerConsultationRepository careerConsultationRepository;
     @Mock private ConsultationSaveService consultationSaveService;
     @Mock private UserRepository userRepository;
+    @Mock private DailyApiUsageService dailyApiUsageService;
 
     private final ConsultationMapper consultationMapper = new ConsultationMapper();
 
@@ -141,7 +143,8 @@ class ConsultationServiceTest {
         service = new ConsultationService(
                 openAICaller, sajuDataService, sajuAnalysisFacade,
                 userProfileProvider, sajuResultProvider, sajuResultMapper, consultationMapper,
-                careerConsultationRepository, consultationSaveService, new SajuValidator(), userRepository);
+                careerConsultationRepository, consultationSaveService, new SajuValidator(), userRepository,
+                dailyApiUsageService);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
         try {
             var field = ConsultationService.class.getDeclaredField("modelVersion");
