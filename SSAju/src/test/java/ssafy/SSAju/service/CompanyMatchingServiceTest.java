@@ -181,6 +181,8 @@ class CompanyMatchingServiceTest {
         assertThat(response.compatibilityScore()).isEqualTo(78);
         assertThat(response.requestContext().companyName()).isEqualTo("현대오토에버");
         verify(childSaveService).saveAllAndMarkCompleted(any(), any());
+        // 캐시 미스 → FastAPI 호출 직전 차감: 1회 필수
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────
@@ -213,6 +215,8 @@ class CompanyMatchingServiceTest {
         assertThat(response).isEqualTo(cachedResponse);
         verify(sajuDataService, never()).fetchSajuFromFastAPI(any(), any());
         verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
+        // completed=true 캐시 히트 → 외부 API 미호출 경로: 차감 없음
+        verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────
@@ -249,6 +253,7 @@ class CompanyMatchingServiceTest {
         // Then: 현재 계산 결과로 응답, childSaveService 호출 없음
         assertThat(response).isNotNull();
         verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────
@@ -292,6 +297,7 @@ class CompanyMatchingServiceTest {
         assertThat(response).isEqualTo(cachedResponse);
         verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
         verify(childReadService).buildFromExisting(completedEntity, request);
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────
@@ -331,6 +337,7 @@ class CompanyMatchingServiceTest {
         assertThat(response).isNotNull();
         verify(sajuDataService).fetchSajuFromFastAPI(USER_BIRTH_DATE, USER_BIRTH_TIME);
         verify(sajuDataService).fetchSajuFromFastAPI(COMPANY_FOUNDING_DATE, LocalTime.of(12, 0));
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────
@@ -349,6 +356,8 @@ class CompanyMatchingServiceTest {
         // When & Then
         assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
                 .isInstanceOf(FastAPITimeoutException.class);
+        // 캐시 미스 → charge 후 FastAPI 실패: 차감은 이미 발생
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────

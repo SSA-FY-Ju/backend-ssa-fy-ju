@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import ssafy.SSAju.career.entity.*;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.ZoneId;
 import ssafy.SSAju.dto.response.ConsultationResponse;
 
@@ -18,7 +19,10 @@ import static org.mockito.Mockito.mock;
 @DisplayName("ConsultationMapper.toResponseFromEntity() 단위 테스트")
 class ConsultationMapperTest {
 
-    private final ConsultationMapper mapper = new ConsultationMapper(Clock.system(ZoneId.of("Asia/Seoul")));
+    /** 고정 시각 주입으로 자정 경계·시간대 차이에 무관한 재현 가능한 테스트 보장 */
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-05-27T12:00:00Z"), ZoneId.of("Asia/Seoul"));
+    private final ConsultationMapper mapper = new ConsultationMapper(FIXED_CLOCK);
 
     @Test
     @DisplayName("CareerConsultation 엔티티 → ConsultationResponse 정상 복원")

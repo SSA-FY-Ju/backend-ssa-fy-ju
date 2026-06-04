@@ -38,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -120,6 +121,8 @@ class CareerFortuneServiceTest {
         verify(userProfileProvider).findOrCreate(BIRTH_DATE, BIRTH_TIME);
         // mapper → service → writer 배선 검증: 실제 expectedResult가 전달됐는지 확인
         verify(sajuResultProvider).findOrCreate(MOCK_USER, savedProfile, expectedResult);
+        // FastAPI 성공 + 검증 성공 → 신규 분석: 일일 한도 1회 차감 필수
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     @Test
@@ -143,6 +146,7 @@ class CareerFortuneServiceTest {
         // Then
         verify(userProfileProvider).findOrCreate(BIRTH_DATE, BIRTH_TIME);
         verify(sajuResultProvider).findOrCreate(MOCK_USER, existingProfile, expectedResult);
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────
@@ -175,6 +179,7 @@ class CareerFortuneServiceTest {
         // Then
         assertThat(result.favoredPeriod()).isEqualTo("H1");
         assertThat(result.reasoning()).contains("상반기");
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────
@@ -198,6 +203,8 @@ class CareerFortuneServiceTest {
         assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID))
                 .isInstanceOf(InvalidSajuDataException.class)
                 .hasMessageContaining("천간");
+        // FastAPI 성공 후 데이터 검증 실패 → 차감 없음
+        verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(USER_ID);
     }
 
     @Test
@@ -217,6 +224,8 @@ class CareerFortuneServiceTest {
         assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID))
                 .isInstanceOf(InvalidSajuDataException.class)
                 .hasMessageContaining("지지");
+        // FastAPI 성공 후 데이터 검증 실패 → 차감 없음
+        verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────
@@ -236,6 +245,8 @@ class CareerFortuneServiceTest {
         assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID))
                 .isInstanceOf(FastAPITimeoutException.class)
                 .hasMessageContaining("시간 초과");
+        // FastAPI 호출 실패 → 차감 없음
+        verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(USER_ID);
     }
 
     @Test
@@ -251,5 +262,7 @@ class CareerFortuneServiceTest {
         assertThatThrownBy(() -> service.analyzeCareerTiming(BIRTH_DATE, BIRTH_TIME, USER_ID))
                 .isInstanceOf(ExternalApiException.class)
                 .isNotInstanceOf(FastAPITimeoutException.class);
+        // FastAPI 호출 실패 → 차감 없음
+        verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(USER_ID);
     }
 }
