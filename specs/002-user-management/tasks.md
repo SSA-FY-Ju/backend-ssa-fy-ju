@@ -233,18 +233,18 @@
 
 ### Implementation for US5
 
-- [ ] T028 [US5] Enhance APIUsageInterceptor with DailyApiUsageService.checkAndIncrementDailyUsage() in SSAju/src/main/java/ssafy/SSAju/handler/APIUsageInterceptor.java
+- [x] T028 [US5] Enhance APIUsageInterceptor with DailyApiUsageService.checkAndIncrementDailyUsage() in SSAju/src/main/java/ssafy/SSAju/handler/APIUsageInterceptor.java
   - Extract userId from SecurityContext
   - Call service before API execution
   - Handle DailyLimitExceededException
 
-- [ ] T029 [US5] Create DailyLimitExceededException in SSAju/src/main/java/ssafy/SSAju/exception/DailyLimitExceededException.java
+- [x] T029 [US5] Create DailyLimitExceededException in SSAju/src/main/java/ssafy/SSAju/exception/DailyLimitExceededException.java
 
-- [ ] T030 [US5] Handle HTTP 429 in GlobalExceptionHandler
+- [x] T030 [US5] Handle HTTP 429 in GlobalExceptionHandler
   - Map DailyLimitExceededException to 429 Conflict
   - Message: "하루 3회 분석 제한에 도달했습니다"
 
-- [ ] T031 [US5] [P] **Race Condition Test**: Verify DailyApiUsageService with DataIntegrityViolationException handling
+- [x] T031 [US5] [P] **Race Condition Test**: Verify DailyApiUsageService with DataIntegrityViolationException handling
   - 10 concurrent requests → exactly 3 succeed, 7 fail with 429
   - UNIQUE INDEX (user_id, usage_date) must be present in DB
 
@@ -260,10 +260,10 @@
 
 ### Implementation for US6
 
-- [ ] T032 [US6] Create DeleteUserRequest DTO in SSAju/src/main/java/ssafy/SSAju/dto/request/DeleteUserRequest.java
+- [x] T032 [US6] Create DeleteUserRequest DTO in SSAju/src/main/java/ssafy/SSAju/dto/request/DeleteUserRequest.java
   - Fields: password (재확인용)
 
-- [ ] T033 [US6] Implement AuthService.deleteUser(Long userId, String password) in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
+- [x] T033 [US6] Implement AuthService.deleteUser(Long userId, String password) in SSAju/src/main/java/ssafy/SSAju/service/AuthService.java
   - **중요**: @SQLDelete 사용 금지. 명시적 soft delete 처리만 사용
   - PasswordEncoder.matches() 비밀번호 재확인
   - User 엔티티 필드 직접 수정:
@@ -274,15 +274,15 @@
   - userRepository.save(user) 호출 (JPA 기본 UPDATE 실행)
   - Mark all RefreshTokens as revoked
 
-- [ ] T034 [US6] Enhance User entity with @SQLRestriction in SSAju/src/main/java/ssafy/SSAju/entity/User.java
+- [x] T034 [US6] Enhance User entity with @SQLRestriction in SSAju/src/main/java/ssafy/SSAju/entity/User.java
   - Add @SQLRestriction: WHERE deleted_at IS NULL (자동 필터링)
   - **주의**: @SQLDelete 어노테이션 제거 (명시적 service 로직에서만 soft delete 처리)
 
-- [ ] T035 [US6] Mask analysis results in AnalysisResultMaskingService in SSAju/src/main/java/ssafy/SSAju/service/AnalysisResultMaskingService.java
+- [x] T035 [US6] Mask analysis results in AnalysisResultMaskingService in SSAju/src/main/java/ssafy/SSAju/service/AnalysisResultMaskingService.java
   - Find and mask SajuAnalysisResult, CareerFortuneResult, CompanyCompatibilityResult
   - Find and delete UserSatisfactionFeedback
 
-- [ ] T036 [US6] Enhance AuthController with DELETE /api/users/me in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
+- [x] T036 [US6] Enhance AuthController with DELETE /api/users/me in SSAju/src/main/java/ssafy/SSAju/controller/AuthController.java
   - Extract userId from SecurityContext (@Authenticated user)
   - Extract password from request body (DeleteUserRequest)
   - Call AuthService.deleteUser(userId, password)
@@ -301,43 +301,34 @@
 
 ### Implementation for US7
 
-- [ ] T037 [US7] Create UserAnalysisDto in SSAju/src/main/java/ssafy/SSAju/dto/response/UserAnalysisDto.java
+- [x] T037 [US7] Create UserAnalysisDto in SSAju/src/main/java/ssafy/SSAju/dto/response/UserAnalysisDto.java
   - Fields: type (SAJU/CAREER_FORTUNE/COMPANY_COMPATIBILITY), analysisId, targetName, birthDate, createdAt, satisfactionStatus
 
-- [ ] T038 [US7] Create AnalysisHistoryRepository with UNION query in SSAju/src/main/java/ssafy/SSAju/repository/AnalysisHistoryRepository.java
+- [x] T038 [US7] Create AnalysisHistoryRepository with UNION query in SSAju/src/main/java/ssafy/SSAju/repository/AnalysisHistoryRepository.java
   - Query: SELECT UNION for SajuAnalysisResult, CareerFortuneResult, CompanyCompatibilityResult
   - Filter: created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR) (최근 1년 범위)
   - Order: created_at DESC
   - Pagination support
 
-- [ ] T039 [US7] Implement UserService.getUserAnalysisHistory() in SSAju/src/main/java/ssafy/SSAju/service/UserService.java
+- [x] T039 [US7] Implement UserService.getUserAnalysisHistory() in SSAju/src/main/java/ssafy/SSAju/service/UserService.java
   - Call AnalysisHistoryRepository
   - Include satisfaction score if available
   - Apply filtering (분석 유형 필터)
 
-- [ ] T040 [US7] Create UserController with GET /api/mypage in SSAju/src/main/java/ssafy/SSAju/controller/UserController.java
+- [x] T040 [US7] Create UserController with GET /api/mypage in SSAju/src/main/java/ssafy/SSAju/controller/UserController.java
   - Return user profile (name, joinDate, lastLoginAt)
   - Return analysis history (paginated)
   - Support filtering by analysis type
 
-- [ ] T041 [US7] Create MyPageResponse DTO in SSAju/src/main/java/ssafy/SSAju/dto/response/MyPageResponse.java
+- [x] T041 [US7] Create MyPageResponse DTO in SSAju/src/main/java/ssafy/SSAju/dto/response/MyPageResponse.java
   - Fields: profile (UserProfile), analyses (List<UserAnalysisDto>), pagination (page, size, total, totalPages)
 
-- [ ] T041-1 [US7] Implement GET /api/mypage/analyses/{analysisId} in UserController for detailed analysis view
+- [x] T041-1 [US7] Implement GET /api/mypage/analyses/{analysisId} in UserController for detailed analysis view
   - Fetch specific analysis result (SajuAnalysisResult OR CareerFortuneResult OR CompanyCompatibilityResult)
   - Include related UserSatisfactionFeedback data (satisfaction_status, feedback_content)
   - Return complete analysis data with metadata
   - File: SSAju/src/main/java/ssafy/SSAju/controller/UserController.java
   - Service: SSAju/src/main/java/ssafy/SSAju/service/UserService.java (new method: getAnalysisDetail)
-
-- [ ] T041-2 [US7] Implement POST /api/mypage/reanalyze/{analysisId} in UserController for re-analysis
-  - Extract previous analysis data (type, target, birthDate, birthTime)
-  - Call appropriate analysis service (Career Fortune API rerun with DailyApiUsage check)
-  - Daily limit (3회) applies to reanalysis
-  - Return new analysis ID
-  - File: SSAju/src/main/java/ssafy/SSAju/controller/UserController.java
-  - Service: SSAju/src/main/java/ssafy/SSAju/service/UserService.java (new method: reanalyze)
-  - Handle HTTP 429 if daily limit exceeded
 
 **Checkpoint**: User Story 7 (마이페이지) is complete with list + detail + reanalysis
 
