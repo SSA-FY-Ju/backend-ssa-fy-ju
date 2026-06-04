@@ -1,5 +1,6 @@
 package ssafy.SSAju.config;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.restclient.RestClientCustomizer;
@@ -24,8 +25,16 @@ import java.time.Duration;
 @Configuration
 public class ChatClientConfig {
 
-    @Value("${saju.openai.timeout-seconds}")
+    @Value("${saju.openai.timeout-seconds:8}")
     private int openaiTimeoutSeconds;
+
+    @PostConstruct
+    void validateConfig() {
+        if (openaiTimeoutSeconds <= 0) {
+            throw new IllegalStateException(
+                    "saju.openai.timeout-seconds must be positive, got: " + openaiTimeoutSeconds);
+        }
+    }
 
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder) {

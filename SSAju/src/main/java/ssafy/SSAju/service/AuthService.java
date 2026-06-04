@@ -190,7 +190,6 @@ public class AuthService {
      * <p><b>프로세스:</b>
      * <ul>
      *   <li>RefreshToken을 revoked 상태로 표시</li>
-     *   <li>RefreshToken 쿠키 제거</li>
      * </ul>
      *
      * <p><b>동시성 안전:</b>
@@ -198,8 +197,7 @@ public class AuthService {
      * 동시 로그아웃 시도 시에도 안전합니다.
      *
      * @param userId 로그아웃하는 사용자 ID
-     * @param refreshTokenValue RefreshToken 값 (쿠키에서 추출)
-     * @param response HTTP 응답 (쿠키 제거용)
+     * @param refreshTokenValue RefreshToken 값 (Refresh-Token 요청 헤더에서 추출)
      */
     @Transactional
     public void logout(Long userId, String refreshTokenValue) {

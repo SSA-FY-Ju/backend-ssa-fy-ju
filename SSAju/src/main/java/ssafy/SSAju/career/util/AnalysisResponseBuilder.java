@@ -70,10 +70,12 @@ public class AnalysisResponseBuilder {
         String weaknessDefense = String.format(
                 "%s 분야 관련 약점 질문 시, 지속적인 학습과 성장 의지를 강조하세요.",
                 category.getDisplayName());
+        // 자정 경계에서 서로 다른 날짜 기준으로 계산되는 것을 방지하기 위해 한 번만 호출
+        LocalDate today = LocalDate.now(clock);
         List<String> luckyDays = List.of(
-                LocalDate.now(clock).plusDays(AnalysisConstants.LUCKY_DAY_FIRST_OFFSET).toString(),
-                LocalDate.now(clock).plusDays(AnalysisConstants.LUCKY_DAY_SECOND_OFFSET).toString(),
-                LocalDate.now(clock).plusDays(AnalysisConstants.LUCKY_DAY_THIRD_OFFSET).toString()
+                today.plusDays(AnalysisConstants.LUCKY_DAY_FIRST_OFFSET).toString(),
+                today.plusDays(AnalysisConstants.LUCKY_DAY_SECOND_OFFSET).toString(),
+                today.plusDays(AnalysisConstants.LUCKY_DAY_THIRD_OFFSET).toString()
         );
         return new CompatibilityAnalysisData.StrategyInfo(
                 category.getKeywords(), weaknessDefense, luckyDays, AnalysisConstants.PREFERRED_TIME);
