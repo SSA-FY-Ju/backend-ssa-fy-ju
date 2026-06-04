@@ -16,6 +16,7 @@ import ssafy.SSAju.entity.User;
 import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -32,6 +33,7 @@ public class CareerFortuneService {
     private final SajuResultMapper sajuResultMapper;
     private final SajuValidator sajuValidator;
     private final UserRepository userRepository;
+    private final DailyApiUsageService dailyApiUsageService;
 
     /**
      * @Transactional 없음: FastAPI I/O 동안 DB 커넥션을 점유하지 않도록 트랜잭션을 분리.
@@ -52,6 +54,9 @@ public class CareerFortuneService {
 
         FastAPIResponse sajuData = sajuDataService.fetchSajuFromFastAPI(birthDate, birthTime);
         sajuValidator.validate(sajuData);
+
+        // FastAPI 성공 후 차감: 외부 API 호출이 발생한 신규 분석에만 차감 (캐싱 없는 관운 분석은 항상 신규)
+        dailyApiUsageService.checkAndIncrementDailyUsage(userId);
 
         SajuAnalysisFacade.SajuAnalysisContext ctx = sajuAnalysisFacade.analyze(sajuData);
         log.debug("십신 분포: {}, 지장간: {}", ctx.tenGodDistribution(), ctx.hiddenStems());

@@ -57,8 +57,8 @@ public class CompanyCompatibility {
      * 모든 자식 엔티티(TargetRoleAnalysis, FiveElementsAnalysis 등 8개)가
      * 정상적으로 저장 완료된 경우 true로 설정됩니다.
      *
-     * <p>false 상태에서는 buildResponseFromExisting()의 캐시 재사용을 차단하여
-     * 불완전한 데이터가 응답으로 반환되는 것을 방지합니다.
+     * <p>false 상태에서는 {@link ssafy.SSAju.service.CompatibilityChildReadService#buildFromExisting}의
+     * 캐시 재사용을 차단하여 불완전한 데이터가 응답으로 반환되는 것을 방지합니다.
      */
     @Column(name = "completed", nullable = false)
     private boolean completed = false;

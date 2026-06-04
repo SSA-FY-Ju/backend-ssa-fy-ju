@@ -1,5 +1,6 @@
 package ssafy.SSAju.career.mapper;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.*;
@@ -8,6 +9,7 @@ import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.response.ConsultationResponse;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
@@ -15,7 +17,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class ConsultationMapper {
+
+    /** KST 기준 현재 연도 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
+    private final Clock clock;
 
     /**
      * CareerAdviceResponse 전체를 CareerConsultation + 자식 엔티티로 변환.
@@ -232,7 +238,7 @@ public class ConsultationMapper {
 
         // CareerFortune이 없는 경우(favoredPeriod=null) UI에 "(null)" 노출 방지
         String periodInfo = (favoredPeriod != null) ? favoredPeriod : "분석 미포함";
-        int currentYear = LocalDate.now().getYear();
+        int currentYear = LocalDate.now(clock).getYear();
         return "%s 일간 · 오행 %s 강세 · %s 기반 | %d년 12개월 타임라인 + 관운 분석 (%s)"
                 .formatted(dayMaster, dominantElements, tenGodSummary, currentYear, periodInfo);
     }

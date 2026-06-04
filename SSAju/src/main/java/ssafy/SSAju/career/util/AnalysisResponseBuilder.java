@@ -7,6 +7,7 @@ import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.enums.FiveElement;
 import ssafy.SSAju.career.enums.ForecastStatus;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +25,8 @@ public class AnalysisResponseBuilder {
 
     private final ForecastScoreCalculator forecastScoreCalculator;
     private final RoleCompatibilityCalculator roleCompatibilityCalculator;
+    /** KST 기준 현재 날짜 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
+    private final Clock clock;
 
     /**
      * 오행 분포 분석 데이터를 빌드합니다.
@@ -67,10 +70,12 @@ public class AnalysisResponseBuilder {
         String weaknessDefense = String.format(
                 "%s 분야 관련 약점 질문 시, 지속적인 학습과 성장 의지를 강조하세요.",
                 category.getDisplayName());
+        // 자정 경계에서 서로 다른 날짜 기준으로 계산되는 것을 방지하기 위해 한 번만 호출
+        LocalDate today = LocalDate.now(clock);
         List<String> luckyDays = List.of(
-                LocalDate.now().plusDays(AnalysisConstants.LUCKY_DAY_FIRST_OFFSET).toString(),
-                LocalDate.now().plusDays(AnalysisConstants.LUCKY_DAY_SECOND_OFFSET).toString(),
-                LocalDate.now().plusDays(AnalysisConstants.LUCKY_DAY_THIRD_OFFSET).toString()
+                today.plusDays(AnalysisConstants.LUCKY_DAY_FIRST_OFFSET).toString(),
+                today.plusDays(AnalysisConstants.LUCKY_DAY_SECOND_OFFSET).toString(),
+                today.plusDays(AnalysisConstants.LUCKY_DAY_THIRD_OFFSET).toString()
         );
         return new CompatibilityAnalysisData.StrategyInfo(
                 category.getKeywords(), weaknessDefense, luckyDays, AnalysisConstants.PREFERRED_TIME);
@@ -125,7 +130,7 @@ public class AnalysisResponseBuilder {
      * 일치 정도로 점수를 산정합니다.
      */
     public List<CompatibilityAnalysisData.MonthlyForecast> buildMonthlyForecasts(FiveElements userFiveElements) {
-        int currentMonth = LocalDate.now().getMonthValue();
+        int currentMonth = LocalDate.now(clock).getMonthValue();
         List<CompatibilityAnalysisData.MonthlyForecast> forecasts = new ArrayList<>();
 
         for (int i = 0; i < AnalysisConstants.FORECAST_MONTH_COUNT; i++) {

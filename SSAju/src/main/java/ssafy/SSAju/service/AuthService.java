@@ -134,7 +134,6 @@ public class AuthService {
      *   <li>비밀번호 일치 확인</li>
      *   <li>AccessToken 생성 (1시간 유효)</li>
      *   <li>RefreshToken 생성 및 DB 저장 (7일 유효)</li>
-     *   <li>RefreshToken을 HttpOnly 쿠키에 설정</li>
      *   <li>마지막 로그인 시각 업데이트</li>
      *   <li>로그인 시도 이벤트 발행 (비동기 기록)</li>
      * </ol>
@@ -143,13 +142,12 @@ public class AuthService {
      * <ul>
      *   <li>이메일 미존재와 비밀번호 오류 시 동일한 에러 메시지 반환</li>
      *   <li>실제 실패 원인(INVALID_EMAIL vs WRONG_PASSWORD)은 이벤트에 기록</li>
-     *   <li>RefreshToken은 SHA-256으로 해시하여 DB 저장 (쿠키에는 원본값 유지)</li>
+     *   <li>RefreshToken은 SHA-256으로 해시하여 DB 저장 (응답 헤더 Refresh-Token에는 원본값 전달)</li>
      * </ul>
      *
      * @param request 로그인 요청 (이메일, 비밀번호)
      * @param clientIp 클라이언트 IP 주소 (로그인 시도 기록용)
-     * @param response HTTP 응답 (RefreshToken 쿠키 설정용)
-     * @return AccessToken 및 만료 시간 (초)
+     * @return AccessToken, RefreshToken 및 만료 시간 (초) — AuthController가 Refresh-Token 응답 헤더로 전달
      * @throws AuthException 이메일 미존재 또는 비밀번호 불일치
      */
     @Transactional
@@ -192,7 +190,6 @@ public class AuthService {
      * <p><b>프로세스:</b>
      * <ul>
      *   <li>RefreshToken을 revoked 상태로 표시</li>
-     *   <li>RefreshToken 쿠키 제거</li>
      * </ul>
      *
      * <p><b>동시성 안전:</b>
@@ -200,8 +197,7 @@ public class AuthService {
      * 동시 로그아웃 시도 시에도 안전합니다.
      *
      * @param userId 로그아웃하는 사용자 ID
-     * @param refreshTokenValue RefreshToken 값 (쿠키에서 추출)
-     * @param response HTTP 응답 (쿠키 제거용)
+     * @param refreshTokenValue RefreshToken 값 (Refresh-Token 요청 헤더에서 추출)
      */
     @Transactional
     public void logout(Long userId, String refreshTokenValue) {
@@ -222,12 +218,10 @@ public class AuthService {
      *   <li>만족도 피드백 등 분석 데이터 삭제</li>
      *   <li>RefreshToken 전체 revoke</li>
      *   <li>User Soft Delete (이름/이메일 마스킹, deleted_at 설정)</li>
-     *   <li>RefreshToken 쿠키 제거</li>
      * </ol>
      *
-     * @param userId  탈퇴 요청 사용자 ID
+     * @param userId   탈퇴 요청 사용자 ID
      * @param password 재확인용 비밀번호
-     * @param response HTTP 응답 (쿠키 제거용)
      * @throws UserNotFoundException 사용자를 찾을 수 없는 경우
      * @throws AuthException 비밀번호가 일치하지 않는 경우
      */

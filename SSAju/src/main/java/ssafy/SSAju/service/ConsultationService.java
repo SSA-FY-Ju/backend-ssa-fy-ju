@@ -25,7 +25,9 @@ import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.service.DailyApiUsageService;
 
+import java.time.Clock;
 import java.util.Objects;
 import java.util.Optional;
 import java.time.YearMonth;
@@ -47,6 +49,9 @@ public class ConsultationService {
     private final ConsultationSaveService consultationSaveService;
     private final SajuValidator sajuValidator;
     private final UserRepository userRepository;
+    private final DailyApiUsageService dailyApiUsageService;
+    /** KST 기준 현재 월 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
+    private final Clock clock;
 
     @Value("${spring.ai.openai.chat.options.model}")
     private String modelVersion;
@@ -89,7 +94,7 @@ public class ConsultationService {
         SajuResult sajuResult = sajuResultProvider.findOrCreate(user, userProfile, newResult);
 
         // ─── 3. 캐시 조회 (M-9) ─────────────────────────────────────────────────
-        YearMonth now = YearMonth.now();
+        YearMonth now = YearMonth.now(clock);
         Integer consultationMonth = now.getYear() * 100 + now.getMonthValue();
         Optional<CareerConsultation> cached = careerConsultationRepository
                 .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth);
@@ -109,6 +114,8 @@ public class ConsultationService {
         }
 
         // ─── 4. OpenAI 호출 (캐시 미스, 외부 I/O) ───────────────────────────────
+        // 캐시 히트 경로는 위에서 이미 반환 → 여기까지 온 경우만 신규 OpenAI 호출, 차감
+        dailyApiUsageService.checkAndIncrementDailyUsage(userId);
         CareerAdviceResponse advice = openAICaller.call(
                 sajuData, tenGodDistribution, hiddenStems, dayMaster);
 

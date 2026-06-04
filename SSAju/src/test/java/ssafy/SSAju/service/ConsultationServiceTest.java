@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import ssafy.SSAju.career.caller.ConsultationOpenAICaller;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
@@ -28,10 +30,13 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.service.DailyApiUsageService;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,9 +47,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("ConsultationService 단위 테스트")
 class ConsultationServiceTest {
 
@@ -57,8 +64,11 @@ class ConsultationServiceTest {
     @Mock private CareerConsultationRepository careerConsultationRepository;
     @Mock private ConsultationSaveService consultationSaveService;
     @Mock private UserRepository userRepository;
+    @Mock private DailyApiUsageService dailyApiUsageService;
 
-    private final ConsultationMapper consultationMapper = new ConsultationMapper();
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-05-27T01:00:00Z"), ZoneId.of("Asia/Seoul"));
+    private final ConsultationMapper consultationMapper = new ConsultationMapper(FIXED_CLOCK);
 
     private ConsultationService service;
 
@@ -141,7 +151,8 @@ class ConsultationServiceTest {
         service = new ConsultationService(
                 openAICaller, sajuDataService, sajuAnalysisFacade,
                 userProfileProvider, sajuResultProvider, sajuResultMapper, consultationMapper,
-                careerConsultationRepository, consultationSaveService, new SajuValidator(), userRepository);
+                careerConsultationRepository, consultationSaveService, new SajuValidator(), userRepository,
+                dailyApiUsageService, FIXED_CLOCK);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
         try {
             var field = ConsultationService.class.getDeclaredField("modelVersion");
@@ -205,6 +216,8 @@ class ConsultationServiceTest {
 
         verify(consultationSaveService).saveOrUpdate(any(), any(), any(), any());
         verify(sajuResultProvider).findOrCreate(MOCK_USER, userProfile, sajuResult);
+        // 캐시 미스 → 신규 OpenAI 호출 발생 → 일일 한도 1회 차감 필수
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────
@@ -233,6 +246,54 @@ class ConsultationServiceTest {
         assertThat(result.sajuProfile()).isNotNull();
         verify(sajuResultProvider).findOrCreate(MOCK_USER, userProfile, newSajuResult);
         verify(consultationSaveService).saveOrUpdate(any(), any(), any(), any());
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+    }
+
+    // ─────────────────────────────────────────
+    // 이번 달 캐시 히트 — OpenAI 호출 없음
+    // ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("이번 달 캐시 히트(모델 버전 일치) → DailyApiUsage 차감 없음, OpenAI 호출 없음")
+    void shouldNeverCharge_WhenCacheHit() {
+        var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        var sajuResult = mock(SajuResult.class);
+        var cachedConsultation = mock(CareerConsultation.class);
+
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
+        given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
+        given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
+        given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
+                .willReturn(Optional.of(cachedConsultation));
+        // 모델 버전 일치 → 캐시 히트 경로 진입
+        given(cachedConsultation.getOpenaiModelVersion()).willReturn("gpt-4o-mini");
+        given(cachedConsultation.getId()).willReturn(99L);
+        // restoreAdvice()가 호출하는 getter 설정
+        given(cachedConsultation.getIndustries()).willReturn(List.of());
+        given(cachedConsultation.getInterviewTips()).willReturn(List.of());
+        given(cachedConsultation.getStrengths()).willReturn(List.of());
+        given(cachedConsultation.getCautions()).willReturn(List.of());
+        given(cachedConsultation.getKeyTenGods()).willReturn(List.of());
+        given(cachedConsultation.getWealthStyle()).willReturn(null);
+        given(cachedConsultation.getRoadmap()).willReturn(null);
+        given(cachedConsultation.getPersonalBranding()).willReturn(null);
+        given(cachedConsultation.getPowerKeywords()).willReturn(null);
+        given(cachedConsultation.getMentalCare()).willReturn(null);
+        given(cachedConsultation.getEnvironmentFit()).willReturn(null);
+        given(cachedConsultation.getWorkStyle()).willReturn(null);
+        given(cachedConsultation.getRelationshipStrategy()).willReturn(null);
+        given(cachedConsultation.getCareerTimeline()).willReturn(null);
+        given(cachedConsultation.getDayMasterDescription()).willReturn("");
+        given(cachedConsultation.getFiveElementsAnalysis()).willReturn("");
+
+        service.getCareerConsultation(VALID_REQUEST, USER_ID);
+
+        // 캐시 히트 → OpenAI 미호출, 일일 한도 차감 없음
+        verify(openAICaller, never()).call(any(), any(), any(), any());
+        verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(any());
     }
 
     // ─────────────────────────────────────────
@@ -257,6 +318,8 @@ class ConsultationServiceTest {
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("OpenAI API 호출 실패");
+        // 캐시 미스 → charge 후 OpenAI 실패: 차감은 이미 발생
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     @Test
@@ -277,6 +340,7 @@ class ConsultationServiceTest {
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("비어있습니다");
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     @Test
@@ -297,5 +361,6 @@ class ConsultationServiceTest {
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("산업 추천 정보가 누락");
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 }

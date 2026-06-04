@@ -33,7 +33,7 @@ import java.util.stream.IntStream;
  *
  * <p><strong>completed 플래그 (Option A)</strong>:
  * 모든 자식 저장이 성공한 후 {@code markCompleted()}를 호출하여
- * {@link CompanyMatchingService#buildResponseFromExisting}의 캐시 재사용을 허용합니다.
+ * {@link CompatibilityChildReadService#buildFromExisting}의 캐시 재사용을 허용합니다.
  * 저장 중 예외 발생 시 트랜잭션 롤백으로 자식 데이터 + completed 업데이트가 모두 취소됩니다.
  */
 @Slf4j

@@ -21,7 +21,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
-import java.util.Optional;
 
 @Slf4j
 @Component
@@ -52,8 +51,6 @@ public class JwtUtil {
         return buildToken(userId, null, TokenType.REFRESH.getValue(), refreshTokenExpirationMs);
     }
 
-    public record ParsedToken(Long userId, String email) {}
-
     /**
      * JWT 토큰을 파싱하고 Claims를 반환합니다. 만료/위조 여부를 구체적인 예외로 구분합니다.
      */
@@ -71,24 +68,6 @@ public class JwtUtil {
             throw new InvalidTokenException("지원하지 않는 토큰 형식입니다.");
         } catch (JwtException ex) {
             throw new InvalidTokenException("유효하지 않은 토큰입니다.");
-        }
-    }
-
-    /**
-     * JWT 토큰을 검증하고 userId, email을 한 번의 파싱으로 추출합니다.
-     *
-     * @param token JWT 문자열
-     * @return 유효한 경우 ParsedToken, 유효하지 않은 경우 empty
-     */
-    public Optional<ParsedToken> validateAndParse(String token) {
-        try {
-            Claims claims = parseClaims(token);
-            Long userId = claims.get(CLAIM_USER_ID, Long.class);
-            String email = claims.get(CLAIM_EMAIL, String.class);
-            return Optional.of(new ParsedToken(userId, email));
-        } catch (JwtException | IllegalArgumentException e) {
-            log.warn("유효하지 않은 JWT 토큰: {}", e.getClass().getSimpleName());
-            return Optional.empty();
         }
     }
 

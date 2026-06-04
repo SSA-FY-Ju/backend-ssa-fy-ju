@@ -35,12 +35,6 @@ public class CareerFortuneAnalyzer {
             TenGodConstants.INJURING_OFFICER.getName()
     );
 
-    // 비겁 과다도 관성 부담 요인: 비견, 겁재
-    private static final List<String> COMPETING_GODS = List.of(
-            TenGodConstants.COMPARING_FRIEND.getName(),
-            TenGodConstants.ROBBING_WEALTH.getName()
-    );
-
     private static final List<String> FAVORABLE_OFFICER_BRANCHES_H1 = List.of("子", "丑", "寅", "卯", "辰", "巳");
 
     private final TenGodCalculator tenGodCalculator;
@@ -85,9 +79,10 @@ public class CareerFortuneAnalyzer {
 
     /**
      * 관성 강도 점수를 계산합니다. 양수이면 상반기, 음수이면 하반기 유리.
-     * - 정관·편관: 가점 (관성 강도)
-     * - 식신·상관: 감점 (관성 설기)
-     * - 비겹 2개 이상: 감점 (관성 부담)
+     * - 정관·편관: 가점 (관성 강도) — TenGodConstants.scoreModifier 적용
+     * - 식신·상관: 감점 (관성 설기) — TenGodConstants.scoreModifier 적용
+     * - 지장간 내 정관/편관: +5 보정
+     * - 지장간 내 식신/상관: -3 보정
      */
     private int calculateOfficerScore(TenGodDistribution tenGodDistribution,
                                        HiddenStems hiddenStems,

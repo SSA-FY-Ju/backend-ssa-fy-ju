@@ -70,7 +70,7 @@ public class SecurityConfig {
                 .accessDeniedHandler(accessDeniedHandler))
             .addFilterBefore(new JwtAuthenticationFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new JwtExceptionFilter(objectMapper), JwtAuthenticationFilter.class)
-            // RefreshToken 검증 필터: /api/auth/refresh 엔드포인트 요청 시 RefreshToken 쿠키 유효성 검증
+            // RefreshToken 검증 필터: /api/auth/refresh 엔드포인트 요청 시 Refresh-Token 헤더 유효성 검증
             .addFilterAfter(new TokenValidationFilter(refreshTokenRepository, objectMapper), JwtAuthenticationFilter.class)
             .httpBasic(AbstractHttpConfigurer::disable);
 

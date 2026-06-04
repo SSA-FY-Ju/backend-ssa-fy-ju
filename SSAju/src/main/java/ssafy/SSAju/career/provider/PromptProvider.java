@@ -1,10 +1,12 @@
 package ssafy.SSAju.career.provider;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 
+import java.time.Clock;
 import java.time.LocalDate;
 
 /**
@@ -17,7 +19,11 @@ import java.time.LocalDate;
  * @see ssafy.SSAju.career.caller.ConsultationOpenAICaller
  */
 @Component
+@RequiredArgsConstructor
 public class PromptProvider {
+
+    /** KST 기준 현재 연도 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
+    private final Clock clock;
 
     /**
      * 커리어 컨설팅 요청에 사용할 프롬프트를 생성합니다.
@@ -35,7 +41,7 @@ public class PromptProvider {
                                                TenGodDistribution tenGodDistribution,
                                                HiddenStems hiddenStems,
                                                String dayMaster) {
-        int currentYear = LocalDate.now().getYear();
+        int currentYear = LocalDate.now(clock).getYear();
         return """
                 당신은 사주 명리학 전문가이자 취업 커리어 컨설턴트입니다.
                 아래 사주 데이터를 분석하여 취업 준비생에게 맞춤 커리어 조언을 한글로 제공해주세요.

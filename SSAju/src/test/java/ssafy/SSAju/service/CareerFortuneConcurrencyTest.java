@@ -22,6 +22,7 @@ import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.TenGodDataRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -65,6 +66,7 @@ class CareerFortuneConcurrencyTest {
 
     @Autowired private CareerFortuneService service;
     @MockitoBean  private SajuDataService sajuDataService;
+    @MockitoBean  private DailyApiUsageService dailyApiUsageService; // 일일 한도 우회 (동시성 검증에 집중)
     @Autowired private UserProfileRepository userProfileRepository;
     @Autowired private SajuResultRepository sajuResultRepository;
     @Autowired private TenGodDataRepository tenGodDataRepository;
