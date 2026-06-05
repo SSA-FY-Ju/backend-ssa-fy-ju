@@ -370,18 +370,23 @@
   - Ensure NOT NULL constraint in DB migration
 
 - [ ] T048-3 Create database migration script (V2_Phase1Integration) in SSAju/src/main/resources/db/migration/
+  - **[BLOCKER]** T049 and T050 depend on this; Phase 1 entities must exist first
   - ALTER TABLE saju_analysis_result ADD user_id BIGINT NOT NULL
   - ALTER TABLE career_fortune_result ADD user_id BIGINT NOT NULL
   - ALTER TABLE company_compatibility_result ADD user_id BIGINT NOT NULL
   - Add FOREIGN KEY constraints to user table
   - Add INDEX on user_id for query performance
 
-- [x] T049 Update Phase 1 AuthController/Service to automatically map user_id when saving analysis results
+- [On-hold] T049 Update Phase 1 AuthController/Service to automatically map user_id when saving analysis results
+  - ⏸️ **Blocked by T048-3**: Phase 1 entities (SajuAnalysisResult, CareerFortuneResult, CompanyCompatibilityResult) not yet created
+  - T048-3 must be completed before T049
   - Extract user_id from SecurityContext (authenticated user)
   - Pass to analysis service/repository
   - File: SSAju/src/main/java/ssafy/SSAju/career/service/ (coordinate with Phase 1)
 
-- [x] T050 Update CLAUDE.md with Phase 2 completion and next phase context
+- [On-hold] T050 Update CLAUDE.md with Phase 2 completion and next phase context
+  - ⏸️ **Blocked by T049**: Phase 2 finalization depends on Phase 1 integration being complete
+  - T048-3 must be completed before T049, and T049 must be completed before T050
 
 ---
 
