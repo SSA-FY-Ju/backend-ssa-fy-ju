@@ -20,11 +20,12 @@ import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -111,7 +112,7 @@ class DailyApiUsageIntegrationTest {
         CountDownLatch doneLatch = new CountDownLatch(totalThreads);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failCount = new AtomicInteger(0);
-        List<Exception> unexpectedErrors = new ArrayList<>();
+        List<Exception> unexpectedErrors = new CopyOnWriteArrayList<>();
 
         ExecutorService executor = Executors.newFixedThreadPool(totalThreads);
         for (int i = 0; i < totalThreads; i++) {
@@ -133,6 +134,9 @@ class DailyApiUsageIntegrationTest {
         startLatch.countDown();
         doneLatch.await();
         executor.shutdown();
+        if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+            executor.shutdownNow();
+        }
 
         log.info("동시 요청 결과: success={}, fail={}", successCount.get(), failCount.get());
         assertThat(unexpectedErrors).isEmpty();

@@ -214,7 +214,8 @@ class AuthIntegrationTest {
     private void signup(String email, String password, String name) throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(signupBody(email, password, name)));
+                .content(signupBody(email, password, name)))
+                .andExpect(status().isCreated());
     }
 
     private String[] loginAndGetTokens(String email, String password) throws Exception {
