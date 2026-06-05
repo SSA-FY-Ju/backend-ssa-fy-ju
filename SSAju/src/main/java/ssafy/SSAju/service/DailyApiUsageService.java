@@ -26,7 +26,8 @@ public class DailyApiUsageService {
 
         int affectedRows = dailyApiUsageRepository.upsertUsageIfUnderLimit(userId, today, DAILY_REQUEST_LIMIT);
 
-        // affectedRows: 1 = INSERT(첫 요청), 2 = UPDATE(증가 성공), 0 = 한도 초과
+        // useAffectedRows=true 기준 (application.yaml DB_URL 및 테스트 Testcontainers URL 필수 설정)
+        // 1 = INSERT(첫 요청 성공), 2 = UPDATE(증가 성공), 0 = no-op(한도 초과) → 예외 발생
         if (affectedRows == 0) {
             log.warn("일일 API 사용 한도 초과: userId={}, date={}", userId, today);
             throw new DailyLimitExceededException("하루 3회 분석 제한에 도달했습니다.");

@@ -47,7 +47,7 @@ class DailyApiUsageIntegrationTest {
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.datasource.url", mysql::getJdbcUrl);
+        registry.add("spring.datasource.url", () -> mysql.getJdbcUrl() + "?useAffectedRows=true");
         registry.add("spring.datasource.username", mysql::getUsername);
         registry.add("spring.datasource.password", mysql::getPassword);
         registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.MySQLDialect");

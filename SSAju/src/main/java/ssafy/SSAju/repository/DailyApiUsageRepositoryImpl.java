@@ -22,22 +22,13 @@ public class DailyApiUsageRepositoryImpl implements DailyApiUsageCustomRepositor
                 ON DUPLICATE KEY UPDATE
                     request_count = IF(request_count < ?, request_count + 1, request_count)
                 """;
-        int affectedRows = jdbcTemplate.update(sql, userId, date, limit);
 
-        // MySQL Connector/J 8.x 기준: INSERT=1, UPDATE(change)=2, UPDATE(no-op/한도초과)=0
-        // MySQL Connector/J 9.x 기준: INSERT=1, UPDATE(change)=2, UPDATE(no-op)=1 (변경됨)
-        // affectedRows=2 는 양쪽 모두 "증가 성공"을 의미하므로 그대로 반환
-        // affectedRows=0 는 8.x에서 "한도 초과"를 의미하므로 그대로 반환
-        if (affectedRows != 1) {
-            return affectedRows;
-        }
-
-        // affectedRows=1 은 9.x에서 새 INSERT(첫 요청)와 no-op UPDATE(한도 초과) 모두에 해당
-        // 실제 request_count를 조회하여 구분: count >= limit이면 no-op → 0 반환
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT request_count FROM daily_api_usage WHERE user_id = ? AND usage_date = ?",
-                Integer.class, userId, date
-        );
-        return (count != null && count >= limit) ? 0 : affectedRows;
+        // JDBC URL에 useAffectedRows=true 설정 필수 (application-local.yaml, DB_URL 환경변수 모두)
+        // useAffectedRows=true → MySQL이 "changed rows"를 반환:
+        //   1 = INSERT 성공 (첫 요청, 새 행 삽입)
+        //   2 = UPDATE 성공 (기존 행 증가)
+        //   0 = UPDATE no-op (request_count >= limit, 한도 초과)
+        // → 단일 쿼리 결과로 원자적 판정 가능, 후속 SELECT 불필요 (TOCTOU 없음)
+        return jdbcTemplate.update(sql, userId, date, limit);
     }
 }
