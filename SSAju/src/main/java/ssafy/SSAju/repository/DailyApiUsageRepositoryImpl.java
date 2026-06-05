@@ -16,15 +16,20 @@ public class DailyApiUsageRepositoryImpl implements DailyApiUsageCustomRepositor
 
     @Override
     public int upsertUsageIfUnderLimit(Long userId, LocalDate date, int limit) {
-        // MySQL Connector/J 8.x 기본값(useAffectedRows=false) 기준:
-        // - INSERT: affectedRows=1, UPDATE 성공: affectedRows=2, no-op UPDATE(한도도달): affectedRows=0
-        // ⚠️ DB_URL에 ?useAffectedRows=true 플래그 추가 금지 (affectedRows 의미 변경)
         String sql = """
                 INSERT INTO daily_api_usage (user_id, usage_date, request_count, created_at)
                 VALUES (?, ?, 1, NOW())
                 ON DUPLICATE KEY UPDATE
                     request_count = IF(request_count < ?, request_count + 1, request_count)
                 """;
+
+        // JDBC URL에 useAffectedRows=true 설정 필수 (DB_URL 환경변수, application.yaml 모두)
+        // 예: jdbc:mysql://localhost:3306/ssaju?useAffectedRows=true&...
+        // useAffectedRows=true → MySQL이 "changed rows"를 반환:
+        //   1 = INSERT 성공 (첫 요청, 새 행 삽입)
+        //   2 = UPDATE 성공 (기존 행 증가)
+        //   0 = UPDATE no-op (request_count >= limit, 한도 초과)
+        // → 단일 쿼리 결과로 원자적 판정 가능, 후속 SELECT 불필요 (TOCTOU 없음)
         return jdbcTemplate.update(sql, userId, date, limit);
     }
 }

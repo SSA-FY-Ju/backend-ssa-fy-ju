@@ -28,6 +28,7 @@ import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.RefreshTokenRepository;
 import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.util.DatabaseConstraints;
+import ssafy.SSAju.annotation.AuditLog;
 import ssafy.SSAju.util.JwtUtil;
 import ssafy.SSAju.util.TokenHashUtil;
 
@@ -87,6 +88,7 @@ public class AuthService {
      * @throws DuplicateEmailException 이메일이 이미 등록되었을 경우
      * @throws AuthException 약관 미동의인 경우
      */
+    @AuditLog
     @Transactional
     public SignupResponse signup(SignupRequest request) {
         checkEmailAvailability(request.email());
@@ -150,6 +152,7 @@ public class AuthService {
      * @return AccessToken, RefreshToken 및 만료 시간 (초) — AuthController가 Refresh-Token 응답 헤더로 전달
      * @throws AuthException 이메일 미존재 또는 비밀번호 불일치
      */
+    @AuditLog
     @Transactional
     public AuthTokenPair login(LoginRequest request, String clientIp) {
         Optional<User> userOpt = userRepository.findByEmail(request.email());
@@ -199,6 +202,7 @@ public class AuthService {
      * @param userId 로그아웃하는 사용자 ID
      * @param refreshTokenValue RefreshToken 값 (Refresh-Token 요청 헤더에서 추출)
      */
+    @AuditLog
     @Transactional
     public void logout(Long userId, String refreshTokenValue) {
         if (refreshTokenValue != null) {
@@ -225,6 +229,7 @@ public class AuthService {
      * @throws UserNotFoundException 사용자를 찾을 수 없는 경우
      * @throws AuthException 비밀번호가 일치하지 않는 경우
      */
+    @AuditLog
     @Transactional
     public void deleteUser(Long userId, String password) {
         User user = userRepository.findById(userId)
@@ -261,6 +266,7 @@ public class AuthService {
      * @return 새 AccessToken 및 만료 시간 (초)
      * @throws InvalidTokenException RefreshToken이 유효하지 않은 경우
      */
+    @AuditLog
     @Transactional(readOnly = true)
     public AuthTokenPair refreshAccessToken(String refreshTokenValue) {
         if (refreshTokenValue == null || refreshTokenValue.isBlank()) {

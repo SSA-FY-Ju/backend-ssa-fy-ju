@@ -338,37 +338,39 @@
 
 **Purpose**: Cross-cutting concerns and system integration
 
-- [ ] T042 Implement logging for all authentication events in SSAju/src/main/java/ssafy/SSAju/aspect/AuditLoggingAspect.java
+- [x] T042 Implement logging for all authentication events in SSAju/src/main/java/ssafy/SSAju/aspect/AuditLoggingAspect.java
   - Sign-up, Login, Logout, Token Refresh, Delete User
   - Include userId, IP, timestamp (민감정보 제외)
 
-- [ ] T043 [P] Add validation constraints on all DTOs (@NotNull, @Email, @Size, etc.)
+- [x] T043 [P] Add validation constraints on all DTOs (@NotNull, @Email, @Size, etc.)
 
-- [ ] T044 [P] Setup integration tests for authentication flow in SSAju/src/test/java/ssafy/SSAju/integration/AuthIntegrationTest.java
+- [x] T044 [P] Setup integration tests for authentication flow in SSAju/src/test/java/ssafy/SSAju/integration/AuthIntegrationTest.java
   - Sign-up → Login → API call → Token refresh → Logout
 
-- [ ] T045 [P] Setup integration tests for daily API usage in SSAju/src/test/java/ssafy/SSAju/integration/DailyApiUsageIntegrationTest.java
+- [x] T045 [P] Setup integration tests for daily API usage in SSAju/src/test/java/ssafy/SSAju/integration/DailyApiUsageIntegrationTest.java
   - Verify 3-request limit
   - Verify concurrent request handling (Race Condition test)
+  - **Note**: MySQL Connector/J 9.x 호환성 버그 수정 (DailyApiUsageRepositoryImpl - no-op UPDATE 감지)
 
-- [ ] T046 [P] Setup integration tests for soft delete in SSAju/src/test/java/ssafy/SSAju/integration/SoftDeleteIntegrationTest.java
+- [x] T046 [P] Setup integration tests for soft delete in SSAju/src/test/java/ssafy/SSAju/integration/SoftDeleteIntegrationTest.java
   - Verify user masking
   - Verify @SQLRestriction filtering
 
-- [ ] T047 [P] Modify SajuAnalysisResult entity to add user_id FK in SSAju/src/main/java/ssafy/SSAju/entity/SajuAnalysisResult.java (Phase 1 integration)
+- [x] T047 [P] Modify SajuAnalysisResult entity to add user_id FK in SSAju/src/main/java/ssafy/SSAju/entity/SajuAnalysisResult.java (Phase 1 integration)
   - Add @ManyToOne User (user_id FK)
   - Ensure NOT NULL constraint in DB migration
   - Backward compatibility: migration script for existing records (set null to default user if needed)
 
-- [ ] T048-1 [P] Modify CareerFortuneResult entity to add user_id FK in SSAju/src/main/java/ssafy/SSAju/entity/CareerFortuneResult.java (Phase 1 integration)
+- [x] T048-1 [P] Modify CareerFortuneResult entity to add user_id FK in SSAju/src/main/java/ssafy/SSAju/entity/CareerFortuneResult.java (Phase 1 integration)
   - Add @ManyToOne User (user_id FK)
   - Ensure NOT NULL constraint in DB migration
 
-- [ ] T048-2 [P] Modify CompanyCompatibilityResult entity to add user_id FK in SSAju/src/main/java/ssafy/SSAju/entity/CompanyCompatibilityResult.java (Phase 1 integration)
+- [x] T048-2 [P] Modify CompanyCompatibilityResult entity to add user_id FK in SSAju/src/main/java/ssafy/SSAju/entity/CompanyCompatibilityResult.java (Phase 1 integration)
   - Add @ManyToOne User (user_id FK)
   - Ensure NOT NULL constraint in DB migration
 
 - [ ] T048-3 Create database migration script (V2_Phase1Integration) in SSAju/src/main/resources/db/migration/
+  - **[BLOCKER]** T049 and T050 depend on this; Phase 1 entities must exist first
   - ALTER TABLE saju_analysis_result ADD user_id BIGINT NOT NULL
   - ALTER TABLE career_fortune_result ADD user_id BIGINT NOT NULL
   - ALTER TABLE company_compatibility_result ADD user_id BIGINT NOT NULL
@@ -376,11 +378,15 @@
   - Add INDEX on user_id for query performance
 
 - [ ] T049 Update Phase 1 AuthController/Service to automatically map user_id when saving analysis results
+  - ⏸️ **Blocked by T048-3**: Phase 1 entities (SajuAnalysisResult, CareerFortuneResult, CompanyCompatibilityResult) not yet created
+  - T048-3 must be completed before T049
   - Extract user_id from SecurityContext (authenticated user)
   - Pass to analysis service/repository
   - File: SSAju/src/main/java/ssafy/SSAju/career/service/ (coordinate with Phase 1)
 
 - [ ] T050 Update CLAUDE.md with Phase 2 completion and next phase context
+  - ⏸️ **Blocked by T049**: Phase 2 finalization depends on Phase 1 integration being complete
+  - T048-3 must be completed before T049, and T049 must be completed before T050
 
 ---
 
