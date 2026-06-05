@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -42,6 +43,9 @@ class SoftDeleteIntegrationTest {
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -77,11 +81,24 @@ class SoftDeleteIntegrationTest {
 
         deleteAccount(tokens[0], "password123");
 
-        // @SQLRestriction을 우회하여 원본 레코드 직접 확인 (native query 사용)
-        // Spring Data JPA의 findAll()은 @SQLRestriction 적용됨 → deleteAll()로도 확인 가능
-        // deleted_at이 채워진 것은 DB에는 존재하므로 count(allUsers) 방식으로 검증
-        long totalCount = userRepository.count(); // @SQLRestriction 적용: 0
-        assertThat(totalCount).isZero();
+        // JdbcTemplate native query로 @SQLRestriction 우회 → 실제 마스킹 값 직접 검증
+        String maskedName = jdbcTemplate.queryForObject(
+                "SELECT name FROM users WHERE id = ? AND deleted_at IS NOT NULL",
+                String.class, userId
+        );
+        String maskedEmail = jdbcTemplate.queryForObject(
+                "SELECT email FROM users WHERE id = ? AND deleted_at IS NOT NULL",
+                String.class, userId
+        );
+
+        // User.softDelete()의 마스킹 패턴 검증
+        assertThat(maskedName).isEqualTo("탈퇴한 사용자");
+        assertThat(maskedEmail)
+                .startsWith("deleted_" + userId + "_")
+                .endsWith("@deleted.local");
+
+        // @SQLRestriction 필터링 확인: 탈퇴한 사용자는 JPA 조회 불가
+        assertThat(userRepository.count()).isZero();
     }
 
     @Test
@@ -134,7 +151,8 @@ class SoftDeleteIntegrationTest {
     private void signup(String email, String password, String name) throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(signupBody(email, password, name)));
+                .content(signupBody(email, password, name)))
+                .andExpect(status().isCreated());
     }
 
     private String[] loginAndGetTokens(String email, String password) throws Exception {
