@@ -472,7 +472,7 @@ openai:
 
 ```bash
 # 데이터베이스
-export DB_URL="jdbc:mysql://localhost:3306/ssaju"
+export DB_URL="jdbc:mysql://localhost:3306/ssaju?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useAffectedRows=true"
 export DB_USERNAME="root"
 export DB_PASSWORD="your_password"
 
@@ -498,7 +498,7 @@ cd SSAju/
 ```
 
 **로컬 기본 설정** (`application-local.yaml`에 정의):
-- DB: `jdbc:mysql://localhost:3306/ssaju`
+- DB: `jdbc:mysql://localhost:3306/ssaju?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useAffectedRows=true`
 - JPA DDL: `update` (테이블 자동 생성/수정)
 - SQL 로깅: `true` (디버깅용)
 - 로컬 환경 자격증명은 `application-local.yaml` 참고

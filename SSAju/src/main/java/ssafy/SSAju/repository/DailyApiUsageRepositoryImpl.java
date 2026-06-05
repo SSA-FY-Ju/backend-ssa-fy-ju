@@ -23,7 +23,8 @@ public class DailyApiUsageRepositoryImpl implements DailyApiUsageCustomRepositor
                     request_count = IF(request_count < ?, request_count + 1, request_count)
                 """;
 
-        // JDBC URL에 useAffectedRows=true 설정 필수 (application-local.yaml, DB_URL 환경변수 모두)
+        // JDBC URL에 useAffectedRows=true 설정 필수 (DB_URL 환경변수, application.yaml 모두)
+        // 예: jdbc:mysql://localhost:3306/ssaju?useAffectedRows=true&...
         // useAffectedRows=true → MySQL이 "changed rows"를 반환:
         //   1 = INSERT 성공 (첫 요청, 새 행 삽입)
         //   2 = UPDATE 성공 (기존 행 증가)
