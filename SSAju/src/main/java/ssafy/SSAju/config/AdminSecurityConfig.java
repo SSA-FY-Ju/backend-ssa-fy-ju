@@ -12,7 +12,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import ssafy.SSAju.admin.config.AdminAccessDeniedHandler;
 import ssafy.SSAju.admin.config.AdminAuthenticationEntryPoint;
-import ssafy.SSAju.filter.JwtAuthenticationFilter;
+import ssafy.SSAju.admin.config.AdminCookieJwtFilter;
 import ssafy.SSAju.security.JwtExceptionFilter;
 import ssafy.SSAju.util.JwtUtil;
 import tools.jackson.databind.ObjectMapper;
@@ -29,6 +29,8 @@ public class AdminSecurityConfig {
     @Bean
     public SecurityFilterChain adminFilterChain(HttpSecurity http, JwtUtil jwtUtil,
                                                 ObjectMapper objectMapper) throws Exception {
+        AdminCookieJwtFilter cookieJwtFilter = new AdminCookieJwtFilter(jwtUtil);
+
         http
             .securityMatcher("/admin/**")
             .csrf(AbstractHttpConfigurer::disable)
@@ -42,8 +44,9 @@ public class AdminSecurityConfig {
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(adminAuthenticationEntryPoint)
                 .accessDeniedHandler(adminAccessDeniedHandler))
-            .addFilterBefore(new JwtAuthenticationFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(new JwtExceptionFilter(objectMapper), JwtAuthenticationFilter.class)
+            // JwtAuthenticationFilter 대신 쿠키도 지원하는 AdminCookieJwtFilter 사용
+            .addFilterBefore(cookieJwtFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new JwtExceptionFilter(objectMapper), AdminCookieJwtFilter.class)
             .httpBasic(AbstractHttpConfigurer::disable);
 
         return http.build();

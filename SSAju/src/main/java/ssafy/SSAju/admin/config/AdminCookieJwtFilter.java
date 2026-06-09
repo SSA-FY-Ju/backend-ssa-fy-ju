@@ -1,15 +1,13 @@
-package ssafy.SSAju.filter;
+package ssafy.SSAju.admin.config;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.UnsupportedJwtException;
-import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -22,19 +20,25 @@ import ssafy.SSAju.util.JwtUtil;
 import ssafy.SSAju.util.TokenType;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
+/**
+ * 관리자 SSR 페이지 전용 JWT 인증 필터.
+ *
+ * <p>브라우저 페이지 이동 시 Authorization 헤더 대신
+ * {@code admin_access_token} 쿠키에서 JWT를 추출하여 인증합니다.
+ * Authorization 헤더가 있으면 헤더를 우선 사용합니다 (AJAX 지원).
+ */
 @Slf4j
-public class JwtAuthenticationFilter extends OncePerRequestFilter {
+@RequiredArgsConstructor
+public class AdminCookieJwtFilter extends OncePerRequestFilter {
 
+    public static final String ADMIN_TOKEN_COOKIE = "admin_access_token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtUtil jwtUtil;
-
-    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
-        this.jwtUtil = jwtUtil;
-    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -44,24 +48,40 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token)) {
             try {
                 Claims claims = jwtUtil.parseAndValidateClaims(token);
-                validateTokenType(claims);
+                validateAccessTokenType(claims);
                 setAuthentication(claims);
-            } catch (TokenExpiredException ex) {
-                log.warn("만료된 Access token: {}", ex.getMessage());
-                request.setAttribute("jwtException", ex);
-            } catch (InvalidTokenException ex) {
-                log.warn("유효하지 않은 token: {}", ex.getMessage());
+            } catch (TokenExpiredException | InvalidTokenException ex) {
+                log.warn("관리자 토큰 검증 실패: {}", ex.getMessage());
+                clearAdminCookie(response);
                 request.setAttribute("jwtException", ex);
             } catch (JwtException ex) {
-                log.warn("JWT 처리 실패: {}", ex.getMessage());
-                request.setAttribute("jwtException", ex);
+                log.warn("관리자 JWT 처리 실패: {}", ex.getMessage());
+                clearAdminCookie(response);
             }
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private void validateTokenType(Claims claims) {
+    private String extractToken(HttpServletRequest request) {
+        // 1순위: Authorization 헤더 (AJAX 요청)
+        String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
+            return bearerToken.substring(BEARER_PREFIX.length());
+        }
+
+        // 2순위: 쿠키 (브라우저 SSR 페이지 이동)
+        if (request.getCookies() != null) {
+            return Arrays.stream(request.getCookies())
+                    .filter(c -> ADMIN_TOKEN_COOKIE.equals(c.getName()))
+                    .map(Cookie::getValue)
+                    .findFirst()
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    private void validateAccessTokenType(Claims claims) {
         String typeValue = (String) claims.get("type");
         if (!TokenType.ACCESS.getValue().equals(typeValue)) {
             throw new InvalidTokenException("Access token만 사용 가능합니다.");
@@ -74,9 +94,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void setAuthentication(Claims claims) {
         Long userId = claims.get("userId", Long.class);
         String email = claims.get("email", String.class);
-        // role 클레임이 없으면 USER로 폴백 (구버전 토큰 호환)
         String role = claims.get("role", String.class);
         String authority = (role != null) ? "ROLE_" + role : "ROLE_USER";
+
         var auth = new UsernamePasswordAuthenticationToken(
                 userId,
                 null,
@@ -84,14 +104,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         );
         auth.setDetails(email);
         SecurityContextHolder.getContext().setAuthentication(auth);
-        log.debug("JWT 인증 성공: userId={}, role={}", userId, authority);
+        log.debug("관리자 쿠키 인증 성공: userId={}, role={}", userId, authority);
     }
 
-    private String extractToken(HttpServletRequest request) {
-        String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
-            return bearerToken.substring(BEARER_PREFIX.length());
-        }
-        return null;
+    private void clearAdminCookie(HttpServletResponse response) {
+        Cookie expired = new Cookie(ADMIN_TOKEN_COOKIE, "");
+        expired.setMaxAge(0);
+        expired.setPath("/admin");
+        expired.setHttpOnly(true);
+        response.addCookie(expired);
     }
 }

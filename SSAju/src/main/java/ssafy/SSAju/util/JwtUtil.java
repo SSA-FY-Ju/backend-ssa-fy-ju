@@ -29,6 +29,7 @@ public class JwtUtil {
     private static final String CLAIM_USER_ID = "userId";
     private static final String CLAIM_EMAIL = "email";
     private static final String CLAIM_TYPE = "type";
+    private static final String CLAIM_ROLE = "role";
 
     private final SecretKey secretKey;
     private final long accessTokenExpirationMs;
@@ -43,8 +44,8 @@ public class JwtUtil {
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
     }
 
-    public String generateAccessToken(Long userId, String email) {
-        return buildToken(userId, email, TokenType.ACCESS.getValue(), accessTokenExpirationMs);
+    public String generateAccessToken(Long userId, String email, String role) {
+        return buildTokenWithRole(userId, email, role, TokenType.ACCESS.getValue(), accessTokenExpirationMs);
     }
 
     public String generateRefreshToken(Long userId) {
@@ -92,7 +93,7 @@ public class JwtUtil {
         return accessTokenExpirationMs / 1000;
     }
 
-    private String buildToken(Long userId, String email, String type, long expirationMs) {
+    private String buildTokenWithRole(Long userId, String email, String role, String type, long expirationMs) {
         // Instant 기반으로 생성하여 타임존 독립성 보장 (M-7).
         Instant nowInstant = Instant.now();
         Date now = Date.from(nowInstant);
@@ -108,8 +109,15 @@ public class JwtUtil {
         if (email != null) {
             builder.claim(CLAIM_EMAIL, email);
         }
+        if (role != null) {
+            builder.claim(CLAIM_ROLE, role);
+        }
 
         return builder.compact();
+    }
+
+    private String buildToken(Long userId, String email, String type, long expirationMs) {
+        return buildTokenWithRole(userId, email, null, type, expirationMs);
     }
 
     private Claims parseClaims(String token) {
