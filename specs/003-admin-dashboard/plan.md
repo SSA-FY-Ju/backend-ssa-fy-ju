@@ -28,10 +28,36 @@
 - MySQL Driver (DB 연결)
 
 **Authentication & Authorization**:
-- JWT 토큰 기반 (AccessToken 1시간 + RefreshToken 7일)
+- JWT 토큰 기반 (AccessToken + RefreshToken, `application.yaml` 설정값 참조)
+  - AccessToken 만료: `jwt.access-token-expiration` (기본값: 3600000ms = 1시간)
+  - RefreshToken 만료: `jwt.refresh-token-expiration` (기본값: 604800000ms = 7일)
+  - 주의: 하드코딩 금지, 환경변수를 통한 설정 필수
 - User Management (Phase 2)의 ROLE(USER, ADMIN) 재사용
 - Spring Security @PreAuthorize("hasRole('ADMIN')") 메서드 레벨 보호
-- 미인증/비관리자 접근 시 /admin/login으로 리다이렉트
+
+**경로별 분리된 SecurityFilterChain 구조**:
+```
+전역 SecurityConfig (기존)
+├─ /api/** → JSON 에러 응답 (REST API 클라이언트용)
+├─ /swagger-ui/** → 허용
+└─ 기타 경로 → authenticated() 검증
+
+AdminSecurityConfig (신규, @Order(0)으로 우선 적용)
+├─ /admin/** 경로에만 적용
+├─ @PreAuthorize("hasRole('ADMIN')")로 경로 보호
+├─ AuthenticationEntryPoint (비인증):
+│  └─ AJAX 요청: JSON 401 에러 응답 (AUTH-001)
+│  └─ 일반 브라우저: /admin/login으로 리다이렉트
+└─ AccessDeniedHandler (비관리자):
+   └─ AJAX 요청: JSON 403 에러 응답 (AUTH-003)
+   └─ 일반 브라우저: /admin/login으로 리다이렉트
+```
+
+**리다이렉트 구현 세부 사항**:
+- 서버는 `X-Requested-With` 헤더로 AJAX 요청 판별
+- AJAX: Content-Type `application/json`의 에러 응답 반환
+- 일반 브라우저: `sendRedirect("/admin/login")`으로 HTML 리다이렉트 처리
+- 로그아웃: RefreshToken을 revoked 처리 (DB 삭제), AccessToken은 클라이언트에서 삭제
 
 **Storage**: MySQL (기존 구현 기반, 추가 마이그레이션 불필요)
 

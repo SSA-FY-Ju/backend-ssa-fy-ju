@@ -8,7 +8,7 @@
 
 ## Implementation Strategy
 
-**MVP Scope**: Phase 3 (US0 - 관리자 로그인) 완료로 기초 마련
+**MVP Scope**: Phase 2 (US0 - 관리자 로그인) 완료로 기초 인증 마련 + Phase 3 (US1 - 대시보드) 완료로 관리자 운영 시작 가능
 **Incremental Delivery**:
 1. Phase 2: 기반 인프라 + 관리자 로그인 (필수 선행)
 2. Phase 3: 대시보드 (5초 응답 성능 목표)
@@ -102,19 +102,33 @@
 
 ### Services
 
-- [ ] T018 [US0] Create `AdminAuthenticationService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
-  - validateAdminCredentials(email, password) - check ROLE=ADMIN from User Management
-  - issueAdminToken(userId) - issue/refresh JWT AccessToken
-  - validateAdminToken(token) - validate JWT and check ROLE=ADMIN
-  - revokeAdminToken(userId) - logout and invalidate token
+**의도 변경**: 독립적인 토큰 생성 서비스 제거 → 기존 AuthService 재사용 (DRY 원칙)
+
+- [ ] **T018-A** [US0] Create `AdminAuthenticationService.java` in `src/main/java/ssafy/SSAju/admin/service/` with **single method**:
+  - `validateAdminCredentials(email, password)` 
+    - ROLE=ADMIN 사용자만 검증
+    - DB에서 사용자 조회 후 role 확인
+    - 비관리자 사용자는 예외 발생: `AUTH-003 ("접근 권한이 없습니다.")`
+  - **주의**: JWT 토큰 생성/검증/무효화는 기존 AuthService 재사용
+
+- [ ] **T018-B** [US0] Modify existing `AuthService.login()`:
+  - admin 로그인 요청도 동일하게 처리
+  - AdminAuthenticationService.validateAdminCredentials() 먼저 호출해서 ROLE_ADMIN 여부 검증
+  - 검증 통과 후 기존 로직으로 JWT 토큰 생성 (AccessToken + RefreshToken)
+  - ⚠️ 중복 제거: JWT 생성/검증 로직 새로 구현 금지, RefreshTokenRepository 재사용
 
 ### Controllers
 
-- [ ] T019 [US0] Create `AdminLoginController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
-  - GET /admin/login (render login form)
-  - POST /admin/login (validate credentials, issue JWT token)
-  - GET /admin/logout (revoke token, redirect to /admin/login)
-  - Redirect to /admin/dashboard on successful login, show error on ROLE != ADMIN
+- [ ] **T019** [US0] Create `AdminLoginController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+  - `GET /admin/login` → render login form (Thymeleaf)
+  - `POST /admin/login` → call AdminAuthenticationService.validateAdminCredentials() 후 AuthService.login() 재사용
+    - 성공: AccessToken + RefreshToken 발급, 프론트엔드는 /admin/dashboard로 리다이렉트 처리
+    - 실패 (USER 권한): AUTH-003 에러 응답 및 로그인 폼 재렌더링
+    - 실패 (자격증명 오류): AUTH-002 에러 응답 및 로그인 폼 재렌더링
+  - `POST /admin/logout` → AuthService.logout() 재사용 (RefreshToken revoke)
+    - RefreshToken 삭제 처리
+    - 프론트엔드에서 AccessToken 삭제 (Stateless JWT)
+    - 프론트엔드에서 /admin/login으로 리다이렉트
 
 ### Views & Templates
 
@@ -128,30 +142,68 @@
 
 ### Spring Security Configuration
 
-- [ ] T022 [US0] Create/Update `AdminSecurityConfig.java` in `src/main/java/ssafy/SSAju/config/` with:
-  - @PreAuthorize("hasRole('ADMIN')") on all /admin/** endpoints
-  - Configure login page: /admin/login
-  - Configure logout handler: invalidate session + redirect to /admin/login
-  - Configure unauthorized handler: redirect to /admin/access-denied
+**주의**: Stateless JWT + SSR 리다이렉트 혼합 구조
 
-- [ ] T023 [US0] Create `AdminAccessDeniedHandler.java` in `src/main/java/ssafy/SSAju/admin/config/` for:
-  - Handle 403 (USER role attempting /admin access)
-  - Handle 401 (missing/invalid token)
-  - Return JSON error responses with clear messages
+- [ ] **T022** [US0] Create/Update `AdminSecurityConfig.java` in `src/main/java/ssafy/SSAju/config/` (@Order(0) 으로 전역 SecurityConfig 보다 먼저 적용):
+  - `/admin/**` 경로에만 적용되는 전용 SecurityFilterChain
+  - @PreAuthorize("hasRole('ADMIN')") on all /admin/** endpoints
+  - Configure login page: `/admin/login`
+  - Configure logout handler (⚠️ 수정):
+    - ❌ "invalidate session" 제거 (JWT는 Stateless)
+    - ✅ "RefreshToken revoke 처리 + /admin/login으로 리다이렉트"
+    - RefreshToken을 DB에서 삭제
+    - 프론트엔드에서 AccessToken 삭제 처리 (Stateless이므로 서버 불가)
+  - Custom AuthenticationEntryPoint: 비인증 요청 처리
+  - Custom AccessDeniedHandler: 비관리자 요청 처리 (아래 T023 참고)
+
+- [ ] **T023** [US0] Create `AdminAuthenticationEntryPoint.java` + `AdminAccessDeniedHandler.java` in `src/main/java/ssafy/SSAju/admin/config/`:
+
+  **AdminAuthenticationEntryPoint.java** (비인증 요청 401):
+  ```java
+  public void commence(HttpServletRequest request, HttpServletResponse response, 
+                       AuthenticationException authException) throws IOException {
+      if ("XMLHttpRequest".equals(request.getHeader("X-Requested-With"))) {
+          // AJAX 요청 → JSON 에러 응답
+          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+          response.setContentType("application/json;charset=UTF-8");
+          response.getWriter().write("{\"code\":\"AUTH-001\",\"message\":\"인증이 필요합니다.\"}");
+      } else {
+          // 일반 브라우저 → HTML 리다이렉트
+          response.sendRedirect("/admin/login");
+      }
+  }
+  ```
+
+  **AdminAccessDeniedHandler.java** (비관리자 요청 403):
+  ```java
+  public void handle(HttpServletRequest request, HttpServletResponse response,
+                     AccessDeniedException accessDeniedException) throws IOException {
+      if ("XMLHttpRequest".equals(request.getHeader("X-Requested-With"))) {
+          // AJAX 요청 → JSON 에러 응답
+          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+          response.setContentType("application/json;charset=UTF-8");
+          response.getWriter().write("{\"code\":\"AUTH-003\",\"message\":\"접근 권한이 없습니다.\"}");
+      } else {
+          // 일반 브라우저 → HTML 리다이렉트
+          response.sendRedirect("/admin/login");
+      }
+  }
+  ```
 
 ### Tests (Optional - JUnit 5 + Mockito)
 
-- [ ] T024 [US0] Create `AdminAuthenticationServiceTest.java` in `src/test/java/ssafy/SSAju/admin/service/` testing:
-  - validateAdminCredentials() with ADMIN/USER roles
-  - issueAdminToken() JWT generation
-  - validateAdminToken() token validation and ROLE check
-  - Edge cases (invalid email, wrong password, missing role field)
+- [ ] **T024** [US0] Create `AdminAuthenticationServiceTest.java` in `src/test/java/ssafy/SSAju/admin/service/` testing:
+  - validateAdminCredentials() with ADMIN role → 성공
+  - validateAdminCredentials() with USER role → AUTH-003 예외 발생
+  - validateAdminCredentials() with invalid credentials → 적절한 예외 발생
+  - ⚠️ JWT 생성/검증 테스트 제거 (AuthService 테스트 대신)
 
-- [ ] T025 [US0] Create `AdminLoginControllerTest.java` in `src/test/java/ssafy/SSAju/admin/controller/` testing:
-  - GET /admin/login form rendering
-  - POST /admin/login with valid ADMIN credentials → token issued
-  - POST /admin/login with USER credentials → error response
-  - GET /admin/logout → token revoked
+- [ ] **T025** [US0] Create `AdminLoginControllerTest.java` in `src/test/java/ssafy/SSAju/admin/controller/` testing:
+  - GET /admin/login form rendering (Thymeleaf 확인)
+  - POST /admin/login with valid ADMIN credentials → AuthService.login() 호출, token issued
+  - POST /admin/login with USER credentials → AUTH-003 에러 응답 + 폼 재렌더링
+  - POST /admin/logout → AuthService.logout() 호출, RefreshToken 삭제 확인
+  - ⚠️ JWT 토큰 생성/검증은 T018-B의 AuthService.login() 테스트로 충분
 
 ---
 
@@ -222,8 +274,14 @@
 ### Services
 
 - [ ] T033 [US2] Create `AdminUserService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
-  - searchUsers(email, name, joinDateFrom, joinDateTo, status, page, size) - with Soft Delete filtering
-  - getUserProfile(userId) - returns UserSearchDTO with totalAnalysisCount
+  - `searchUsers(email, name, joinDateFrom, joinDateTo, status, page, size)` - with Soft Delete filtering
+  - `getUserProfile(userId)` - returns UserSearchDTO with totalAnalysisCount
+  
+  **⚠️ 마스킹 이메일 주의**:
+  - ❌ getMaskedEmail() 메서드 생성 금지 (중복)
+  - ✅ DB에서 조회 시 탈퇴 사용자의 이메일은 이미 마스킹된 형식
+    (예: deleted_123_1686326400@deleted.local) 으로 저장됨
+  - ✅ 조회만 하면 됨, 생성 로직은 User.deleteUser() (또는 유사 메서드)에서 이미 처리
 
 ### Controllers
 

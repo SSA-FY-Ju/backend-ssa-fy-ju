@@ -21,10 +21,22 @@ JWT AccessToken을 발급받아 관리자 대시보드 및 모든 관리자 화�
 
 **Acceptance Scenarios**:
 
-1. **Given** 관리자 로그인 폼에 접근 **When** ADMIN 권한을 가진 계정으로 이메일/비밀번호 입력 후 제출 **Then** AccessToken 발급받고 대시보드로 이동
-2. **Given** USER 권한의 계정 **When** 로그인 시도 **Then** "관리자만 접근 가능합니다" 에러 메시지 표시
-3. **Given** 인증받지 않은 사용자 **When** /admin 페이지 직접 접근 시도 **Then** 로그인 페이지로 리다이렉트
-4. **Given** 로그인한 관리자 **When** 로그아웃 버튼 클릭 **Then** 세션 종료 및 로그인 페이지로 이동
+1. **Given** 관리자 로그인 폼에 접근 **When** ADMIN 권한을 가진 계정으로 이메일/비밀번호 입력 후 제출 **Then** AccessToken(1시간 유효) 및 RefreshToken(7일 유효) 발급받고 프론트엔드가 /admin/dashboard로 이동
+
+2. **Given** USER 권한의 계정 **When** 유효한 JWT 토큰으로 /admin/** 엔드포인트 접근 시도 **Then** 서버는 `403 Forbidden` 응답 반환
+   - 에러코드: `AUTH-003`
+   - 메시지: "접근 권한이 없습니다."
+   - 이유: JWT 토큰은 정상이나 SecurityConfig의 @PreAuthorize("hasRole('ADMIN')")에서 차단
+
+3. **Given** 인증받지 않은 사용자(JWT 토큰 없음) **When** /admin/** 페이지 직접 접근 시도 **Then** 서버는 `401 Unauthorized` 응답 반환
+   - 에러코드: `AUTH-001`
+   - 메시지: "인증이 필요합니다."
+   - 책임 분리: 서버는 401만 반환, 프론트엔드에서 /admin/login으로 리다이렉트 처리
+
+4. **Given** 로그인한 관리자 **When** 로그아웃 버튼 클릭 **Then** 다음이 순차적으로 실행
+   - RefreshToken을 DB에서 revoked 처리 (삭제)
+   - AccessToken은 클라이언트에서 삭제 (Stateless JWT이므로 서버는 처리 불가)
+   - 프론트엔드가 /admin/login으로 리다이렉트
 
 ---
 
