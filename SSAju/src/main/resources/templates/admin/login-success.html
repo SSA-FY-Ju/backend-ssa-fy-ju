@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>로그인 성공</title>
+    <script th:inline="javascript">
+        const accessToken = [[${accessToken}]];
+        const refreshToken = [[${refreshToken}]];
+        if (accessToken) {
+            localStorage.setItem('accessToken', accessToken);
+        }
+        if (refreshToken) {
+            localStorage.setItem('refreshToken', refreshToken);
+        }
+        window.location.href = '/admin/dashboard';
+    </script>
+</head>
+<body>
+<p>로그인 중...</p>
+</body>
+</html>

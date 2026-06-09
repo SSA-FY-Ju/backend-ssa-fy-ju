@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSAju 관리자 로그인</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #1a1a2e; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .login-card { background: #fff; border-radius: 8px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .login-card h1 { text-align: center; color: #1a1a2e; margin-bottom: 8px; font-size: 1.5rem; }
+        .login-card .subtitle { text-align: center; color: #888; font-size: 0.9rem; margin-bottom: 32px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 0.85rem; color: #555; margin-bottom: 6px; font-weight: 500; }
+        .form-group input { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; transition: border-color 0.2s; }
+        .form-group input:focus { outline: none; border-color: #e94560; }
+        .error-message { background: #fff3f3; border: 1px solid #e94560; color: #c0392b; padding: 10px 14px; border-radius: 4px; font-size: 0.9rem; margin-bottom: 20px; }
+        .submit-btn { width: 100%; padding: 12px; background: #e94560; color: #fff; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+        .submit-btn:hover { background: #c0392b; }
+        .submit-btn:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+<div class="login-card">
+    <h1>SSAju</h1>
+    <p class="subtitle">관리자 로그인</p>
+
+    <div th:if="${errorMessage}" class="error-message" th:text="${errorMessage}"></div>
+
+    <form th:action="@{/admin/login}" method="post">
+        <div class="form-group">
+            <label for="email">이메일</label>
+            <input type="email" id="email" name="email"
+                   th:value="${loginRequest?.email()}"
+                   placeholder="admin@example.com"
+                   required autocomplete="email">
+        </div>
+        <div class="form-group">
+            <label for="password">비밀번호</label>
+            <input type="password" id="password" name="password"
+                   placeholder="비밀번호를 입력하세요"
+                   required autocomplete="current-password">
+        </div>
+        <button type="submit" class="submit-btn" id="loginBtn">로그인</button>
+    </form>
+</div>
+<script>
+    document.querySelector('form').addEventListener('submit', function() {
+        const btn = document.getElementById('loginBtn');
+        btn.disabled = true;
+        btn.textContent = '로그인 중...';
+    });
+</script>
+</body>
+</html>
