@@ -36,7 +36,7 @@
 - Spring Security @PreAuthorize("hasRole('ADMIN')") 메서드 레벨 보호
 
 **경로별 분리된 SecurityFilterChain 구조**:
-```
+```text
 전역 SecurityConfig (기존)
 ├─ /api/** → JSON 에러 응답 (REST API 클라이언트용)
 ├─ /swagger-ui/** → 허용
