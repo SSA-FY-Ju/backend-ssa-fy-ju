@@ -161,7 +161,7 @@
 - [ ] T026 [US2] Create `AdminUserService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
   - searchUsers(email, name, joinDateFrom, joinDateTo, status, page, size) - with Soft Delete filtering
   - getUserProfile(userId) - returns UserSearchDTO with totalAnalysisCount
-  - getMaskedEmail(userId) - generates deleted_{userId}_{epochSecond}@deleted.local format
+  - Note: getMaskedEmail() 생성 제거. 이유: T007에서 DB 저장 시 이미 마스킹되므로 조회만 필요
 
 ### Controllers
 
@@ -238,7 +238,12 @@
   - decrementDailyUsage() with validation (cannot go negative)
 
 - [ ] T038 [US3] Create `AdminAnalyticsControllerTest.java` testing:
-  - POST /admin/daily-usages/users/{userId}/adjust response correctness
+  - GET /admin/analytics response structure and pagination
+  - GET /admin/analytics/{id} detail view with JSON validation
+
+- [ ] T038-B [US3] Create `AdminUsageAdjustmentControllerTest.java` testing:
+  - POST /admin/daily-usages/users/{userId}/adjust with RESET action
+  - POST /admin/daily-usages/users/{userId}/adjust with DECREMENT action and validation
 
 ---
 
@@ -358,7 +363,7 @@
 
 ## Parallel Execution Roadmap
 
-```
+```text
 Phase 1 (Setup) [Sequential - must complete first]
     ↓
 Phase 2 (Foundational) [Sequential - must complete first]
