@@ -63,7 +63,7 @@
 - ✅ Spring Boot MVC 패턴 적합
 - ✅ 기존 엔티티와 통합 가능 (Phase 2 기반)
 - ✅ 타임리프로 소규모 UI 렌더링 가능
-- ✅ 조회 API만 필요 (POST 액션 제거)
+- ✅ REST API (조회 + 관리자 조정 POST) 필요 (일일 사용량 조정은 필수 기능)
 
 **Gate 3**: 기술 스택 검증
 - ✅ Java 21 / Spring Boot 4.0.5 기존 프로젝트
@@ -223,7 +223,7 @@ src/test/java/ssafy/SSAju/admin/
 ### 2. API Contracts (관리자 전용 REST)
 
 **대시보드 API**
-```
+```http
 GET /admin/dashboard
 Response: {
   totalAnalysis: int,
@@ -234,7 +234,7 @@ Response: {
 ```
 
 **유저 관리 API (조회만)**
-```
+```http
 GET /admin/users?email=...&name=...&joinDate=...&status=ACTIVE|INACTIVE
 Response: Page<UserSearchDTO>
 
@@ -244,7 +244,7 @@ Response: { id, email, name, joinDate, status, deletedAt, totalAnalysisCount }
 ```
 
 **분석 기록 API**
-```
+```http
 GET /admin/analytics?type=SAJU|GWANWUN|GUNG_HAP&page=0&size=20
 Response: Page<AnalyticsListDTO>
 
@@ -253,14 +253,14 @@ Response: { id, userId, analysisType, jsonData, createdAt }
 ```
 
 **일일 제한 수동 조정 API (RESTful 설계)**
-```
+```http
 POST /admin/daily-usages/users/{userId}/adjust
 Body: { "action": "RESET" } 또는 { "action": "DECREMENT", "amount": 1 }
 Response: { userId, date, usageCountBefore, usageCountAfter, action }
 ```
 
 **피드백 관리 API**
-```
+```http
 GET /admin/feedback?type=SAJU|GWANWUN|GUNG_HAP&page=0&size=20
 Response: Page<FeedbackListDTO>
 
