@@ -23,8 +23,8 @@
 
 - [x] All mandatory sections completed
   - ✅ User Scenarios & Testing (4개 스토리 + Edge Cases)
-  - ✅ Requirements (14개 FR, Key Entities 정의)
-  - ✅ Success Criteria (7개 측정 가능한 목표)
+  - ✅ Requirements (13개 FR, Key Entities 정의)
+  - ✅ Success Criteria (6개 측정 가능한 목표)
   - ✅ Assumptions (8개 선언)
 
 ## Requirement Completeness
@@ -49,7 +49,7 @@
   - ✅ 대시보드, 유저 관리, 분석 기록, 피드백 모두 테스트 시나리오 명확
 
 - [x] Edge cases are identified
-  - ✅ 대시보드 로드 중 새 기록 생성, 자정 리셋, 마스킹 충돌, 페이지 성능, 동시 Ban 처리 등 5개 케이스
+  - ✅ 대시보드 로드 중 새 기록 생성, 자정 리셋, 마스킹 충돌, 페이지 성능, Ban 제거 등 5개 케이스
 
 - [x] Scope is clearly bounded
   - ✅ 관리자 전용 화면, 로그인 후 접근, 타임리프 기반 구현 명시
@@ -62,7 +62,7 @@
 ## Feature Readiness
 
 - [x] All functional requirements have clear acceptance criteria
-  - ✅ 14개 FR은 구현 가능하며, 각각 테스트 시나리오로 검증 가능
+  - ✅ 13개 FR은 구현 가능하며, 각각 테스트 시나리오로 검증 가능
   - ✅ "System MUST" 형식으로 명확하게 정의
 
 - [x] User scenarios cover primary flows
