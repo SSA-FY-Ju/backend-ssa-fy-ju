@@ -103,17 +103,35 @@ CS 문의 대응을 위해 특정 유저의 DailyApiUsage 카운트를 수동으
 - **FR-007**: System MUST 서비스 전체 분석 히스토리를 최신순으로 조회하는 기능 제공
 - **FR-008**: System MUST 특정 분석 기록의 AI 생성 JSON 데이터(사주/관운/궁합)를 원문으로 확인하는 기능 제공
 - **FR-009**: System MUST JSON 데이터의 텍스트 인코딩이 올바른지 관리자가 시각적으로 검증할 수 있도록 한글 등 특수 문자를 올바르게 렌더링
-- **FR-010**: System MUST 특정 유저의 DailyApiUsage 카운트를 수동으로 초기화하는 인터페이스 제공 (CS용). 관리자는 두 가지 옵션 중 선택: (1) 완전 리셋(UsageCount를 0으로 설정), (2) 특정 개수만큼 차감
+- **FR-010**: System MUST 특정 유저의 DailyApiUsage 카운트를 수동으로 조정하는 인터페이스 제공 (CS용). 관리자는 두 가지 옵션 중 선택: (1) 완전 리셋(UsageCount를 0으로 설정), (2) 특정 개수만큼 차감 (단, usageCountAfter >= 0 보장). 현재 카운트보다 큰 차감을 요청할 시 카운트를 0으로 고정하고 조정된 값을 반환하며, 모든 조정은 감사 로그에 기록됨.
 - **FR-011**: System MUST 사주/관운/궁합별 만족도 점수 통계(평균, 분포, 응답 수)를 조회 가능하게 함
 - **FR-012**: System MUST 유저가 남긴 주관식 피드백(feedback_content)을 목록으로 표시하고 검색/필터 가능
 - **FR-013**: System MUST 특정 피드백에서 클릭 한 번으로 해당 유저가 받았던 실제 사주 분석 결과 화면으로 이동하는 링크 제공
 
 ### Key Entities
 
-- **SajuAnalysis**: 사주 분석 기록 (ID, UserId, CreatedAt, JsonData, AnalysisType)
+- **SajuAnalysis** (코드: SajuResult): 사주 분석 기록 (ID, UserId, CreatedAt, JsonData, AnalysisType)
 - **UserSatisfactionFeedback**: 만족도 피드백 (ID, UserId, SajuAnalysisId, SatisfactionScore, FeedbackContent, CreatedAt)
 - **DailyApiUsage**: 일일 API 사용 현황 (ID, UserId, Date, UsageCount)
 - **User**: 유저 정보 (ID, Email, Name, Status, CreatedAt, DeletedAt)
+
+### Entity Mapping Reference (Spec vs. Codebase)
+
+스펙 문서와 실제 코드베이스 간 엔티티명 매핑:
+
+| Spec 문서 | 실제 코드베이스 | 필드 매핑 | 설명 |
+|-----------|---------------|---------|------|
+| **SajuAnalysis** | **SajuResult** | - | 사주 분석 결과 저장소 |
+| id | id | PK | 분석 기록 ID |
+| userId | userId | FK to User | 분석을 요청한 유저 |
+| createdAt | fetchedAt | 타임스탐프 | 분석 생성/조회 시점 |
+| jsonData | payload | JSON 문자열 | AI 생성 JSON 원문 |
+| analysisType | analysisType | ENUM | SAJU, GWANWUN, GUNG_HAP |
+
+**사용 원칙**:
+- **API/DTO**: SajuAnalysis로 표현 (스펙 기준, 외부 계약)
+- **Repository**: SajuResult 엔티티 사용 (코드 기준, 내부 구현)
+- **구현자**: 이 매핑표를 참고하여 API 응답 시 SajuAnalysis 필드명 사용
 
 ## Clarifications
 
