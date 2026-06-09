@@ -10,6 +10,24 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
+### User Story 0 - 관리자 로그인 (Priority: P0) ⚠️ 필수 선행
+
+관리자는 ROLE=ADMIN 자격으로 로그인 폼에서 이메일과 비밀번호를 입력하여 인증받고,
+JWT AccessToken을 발급받아 관리자 대시보드 및 모든 관리자 화면에 접근할 수 있습니다.
+
+**Why this priority**: 모든 관리자 화면 접근의 필수 선행 조건. 이 기능이 완료되어야 다른 모든 관리자 기능 진행 가능
+
+**Independent Test**: 관리자 계정(ROLE=ADMIN)으로 로그인 → AccessToken 발급 → /admin 페이지 접근 확인
+
+**Acceptance Scenarios**:
+
+1. **Given** 관리자 로그인 폼에 접근 **When** ADMIN 권한을 가진 계정으로 이메일/비밀번호 입력 후 제출 **Then** AccessToken 발급받고 대시보드로 이동
+2. **Given** USER 권한의 계정 **When** 로그인 시도 **Then** "관리자만 접근 가능합니다" 에러 메시지 표시
+3. **Given** 인증받지 않은 사용자 **When** /admin 페이지 직접 접근 시도 **Then** 로그인 페이지로 리다이렉트
+4. **Given** 로그인한 관리자 **When** 로그아웃 버튼 클릭 **Then** 세션 종료 및 로그인 페이지로 이동
+
+---
+
 ### User Story 1 - 관리자가 서비스 현황을 한눈에 파악 (Priority: P1)
 
 관리자는 로그인 후 오늘의 서비스 상태를 즉시 파악할 수 있는 대시보드를 본다.
@@ -141,7 +159,10 @@ CS 문의 대응을 위해 특정 유저의 DailyApiUsage 카운트를 수동으
 
 ## Assumptions
 
-- **관리자 인증**: 관리자는 이미 로그인된 상태이며, 별도의 인증 프로세스는 불필요 (Phase 2 User Management 기반)
+- **관리자 인증**: 관리자는 User Management (Phase 2)의 ROLE=ADMIN 기반 JWT 로그인을 통해 인증
+  - User Management에서 로그인 시 AccessToken(1시간) + RefreshToken(7일) 발급
+  - ROLE=ADMIN인 사용자만 /admin 페이지 및 관리자 API 접근 가능 (Spring Security @PreAuthorize)
+  - ROLE != ADMIN 사용자가 접근 시 로그인 페이지로 리다이렉트
 - **기존 엔티티 재사용**: SajuAnalysis, UserSatisfactionFeedback, DailyApiUsage 등 필요한 엔티티는 이미 구현되어 있거나 명세서에 정의됨
 - **타임리프 기반 구현**: 관리자 페이지는 타임리프 템플릿으로 렌더링되며, 별도의 프론트엔드 프레임워크(React, Vue)는 사용하지 않음
 - **실시간 데이터**: 대시보드의 분석 현황 데이터는 수동 새로고침 기반이며, WebSocket 등 실시간 푸시는 v1에서 제외

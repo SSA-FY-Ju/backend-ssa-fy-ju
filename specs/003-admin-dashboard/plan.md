@@ -24,7 +24,14 @@
 - Spring Data JPA (ORM)
 - Thymeleaf (SSR 템플릿)
 - Spring Web MVC
+- Spring Security (RBAC & JWT 검증)
 - MySQL Driver (DB 연결)
+
+**Authentication & Authorization**:
+- JWT 토큰 기반 (AccessToken 1시간 + RefreshToken 7일)
+- User Management (Phase 2)의 ROLE(USER, ADMIN) 재사용
+- Spring Security @PreAuthorize("hasRole('ADMIN')") 메서드 레벨 보호
+- 미인증/비관리자 접근 시 /admin/login으로 리다이렉트
 
 **Storage**: MySQL (기존 구현 기반, 추가 마이그레이션 불필요)
 

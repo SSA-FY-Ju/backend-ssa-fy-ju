@@ -8,19 +8,21 @@
 
 ## Implementation Strategy
 
-**MVP Scope**: Phase 3 (US1 - 대시보드) 완료로 최소 가치 제공
+**MVP Scope**: Phase 3 (US0 - 관리자 로그인) 완료로 기초 마련
 **Incremental Delivery**:
-1. Phase 3: 대시보드 (5초 응답 성능 목표)
-2. Phase 4: 유저 관리 (검색/필터링)
-3. Phase 5: 분석 기록 (JSON 조회 + 일일 제한 초기화)
-4. Phase 6: 피드백 관리 (통계 + 연관 링크)
+1. Phase 2: 기반 인프라 + 관리자 로그인 (필수 선행)
+2. Phase 3: 대시보드 (5초 응답 성능 목표)
+3. Phase 4: 유저 관리 (검색/필터링)
+4. Phase 5: 분석 기록 (JSON 조회 + 일일 제한 초기화)
+5. Phase 6: 피드백 관리 (통계 + 연관 링크)
 
 **Parallel Opportunities**:
-- Phase 3-4: US1, US2 동시 개발 가능 (독립적인 화면)
+- Phase 3-4: US1, US2 동시 개발 가능 (독립적인 화면, US0 로그인 완료 후)
 - Phase 5-6: US3, US4 동시 개발 가능 (독립적인 데이터)
 - DTO, Service, Controller 층은 각 story별로 병렬 개발 가능
 
 **Independent Test Criteria per User Story**:
+- **US0**: 관리자 로그인 폼, ADMIN/USER 권한 검증, 세션 관리 확인
 - **US1**: 대시보드 페이지 로드 후 4개 데이터 섹션 렌더링 확인
 - **US2**: 유저 검색 & 상세 프로필 조회, Soft Delete 필터링 확인
 - **US3**: 분석 히스토리 조회, JSON 인코딩, 일일 제한 초기화 API
@@ -32,34 +34,33 @@
 
 ### Project Structure & Configuration
 
-- [ ] T001 Create admin module package structure in `src/main/java/ssafy/SSAju/admin/` with subdirectories (controller, service, dto, repository)
+- [ ] T001 Create admin module package structure in `src/main/java/ssafy/SSAju/admin/` with subdirectories (controller, service, dto, repository, config)
 
 - [ ] T002 Create Thymeleaf template directory structure in `src/main/resources/templates/admin/` with layout subdirectory
 
-- [ ] T003 Configure Spring Security for admin role-based access control in `src/main/java/ssafy/SSAju/config/AdminSecurityConfig.java`
+- [ ] T003 [P] Create test package structure in `src/test/java/ssafy/SSAju/admin/` with controller, service, integration subdirectories
 
-- [ ] T004 [P] Create test package structure in `src/test/java/ssafy/SSAju/admin/` with controller, service, integration subdirectories
-
-- [ ] T005 [P] Create base application.yml configuration for admin module (logging, pagination defaults) in `src/main/resources/application-admin.yaml`
+- [ ] T004 [P] Create base application-admin.yaml configuration for admin module (logging, pagination defaults) in `src/main/resources/`
 
 ### DTO & Common Classes
 
-- [ ] T006 [P] Create `DashboardDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: totalAnalysis, analysisTypeBreakdown, dailyLimitExhaustedCount, feedbackSummary
+- [ ] T005 [P] Create `DashboardDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: totalAnalysis, analysisTypeBreakdown, dailyLimitExhaustedCount, feedbackSummary
 
-- [ ] T007 [P] Create `UserSearchDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, email, name, joinDate, status, deletedAt, totalAnalysisCount
-  - Note: 탈퇴 유저의 email은 이미 마스킹된 형식(deleted_{userId}_{epochSecond}@deleted.local)으로 DB에 저장되므로 maskedEmail 필드 불필요
+- [ ] T006 [P] Create `UserSearchDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, email, name, joinDate, status, deletedAt, totalAnalysisCount
 
-- [ ] T008 [P] Create `AnalyticsListDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, analysisType, createdAt
+- [ ] T007 [P] Create `AnalyticsListDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, analysisType, createdAt
 
-- [ ] T009 [P] Create `AnalyticsDetailDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, analysisType, jsonData, createdAt
+- [ ] T008 [P] Create `AnalyticsDetailDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, analysisType, jsonData, createdAt
 
-- [ ] T010 [P] Create `FeedbackListDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, feedbackContent, satisfactionScore, analysisType, createdAt
+- [ ] T009 [P] Create `FeedbackListDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, feedbackContent, satisfactionScore, analysisType, createdAt
 
-- [ ] T011 [P] Create `FeedbackStatDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: satisCountBySajuType, averageScore, totalFeedbackCount
+- [ ] T010 [P] Create `FeedbackStatDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: satisCountBySajuType, averageScore, totalFeedbackCount
+
+- [ ] T011 [P] Create `AdminLoginRequestDTO.java` and `AdminLoginResponseDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with JWT token fields
 
 ---
 
-## Phase 2: Foundational & Data Access Layer
+## Phase 2: Foundational & 관리자 로그인 (US0 - P0)
 
 ### Custom Query Repositories
 
@@ -88,6 +89,70 @@
 
 - [ ] T017 Create pagination utility `AdminPaginationUtil.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods for page size validation, offset calculation
 
+### User Story 0: 관리자 로그인 (Priority: P0) ⚠️ 필수 선행
+
+**Goal**: 관리자가 ADMIN 권한으로 로그인하여 JWT AccessToken을 발급받고 모든 관리자 페이지에 접근 가능하도록 함
+
+**Independent Test**:
+- 관리자 로그인 폼 렌더링 확인
+- ADMIN 권한 사용자 로그인 시 AccessToken 발급
+- USER 권한 사용자 로그인 시도 시 에러 메시지 표시
+- 미인증 사용자의 /admin 접근 시 로그인 페이지로 리다이렉트
+- 로그아웃 시 세션 종료 확인
+
+### Services
+
+- [ ] T018 [US0] Create `AdminAuthenticationService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+  - validateAdminCredentials(email, password) - check ROLE=ADMIN from User Management
+  - issueAdminToken(userId) - issue/refresh JWT AccessToken
+  - validateAdminToken(token) - validate JWT and check ROLE=ADMIN
+  - revokeAdminToken(userId) - logout and invalidate token
+
+### Controllers
+
+- [ ] T019 [US0] Create `AdminLoginController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+  - GET /admin/login (render login form)
+  - POST /admin/login (validate credentials, issue JWT token)
+  - GET /admin/logout (revoke token, redirect to /admin/login)
+  - Redirect to /admin/dashboard on successful login, show error on ROLE != ADMIN
+
+### Views & Templates
+
+- [ ] T020 [US0] Create Thymeleaf layout base template `admin/layout/admin-base.html` with header, sidebar, footer structure
+
+- [ ] T021 [US0] Create Thymeleaf admin login template `admin/login.html` with:
+  - Email/password input form
+  - Error message display (invalid credentials, role denied)
+  - Submit button with loading state
+  - Responsive design
+
+### Spring Security Configuration
+
+- [ ] T022 [US0] Create/Update `AdminSecurityConfig.java` in `src/main/java/ssafy/SSAju/config/` with:
+  - @PreAuthorize("hasRole('ADMIN')") on all /admin/** endpoints
+  - Configure login page: /admin/login
+  - Configure logout handler: invalidate session + redirect to /admin/login
+  - Configure unauthorized handler: redirect to /admin/access-denied
+
+- [ ] T023 [US0] Create `AdminAccessDeniedHandler.java` in `src/main/java/ssafy/SSAju/admin/config/` for:
+  - Handle 403 (USER role attempting /admin access)
+  - Handle 401 (missing/invalid token)
+  - Return JSON error responses with clear messages
+
+### Tests (Optional - JUnit 5 + Mockito)
+
+- [ ] T024 [US0] Create `AdminAuthenticationServiceTest.java` in `src/test/java/ssafy/SSAju/admin/service/` testing:
+  - validateAdminCredentials() with ADMIN/USER roles
+  - issueAdminToken() JWT generation
+  - validateAdminToken() token validation and ROLE check
+  - Edge cases (invalid email, wrong password, missing role field)
+
+- [ ] T025 [US0] Create `AdminLoginControllerTest.java` in `src/test/java/ssafy/SSAju/admin/controller/` testing:
+  - GET /admin/login form rendering
+  - POST /admin/login with valid ADMIN credentials → token issued
+  - POST /admin/login with USER credentials → error response
+  - GET /admin/logout → token revoked
+
 ---
 
 ## Phase 3: User Story 1 - 대시보드 (P1)
@@ -101,7 +166,7 @@
 
 ### Services
 
-- [ ] T018 [US1] Create `AdminDashboardService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+- [ ] T026 [US1] Create `AdminDashboardService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
   - getTodaysAnalysisSummary() - returns total count and type breakdown (SAJU, GWANWUN, GUNG_HAP)
   - getDailyLimitExhaustedCount() - returns count of users who used all 3 daily limits
   - getFeedbackSummary() - returns satisfied/unsatisfied ratio and unviewed feedback count
@@ -109,20 +174,18 @@
 
 ### Controllers
 
-- [ ] T019 [US1] Create `AdminDashboardController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [ ] T027 [US1] Create `AdminDashboardController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - GET /admin/dashboard (returns JSON + renders Thymeleaf view)
   - GET /admin/api/dashboard (returns JSON only for AJAX refresh)
 
 ### Views & Templates
 
-- [ ] T020 [US1] Create Thymeleaf layout base template `admin/layout/admin-base.html` with header, sidebar, footer structure
-
-- [ ] T021 [US1] Create Thymeleaf components:
+- [ ] T028 [US1] Create Thymeleaf components:
   - `admin/layout/admin-header.html` - navigation, branding
   - `admin/layout/admin-sidebar.html` - menu items (Dashboard, User Management, Analytics, Feedback)
   - `admin/layout/admin-footer.html` - copyright, version
 
-- [ ] T022 [US1] Create dashboard template `admin/dashboard.html` with sections:
+- [ ] T029 [US1] Create dashboard template `admin/dashboard.html` with sections:
   - Analysis Summary Widget (today's count by type)
   - Daily Limit Warning Widget (users with exhausted quota)
   - Feedback Summary Widget (satisfaction ratio, unviewed count)
@@ -130,18 +193,18 @@
 
 ### Tests (Optional - JUnit 5 + Mockito)
 
-- [ ] T023 [US1] Create `AdminDashboardServiceTest.java` in `src/test/java/ssafy/SSAju/admin/service/` testing:
+- [ ] T030 [US1] Create `AdminDashboardServiceTest.java` in `src/test/java/ssafy/SSAju/admin/service/` testing:
   - getTodaysAnalysisSummary() with mock data (Asia/Seoul timezone handling)
   - getDailyLimitExhaustedCount() with edge cases (midnight reset)
   - getFeedbackSummary() with empty/partial data
   - getDashboardData() aggregation
 
-- [ ] T024 [US1] Create `AdminDashboardControllerTest.java` in `src/test/java/ssafy/SSAju/admin/controller/` testing:
+- [ ] T031 [US1] Create `AdminDashboardControllerTest.java` in `src/test/java/ssafy/SSAju/admin/controller/` testing:
   - GET /admin/dashboard response time < 5 seconds
   - JSON structure validation
   - Thymeleaf view rendering
 
-- [ ] T025 [US1] Create integration test `AdminDashboardIntegrationTest.java` in `src/test/java/ssafy/SSAju/admin/integration/` testing:
+- [ ] T032 [US1] Create integration test `AdminDashboardIntegrationTest.java` in `src/test/java/ssafy/SSAju/admin/integration/` testing:
   - End-to-end dashboard flow with real DB mock data
   - Data consistency across services
 
@@ -158,32 +221,31 @@
 
 ### Services
 
-- [ ] T026 [US2] Create `AdminUserService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+- [ ] T033 [US2] Create `AdminUserService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
   - searchUsers(email, name, joinDateFrom, joinDateTo, status, page, size) - with Soft Delete filtering
   - getUserProfile(userId) - returns UserSearchDTO with totalAnalysisCount
-  - Note: getMaskedEmail() 생성 제거. 이유: T007에서 DB 저장 시 이미 마스킹되므로 조회만 필요
 
 ### Controllers
 
-- [ ] T027 [US2] Create `AdminUserManagementController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [ ] T034 [US2] Create `AdminUserManagementController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - GET /admin/users (search + filter + pagination)
   - GET /admin/users/{id} (detail profile)
 
 ### Views & Templates
 
-- [ ] T028 [US2] Create user management template `admin/user-management.html` with:
+- [ ] T035 [US2] Create user management template `admin/user-management.html` with:
   - Search form (email, name, joinDate range picker, status dropdown)
   - User list table (pagination, sortable columns)
   - Detail profile modal (basic info, analysis count)
 
 ### Tests (Optional)
 
-- [ ] T029 [US2] Create `AdminUserServiceTest.java` testing:
+- [ ] T036 [US2] Create `AdminUserServiceTest.java` testing:
   - searchUsers() with various filter combinations
   - getUserProfile() with analysis count
-  - getMaskedEmail() uniqueness across multiple users
+  - Soft Delete filtering correctness
 
-- [ ] T030 [US2] Create `AdminUserManagementControllerTest.java` testing:
+- [ ] T037 [US2] Create `AdminUserManagementControllerTest.java` testing:
   - GET /admin/users response time < 2 seconds (1000 records)
   - Soft Delete filtering correctness
   - Pagination functionality
@@ -201,47 +263,47 @@
 
 ### Services
 
-- [ ] T031 [US3] Create `AdminAnalyticsService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+- [ ] T038 [US3] Create `AdminAnalyticsService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
   - getAnalyticsHistory(analysisType, dateFrom, dateTo, page, size) - returns paginated list with latest first
   - getAnalyticsDetail(analysisId) - returns AnalyticsDetailDTO with raw JSON data
   - validateJsonEncoding(jsonData) - checks UTF-8 Korean character rendering
 
-- [ ] T032 [US3] Create `AdminUsageAdjustmentService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+- [ ] T039 [US3] Create `AdminUsageAdjustmentService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
   - resetDailyUsage(userId, date) - sets UsageCount to 0
   - decrementDailyUsage(userId, date, amount) - decreases by amount with validation
 
 ### Controllers
 
-- [ ] T033 [US3] Create `AdminAnalyticsController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [ ] T040 [US3] Create `AdminAnalyticsController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - GET /admin/analytics (list with type/date filtering)
   - GET /admin/analytics/{id} (detail with JSON validation)
 
-- [ ] T034 [US3] Create `AdminUsageAdjustmentController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [ ] T041 [US3] Create `AdminUsageAdjustmentController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - POST /admin/daily-usages/users/{userId}/adjust (body: {"action": "RESET"} or {"action": "DECREMENT", "amount": N})
 
 ### Views & Templates
 
-- [ ] T035 [US3] Create analytics template `admin/analytics-history.html` with:
+- [ ] T042 [US3] Create analytics template `admin/analytics-history.html` with:
   - Analytics list table (type filter, date range picker, pagination)
   - Detail view modal (JSON display in code block with syntax highlighting)
   - Usage reset form (action dropdown + amount input + confirm modal)
 
 ### Tests (Optional)
 
-- [ ] T036 [US3] Create `AdminAnalyticsServiceTest.java` testing:
+- [ ] T043 [US3] Create `AdminAnalyticsServiceTest.java` testing:
   - getAnalyticsHistory() pagination and sorting
   - getAnalyticsDetail() JSON data integrity
   - validateJsonEncoding() with Korean characters
 
-- [ ] T037 [US3] Create `AdminUsageAdjustmentServiceTest.java` testing:
+- [ ] T044 [US3] Create `AdminUsageAdjustmentServiceTest.java` testing:
   - resetDailyUsage() with edge cases (already 0)
   - decrementDailyUsage() with validation (cannot go negative)
 
-- [ ] T038 [US3] Create `AdminAnalyticsControllerTest.java` testing:
+- [ ] T045 [US3] Create `AdminAnalyticsControllerTest.java` testing:
   - GET /admin/analytics response structure and pagination
   - GET /admin/analytics/{id} detail view with JSON validation
 
-- [ ] T038-B [US3] Create `AdminUsageAdjustmentControllerTest.java` testing:
+- [ ] T046 [US3] Create `AdminUsageAdjustmentControllerTest.java` testing:
   - POST /admin/daily-usages/users/{userId}/adjust with RESET action
   - POST /admin/daily-usages/users/{userId}/adjust with DECREMENT action and validation
 
@@ -258,33 +320,33 @@
 
 ### Services
 
-- [ ] T039 [US4] Create `AdminFeedbackService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+- [ ] T047 [US4] Create `AdminFeedbackService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
   - getFeedbackStats() - aggregates satisfaction scores by analysis type (SAJU, GWANWUN, GUNG_HAP)
   - getFeedbackList(analysisType, page, size) - returns paginated feedback with filtering
   - getFeedbackWithAnalysis(feedbackId) - returns linked analysis result for that feedback
 
 ### Controllers
 
-- [ ] T040 [US4] Create `AdminFeedbackController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [ ] T048 [US4] Create `AdminFeedbackController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - GET /admin/feedback (list with type filtering)
   - GET /admin/feedback/stats (satisfaction statistics)
   - GET /admin/feedback/{id}/analysis/{analysisId} (linked view)
 
 ### Views & Templates
 
-- [ ] T041 [US4] Create feedback template `admin/feedback-management.html` with:
+- [ ] T049 [US4] Create feedback template `admin/feedback-management.html` with:
   - Satisfaction stats section (average score by type, distribution chart)
   - Feedback list table (type filter, pagination, content preview)
   - Analysis result linked view (modal or new tab)
 
 ### Tests (Optional)
 
-- [ ] T042 [US4] Create `AdminFeedbackServiceTest.java` testing:
+- [ ] T050 [US4] Create `AdminFeedbackServiceTest.java` testing:
   - getFeedbackStats() calculation accuracy (average, distribution)
   - getFeedbackList() filtering and pagination
   - getFeedbackWithAnalysis() data linking correctness
 
-- [ ] T043 [US4] Create `AdminFeedbackControllerTest.java` testing:
+- [ ] T051 [US4] Create `AdminFeedbackControllerTest.java` testing:
   - GET /admin/feedback/stats response structure
   - GET /admin/feedback/{id}/analysis/{analysisId} linked data validation
 
@@ -294,51 +356,51 @@
 
 ### Error Handling & Validation
 
-- [ ] T044 Create global exception handler `AdminExceptionHandler.java` in `src/main/java/ssafy/SSAju/admin/config/` for:
+- [ ] T052 Create global exception handler `AdminExceptionHandler.java` in `src/main/java/ssafy/SSAju/admin/config/` for:
   - 404 (user/analysis not found)
   - 400 (invalid filter/page parameters)
   - 500 (database/service errors)
   - Proper JSON error responses
 
-- [ ] T045 Create input validation utilities in `src/main/java/ssafy/SSAju/admin/validation/`:
+- [ ] T053 Create input validation utilities in `src/main/java/ssafy/SSAju/admin/validation/`:
   - DateRangeValidator.java (from <= to)
   - PaginationValidator.java (page >= 0, size > 0)
   - FilterValidator.java (allowed enum values)
 
 ### Logging & Monitoring
 
-- [ ] T046 [P] Add structured logging to all admin services:
+- [ ] T054 [P] Add structured logging to all admin services:
   - Log incoming requests (user, filters, page)
   - Log query execution time (performance monitoring)
   - Log errors with context
 
-- [ ] T047 [P] Apply existing `@AuditLog` annotation to sensitive admin service methods for tracking:
+- [ ] T055 [P] Apply existing `@AuditLog` annotation to sensitive admin service methods for tracking:
   - Attach `@AuditLog` to `AdminUsageAdjustmentService.resetDailyUsage()` and `decrementDailyUsage()` methods
-  - Attach `@AuditLog` to critical admin search/filter operations (reuse existing AuditLoggingAspect - no new utility needed)
+  - Attach `@AuditLog` to admin login/logout operations
   - Logs include: action name, userId, status (SUCCESS|FAILURE), execution time
-  - Personal information (email, password) automatically excluded by existing aspect
 
 ### Performance & Caching
 
-- [ ] T048 Add query optimization:
+- [ ] T056 Add query optimization:
   - Verify indexes on SajuAnalysis (CreatedAt, AnalysisType, UserId)
   - Verify indexes on User (DeletedAt, Status)
   - Verify indexes on UserSatisfactionFeedback (CreatedAt, AnalysisType)
 
-- [ ] T049 [P] Implement result caching (optional, v1) for dashboard statistics:
+- [ ] T057 [P] Implement result caching (optional, v1) for dashboard statistics:
   - Cache dashboard data for 1 minute
   - Invalidate on new analysis creation
 
 ### Documentation & Testing
 
-- [ ] T050 Create integration test script `AdminDashboardFullIntegrationTest.java` covering:
-  - Complete user flows for each story
+- [ ] T058 Create integration test script `AdminDashboardFullIntegrationTest.java` covering:
+  - Complete user flows for each story (including US0 login)
   - Data consistency validation
   - Performance benchmarks (5s, 2s, 3s targets)
 
-- [ ] T051 Create Postman collection or curl examples for all admin APIs
+- [ ] T059 Create Postman collection or curl examples for all admin APIs including login
 
-- [ ] T052 Create admin page user guide in `docs/admin-guide.md`:
+- [ ] T060 Create admin page user guide in `docs/admin-guide.md`:
+  - Admin login flow
   - Dashboard interpretation
   - User management best practices
   - Troubleshooting common issues
@@ -350,14 +412,14 @@
 | Phase | Tasks | Focus |
 |-------|-------|-------|
 | **Phase 1** | T001-T011 | Setup, DTOs, Configuration |
-| **Phase 2** | T012-T017 | Data Access, Query Repositories |
-| **Phase 3 (US1)** | T018-T025 | Dashboard (P1) |
-| **Phase 4 (US2)** | T026-T030 | User Management (P1) |
-| **Phase 5 (US3)** | T031-T038 | Analytics & Usage (P2) |
-| **Phase 6 (US4)** | T039-T043 | Feedback & Stats (P2) |
-| **Phase 7** | T044-T052 | Polish, Logging, Docs |
+| **Phase 2** | T012-T025 | Data Access, Query Repositories, 관리자 로그인 (US0) |
+| **Phase 3 (US1)** | T026-T032 | Dashboard (P1) |
+| **Phase 4 (US2)** | T033-T037 | User Management (P1) |
+| **Phase 5 (US3)** | T038-T046 | Analytics & Usage (P2) |
+| **Phase 6 (US4)** | T047-T051 | Feedback & Stats (P2) |
+| **Phase 7** | T052-T060 | Polish, Logging, Docs |
 
-**Total Tasks**: 52 (31 Implementation + 21 Optional Tests)
+**Total Tasks**: 60 (40 Implementation + 20 Optional Tests)
 
 ---
 
@@ -366,10 +428,10 @@
 ```text
 Phase 1 (Setup) [Sequential - must complete first]
     ↓
-Phase 2 (Foundational) [Sequential - must complete first]
+Phase 2 (Foundational + US0 Login) [Sequential - must complete first]
     ↓
 ┌─────────────────────┬─────────────────────┐
-│  Phase 3 (US1)      │  Phase 4 (US2)      │  ← Parallel (P1 stories)
+│  Phase 3 (US1)      │  Phase 4 (US2)      │  ← Parallel (P1 stories, after US0 login)
 │  Dashborad          │  User Management    │
 └─────────────────────┴─────────────────────┘
     ↓
@@ -383,14 +445,15 @@ Phase 7 (Polish) [Final - performance, docs, testing]
 
 ---
 
-## MVP Checklist (Phase 3 Only)
+## MVP Checklist (US0 + Phase 3)
 
-- [ ] T018-T025 Admin Dashboard Service, Controller, Views, Tests
+- [ ] T018-T025 Admin Authentication Service, Controller, Views, Tests
+- [ ] T026-T032 Admin Dashboard Service, Controller, Views, Tests
 - [ ] T012-T014 Analytics Query Repository
 - [ ] Performance validation: Dashboard load time < 5 seconds
-- [ ] Independent test passing: Dashboard displays all 4 widgets correctly
+- [ ] Independent test passing: Admin login works + Dashboard displays all 4 widgets correctly
 
 ---
 
 **Status**: Ready for implementation
-**Next**: Begin Phase 1 tasks (T001-T011) or use this roadmap for team parallel work
+**Next**: Begin Phase 1 tasks (T001-T011) followed by Phase 2 including US0 Admin Login
