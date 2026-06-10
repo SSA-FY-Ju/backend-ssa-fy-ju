@@ -33,9 +33,9 @@ class AdminAuthenticationServiceTest {
     @InjectMocks
     private AdminAuthenticationService adminAuthenticationService;
 
-    private User buildUser(UserRole role) {
+    private User buildUser(String email, UserRole role) {
         return User.builder()
-                .email("admin@test.com")
+                .email(email)
                 .passwordHash("hashed")
                 .name("관리자")
                 .role(role)
@@ -49,7 +49,7 @@ class AdminAuthenticationServiceTest {
     @DisplayName("ADMIN 권한 사용자 + 올바른 비밀번호 → 정상 통과")
     void validateAdminCredentials_adminUser_success() {
         // Given
-        User adminUser = buildUser(UserRole.ADMIN);
+        User adminUser = buildUser("admin@test.com", UserRole.ADMIN);
         given(userRepository.findByEmail("admin@test.com")).willReturn(Optional.of(adminUser));
         given(passwordEncoder.matches("password", "hashed")).willReturn(true);
 
@@ -62,7 +62,7 @@ class AdminAuthenticationServiceTest {
     @DisplayName("USER 권한 사용자 → AUTH-003 예외 발생")
     void validateAdminCredentials_userRole_throwsAuthException() {
         // Given
-        User normalUser = buildUser(UserRole.USER);
+        User normalUser = buildUser("user@test.com", UserRole.USER);
         given(userRepository.findByEmail("user@test.com")).willReturn(Optional.of(normalUser));
         given(passwordEncoder.matches("password", "hashed")).willReturn(true);
 
@@ -88,7 +88,7 @@ class AdminAuthenticationServiceTest {
     @DisplayName("비밀번호 불일치 → 자격증명 불일치 예외 발생")
     void validateAdminCredentials_wrongPassword_throwsAuthException() {
         // Given
-        User adminUser = buildUser(UserRole.ADMIN);
+        User adminUser = buildUser("admin@test.com", UserRole.ADMIN);
         given(userRepository.findByEmail("admin@test.com")).willReturn(Optional.of(adminUser));
         given(passwordEncoder.matches("wrong", "hashed")).willReturn(false);
 

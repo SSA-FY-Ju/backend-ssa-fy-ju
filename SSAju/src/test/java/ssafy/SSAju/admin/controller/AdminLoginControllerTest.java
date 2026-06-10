@@ -16,11 +16,16 @@ import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.service.AuthService;
 import ssafy.SSAju.util.JwtUtil;
 
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -116,5 +121,46 @@ class AdminLoginControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/login"))
                 .andExpect(model().attribute("errorMessage", "이메일 또는 비밀번호가 일치하지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("POST /admin/logout - 인증된 사용자 → authService.logout 호출 후 login 리다이렉트")
+    void logout_authenticatedUser_callsLogoutAndRedirects() throws Exception {
+        // Given
+        var auth = new UsernamePasswordAuthenticationToken(1L, null, java.util.List.of());
+        willDoNothing().given(authService).logout(any(), any());
+
+        // When & Then
+        mockMvc.perform(post("/admin/logout").principal(auth))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/login"));
+
+        verify(authService).logout(any(), any());
+    }
+
+    @Test
+    @DisplayName("POST /admin/logout - 인증 없음 → authService.logout 미호출, login 리다이렉트")
+    void logout_unauthenticated_skipsLogoutAndRedirects() throws Exception {
+        // When & Then (principal 없음 → authentication = null)
+        mockMvc.perform(post("/admin/logout"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/login"));
+
+        verify(authService, never()).logout(any(), any());
+    }
+
+    @Test
+    @DisplayName("POST /admin/logout - refresh token 쿠키 없음 → authService.logout(userId, null) 호출")
+    void logout_withoutRefreshTokenCookie_callsLogoutWithNull() throws Exception {
+        // Given (refresh token 쿠키 미전송)
+        var auth = new UsernamePasswordAuthenticationToken(1L, null, java.util.List.of());
+        willDoNothing().given(authService).logout(any(), isNull());
+
+        // When & Then
+        mockMvc.perform(post("/admin/logout").principal(auth))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/login"));
+
+        verify(authService).logout(1L, null);
     }
 }
