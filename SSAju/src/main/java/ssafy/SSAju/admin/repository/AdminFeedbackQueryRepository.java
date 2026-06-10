@@ -39,7 +39,7 @@ public class AdminFeedbackQueryRepository {
             countQuery.setParameter("type", feedbackType);
         }
 
-        query.setFirstResult((int) pageable.getOffset());
+        query.setFirstResult(Math.toIntExact(pageable.getOffset()));
         query.setMaxResults(pageable.getPageSize());
 
         List<FeedbackListDTO> content = query.getResultList().stream()
