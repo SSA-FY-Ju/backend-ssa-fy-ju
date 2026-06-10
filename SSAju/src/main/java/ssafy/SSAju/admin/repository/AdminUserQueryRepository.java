@@ -53,7 +53,23 @@ public class AdminUserQueryRepository {
             params.add(status.name());
         }
 
-        String base = "SELECT u.id, u.email, u.name, u.status, u.created_at, u.deleted_at FROM users u" + where;
+        String base = """
+                SELECT u.id, u.email, u.name, u.status, u.created_at, u.deleted_at,
+                       COALESCE(ac.total, 0) AS total_analysis_count
+                FROM users u
+                LEFT JOIN (
+                    SELECT user_id, COUNT(*) AS total
+                    FROM (
+                        SELECT user_id FROM saju_result
+                        UNION ALL
+                        SELECT sr.user_id FROM career_consultation cc
+                            JOIN saju_result sr ON cc.saju_result_id = sr.id
+                        UNION ALL
+                        SELECT user_id FROM company_compatibility
+                    ) all_analyses
+                    GROUP BY user_id
+                ) ac ON u.id = ac.user_id
+                """ + where;
         String countSql = "SELECT COUNT(*) FROM (" + base + ") cnt";
         Long total = jdbcTemplate.queryForObject(countSql, Long.class, params.toArray());
 
@@ -69,7 +85,7 @@ public class AdminUserQueryRepository {
                 rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null,
                 UserStatus.valueOf(rs.getString("status")),
                 rs.getTimestamp("deleted_at") != null ? rs.getTimestamp("deleted_at").toInstant() : null,
-                0L
+                rs.getLong("total_analysis_count")
         ), listParams.toArray());
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
