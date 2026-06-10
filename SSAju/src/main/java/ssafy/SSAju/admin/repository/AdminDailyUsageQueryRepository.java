@@ -44,6 +44,7 @@ public class AdminDailyUsageQueryRepository {
     }
 
     public int decrementDailyUsage(Long userId, LocalDate date, int amount) {
+        if (amount <= 0) return 0;
         return em.createQuery(
                         "UPDATE DailyApiUsage d SET d.requestCount = GREATEST(0, d.requestCount - :amount) " +
                         "WHERE d.user.id = :userId AND d.usageDate = :date")
