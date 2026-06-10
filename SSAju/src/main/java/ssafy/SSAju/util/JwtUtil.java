@@ -93,6 +93,10 @@ public class JwtUtil {
         return accessTokenExpirationMs / 1000;
     }
 
+    public long getRefreshTokenExpirationSeconds() {
+        return refreshTokenExpirationMs / 1000;
+    }
+
     private String buildTokenWithRole(Long userId, String email, String role, String type, long expirationMs) {
         // Instant 기반으로 생성하여 타임존 독립성 보장 (M-7).
         Instant nowInstant = Instant.now();

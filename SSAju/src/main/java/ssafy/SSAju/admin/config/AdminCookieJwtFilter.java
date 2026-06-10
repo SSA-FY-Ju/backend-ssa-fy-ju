@@ -7,8 +7,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -31,14 +32,20 @@ import java.util.List;
  * Authorization 헤더가 있으면 헤더를 우선 사용합니다 (AJAX 지원).
  */
 @Slf4j
-@RequiredArgsConstructor
 public class AdminCookieJwtFilter extends OncePerRequestFilter {
 
     public static final String ADMIN_TOKEN_COOKIE = "admin_access_token";
+    public static final String ADMIN_REFRESH_TOKEN_COOKIE = "admin_refresh_token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtUtil jwtUtil;
+    private final boolean cookieSecure;
+
+    public AdminCookieJwtFilter(JwtUtil jwtUtil, boolean cookieSecure) {
+        this.jwtUtil = jwtUtil;
+        this.cookieSecure = cookieSecure;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -108,10 +115,13 @@ public class AdminCookieJwtFilter extends OncePerRequestFilter {
     }
 
     private void clearAdminCookie(HttpServletResponse response) {
-        Cookie expired = new Cookie(ADMIN_TOKEN_COOKIE, "");
-        expired.setMaxAge(0);
-        expired.setPath("/admin");
-        expired.setHttpOnly(true);
-        response.addCookie(expired);
+        ResponseCookie expired = ResponseCookie.from(ADMIN_TOKEN_COOKIE, "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path("/admin")
+                .maxAge(0)
+                .sameSite("Strict")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, expired.toString());
     }
 }

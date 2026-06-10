@@ -1,6 +1,7 @@
 package ssafy.SSAju.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -26,10 +27,13 @@ public class AdminSecurityConfig {
     private final AdminAuthenticationEntryPoint adminAuthenticationEntryPoint;
     private final AdminAccessDeniedHandler adminAccessDeniedHandler;
 
+    @Value("${server.cookie.secure:true}")
+    private boolean cookieSecure;
+
     @Bean
     public SecurityFilterChain adminFilterChain(HttpSecurity http, JwtUtil jwtUtil,
                                                 ObjectMapper objectMapper) throws Exception {
-        AdminCookieJwtFilter cookieJwtFilter = new AdminCookieJwtFilter(jwtUtil);
+        AdminCookieJwtFilter cookieJwtFilter = new AdminCookieJwtFilter(jwtUtil, cookieSecure);
 
         http
             .securityMatcher("/admin/**")

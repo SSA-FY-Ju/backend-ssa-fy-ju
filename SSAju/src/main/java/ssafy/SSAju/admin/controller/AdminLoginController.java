@@ -1,18 +1,20 @@
 package ssafy.SSAju.admin.controller;
 
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import ssafy.SSAju.admin.config.AdminCookieJwtFilter;
 import ssafy.SSAju.admin.dto.AdminLoginRequestDTO;
@@ -24,6 +26,8 @@ import ssafy.SSAju.service.AuthService;
 import ssafy.SSAju.util.ClientIpUtil;
 import ssafy.SSAju.util.JwtUtil;
 
+import java.util.Arrays;
+
 @Slf4j
 @Controller
 @RequestMapping("/admin")
@@ -34,6 +38,9 @@ public class AdminLoginController {
     private final AuthService authService;
     private final JwtUtil jwtUtil;
 
+    @Value("${server.cookie.secure:true}")
+    private boolean cookieSecure;
+
     @GetMapping("/login")
     public String loginForm(Model model) {
         model.addAttribute("loginRequest", new AdminLoginRequestDTO("", ""));
@@ -42,9 +49,15 @@ public class AdminLoginController {
 
     @PostMapping("/login")
     public String login(@Valid @ModelAttribute AdminLoginRequestDTO loginRequest,
+                        BindingResult bindingResult,
                         Model model,
                         HttpServletRequest request,
                         HttpServletResponse response) {
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("loginRequest", loginRequest);
+            return "admin/login";
+        }
+
         try {
             adminAuthenticationService.validateAdminCredentials(loginRequest.email(), loginRequest.password());
 
@@ -52,14 +65,21 @@ public class AdminLoginController {
             String clientIp = ClientIpUtil.getClientIp(request);
             AuthTokenPair tokenPair = authService.login(authRequest, clientIp);
 
-            // SSR 페이지에서 사용할 HttpOnly 쿠키에 AccessToken 저장
-            Cookie adminCookie = new Cookie(AdminCookieJwtFilter.ADMIN_TOKEN_COOKIE, tokenPair.accessToken());
-            adminCookie.setHttpOnly(true);
-            adminCookie.setPath("/admin");
-            adminCookie.setMaxAge((int) jwtUtil.getAccessTokenExpirationSeconds());
-            response.addCookie(adminCookie);
+            response.addHeader(HttpHeaders.SET_COOKIE, buildCookie(
+                    AdminCookieJwtFilter.ADMIN_TOKEN_COOKIE,
+                    tokenPair.accessToken(),
+                    "/admin",
+                    jwtUtil.getAccessTokenExpirationSeconds()
+            ).toString());
 
-            log.info("관리자 로그인 완료: email={}", loginRequest.email());
+            response.addHeader(HttpHeaders.SET_COOKIE, buildCookie(
+                    AdminCookieJwtFilter.ADMIN_REFRESH_TOKEN_COOKIE,
+                    tokenPair.refreshTokenValue(),
+                    "/admin",
+                    jwtUtil.getRefreshTokenExpirationSeconds()
+            ).toString());
+
+            log.info("관리자 로그인 완료");
             return "redirect:/admin/dashboard";
 
         } catch (AuthException e) {
@@ -71,20 +91,49 @@ public class AdminLoginController {
 
     @PostMapping("/logout")
     public String logout(Authentication authentication,
-                         @RequestHeader(value = "Refresh-Token", required = false) String refreshToken,
+                         HttpServletRequest request,
                          HttpServletResponse response) {
         if (authentication != null) {
             Long userId = (Long) authentication.getPrincipal();
+
+            String refreshToken = extractCookieValue(request, AdminCookieJwtFilter.ADMIN_REFRESH_TOKEN_COOKIE);
             authService.logout(userId, refreshToken);
         }
 
-        // 쿠키 삭제
-        Cookie expired = new Cookie(AdminCookieJwtFilter.ADMIN_TOKEN_COOKIE, "");
-        expired.setMaxAge(0);
-        expired.setPath("/admin");
-        expired.setHttpOnly(true);
-        response.addCookie(expired);
+        response.addHeader(HttpHeaders.SET_COOKIE, expireCookie(
+                AdminCookieJwtFilter.ADMIN_TOKEN_COOKIE, "/admin").toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, expireCookie(
+                AdminCookieJwtFilter.ADMIN_REFRESH_TOKEN_COOKIE, "/admin").toString());
 
         return "redirect:/admin/login";
+    }
+
+    private ResponseCookie buildCookie(String name, String value, String path, long maxAge) {
+        return ResponseCookie.from(name, value)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path(path)
+                .maxAge(maxAge)
+                .sameSite("Strict")
+                .build();
+    }
+
+    private ResponseCookie expireCookie(String name, String path) {
+        return ResponseCookie.from(name, "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path(path)
+                .maxAge(0)
+                .sameSite("Strict")
+                .build();
+    }
+
+    private String extractCookieValue(HttpServletRequest request, String name) {
+        if (request.getCookies() == null) return null;
+        return Arrays.stream(request.getCookies())
+                .filter(c -> name.equals(c.getName()))
+                .map(c -> c.getValue())
+                .findFirst()
+                .orElse(null);
     }
 }
