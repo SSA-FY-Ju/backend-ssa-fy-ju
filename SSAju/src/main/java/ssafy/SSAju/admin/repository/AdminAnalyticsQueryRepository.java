@@ -68,6 +68,7 @@ public class AdminAnalyticsQueryRepository {
     }
 
     public Optional<AnalyticsDetailDTO> findAnalyticsById(Long id, String analysisType) {
+        if (analysisType == null) return Optional.empty();
         return switch (analysisType) {
             case SAJU -> findSajuDetail(id);
             case CAREER_CONSULTATION -> findConsultationDetail(id);
@@ -122,19 +123,26 @@ public class AdminAnalyticsQueryRepository {
     }
 
     private Optional<AnalyticsDetailDTO> findSajuDetail(Long id) {
-        String sql = "SELECT sr.id, sr.user_id, sr.fetched_at AS created_at FROM saju_result sr WHERE sr.id = ?";
+        String sql = """
+                SELECT sr.id, sr.user_id,
+                       CONCAT(sfd.year_pillar, sfd.month_pillar, sfd.day_pillar, sfd.hour_pillar) AS json_data,
+                       sr.fetched_at AS created_at
+                FROM saju_result sr
+                LEFT JOIN saju_full_data sfd ON sfd.saju_result_id = sr.id
+                WHERE sr.id = ?
+                """;
         return jdbcTemplate.query(sql, (rs, rowNum) -> new AnalyticsDetailDTO(
                 rs.getLong("id"),
                 rs.getLong("user_id"),
                 SAJU,
-                null,
+                rs.getString("json_data"),
                 rs.getTimestamp("created_at").toInstant()
         ), id).stream().findFirst();
     }
 
     private Optional<AnalyticsDetailDTO> findConsultationDetail(Long id) {
         String sql = """
-                SELECT cc.id, sr.user_id, cc.generated_at AS created_at
+                SELECT cc.id, sr.user_id, cc.day_master_description AS json_data, cc.generated_at AS created_at
                 FROM career_consultation cc
                 JOIN saju_result sr ON cc.saju_result_id = sr.id
                 WHERE cc.id = ?
@@ -143,18 +151,22 @@ public class AdminAnalyticsQueryRepository {
                 rs.getLong("id"),
                 rs.getLong("user_id"),
                 CAREER_CONSULTATION,
-                null,
+                rs.getString("json_data"),
                 rs.getTimestamp("created_at").toInstant()
         ), id).stream().findFirst();
     }
 
     private Optional<AnalyticsDetailDTO> findCompatibilityDetail(Long id) {
-        String sql = "SELECT id, user_id, created_at FROM company_compatibility WHERE id = ?";
+        String sql = """
+                SELECT id, user_id, summary AS json_data, created_at
+                FROM company_compatibility
+                WHERE id = ?
+                """;
         return jdbcTemplate.query(sql, (rs, rowNum) -> new AnalyticsDetailDTO(
                 rs.getLong("id"),
                 rs.getLong("user_id"),
                 COMPANY_COMPATIBILITY,
-                null,
+                rs.getString("json_data"),
                 rs.getTimestamp("created_at").toInstant()
         ), id).stream().findFirst();
     }
