@@ -3,17 +3,15 @@ package ssafy.SSAju.admin.repository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import ssafy.SSAju.admin.service.AdminBaseService;
 import ssafy.SSAju.entity.DailyApiUsage;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
 public class AdminDailyUsageQueryRepository {
-
-    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
     private final EntityManager em;
 

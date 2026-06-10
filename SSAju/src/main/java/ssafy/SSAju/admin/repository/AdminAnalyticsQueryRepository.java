@@ -5,9 +5,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
+import ssafy.SSAju.admin.service.AdminBaseService;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +18,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class AdminAnalyticsQueryRepository {
 
-    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final String SAJU = "SAJU";
     private static final String CAREER_CONSULTATION = "CAREER_CONSULTATION";
     private static final String COMPANY_COMPATIBILITY = "COMPANY_COMPATIBILITY";
@@ -52,8 +51,8 @@ public class AdminAnalyticsQueryRepository {
 
     public List<AnalyticsListDTO> findAnalyticsByDateAndType(
             String analysisType, LocalDate dateFrom, LocalDate dateTo, int page, int size) {
-        var fromInstant = dateFrom.atStartOfDay(SEOUL).toInstant();
-        var toInstant = dateTo.plusDays(1).atStartOfDay(SEOUL).toInstant();
+        var fromInstant = dateFrom.atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
+        var toInstant = dateTo.plusDays(1).atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
         int offset = page * size;
 
         String sql = buildListSql(analysisType);
@@ -78,8 +77,8 @@ public class AdminAnalyticsQueryRepository {
     }
 
     public Map<String, Long> findDailyAnalysisSummary(LocalDate date) {
-        var fromInstant = date.atStartOfDay(SEOUL).toInstant();
-        var toInstant = date.plusDays(1).atStartOfDay(SEOUL).toInstant();
+        var fromInstant = date.atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
+        var toInstant = date.plusDays(1).atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
 
         Map<String, Long> result = new HashMap<>();
         result.put(SAJU, countSaju(fromInstant, toInstant));
