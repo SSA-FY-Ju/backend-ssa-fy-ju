@@ -34,29 +34,29 @@
 
 ### Project Structure & Configuration
 
-- [ ] T001 Create admin module package structure in `src/main/java/ssafy/SSAju/admin/` with subdirectories (controller, service, dto, repository, config)
+- [x] T001 Create admin module package structure in `src/main/java/ssafy/SSAju/admin/` with subdirectories (controller, service, dto, repository, config)
 
-- [ ] T002 Create Thymeleaf template directory structure in `src/main/resources/templates/admin/` with layout subdirectory
+- [x] T002 Create Thymeleaf template directory structure in `src/main/resources/templates/admin/` with layout subdirectory
 
-- [ ] T003 [P] Create test package structure in `src/test/java/ssafy/SSAju/admin/` with controller, service, integration subdirectories
+- [x] T003 [P] Create test package structure in `src/test/java/ssafy/SSAju/admin/` with controller, service, integration subdirectories
 
-- [ ] T004 [P] Create base application-admin.yaml configuration for admin module (logging, pagination defaults) in `src/main/resources/`
+- [x] T004 [P] Create base application-admin.yaml configuration for admin module (logging, pagination defaults) in `src/main/resources/`
 
 ### DTO & Common Classes
 
-- [ ] T005 [P] Create `DashboardDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: totalAnalysis, analysisTypeBreakdown, dailyLimitExhaustedCount, feedbackSummary
+- [x] T005 [P] Create `DashboardDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: totalAnalysis, analysisTypeBreakdown, dailyLimitExhaustedCount, feedbackSummary
 
-- [ ] T006 [P] Create `UserSearchDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, email, name, joinDate, status, deletedAt, totalAnalysisCount
+- [x] T006 [P] Create `UserSearchDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, email, name, joinDate, status, deletedAt, totalAnalysisCount
 
-- [ ] T007 [P] Create `AnalyticsListDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, analysisType, createdAt
+- [x] T007 [P] Create `AnalyticsListDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, analysisType, createdAt
 
-- [ ] T008 [P] Create `AnalyticsDetailDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, analysisType, jsonData, createdAt
+- [x] T008 [P] Create `AnalyticsDetailDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, analysisType, jsonData, createdAt
 
-- [ ] T009 [P] Create `FeedbackListDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, feedbackContent, satisfactionScore, analysisType, createdAt
+- [x] T009 [P] Create `FeedbackListDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: id, userId, feedbackContent, satisfactionScore, analysisType, createdAt
 
-- [ ] T010 [P] Create `FeedbackStatDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: satisCountBySajuType, averageScore, totalFeedbackCount
+- [x] T010 [P] Create `FeedbackStatDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with fields: satisCountBySajuType, averageScore, totalFeedbackCount
 
-- [ ] T011 [P] Create `AdminLoginRequestDTO.java` and `AdminLoginResponseDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with JWT token fields
+- [x] T011 [P] Create `AdminLoginRequestDTO.java` and `AdminLoginResponseDTO.java` in `src/main/java/ssafy/SSAju/admin/dto/` with JWT token fields
 
 ---
 
@@ -64,30 +64,30 @@
 
 ### Custom Query Repositories
 
-- [ ] T012 Create custom query repository `AdminAnalyticsQueryRepository.java` in `src/main/java/ssafy/SSAju/admin/repository/` with methods:
+- [x] T012 Create custom query repository `AdminAnalyticsQueryRepository.java` in `src/main/java/ssafy/SSAju/admin/repository/` with methods:
   - findAnalyticsByDateAndType (with pagination)
   - findAnalyticsById (with JSON validation)
   - findDailyAnalysisSummary (for dashboard aggregation)
 
-- [ ] T013 Create custom query repository `AdminFeedbackQueryRepository.java` in `src/main/java/ssafy/SSAju/admin/repository/` with methods:
+- [x] T013 Create custom query repository `AdminFeedbackQueryRepository.java` in `src/main/java/ssafy/SSAju/admin/repository/` with methods:
   - findFeedbackByTypeAndDate (with pagination)
   - findFeedbackStatsByAnalysisType (for statistics)
   - findFeedbackWithAnalysis (for linked views)
 
-- [ ] T014 Create custom query repository `AdminUserQueryRepository.java` in `src/main/java/ssafy/SSAju/admin/repository/` with methods:
+- [x] T014 Create custom query repository `AdminUserQueryRepository.java` in `src/main/java/ssafy/SSAju/admin/repository/` with methods:
   - findUsersByFilters (email, name, joinDate, status with pagination)
   - findUserById (with analysis count)
   - findDeletedUsers (Soft Delete filtering)
 
-- [ ] T015 Create custom query repository `AdminDailyUsageQueryRepository.java` in `src/main/java/ssafy/SSAju/admin/repository/` with methods:
+- [x] T015 Create custom query repository `AdminDailyUsageQueryRepository.java` in `src/main/java/ssafy/SSAju/admin/repository/` with methods:
   - findUsageByUserAndDate
   - updateUsageCount (for reset/decrement operations)
 
 ### Service Layer Base Classes
 
-- [ ] T016 Create base admin service class `AdminBaseService.java` in `src/main/java/ssafy/SSAju/admin/service/` with utility methods (timezone handling, pagination, error handling)
+- [x] T016 Create base admin service class `AdminBaseService.java` in `src/main/java/ssafy/SSAju/admin/service/` with utility methods (timezone handling, pagination, error handling)
 
-- [ ] T017 Create pagination utility `AdminPaginationUtil.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods for page size validation, offset calculation
+- [x] T017 Create pagination utility `AdminPaginationUtil.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods for page size validation, offset calculation
 
 ### User Story 0: 관리자 로그인 (Priority: P0) ⚠️ 필수 선행
 
@@ -104,14 +104,14 @@
 
 **의도 변경**: 독립적인 토큰 생성 서비스 제거 → 기존 AuthService 재사용 (DRY 원칙)
 
-- [ ] **T018-A** [US0] Create `AdminAuthenticationService.java` in `src/main/java/ssafy/SSAju/admin/service/` with **single method**:
+- [x] **T018-A** [US0] Create `AdminAuthenticationService.java` in `src/main/java/ssafy/SSAju/admin/service/` with **single method**:
   - `validateAdminCredentials(email, password)` 
     - ROLE=ADMIN 사용자만 검증
     - DB에서 사용자 조회 후 role 확인
     - 비관리자 사용자는 예외 발생: `AUTH-003 ("접근 권한이 없습니다.")`
   - **주의**: JWT 토큰 생성/검증/무효화는 기존 AuthService 재사용
 
-- [ ] **T018-B** [US0] Modify existing `AuthService.login()`:
+- [x] **T018-B** [US0] Modify existing `AuthService.login()`:
   - admin 로그인 요청도 동일하게 처리
   - AdminAuthenticationService.validateAdminCredentials() 먼저 호출해서 ROLE_ADMIN 여부 검증
   - 검증 통과 후 기존 로직으로 JWT 토큰 생성 (AccessToken + RefreshToken)
@@ -119,7 +119,7 @@
 
 ### Controllers
 
-- [ ] **T019** [US0] Create `AdminLoginController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [x] **T019** [US0] Create `AdminLoginController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - `GET /admin/login` → render login form (Thymeleaf)
   - `POST /admin/login` → call AdminAuthenticationService.validateAdminCredentials() 후 AuthService.login() 재사용
     - 성공: AccessToken + RefreshToken 발급, 프론트엔드는 /admin/dashboard로 리다이렉트 처리
@@ -132,9 +132,9 @@
 
 ### Views & Templates
 
-- [ ] T020 [US0] Create Thymeleaf layout base template `admin/layout/admin-base.html` with header, sidebar, footer structure
+- [x] T020 [US0] Create Thymeleaf layout base template `admin/layout/admin-base.html` with header, sidebar, footer structure
 
-- [ ] T021 [US0] Create Thymeleaf admin login template `admin/login.html` with:
+- [x] T021 [US0] Create Thymeleaf admin login template `admin/login.html` with:
   - Email/password input form
   - Error message display (invalid credentials, role denied)
   - Submit button with loading state
@@ -144,7 +144,7 @@
 
 **주의**: Stateless JWT + SSR 리다이렉트 혼합 구조
 
-- [ ] **T022** [US0] Create/Update `AdminSecurityConfig.java` in `src/main/java/ssafy/SSAju/config/` (@Order(0) 으로 전역 SecurityConfig 보다 먼저 적용):
+- [x] **T022** [US0] Create/Update `AdminSecurityConfig.java` in `src/main/java/ssafy/SSAju/config/` (@Order(0) 으로 전역 SecurityConfig 보다 먼저 적용):
   - `/admin/**` 경로에만 적용되는 전용 SecurityFilterChain
   - @PreAuthorize("hasRole('ADMIN')") on all /admin/** endpoints
   - Configure login page: `/admin/login`
@@ -156,7 +156,7 @@
   - Custom AuthenticationEntryPoint: 비인증 요청 처리
   - Custom AccessDeniedHandler: 비관리자 요청 처리 (아래 T023 참고)
 
-- [ ] **T023** [US0] Create `AdminAuthenticationEntryPoint.java` + `AdminAccessDeniedHandler.java` in `src/main/java/ssafy/SSAju/admin/config/`:
+- [x] **T023** [US0] Create `AdminAuthenticationEntryPoint.java` + `AdminAccessDeniedHandler.java` in `src/main/java/ssafy/SSAju/admin/config/`:
 
   **AdminAuthenticationEntryPoint.java** (비인증 요청 401):
   ```java
@@ -192,13 +192,13 @@
 
 ### Tests (Optional - JUnit 5 + Mockito)
 
-- [ ] **T024** [US0] Create `AdminAuthenticationServiceTest.java` in `src/test/java/ssafy/SSAju/admin/service/` testing:
+- [x] **T024** [US0] Create `AdminAuthenticationServiceTest.java` in `src/test/java/ssafy/SSAju/admin/service/` testing:
   - validateAdminCredentials() with ADMIN role → 성공
   - validateAdminCredentials() with USER role → AUTH-003 예외 발생
   - validateAdminCredentials() with invalid credentials → 적절한 예외 발생
   - ⚠️ JWT 생성/검증 테스트 제거 (AuthService 테스트 대신)
 
-- [ ] **T025** [US0] Create `AdminLoginControllerTest.java` in `src/test/java/ssafy/SSAju/admin/controller/` testing:
+- [x] **T025** [US0] Create `AdminLoginControllerTest.java` in `src/test/java/ssafy/SSAju/admin/controller/` testing:
   - GET /admin/login form rendering (Thymeleaf 확인)
   - POST /admin/login with valid ADMIN credentials → AuthService.login() 호출, token issued
   - POST /admin/login with USER credentials → AUTH-003 에러 응답 + 폼 재렌더링
