@@ -98,7 +98,7 @@ class CareerApiIntegrationTest {
                 .termsAgreedAt(Instant.now())
                 .privacyAgreedAt(Instant.now())
                 .build());
-        String token = jwtUtil.generateAccessToken(testUser.getId(), testUser.getEmail());
+        String token = jwtUtil.generateAccessToken(testUser.getId(), testUser.getEmail(), testUser.getRole().name());
         authHeader = "Bearer " + token;
 
         // FastAPI stub: 실제 사주 데이터 형태로 구성

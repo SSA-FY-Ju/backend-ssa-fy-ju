@@ -76,7 +76,7 @@ class AuthServiceTest {
         // Given
         String tokenValue = "valid-refresh-token";
         given(refreshTokenRepository.findByTokenHash(anyString())).willReturn(Optional.of(validRefreshToken));
-        given(jwtUtil.generateAccessToken(1L, "test@test.com")).willReturn("new-access-token");
+        given(jwtUtil.generateAccessToken(1L, "test@test.com", "USER")).willReturn("new-access-token");
         given(jwtUtil.getAccessTokenExpirationSeconds()).willReturn(3600L);
 
         // When

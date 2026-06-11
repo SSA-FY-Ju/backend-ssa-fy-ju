@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle} ?: 'SSAju 관리자'">SSAju 관리자</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #f5f5f5; display: flex; min-height: 100vh; }
+        .sidebar { width: 240px; background: #1a1a2e; color: #eee; padding: 24px 0; flex-shrink: 0; }
+        .sidebar .brand { padding: 0 24px 24px; font-size: 1.2rem; font-weight: bold; color: #e94560; border-bottom: 1px solid #333; }
+        .sidebar nav ul { list-style: none; margin-top: 16px; }
+        .sidebar nav ul li a { display: block; padding: 12px 24px; color: #ccc; text-decoration: none; transition: background 0.2s; }
+        .sidebar nav ul li a:hover, .sidebar nav ul li a.active { background: #16213e; color: #fff; border-left: 3px solid #e94560; }
+        .main-wrapper { flex: 1; display: flex; flex-direction: column; }
+        .header { background: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 1.1rem; color: #333; }
+        .header .logout-btn { background: #e94560; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        .content { flex: 1; padding: 24px; }
+        .footer { background: #fff; text-align: center; padding: 12px; font-size: 0.8rem; color: #999; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="brand">SSAju Admin</div>
+    <nav>
+        <ul>
+            <li><a th:href="@{/admin/dashboard}" th:classappend="${currentMenu == 'dashboard'} ? 'active'">대시보드</a></li>
+            <li><a th:href="@{/admin/users}" th:classappend="${currentMenu == 'users'} ? 'active'">유저 관리</a></li>
+            <li><a th:href="@{/admin/analytics}" th:classappend="${currentMenu == 'analytics'} ? 'active'">분석 기록</a></li>
+            <li><a th:href="@{/admin/feedback}" th:classappend="${currentMenu == 'feedback'} ? 'active'">피드백 관리</a></li>
+        </ul>
+    </nav>
+</div>
+<div class="main-wrapper">
+    <div class="header">
+        <h1 th:text="${pageTitle} ?: '관리자 대시보드'">관리자 대시보드</h1>
+        <form th:action="@{/admin/logout}" method="post" style="display:inline;">
+            <button type="submit" class="logout-btn">로그아웃</button>
+        </form>
+    </div>
+    <div class="content" th:fragment="content">
+        <!-- 각 페이지에서 override -->
+    </div>
+    <div class="footer">
+        &copy; 2026 SSAju Admin System
+    </div>
+</div>
+</body>
+</html>

@@ -169,7 +169,7 @@ public class AuthService {
             throw new AuthException("이메일 또는 비밀번호가 일치하지 않습니다.");
         }
 
-        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail());
+        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
         String refreshTokenValue = jwtUtil.generateRefreshToken(user.getId());
 
         RefreshToken refreshToken = RefreshToken.builder()
@@ -281,7 +281,7 @@ public class AuthService {
         }
 
         User user = refreshToken.getUser();
-        String newAccessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail());
+        String newAccessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
 
         log.info("AccessToken 갱신 완료: userId={}", user.getId());
         return new AuthTokenPair(newAccessToken, refreshTokenValue, jwtUtil.getAccessTokenExpirationSeconds());
