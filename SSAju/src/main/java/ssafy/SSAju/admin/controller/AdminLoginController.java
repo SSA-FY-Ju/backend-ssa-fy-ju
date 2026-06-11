@@ -92,13 +92,9 @@ public class AdminLoginController {
     public String logout(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = extractCookieValue(request, AdminCookieJwtFilter.ADMIN_REFRESH_TOKEN_COOKIE);
         if (refreshToken != null) {
-            try {
-                Long userId = jwtUtil.extractUserId(refreshToken);
-                if (userId != null) {
-                    authService.logout(userId, refreshToken);
-                }
-            } catch (Exception e) {
-                log.warn("로그아웃 토큰 처리 실패: {}", e.getMessage());
+            Long userId = jwtUtil.extractUserId(refreshToken);
+            if (userId != null) {
+                authService.logout(userId, refreshToken);
             }
         }
 
