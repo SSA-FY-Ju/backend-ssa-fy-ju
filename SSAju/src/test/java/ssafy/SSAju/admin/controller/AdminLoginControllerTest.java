@@ -79,6 +79,7 @@ class AdminLoginControllerTest {
         given(authService.login(any(), anyString()))
                 .willReturn(new AuthTokenPair("access-token", "refresh-token", 3600L));
         given(jwtUtil.getAccessTokenExpirationSeconds()).willReturn(3600L);
+        given(jwtUtil.getRefreshTokenExpirationSeconds()).willReturn(7200L);
 
         // When & Then
         mockMvc.perform(post("/admin/login")
@@ -88,7 +89,10 @@ class AdminLoginControllerTest {
                 .andExpect(redirectedUrl("/admin/dashboard"))
                 .andExpect(cookie().exists("admin_access_token"))
                 .andExpect(cookie().httpOnly("admin_access_token", true))
-                .andExpect(cookie().path("admin_access_token", "/admin"));
+                .andExpect(cookie().path("admin_access_token", "/admin"))
+                .andExpect(cookie().exists("admin_refresh_token"))
+                .andExpect(cookie().httpOnly("admin_refresh_token", true))
+                .andExpect(cookie().path("admin_refresh_token", "/admin"));
     }
 
     @Test
