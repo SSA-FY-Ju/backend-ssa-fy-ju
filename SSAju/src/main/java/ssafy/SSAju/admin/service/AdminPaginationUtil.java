@@ -21,6 +21,7 @@ public class AdminPaginationUtil {
 
     public Pageable ofDefault(int page) {
         int defaultSize = adminConfig.getPagination().getDefaultPageSize();
-        return PageRequest.of(Math.max(page, 0), defaultSize);
+        int validSize = Math.max(defaultSize, 1);
+        return PageRequest.of(Math.max(page, 0), validSize);
     }
 }
