@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="header" class="header">
+    <h1 th:text="${pageTitle} ?: '관리자 대시보드'">관리자 대시보드</h1>
+    <form th:action="@{/admin/logout}" method="post" style="display:inline;">
+        <button type="submit" class="logout-btn">로그아웃</button>
+    </form>
+</div>
+</body>
+</html>

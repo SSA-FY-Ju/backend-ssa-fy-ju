@@ -218,7 +218,7 @@
 
 ### Services
 
-- [ ] T026 [US1] Create `AdminDashboardService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+- [x] T026 [US1] Create `AdminDashboardService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
   - getTodaysAnalysisSummary() - returns total count and type breakdown (SAJU, GWANWUN, GUNG_HAP)
   - getDailyLimitExhaustedCount() - returns count of users who used all 3 daily limits
   - getFeedbackSummary() - returns satisfied/unsatisfied ratio and unviewed feedback count
@@ -226,18 +226,18 @@
 
 ### Controllers
 
-- [ ] T027 [US1] Create `AdminDashboardController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [x] T027 [US1] Create `AdminDashboardController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - GET /admin/dashboard (returns JSON + renders Thymeleaf view)
   - GET /admin/api/dashboard (returns JSON only for AJAX refresh)
 
 ### Views & Templates
 
-- [ ] T028 [US1] Create Thymeleaf components:
+- [x] T028 [US1] Create Thymeleaf components:
   - `admin/layout/admin-header.html` - navigation, branding
   - `admin/layout/admin-sidebar.html` - menu items (Dashboard, User Management, Analytics, Feedback)
   - `admin/layout/admin-footer.html` - copyright, version
 
-- [ ] T029 [US1] Create dashboard template `admin/dashboard.html` with sections:
+- [x] T029 [US1] Create dashboard template `admin/dashboard.html` with sections:
   - Analysis Summary Widget (today's count by type)
   - Daily Limit Warning Widget (users with exhausted quota)
   - Feedback Summary Widget (satisfaction ratio, unviewed count)
@@ -245,18 +245,18 @@
 
 ### Tests (Optional - JUnit 5 + Mockito)
 
-- [ ] T030 [US1] Create `AdminDashboardServiceTest.java` in `src/test/java/ssafy/SSAju/admin/service/` testing:
+- [x] T030 [US1] Create `AdminDashboardServiceTest.java` in `src/test/java/ssafy/SSAju/admin/service/` testing:
   - getTodaysAnalysisSummary() with mock data (Asia/Seoul timezone handling)
   - getDailyLimitExhaustedCount() with edge cases (midnight reset)
   - getFeedbackSummary() with empty/partial data
   - getDashboardData() aggregation
 
-- [ ] T031 [US1] Create `AdminDashboardControllerTest.java` in `src/test/java/ssafy/SSAju/admin/controller/` testing:
+- [x] T031 [US1] Create `AdminDashboardControllerTest.java` in `src/test/java/ssafy/SSAju/admin/controller/` testing:
   - GET /admin/dashboard response time < 5 seconds
   - JSON structure validation
   - Thymeleaf view rendering
 
-- [ ] T032 [US1] Create integration test `AdminDashboardIntegrationTest.java` in `src/test/java/ssafy/SSAju/admin/integration/` testing:
+- [x] T032 [US1] Create integration test `AdminDashboardIntegrationTest.java` in `src/test/java/ssafy/SSAju/admin/integration/` testing:
   - End-to-end dashboard flow with real DB mock data
   - Data consistency across services
 
@@ -505,9 +505,9 @@ Phase 7 (Polish) [Final - performance, docs, testing]
 
 ## MVP Checklist (US0 + Phase 3)
 
-- [ ] T018-T025 Admin Authentication Service, Controller, Views, Tests
-- [ ] T026-T032 Admin Dashboard Service, Controller, Views, Tests
-- [ ] T012-T014 Analytics Query Repository
+- [x] T018-T025 Admin Authentication Service, Controller, Views, Tests
+- [x] T026-T032 Admin Dashboard Service, Controller, Views, Tests
+- [x] T012-T014 Analytics Query Repository
 - [ ] Performance validation: Dashboard load time < 5 seconds
 - [ ] Independent test passing: Admin login works + Dashboard displays all 4 widgets correctly
 
