@@ -46,7 +46,7 @@ public class AdminSecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth ->
                 auth
-                    .requestMatchers("/admin/login").permitAll()
+                    .requestMatchers("/admin/login", "/admin/logout").permitAll()
                     .requestMatchers("/admin/**").hasRole("ADMIN")
                     .anyRequest().authenticated())
             .exceptionHandling(ex -> ex

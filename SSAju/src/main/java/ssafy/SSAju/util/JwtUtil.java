@@ -97,6 +97,25 @@ public class JwtUtil {
         return refreshTokenExpirationMs / 1000;
     }
 
+    /**
+     * 토큰에서 userId를 추출합니다. 만료된 토큰에서도 추출 가능합니다.
+     *
+     * <p>로그아웃 시 access token이 만료된 상태에서도 refresh token의 userId를
+     * 읽어 서버 측 폐기를 수행하기 위해 사용됩니다.
+     *
+     * @param token JWT 토큰 (만료 여부 무관)
+     * @return userId, 위조·손상된 토큰이면 null
+     */
+    public Long extractUserId(String token) {
+        try {
+            return parseClaims(token).get(CLAIM_USER_ID, Long.class);
+        } catch (ExpiredJwtException ex) {
+            return ex.getClaims().get(CLAIM_USER_ID, Long.class);
+        } catch (JwtException ex) {
+            return null;
+        }
+    }
+
     private String buildTokenWithRole(Long userId, String email, String role, String type, long expirationMs) {
         // Instant 기반으로 생성하여 타임존 독립성 보장 (M-7).
         Instant nowInstant = Instant.now();

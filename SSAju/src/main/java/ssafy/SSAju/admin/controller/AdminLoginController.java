@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -90,14 +89,17 @@ public class AdminLoginController {
     }
 
     @PostMapping("/logout")
-    public String logout(Authentication authentication,
-                         HttpServletRequest request,
-                         HttpServletResponse response) {
-        if (authentication != null) {
-            Long userId = (Long) authentication.getPrincipal();
-
-            String refreshToken = extractCookieValue(request, AdminCookieJwtFilter.ADMIN_REFRESH_TOKEN_COOKIE);
-            authService.logout(userId, refreshToken);
+    public String logout(HttpServletRequest request, HttpServletResponse response) {
+        String refreshToken = extractCookieValue(request, AdminCookieJwtFilter.ADMIN_REFRESH_TOKEN_COOKIE);
+        if (refreshToken != null) {
+            try {
+                Long userId = jwtUtil.extractUserId(refreshToken);
+                if (userId != null) {
+                    authService.logout(userId, refreshToken);
+                }
+            } catch (Exception e) {
+                log.warn("로그아웃 토큰 처리 실패: {}", e.getMessage());
+            }
         }
 
         response.addHeader(HttpHeaders.SET_COOKIE, expireCookie(

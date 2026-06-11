@@ -16,10 +16,9 @@ import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.service.AuthService;
 import ssafy.SSAju.util.JwtUtil;
 
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
@@ -128,24 +127,25 @@ class AdminLoginControllerTest {
     }
 
     @Test
-    @DisplayName("POST /admin/logout - 인증된 사용자 → authService.logout 호출 후 login 리다이렉트")
-    void logout_authenticatedUser_callsLogoutAndRedirects() throws Exception {
+    @DisplayName("POST /admin/logout - refresh token 쿠키 있음 → authService.logout(userId, token) 호출 후 login 리다이렉트")
+    void logout_withRefreshTokenCookie_callsLogoutAndRedirects() throws Exception {
         // Given
-        var auth = new UsernamePasswordAuthenticationToken(1L, null, java.util.List.of());
+        given(jwtUtil.extractUserId("valid-refresh-token")).willReturn(1L);
         willDoNothing().given(authService).logout(any(), any());
 
         // When & Then
-        mockMvc.perform(post("/admin/logout").principal(auth))
+        mockMvc.perform(post("/admin/logout")
+                        .cookie(new jakarta.servlet.http.Cookie("admin_refresh_token", "valid-refresh-token")))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/login"));
 
-        verify(authService).logout(any(), any());
+        verify(authService).logout(eq(1L), eq("valid-refresh-token"));
     }
 
     @Test
-    @DisplayName("POST /admin/logout - 인증 없음 → authService.logout 미호출, login 리다이렉트")
-    void logout_unauthenticated_skipsLogoutAndRedirects() throws Exception {
-        // When & Then (principal 없음 → authentication = null)
+    @DisplayName("POST /admin/logout - refresh token 쿠키 없음 → authService.logout 미호출, login 리다이렉트")
+    void logout_withoutRefreshTokenCookie_skipsLogoutAndRedirects() throws Exception {
+        // When & Then (refresh token 쿠키 미전송)
         mockMvc.perform(post("/admin/logout"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/login"));
@@ -154,17 +154,18 @@ class AdminLoginControllerTest {
     }
 
     @Test
-    @DisplayName("POST /admin/logout - refresh token 쿠키 없음 → authService.logout(userId, null) 호출")
-    void logout_withoutRefreshTokenCookie_callsLogoutWithNull() throws Exception {
-        // Given (refresh token 쿠키 미전송)
-        var auth = new UsernamePasswordAuthenticationToken(1L, null, java.util.List.of());
-        willDoNothing().given(authService).logout(any(), isNull());
+    @DisplayName("POST /admin/logout - access token 만료 상태에서도 refresh token으로 서버 폐기 수행")
+    void logout_withExpiredAccessToken_stillRevokesViaRefreshToken() throws Exception {
+        // Given: access token이 없어도 refresh token만으로 로그아웃 가능
+        given(jwtUtil.extractUserId("refresh-only-token")).willReturn(2L);
+        willDoNothing().given(authService).logout(any(), any());
 
-        // When & Then
-        mockMvc.perform(post("/admin/logout").principal(auth))
+        // When & Then (access token 쿠키 없이 refresh token만 전송)
+        mockMvc.perform(post("/admin/logout")
+                        .cookie(new jakarta.servlet.http.Cookie("admin_refresh_token", "refresh-only-token")))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/login"));
 
-        verify(authService).logout(1L, null);
+        verify(authService).logout(eq(2L), eq("refresh-only-token"));
     }
 }
