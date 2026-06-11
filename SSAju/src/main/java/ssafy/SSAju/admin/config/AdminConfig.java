@@ -1,6 +1,7 @@
 package ssafy.SSAju.admin.config;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
@@ -27,6 +28,11 @@ public class AdminConfig {
         @Min(1) private int defaultPageSize = 20;
         @Min(1) private int maxPageSize = 50;
         @Min(1) private int analyticsRangeDays = 30;
+
+        @AssertTrue(message = "defaultPageSize는 maxPageSize 이하여야 합니다")
+        public boolean isDefaultNotExceedingMax() {
+            return defaultPageSize <= maxPageSize;
+        }
     }
 
     @Getter
