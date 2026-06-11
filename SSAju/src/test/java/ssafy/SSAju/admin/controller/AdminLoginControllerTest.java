@@ -1,11 +1,13 @@
 package ssafy.SSAju.admin.controller;
 
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.view.InternalResourceView;
@@ -19,7 +21,6 @@ import ssafy.SSAju.util.JwtUtil;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
@@ -50,8 +51,11 @@ class AdminLoginControllerTest {
 
     @BeforeEach
     void setUp() {
+        AdminLoginController controller = new AdminLoginController(adminAuthenticationService, authService, jwtUtil);
+        // standalone 생성 시 @Value 주입이 안 되므로 운영 기본값(true) 명시 주입
+        ReflectionTestUtils.setField(controller, "cookieSecure", true);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AdminLoginController(adminAuthenticationService, authService, jwtUtil))
+                .standaloneSetup(controller)
                 .setViewResolvers((viewName, locale) -> {
                     if (viewName.startsWith("redirect:")) {
                         return new RedirectView(viewName.substring("redirect:".length()));
@@ -88,9 +92,13 @@ class AdminLoginControllerTest {
                 .andExpect(redirectedUrl("/admin/dashboard"))
                 .andExpect(cookie().exists("admin_access_token"))
                 .andExpect(cookie().httpOnly("admin_access_token", true))
+                .andExpect(cookie().secure("admin_access_token", true))
+                .andExpect(cookie().sameSite("admin_access_token", "Strict"))
                 .andExpect(cookie().path("admin_access_token", "/admin"))
                 .andExpect(cookie().exists("admin_refresh_token"))
                 .andExpect(cookie().httpOnly("admin_refresh_token", true))
+                .andExpect(cookie().secure("admin_refresh_token", true))
+                .andExpect(cookie().sameSite("admin_refresh_token", "Strict"))
                 .andExpect(cookie().path("admin_refresh_token", "/admin"));
     }
 
@@ -135,9 +143,13 @@ class AdminLoginControllerTest {
 
         // When & Then
         mockMvc.perform(post("/admin/logout")
-                        .cookie(new jakarta.servlet.http.Cookie("admin_refresh_token", "valid-refresh-token")))
+                        .cookie(new Cookie("admin_refresh_token", "valid-refresh-token")))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/login"));
+                .andExpect(redirectedUrl("/admin/login"))
+                .andExpect(cookie().maxAge("admin_access_token", 0))
+                .andExpect(cookie().maxAge("admin_refresh_token", 0))
+                .andExpect(cookie().secure("admin_access_token", true))
+                .andExpect(cookie().sameSite("admin_access_token", "Strict"));
 
         verify(authService).logout(eq(1L), eq("valid-refresh-token"));
     }
@@ -148,7 +160,9 @@ class AdminLoginControllerTest {
         // When & Then (refresh token 쿠키 미전송)
         mockMvc.perform(post("/admin/logout"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/login"));
+                .andExpect(redirectedUrl("/admin/login"))
+                .andExpect(cookie().maxAge("admin_access_token", 0))
+                .andExpect(cookie().maxAge("admin_refresh_token", 0));
 
         verify(authService, never()).logout(any(), any());
     }
@@ -162,9 +176,11 @@ class AdminLoginControllerTest {
 
         // When & Then (access token 쿠키 없이 refresh token만 전송)
         mockMvc.perform(post("/admin/logout")
-                        .cookie(new jakarta.servlet.http.Cookie("admin_refresh_token", "refresh-only-token")))
+                        .cookie(new Cookie("admin_refresh_token", "refresh-only-token")))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/login"));
+                .andExpect(redirectedUrl("/admin/login"))
+                .andExpect(cookie().maxAge("admin_access_token", 0))
+                .andExpect(cookie().maxAge("admin_refresh_token", 0));
 
         verify(authService).logout(eq(2L), eq("refresh-only-token"));
     }
