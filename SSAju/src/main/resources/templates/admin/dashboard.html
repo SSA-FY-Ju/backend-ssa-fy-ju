@@ -87,7 +87,7 @@
             <div class="widget widget-warning">
                 <div class="widget-title">일일 제한 소진 사용자</div>
                 <div class="widget-value" th:text="${dashboard.dailyLimitExhaustedCount}">0</div>
-                <div class="widget-sub">명 (오늘 기준 3회 소진)</div>
+                <div class="widget-sub">명 (오늘 기준 <span th:text="${dailyLimit}">3</span>회 소진)</div>
             </div>
 
             <!-- 3. 피드백 요약 위젯 -->

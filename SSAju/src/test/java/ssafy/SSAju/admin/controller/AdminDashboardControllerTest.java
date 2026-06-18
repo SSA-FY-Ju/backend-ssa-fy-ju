@@ -10,12 +10,14 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.view.InternalResourceView;
+import ssafy.SSAju.admin.config.AdminConfig;
 import ssafy.SSAju.admin.dto.DashboardDTO;
 import ssafy.SSAju.admin.service.AdminDashboardService;
 
 import java.util.Map;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -25,6 +27,9 @@ class AdminDashboardControllerTest {
 
     @Mock
     private AdminDashboardService adminDashboardService;
+
+    @Mock
+    private AdminConfig adminConfig;
 
     private MockMvc mockMvc;
 
@@ -39,7 +44,11 @@ class AdminDashboardControllerTest {
 
     @BeforeEach
     void setUp() {
-        AdminDashboardController controller = new AdminDashboardController(adminDashboardService);
+        AdminConfig.Api api = new AdminConfig.Api();
+        api.setDailyLimit(3);
+        lenient().when(adminConfig.getApi()).thenReturn(api);
+
+        AdminDashboardController controller = new AdminDashboardController(adminDashboardService, adminConfig);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(controller)
                 .setViewResolvers((viewName, locale) -> new InternalResourceView(viewName))

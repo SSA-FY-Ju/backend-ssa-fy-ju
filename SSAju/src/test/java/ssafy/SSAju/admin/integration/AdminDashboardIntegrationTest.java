@@ -12,7 +12,10 @@ import org.springframework.web.context.WebApplicationContext;
 import ssafy.SSAju.admin.service.AdminDashboardService;
 import ssafy.SSAju.admin.dto.DashboardDTO;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -69,24 +72,22 @@ class AdminDashboardIntegrationTest {
         DashboardDTO result = adminDashboardService.getDashboardData();
 
         assertThat(result).isNotNull();
-        assertThat(result.totalAnalysis()).isGreaterThanOrEqualTo(0L);
-        assertThat(result.dailyLimitExhaustedCount()).isGreaterThanOrEqualTo(0L);
+        assertThat(result.totalAnalysis()).isEqualTo(0L);
+        assertThat(result.dailyLimitExhaustedCount()).isEqualTo(0L);
         assertThat(result.feedbackSummary()).isNotNull();
-        assertThat(result.feedbackSummary().satisfiedCount()).isGreaterThanOrEqualTo(0L);
-        assertThat(result.feedbackSummary().unsatisfiedCount()).isGreaterThanOrEqualTo(0L);
-        assertThat(result.feedbackSummary().totalCount()).isGreaterThanOrEqualTo(0L);
+        assertThat(result.feedbackSummary().satisfiedCount()).isEqualTo(0L);
+        assertThat(result.feedbackSummary().unsatisfiedCount()).isEqualTo(0L);
+        assertThat(result.feedbackSummary().totalCount()).isEqualTo(0L);
     }
 
     @Test
     @DisplayName("GET /admin/api/dashboard → 5초 이내 응답 (SC-001)")
-    void getDashboardJson_respondsWithinFiveSeconds() throws Exception {
-        long start = System.currentTimeMillis();
-        mockMvc.perform(get("/admin/api/dashboard")
-                        .accept(MediaType.APPLICATION_JSON)
-                        .with(user("admin@test.com").roles("ADMIN")))
-                .andExpect(status().isOk());
-        long elapsed = System.currentTimeMillis() - start;
-
-        assertThat(elapsed).isLessThan(5_000L);
+    void getDashboardJson_respondsWithinFiveSeconds() {
+        assertTimeout(Duration.ofSeconds(5), () ->
+                mockMvc.perform(get("/admin/api/dashboard")
+                                .accept(MediaType.APPLICATION_JSON)
+                                .with(user("admin@test.com").roles("ADMIN")))
+                        .andExpect(status().isOk())
+        );
     }
 }

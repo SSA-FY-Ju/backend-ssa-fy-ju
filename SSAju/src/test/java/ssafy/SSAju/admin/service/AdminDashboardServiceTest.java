@@ -19,6 +19,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
@@ -110,6 +111,7 @@ class AdminDashboardServiceTest {
 
         assertThat(result.feedbackSummary().satisfiedCount()).isEqualTo(10L);
         assertThat(result.feedbackSummary().unsatisfiedCount()).isEqualTo(3L);
+        assertThat(result.feedbackSummary().totalCount()).isEqualTo(13L);
     }
 
     @Test
@@ -118,7 +120,7 @@ class AdminDashboardServiceTest {
         given(adminConfig.getApi()).willReturn(stubApi(5));
         given(analyticsQueryRepository.findDailyAnalysisSummary(any(LocalDate.class)))
                 .willReturn(Map.of());
-        given(dailyUsageQueryRepository.countDailyLimitExhausted(any(LocalDate.class), anyInt()))
+        given(dailyUsageQueryRepository.countDailyLimitExhausted(any(LocalDate.class), eq(5)))
                 .willReturn(2L);
         given(feedbackQueryRepository.findFeedbackStats())
                 .willReturn(new FeedbackStatDTO(Map.of(), Map.of(), 0L));
