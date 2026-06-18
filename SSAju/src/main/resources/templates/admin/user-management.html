@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle} ?: 'SSAju 관리자'">SSAju 유저 관리</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #f5f5f5; display: flex; min-height: 100vh; }
+        .sidebar { width: 240px; background: #1a1a2e; color: #eee; padding: 24px 0; flex-shrink: 0; }
+        .sidebar .brand { padding: 0 24px 24px; font-size: 1.2rem; font-weight: bold; color: #e94560; border-bottom: 1px solid #333; }
+        .sidebar nav ul { list-style: none; margin-top: 16px; }
+        .sidebar nav ul li a { display: block; padding: 12px 24px; color: #ccc; text-decoration: none; transition: background 0.2s; }
+        .sidebar nav ul li a:hover, .sidebar nav ul li a.active { background: #16213e; color: #fff; border-left: 3px solid #e94560; }
+        .main-wrapper { flex: 1; display: flex; flex-direction: column; }
+        .header { background: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 1.1rem; color: #333; }
+        .logout-btn { background: #e94560; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        .content { flex: 1; padding: 24px; }
+        .footer { background: #fff; text-align: center; padding: 12px; font-size: 0.8rem; color: #999; border-top: 1px solid #eee; }
+
+        /* Search form */
+        .search-card { background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .search-card h2 { font-size: 0.95rem; color: #555; margin-bottom: 14px; font-weight: 600; }
+        .search-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 0.78rem; color: #888; font-weight: 500; }
+        .form-group input, .form-group select { padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; color: #333; min-width: 140px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #e94560; }
+        .search-btn { background: #e94560; color: #fff; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; height: 36px; }
+        .reset-btn { background: #fff; color: #555; border: 1px solid #ddd; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; height: 36px; text-decoration: none; display: inline-flex; align-items: center; }
+
+        /* Table */
+        .table-card { background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .table-header h2 { font-size: 0.95rem; color: #555; font-weight: 600; }
+        .result-count { font-size: 0.85rem; color: #888; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        thead tr { background: #f9f9f9; }
+        th { padding: 10px 12px; text-align: left; color: #666; font-weight: 600; font-size: 0.82rem; border-bottom: 2px solid #eee; }
+        td { padding: 12px; border-bottom: 1px solid #f0f0f0; color: #333; }
+        tr:hover td { background: #fafafa; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+        .badge-active { background: #e8f5e9; color: #2e7d32; }
+        .badge-inactive { background: #f3e5f5; color: #6a1b9a; }
+        .detail-btn { background: none; border: 1px solid #ddd; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82rem; color: #555; }
+        .detail-btn:hover { background: #f0f0f0; }
+        .empty-row td { text-align: center; color: #aaa; padding: 32px; }
+
+        /* Pagination */
+        .pagination { display: flex; justify-content: flex-end; margin-top: 16px; gap: 8px; }
+        .pagination a, .pagination span { padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; font-size: 0.88rem; color: #555; }
+        .pagination a:hover { background: #f0f0f0; }
+        .pagination .disabled { color: #ccc; cursor: default; }
+
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #fff; border-radius: 8px; padding: 28px; width: 480px; max-width: 90vw; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { font-size: 1rem; color: #1a1a2e; }
+        .modal-close { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: #888; }
+        .modal-body dl { display: grid; grid-template-columns: 100px 1fr; gap: 10px 16px; }
+        .modal-body dt { font-size: 0.82rem; color: #888; font-weight: 600; display: flex; align-items: center; }
+        .modal-body dd { font-size: 0.9rem; color: #333; }
+        .modal-loading { text-align: center; color: #aaa; padding: 20px; }
+    </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+    <div class="brand">SSAju Admin</div>
+    <nav>
+        <ul>
+            <li><a th:href="@{/admin/dashboard}" th:classappend="${currentMenu == 'dashboard'} ? 'active'">대시보드</a></li>
+            <li><a th:href="@{/admin/users}" th:classappend="${currentMenu == 'users'} ? 'active'">유저 관리</a></li>
+            <li><a th:href="@{/admin/analytics}" th:classappend="${currentMenu == 'analytics'} ? 'active'">분석 기록</a></li>
+            <li><a th:href="@{/admin/feedback}" th:classappend="${currentMenu == 'feedback'} ? 'active'">피드백 관리</a></li>
+        </ul>
+    </nav>
+</aside>
+
+<div class="main-wrapper">
+    <!-- Header -->
+    <header class="header">
+        <h1 th:text="${pageTitle}">유저 관리</h1>
+        <form th:action="@{/admin/logout}" method="post">
+            <button class="logout-btn" type="submit">로그아웃</button>
+        </form>
+    </header>
+
+    <main class="content">
+
+        <!-- Search Form -->
+        <div class="search-card">
+            <h2>유저 검색</h2>
+            <form class="search-form" th:action="@{/admin/users}" method="get">
+                <div class="form-group">
+                    <label>이메일</label>
+                    <input type="text" name="email" th:value="${email}" placeholder="이메일 검색">
+                </div>
+                <div class="form-group">
+                    <label>이름</label>
+                    <input type="text" name="name" th:value="${name}" placeholder="이름 검색">
+                </div>
+                <div class="form-group">
+                    <label>가입일 (시작)</label>
+                    <input type="date" name="joinDateFrom" th:value="${joinDateFrom}">
+                </div>
+                <div class="form-group">
+                    <label>가입일 (종료)</label>
+                    <input type="date" name="joinDateTo" th:value="${joinDateTo}">
+                </div>
+                <div class="form-group">
+                    <label>상태</label>
+                    <select name="status">
+                        <option value="">전체</option>
+                        <option value="ACTIVE" th:selected="${status != null && status.name() == 'ACTIVE'}">활성</option>
+                        <option value="INACTIVE" th:selected="${status != null && status.name() == 'INACTIVE'}">탈퇴</option>
+                    </select>
+                </div>
+                <button class="search-btn" type="submit">검색</button>
+                <a class="reset-btn" th:href="@{/admin/users}">초기화</a>
+            </form>
+        </div>
+
+        <!-- User Table -->
+        <div class="table-card">
+            <div class="table-header">
+                <h2>유저 목록</h2>
+                <span class="result-count" th:text="${users.size()} + '건 조회됨'">0건 조회됨</span>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>이메일</th>
+                        <th>이름</th>
+                        <th>가입일</th>
+                        <th>상태</th>
+                        <th>분석 횟수</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${users.isEmpty()}">
+                        <td colspan="7" class="empty-row" style="text-align:center; color:#aaa; padding:32px;">
+                            검색 결과가 없습니다.
+                        </td>
+                    </tr>
+                    <tr th:each="user : ${users}">
+                        <td th:text="${user.id}">1</td>
+                        <td th:text="${user.email}">user@test.com</td>
+                        <td th:text="${user.name}">홍길동</td>
+                        <td th:text="${#temporals.format(user.joinDate, 'yyyy-MM-dd')}">2024-01-01</td>
+                        <td>
+                            <span th:if="${user.status.name() == 'ACTIVE'}" class="badge badge-active">활성</span>
+                            <span th:if="${user.status.name() == 'INACTIVE'}" class="badge badge-inactive">탈퇴</span>
+                        </td>
+                        <td th:text="${user.totalAnalysisCount}">0</td>
+                        <td>
+                            <button class="detail-btn" th:data-user-id="${user.id}" onclick="openProfileModal(this)">
+                                상세보기
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Keyset 기반 다음 페이지 -->
+            <div class="pagination" th:if="${nextCursor != null}">
+                <a th:href="@{/admin/users(
+                        email=${email},
+                        name=${name},
+                        joinDateFrom=${joinDateFrom},
+                        joinDateTo=${joinDateTo},
+                        status=${status},
+                        cursor=${nextCursor},
+                        size=${size})}">다음 페이지 &rarr;</a>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="footer">
+        &copy; 2026 SSAju Admin
+    </footer>
+</div>
+
+<!-- Profile Modal -->
+<div class="modal-overlay" id="profileModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>유저 상세 정보</h3>
+            <button class="modal-close" onclick="closeProfileModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="profileModalBody">
+            <p class="modal-loading">불러오는 중...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openProfileModal(btn) {
+        const userId = btn.getAttribute('data-user-id');
+        const modal = document.getElementById('profileModal');
+        const body = document.getElementById('profileModalBody');
+
+        modal.classList.add('active');
+        body.innerHTML = '<p class="modal-loading">불러오는 중...</p>';
+
+        fetch('/admin/users/' + userId, { headers: { 'Accept': 'application/json' } })
+            .then(res => res.json())
+            .then(user => {
+                body.innerHTML = `
+                    <dl>
+                        <dt>ID</dt><dd>${user.id}</dd>
+                        <dt>이메일</dt><dd>${user.email}</dd>
+                        <dt>이름</dt><dd>${user.name}</dd>
+                        <dt>상태</dt><dd>${user.status}</dd>
+                        <dt>분석 횟수</dt><dd>${user.totalAnalysisCount}회</dd>
+                        <dt>가입일</dt><dd>${user.joinDate ? user.joinDate.slice(0, 10) : '-'}</dd>
+                        <dt>탈퇴일</dt><dd>${user.deletedAt ? user.deletedAt.slice(0, 10) : '-'}</dd>
+                    </dl>`;
+            })
+            .catch(() => {
+                body.innerHTML = '<p class="modal-loading">데이터를 불러올 수 없습니다.</p>';
+            });
+    }
+
+    function closeProfileModal() {
+        document.getElementById('profileModal').classList.remove('active');
+    }
+
+    document.getElementById('profileModal').addEventListener('click', function(e) {
+        if (e.target === this) closeProfileModal();
+    });
+</script>
+</body>
+</html>
