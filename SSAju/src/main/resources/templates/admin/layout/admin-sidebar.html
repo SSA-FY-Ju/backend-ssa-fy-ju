@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="sidebar" class="sidebar">
+    <div class="brand">SSAju Admin</div>
+    <nav>
+        <ul>
+            <li><a th:href="@{/admin/dashboard}" th:classappend="${currentMenu == 'dashboard'} ? ' active'">대시보드</a></li>
+            <li><a th:href="@{/admin/users}" th:classappend="${currentMenu == 'users'} ? ' active'">유저 관리</a></li>
+            <li><a th:href="@{/admin/analytics}" th:classappend="${currentMenu == 'analytics'} ? ' active'">분석 기록</a></li>
+            <li><a th:href="@{/admin/feedback}" th:classappend="${currentMenu == 'feedback'} ? ' active'">피드백 관리</a></li>
+        </ul>
+    </nav>
+</div>
+</body>
+</html>

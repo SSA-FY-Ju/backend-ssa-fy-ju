@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle} ?: 'SSAju 관리자'">SSAju 관리자 대시보드</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #f5f5f5; display: flex; min-height: 100vh; }
+        .sidebar { width: 240px; background: #1a1a2e; color: #eee; padding: 24px 0; flex-shrink: 0; }
+        .sidebar .brand { padding: 0 24px 24px; font-size: 1.2rem; font-weight: bold; color: #e94560; border-bottom: 1px solid #333; }
+        .sidebar nav ul { list-style: none; margin-top: 16px; }
+        .sidebar nav ul li a { display: block; padding: 12px 24px; color: #ccc; text-decoration: none; transition: background 0.2s; }
+        .sidebar nav ul li a:hover, .sidebar nav ul li a.active { background: #16213e; color: #fff; border-left: 3px solid #e94560; }
+        .main-wrapper { flex: 1; display: flex; flex-direction: column; }
+        .header { background: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 1.1rem; color: #333; }
+        .logout-btn { background: #e94560; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        .content { flex: 1; padding: 24px; }
+        .footer { background: #fff; text-align: center; padding: 12px; font-size: 0.8rem; color: #999; border-top: 1px solid #eee; }
+
+        /* Dashboard layout */
+        .dashboard-toolbar { display: flex; justify-content: flex-end; margin-bottom: 20px; }
+        .refresh-btn { background: #fff; border: 1px solid #ddd; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; color: #555; transition: background 0.2s; }
+        .refresh-btn:hover { background: #f0f0f0; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+
+        /* Widgets */
+        .widget { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .widget-title { font-size: 0.85rem; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+        .widget-value { font-size: 2.2rem; font-weight: bold; color: #1a1a2e; margin-bottom: 8px; }
+        .widget-sub { font-size: 0.85rem; color: #aaa; }
+
+        /* Analysis breakdown */
+        .breakdown-list { list-style: none; margin-top: 12px; }
+        .breakdown-list li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; color: #555; }
+        .breakdown-list li:last-child { border-bottom: none; }
+        .breakdown-list .count { font-weight: 600; color: #1a1a2e; }
+
+        /* Warning widget */
+        .widget-warning .widget-value { color: #e94560; }
+
+        /* Feedback widget */
+        .feedback-row { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.9rem; }
+        .feedback-row .label { color: #888; }
+        .feedback-row .val { font-weight: 600; }
+        .feedback-row .val.satisfied { color: #27ae60; }
+        .feedback-row .val.unsatisfied { color: #e94560; }
+    </style>
+</head>
+<body>
+
+<div th:replace="~{admin/layout/admin-sidebar :: sidebar}"></div>
+
+<div class="main-wrapper">
+    <div th:replace="~{admin/layout/admin-header :: header}"></div>
+
+    <div class="content">
+        <div class="dashboard-toolbar">
+            <button class="refresh-btn" onclick="location.reload()">새로고침</button>
+        </div>
+
+        <div class="dashboard-grid">
+
+            <!-- 1. 분석 현황 위젯 -->
+            <div class="widget">
+                <div class="widget-title">오늘의 분석 현황</div>
+                <div class="widget-value" th:text="${dashboard.totalAnalysis}">0</div>
+                <div class="widget-sub">건</div>
+                <ul class="breakdown-list">
+                    <li>
+                        <span>사주 분석</span>
+                        <span class="count" th:text="${dashboard.analysisTypeBreakdown.get('SAJU')} ?: 0">0</span>
+                    </li>
+                    <li>
+                        <span>커리어 컨설팅</span>
+                        <span class="count" th:text="${dashboard.analysisTypeBreakdown.get('CAREER_CONSULTATION')} ?: 0">0</span>
+                    </li>
+                    <li>
+                        <span>기업 궁합</span>
+                        <span class="count" th:text="${dashboard.analysisTypeBreakdown.get('COMPANY_COMPATIBILITY')} ?: 0">0</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 2. 일일 제한 소진 위젯 -->
+            <div class="widget widget-warning">
+                <div class="widget-title">일일 제한 소진 사용자</div>
+                <div class="widget-value" th:text="${dashboard.dailyLimitExhaustedCount}">0</div>
+                <div class="widget-sub">명 (오늘 기준 <span th:text="${dailyLimit}">3</span>회 소진)</div>
+            </div>
+
+            <!-- 3. 피드백 요약 위젯 -->
+            <div class="widget">
+                <div class="widget-title">누적 피드백 현황</div>
+                <div class="widget-value" th:text="${dashboard.feedbackSummary.totalCount}">0</div>
+                <div class="widget-sub">건 총 피드백</div>
+                <div class="feedback-row" style="margin-top: 16px;">
+                    <span class="label">만족</span>
+                    <span class="val satisfied" th:text="${dashboard.feedbackSummary.satisfiedCount}">0</span>
+                </div>
+                <div class="feedback-row">
+                    <span class="label">불만족</span>
+                    <span class="val unsatisfied" th:text="${dashboard.feedbackSummary.unsatisfiedCount}">0</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div th:replace="~{admin/layout/admin-footer :: footer}"></div>
+</div>
+
+</body>
+</html>
