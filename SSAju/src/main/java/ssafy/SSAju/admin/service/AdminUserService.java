@@ -12,6 +12,7 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.UserNotFoundException;
 
 import java.time.Instant;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -32,6 +33,19 @@ public class AdminUserService extends AdminBaseService {
                 email, name, joinDateFrom, joinDateTo, status, pageable);
 
         log.debug("유저 검색 완료: email={}, page={}, totalElements={}", email, page, result.getTotalElements());
+        return result;
+    }
+
+    public List<UserSearchDTO> searchUsersWithKeyset(
+            String email, String name,
+            Instant joinDateFrom, Instant joinDateTo,
+            UserStatus status, Long cursor, int size) {
+
+        int validSize = Math.min(Math.max(size, 1), 100);
+        List<UserSearchDTO> result = userQueryRepository.findUsersByKeyset(
+                email, name, joinDateFrom, joinDateTo, status, cursor, validSize);
+
+        log.debug("유저 Keyset 검색 완료: cursor={}, size={}, resultCount={}", cursor, validSize, result.size());
         return result;
     }
 

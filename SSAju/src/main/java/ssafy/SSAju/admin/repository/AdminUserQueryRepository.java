@@ -91,6 +91,74 @@ public class AdminUserQueryRepository {
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
     }
 
+    /**
+     * Keyset(커서) 기반 유저 목록 조회.
+     * lastId가 null이면 첫 페이지, null이 아니면 해당 id 이후 데이터를 조회.
+     * OFFSET 방식과 달리 깊은 페이지에서도 일정한 성능을 보장.
+     */
+    public List<UserSearchDTO> findUsersByKeyset(
+            String email, String name, Instant joinDateFrom, Instant joinDateTo,
+            UserStatus status, Long lastId, int limit) {
+
+        StringBuilder where = new StringBuilder(" WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+
+        if (email != null && !email.isBlank()) {
+            where.append(" AND u.email LIKE ?");
+            params.add("%" + email + "%");
+        }
+        if (name != null && !name.isBlank()) {
+            where.append(" AND u.name LIKE ?");
+            params.add("%" + name + "%");
+        }
+        if (joinDateFrom != null) {
+            where.append(" AND u.created_at >= ?");
+            params.add(Timestamp.from(joinDateFrom));
+        }
+        if (joinDateTo != null) {
+            where.append(" AND u.created_at < ?");
+            params.add(Timestamp.from(joinDateTo));
+        }
+        if (status != null) {
+            where.append(" AND u.status = ?");
+            params.add(status.name());
+        }
+        if (lastId != null) {
+            where.append(" AND u.id < ?");
+            params.add(lastId);
+        }
+
+        String sql = """
+                SELECT u.id, u.email, u.name, u.status, u.created_at, u.deleted_at,
+                       COALESCE(ac.total, 0) AS total_analysis_count
+                FROM users u
+                LEFT JOIN (
+                    SELECT user_id, COUNT(*) AS total
+                    FROM (
+                        SELECT user_id FROM saju_result
+                        UNION ALL
+                        SELECT sr.user_id FROM career_consultation cc
+                            JOIN saju_result sr ON cc.saju_result_id = sr.id
+                        UNION ALL
+                        SELECT user_id FROM company_compatibility
+                    ) all_analyses
+                    GROUP BY user_id
+                ) ac ON u.id = ac.user_id
+                """ + where + " ORDER BY u.id DESC LIMIT ?";
+
+        params.add(limit);
+
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new UserSearchDTO(
+                rs.getLong("id"),
+                rs.getString("email"),
+                rs.getString("name"),
+                rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null,
+                UserStatus.valueOf(rs.getString("status")),
+                rs.getTimestamp("deleted_at") != null ? rs.getTimestamp("deleted_at").toInstant() : null,
+                rs.getLong("total_analysis_count")
+        ), params.toArray());
+    }
+
     public Optional<UserSearchDTO> findUserById(Long userId) {
         String sql = """
                 SELECT u.id, u.email, u.name, u.status, u.created_at, u.deleted_at
