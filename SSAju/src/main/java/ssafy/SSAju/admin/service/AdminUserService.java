@@ -2,8 +2,6 @@ package ssafy.SSAju.admin.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.admin.dto.UserSearchDTO;
@@ -23,29 +21,16 @@ public class AdminUserService extends AdminBaseService {
     private final AdminUserQueryRepository userQueryRepository;
     private final AdminPaginationUtil paginationUtil;
 
-    public Page<UserSearchDTO> searchUsers(
-            String email, String name,
-            Instant joinDateFrom, Instant joinDateTo,
-            UserStatus status, int page, int size) {
-
-        Pageable pageable = paginationUtil.of(page, size);
-        Page<UserSearchDTO> result = userQueryRepository.findUsersByFilters(
-                email, name, joinDateFrom, joinDateTo, status, pageable);
-
-        log.debug("유저 검색 완료: email={}, page={}, totalElements={}", email, page, result.getTotalElements());
-        return result;
-    }
-
-    public List<UserSearchDTO> searchUsersWithKeyset(
+    public List<UserSearchDTO> searchUsers(
             String email, String name,
             Instant joinDateFrom, Instant joinDateTo,
             UserStatus status, Long cursor, int size) {
 
-        int validSize = Math.min(Math.max(size, 1), 100);
+        int validSize = paginationUtil.of(0, size).getPageSize();
         List<UserSearchDTO> result = userQueryRepository.findUsersByKeyset(
                 email, name, joinDateFrom, joinDateTo, status, cursor, validSize);
 
-        log.debug("유저 Keyset 검색 완료: cursor={}, size={}, resultCount={}", cursor, validSize, result.size());
+        log.debug("유저 검색 완료: cursor={}, size={}, resultCount={}", cursor, validSize, result.size());
         return result;
     }
 

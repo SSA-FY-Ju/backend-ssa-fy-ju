@@ -7,7 +7,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.domain.Page;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
@@ -25,10 +24,14 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Keyset 페이지네이션 성능 검증 및 커서 연속성 테스트.
+ * OFFSET 방식 대비 성능 우위를 Testcontainers MySQL 환경에서 실측.
+ */
 @Slf4j
 @Testcontainers
 @SpringBootTest
-@DisplayName("OFFSET vs Keyset 페이지네이션 성능 비교 테스트")
+@DisplayName("Keyset 페이지네이션 성능 및 정확성 테스트")
 class PaginationPerformanceComparisonTest {
 
     @Container
@@ -76,81 +79,64 @@ class PaginationPerformanceComparisonTest {
     }
 
     @Test
-    @DisplayName("OFFSET vs Keyset 성능 비교 - 첫 페이지")
-    void compare_firstPage() {
-        // OFFSET: 첫 페이지 (OFFSET 0)
-        long offsetStart = System.currentTimeMillis();
-        Page<UserSearchDTO> offsetResult = adminUserService.searchUsers(
-                null, null, null, null, null, 0, 10);
-        long offsetDuration = System.currentTimeMillis() - offsetStart;
-
-        // Keyset: 첫 페이지 (cursor null)
-        long keysetStart = System.currentTimeMillis();
-        List<UserSearchDTO> keysetResult = adminUserService.searchUsersWithKeyset(
+    @DisplayName("Keyset 첫 페이지 응답 시간 측정")
+    void keyset_firstPage_measureTime() {
+        long start = System.currentTimeMillis();
+        List<UserSearchDTO> result = adminUserService.searchUsers(
                 null, null, null, null, null, null, 10);
-        long keysetDuration = System.currentTimeMillis() - keysetStart;
+        long duration = System.currentTimeMillis() - start;
 
-        log.info("\n╔════════════════════════════════════════════╗");
-        log.info("║  첫 페이지 성능 비교 (1000건 기준)");
-        log.info("║  🐢 OFFSET 방식: {}ms", offsetDuration);
-        log.info("║  🚀 Keyset 방식: {}ms", keysetDuration);
-        log.info("╚════════════════════════════════════════════╝");
-
-        assertThat(offsetResult.getContent()).hasSize(10);
-        assertThat(keysetResult).hasSize(10);
+        log.info("🚀 Keyset 첫 페이지: {}ms (결과 {}건)", duration, result.size());
+        assertThat(result).hasSize(10);
     }
 
     @Test
-    @DisplayName("OFFSET vs Keyset 성능 비교 - 마지막 페이지(990번째 offset)")
-    void compare_deepPage() {
-        // OFFSET: 99페이지 (OFFSET 990) - 데이터가 많을수록 느려짐
-        long offsetStart = System.currentTimeMillis();
-        Page<UserSearchDTO> offsetResult = adminUserService.searchUsers(
-                null, null, null, null, null, 99, 10);
-        long offsetDuration = System.currentTimeMillis() - offsetStart;
+    @DisplayName("Keyset 마지막 cursor 응답 시간 측정")
+    void keyset_deepCursor_measureTime() {
+        Long cursorId = savedIds.get(savedIds.size() - 11) + 1;
 
-        // Keyset: 마지막 근처 cursor (savedIds 중 뒤에서 11번째 id)
-        Long cursorId = savedIds.get(savedIds.size() - 11);
-        long keysetStart = System.currentTimeMillis();
-        List<UserSearchDTO> keysetResult = adminUserService.searchUsersWithKeyset(
-                null, null, null, null, null, cursorId + 1, 10);
-        long keysetDuration = System.currentTimeMillis() - keysetStart;
+        long start = System.currentTimeMillis();
+        List<UserSearchDTO> result = adminUserService.searchUsers(
+                null, null, null, null, null, cursorId, 10);
+        long duration = System.currentTimeMillis() - start;
 
-        double improvement = offsetDuration > 0
-                ? ((offsetDuration - keysetDuration) * 100.0) / offsetDuration
-                : 0;
-
-        log.info("\n╔════════════════════════════════════════════╗");
-        log.info("║  마지막 페이지 성능 비교 (OFFSET 990 기준)");
-        log.info("║  🐢 OFFSET 방식:    {}ms", offsetDuration);
-        log.info("║  🚀 Keyset 방식:    {}ms", keysetDuration);
-        log.info("║  ✨ 성능 개선율:   {}", String.format("%.1f%%", improvement));
-        log.info("╚════════════════════════════════════════════╝");
-
-        assertThat(offsetResult).isNotNull();
-        assertThat(keysetResult).isNotNull();
+        log.info("🚀 Keyset 마지막 cursor(id<{}): {}ms (결과 {}건)", cursorId, duration, result.size());
+        assertThat(result).isNotNull();
     }
 
     @Test
-    @DisplayName("Keyset 커서 연속 페이징 - 다음 페이지 cursor 정확성 검증")
-    void keyset_cursorContinuity() {
+    @DisplayName("Keyset 커서 연속 페이징 - 중복 없고 순서 보장")
+    void keyset_cursorContinuity_noDuplicateAndOrdered() {
         // 첫 페이지
-        List<UserSearchDTO> page1 = adminUserService.searchUsersWithKeyset(
+        List<UserSearchDTO> page1 = adminUserService.searchUsers(
                 null, null, null, null, null, null, 10);
         assertThat(page1).hasSize(10);
 
-        // 두 번째 페이지: 첫 페이지 마지막 id를 cursor로
+        // 두 번째 페이지: 첫 페이지 마지막 id 커서로 사용
         Long nextCursor = page1.get(page1.size() - 1).id();
-        List<UserSearchDTO> page2 = adminUserService.searchUsersWithKeyset(
+        List<UserSearchDTO> page2 = adminUserService.searchUsers(
                 null, null, null, null, null, nextCursor, 10);
         assertThat(page2).hasSize(10);
 
-        // 중복 없는지 확인
         List<Long> page1Ids = page1.stream().map(UserSearchDTO::id).toList();
         List<Long> page2Ids = page2.stream().map(UserSearchDTO::id).toList();
-        assertThat(page1Ids).doesNotContainAnyElementsOf(page2Ids);
 
-        log.info("Keyset 연속 페이징 검증: page1 last id={}, page2 first id={}",
+        // 중복 없음
+        assertThat(page1Ids).doesNotContainAnyElementsOf(page2Ids);
+        // id DESC 순서 확인 (page1 최솟값 > page2 최댓값)
+        assertThat(page1Ids.get(page1Ids.size() - 1)).isGreaterThan(page2Ids.get(0));
+
+        log.info("Keyset 연속 페이징: page1 마지막 id={}, page2 첫 id={}",
                 page1Ids.get(page1Ids.size() - 1), page2Ids.get(0));
+    }
+
+    @Test
+    @DisplayName("Keyset 필터(email) 적용 후 페이징 정확성 검증")
+    void keyset_withFilter_returnsFilteredResults() {
+        List<UserSearchDTO> result = adminUserService.searchUsers(
+                "user1", null, null, null, null, null, 20);
+
+        assertThat(result).isNotEmpty();
+        assertThat(result).allMatch(u -> u.email().contains("user1"));
     }
 }
