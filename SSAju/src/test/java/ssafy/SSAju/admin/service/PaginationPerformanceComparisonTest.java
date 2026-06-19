@@ -24,10 +24,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Keyset 페이지네이션 성능 검증 및 커서 연속성 테스트.
- * OFFSET 방식 대비 성능 우위를 Testcontainers MySQL 환경에서 실측.
- */
 @Slf4j
 @Testcontainers
 @SpringBootTest
@@ -53,6 +49,8 @@ class PaginationPerformanceComparisonTest {
     private UserRepository userRepository;
 
     private List<Long> savedIds;
+
+    private static final int PAGE_SIZE = 10;
 
     @BeforeEach
     void setUp() {
@@ -83,50 +81,46 @@ class PaginationPerformanceComparisonTest {
     void keyset_firstPage_measureTime() {
         long start = System.currentTimeMillis();
         List<UserSearchDTO> result = adminUserService.searchUsers(
-                null, null, null, null, null, null, 10);
+                null, null, null, null, null, null, PAGE_SIZE);
         long duration = System.currentTimeMillis() - start;
 
         log.info("🚀 Keyset 첫 페이지: {}ms (결과 {}건)", duration, result.size());
-        assertThat(result).hasSize(10);
+        assertThat(result).hasSize(PAGE_SIZE);
     }
 
     @Test
-    @DisplayName("Keyset 마지막 cursor 응답 시간 측정")
-    void keyset_deepCursor_measureTime() {
+    @DisplayName("Keyset 딥 페이지 응답 시간 측정")
+    void keyset_deepPage_measureTime() {
         Long cursorId = savedIds.get(savedIds.size() - 11) + 1;
 
         long start = System.currentTimeMillis();
         List<UserSearchDTO> result = adminUserService.searchUsers(
-                null, null, null, null, null, cursorId, 10);
+                null, null, null, null, null, cursorId, PAGE_SIZE);
         long duration = System.currentTimeMillis() - start;
 
-        log.info("🚀 Keyset 마지막 cursor(id<{}): {}ms (결과 {}건)", cursorId, duration, result.size());
+        log.info("🚀 Keyset 딥 페이지(id<{}): {}ms (결과 {}건)", cursorId, duration, result.size());
         assertThat(result).isNotNull();
     }
 
     @Test
     @DisplayName("Keyset 커서 연속 페이징 - 중복 없고 순서 보장")
     void keyset_cursorContinuity_noDuplicateAndOrdered() {
-        // 첫 페이지
         List<UserSearchDTO> page1 = adminUserService.searchUsers(
-                null, null, null, null, null, null, 10);
-        assertThat(page1).hasSize(10);
+                null, null, null, null, null, null, PAGE_SIZE);
+        assertThat(page1).hasSize(PAGE_SIZE);
 
-        // 두 번째 페이지: 첫 페이지 마지막 id 커서로 사용
         Long nextCursor = page1.get(page1.size() - 1).id();
         List<UserSearchDTO> page2 = adminUserService.searchUsers(
-                null, null, null, null, null, nextCursor, 10);
-        assertThat(page2).hasSize(10);
+                null, null, null, null, null, nextCursor, PAGE_SIZE);
+        assertThat(page2).hasSize(PAGE_SIZE);
 
         List<Long> page1Ids = page1.stream().map(UserSearchDTO::id).toList();
         List<Long> page2Ids = page2.stream().map(UserSearchDTO::id).toList();
 
-        // 중복 없음
         assertThat(page1Ids).doesNotContainAnyElementsOf(page2Ids);
-        // id DESC 순서 확인 (page1 최솟값 > page2 최댓값)
         assertThat(page1Ids.get(page1Ids.size() - 1)).isGreaterThan(page2Ids.get(0));
 
-        log.info("Keyset 연속 페이징: page1 마지막 id={}, page2 첫 id={}",
+        log.info("✅ Keyset 연속 페이징: page1 마지막 id={}, page2 첫 id={} → 중복 없음, 순서 보장",
                 page1Ids.get(page1Ids.size() - 1), page2Ids.get(0));
     }
 
@@ -138,5 +132,6 @@ class PaginationPerformanceComparisonTest {
 
         assertThat(result).isNotEmpty();
         assertThat(result).allMatch(u -> u.email().contains("user1"));
+        log.info("✅ Keyset 필터 정확성: 'user1' 검색 결과 {}건, 모두 일치", result.size());
     }
 }
