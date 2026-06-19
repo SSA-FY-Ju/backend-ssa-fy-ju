@@ -28,6 +28,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminUserManagementController {
 
+    private static final int PAGE_SIZE = 20;
+
     private final AdminUserService adminUserService;
 
     @GetMapping
@@ -38,16 +40,15 @@ public class AdminUserManagementController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate joinDateTo,
             @RequestParam(required = false) UserStatus status,
             @RequestParam(required = false) Long cursor,
-            @RequestParam(defaultValue = "20") int size,
             Model model) {
 
         List<UserSearchDTO> users = adminUserService.searchUsers(
                 email, name,
-                toInstant(joinDateFrom),
-                toInstant(joinDateTo),
-                status, cursor, size);
+                toStartOfDayInstant(joinDateFrom),
+                toExclusiveEndInstant(joinDateTo),
+                status, cursor, PAGE_SIZE);
 
-        Long nextCursor = users.size() == size ? users.get(users.size() - 1).id() : null;
+        Long nextCursor = users.size() == PAGE_SIZE ? users.get(users.size() - 1).id() : null;
 
         model.addAttribute("users", users);
         model.addAttribute("nextCursor", nextCursor);
@@ -56,7 +57,7 @@ public class AdminUserManagementController {
         model.addAttribute("joinDateFrom", joinDateFrom);
         model.addAttribute("joinDateTo", joinDateTo);
         model.addAttribute("status", status);
-        model.addAttribute("size", size);
+        model.addAttribute("size", PAGE_SIZE);
         model.addAttribute("pageTitle", "유저 관리");
         model.addAttribute("currentMenu", "users");
         return "admin/user-management";
@@ -70,14 +71,13 @@ public class AdminUserManagementController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate joinDateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate joinDateTo,
             @RequestParam(required = false) UserStatus status,
-            @RequestParam(required = false) Long cursor,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(required = false) Long cursor) {
 
         List<UserSearchDTO> users = adminUserService.searchUsers(
                 email, name,
-                toInstant(joinDateFrom),
-                toInstant(joinDateTo),
-                status, cursor, size);
+                toStartOfDayInstant(joinDateFrom),
+                toExclusiveEndInstant(joinDateTo),
+                status, cursor, PAGE_SIZE);
 
         return ResponseEntity.ok(users);
     }
@@ -89,7 +89,11 @@ public class AdminUserManagementController {
         return ResponseEntity.ok(profile);
     }
 
-    private Instant toInstant(LocalDate date) {
+    private Instant toStartOfDayInstant(LocalDate date) {
         return date != null ? date.atStartOfDay().toInstant(ZoneOffset.UTC) : null;
+    }
+
+    private Instant toExclusiveEndInstant(LocalDate date) {
+        return date != null ? date.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC) : null;
     }
 }

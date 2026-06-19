@@ -79,10 +79,10 @@ class PaginationPerformanceComparisonTest {
     @Test
     @DisplayName("Keyset 첫 페이지 응답 시간 측정")
     void keyset_firstPage_measureTime() {
-        long start = System.currentTimeMillis();
+        long start = System.nanoTime();
         List<UserSearchDTO> result = adminUserService.searchUsers(
                 null, null, null, null, null, null, PAGE_SIZE);
-        long duration = System.currentTimeMillis() - start;
+        long duration = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
         log.info("🚀 Keyset 첫 페이지: {}ms (결과 {}건)", duration, result.size());
         assertThat(result).hasSize(PAGE_SIZE);
@@ -91,15 +91,16 @@ class PaginationPerformanceComparisonTest {
     @Test
     @DisplayName("Keyset 딥 페이지 응답 시간 측정")
     void keyset_deepPage_measureTime() {
-        Long cursorId = savedIds.get(savedIds.size() - 11) + 1;
+        Long cursorId = savedIds.get(PAGE_SIZE);
 
-        long start = System.currentTimeMillis();
+        long start = System.nanoTime();
         List<UserSearchDTO> result = adminUserService.searchUsers(
                 null, null, null, null, null, cursorId, PAGE_SIZE);
-        long duration = System.currentTimeMillis() - start;
+        long duration = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
         log.info("🚀 Keyset 딥 페이지(id<{}): {}ms (결과 {}건)", cursorId, duration, result.size());
-        assertThat(result).isNotNull();
+        assertThat(result).hasSize(PAGE_SIZE);
+        assertThat(result).allMatch(u -> u.id() < cursorId);
     }
 
     @Test

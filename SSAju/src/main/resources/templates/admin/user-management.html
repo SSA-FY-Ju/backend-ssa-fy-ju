@@ -214,19 +214,32 @@
         fetch('/admin/users/' + userId, { headers: { 'Accept': 'application/json' } })
             .then(res => res.json())
             .then(user => {
-                body.innerHTML = `
-                    <dl>
-                        <dt>ID</dt><dd>${user.id}</dd>
-                        <dt>이메일</dt><dd>${user.email}</dd>
-                        <dt>이름</dt><dd>${user.name}</dd>
-                        <dt>상태</dt><dd>${user.status}</dd>
-                        <dt>분석 횟수</dt><dd>${user.totalAnalysisCount}회</dd>
-                        <dt>가입일</dt><dd>${user.joinDate ? user.joinDate.slice(0, 10) : '-'}</dd>
-                        <dt>탈퇴일</dt><dd>${user.deletedAt ? user.deletedAt.slice(0, 10) : '-'}</dd>
-                    </dl>`;
+                const formatDate = (v) => v ? String(v).slice(0, 10) : '-';
+                const rows = [
+                    ['ID', user.id],
+                    ['이메일', user.email],
+                    ['이름', user.name],
+                    ['상태', user.status],
+                    ['분석 횟수', `${user.totalAnalysisCount ?? 0}회`],
+                    ['가입일', formatDate(user.joinDate)],
+                    ['탈퇴일', formatDate(user.deletedAt)]
+                ];
+
+                const dl = document.createElement('dl');
+                rows.forEach(([label, value]) => {
+                    const dt = document.createElement('dt');
+                    dt.textContent = label;
+                    const dd = document.createElement('dd');
+                    dd.textContent = value == null ? '-' : String(value);
+                    dl.append(dt, dd);
+                });
+                body.replaceChildren(dl);
             })
             .catch(() => {
-                body.innerHTML = '<p class="modal-loading">데이터를 불러올 수 없습니다.</p>';
+                const p = document.createElement('p');
+                p.className = 'modal-loading';
+                p.textContent = '데이터를 불러올 수 없습니다.';
+                body.replaceChildren(p);
             });
     }
 
