@@ -347,6 +347,17 @@
 
         const action = document.querySelector('input[name="adjustAction"]:checked').value;
         const amount = parseInt(document.getElementById('decrementAmount').value, 10);
+
+        if (action === 'DECREMENT' && (isNaN(amount) || amount <= 0)) {
+            const resultEl = document.getElementById('adjustResult');
+            resultEl.style.display = 'block';
+            resultEl.className = 'adjust-result error';
+            resultEl.textContent = '감소량은 1 이상의 숫자여야 합니다.';
+            submitBtn.disabled = false;
+            submitBtn.textContent = '적용';
+            return;
+        }
+
         const body = action === 'RESET' ? { action } : { action, amount };
 
         fetch(`/admin/daily-usages/users/${currentAdjustUserId}/adjust`, {
