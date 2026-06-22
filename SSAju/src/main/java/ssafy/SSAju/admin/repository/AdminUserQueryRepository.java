@@ -1,9 +1,6 @@
 package ssafy.SSAju.admin.repository;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import ssafy.SSAju.admin.dto.UserSearchDTO;
@@ -22,12 +19,14 @@ public class AdminUserQueryRepository {
     private final JdbcTemplate jdbcTemplate;
 
     /**
-     * Soft Delete된 유저 포함 검색.
-     * User 엔티티의 @SQLRestriction("deleted_at IS NULL")을 우회하기 위해 native query 사용.
+     * Keyset(커서) 기반 유저 목록 조회.
+     * lastId가 null이면 첫 페이지, null이 아니면 해당 id 이후 데이터를 조회.
+     * OFFSET 방식과 달리 깊은 페이지에서도 일정한 성능을 보장.
+     * User 엔티티의 @SQLRestriction을 우회하기 위해 native query 사용.
      */
-    public Page<UserSearchDTO> findUsersByFilters(
+    public List<UserSearchDTO> findUsersByKeyset(
             String email, String name, Instant joinDateFrom, Instant joinDateTo,
-            UserStatus status, Pageable pageable) {
+            UserStatus status, Long lastId, int limit) {
 
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         List<Object> params = new ArrayList<>();
@@ -52,8 +51,12 @@ public class AdminUserQueryRepository {
             where.append(" AND u.status = ?");
             params.add(status.name());
         }
+        if (lastId != null) {
+            where.append(" AND u.id < ?");
+            params.add(lastId);
+        }
 
-        String base = """
+        String sql = """
                 SELECT u.id, u.email, u.name, u.status, u.created_at, u.deleted_at,
                        COALESCE(ac.total, 0) AS total_analysis_count
                 FROM users u
@@ -69,16 +72,11 @@ public class AdminUserQueryRepository {
                     ) all_analyses
                     GROUP BY user_id
                 ) ac ON u.id = ac.user_id
-                """ + where;
-        String countSql = "SELECT COUNT(*) FROM (" + base + ") cnt";
-        Long total = jdbcTemplate.queryForObject(countSql, Long.class, params.toArray());
+                """ + where + " ORDER BY u.id DESC LIMIT ?";
 
-        String listSql = base + " ORDER BY u.created_at DESC LIMIT ? OFFSET ?";
-        List<Object> listParams = new ArrayList<>(params);
-        listParams.add(pageable.getPageSize());
-        listParams.add(pageable.getOffset());
+        params.add(limit);
 
-        List<UserSearchDTO> content = jdbcTemplate.query(listSql, (rs, rowNum) -> new UserSearchDTO(
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new UserSearchDTO(
                 rs.getLong("id"),
                 rs.getString("email"),
                 rs.getString("name"),
@@ -86,9 +84,7 @@ public class AdminUserQueryRepository {
                 UserStatus.valueOf(rs.getString("status")),
                 rs.getTimestamp("deleted_at") != null ? rs.getTimestamp("deleted_at").toInstant() : null,
                 rs.getLong("total_analysis_count")
-        ), listParams.toArray());
-
-        return new PageImpl<>(content, pageable, total != null ? total : 0L);
+        ), params.toArray());
     }
 
     public Optional<UserSearchDTO> findUserById(Long userId) {
