@@ -39,16 +39,17 @@ public class AdminAnalyticsController {
             Model model) {
 
         String normalizedType = (type != null && !type.isBlank()) ? type : null;
+        int validPage = Math.max(page, 0);
         List<AnalyticsListDTO> analytics = adminAnalyticsService.getAnalyticsHistory(
-                normalizedType, dateFrom, dateTo, page, PAGE_SIZE);
+                normalizedType, dateFrom, dateTo, validPage, PAGE_SIZE);
 
         model.addAttribute("analytics", analytics);
         model.addAttribute("type", normalizedType);
         model.addAttribute("dateFrom", dateFrom);
         model.addAttribute("dateTo", dateTo);
-        model.addAttribute("page", page);
+        model.addAttribute("page", validPage);
         model.addAttribute("pageSize", PAGE_SIZE);
-        model.addAttribute("hasPrev", page > 0);
+        model.addAttribute("hasPrev", validPage > 0);
         model.addAttribute("hasNext", analytics.size() == PAGE_SIZE);
         model.addAttribute("pageTitle", "분석 기록");
         model.addAttribute("currentMenu", "analytics");
