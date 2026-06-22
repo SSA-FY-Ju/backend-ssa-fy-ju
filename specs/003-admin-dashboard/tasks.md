@@ -273,7 +273,7 @@
 
 ### Services
 
-- [ ] T033 [US2] Create `AdminUserService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+- [x] T033 [US2] Create `AdminUserService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
   - `searchUsers(email, name, joinDateFrom, joinDateTo, status, page, size)` - with Soft Delete filtering
   - `getUserProfile(userId)` - returns UserSearchDTO with totalAnalysisCount
   
@@ -285,25 +285,25 @@
 
 ### Controllers
 
-- [ ] T034 [US2] Create `AdminUserManagementController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [x] T034 [US2] Create `AdminUserManagementController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - GET /admin/users (search + filter + pagination)
   - GET /admin/users/{id} (detail profile)
 
 ### Views & Templates
 
-- [ ] T035 [US2] Create user management template `admin/user-management.html` with:
+- [x] T035 [US2] Create user management template `admin/user-management.html` with:
   - Search form (email, name, joinDate range picker, status dropdown)
   - User list table (pagination, sortable columns)
   - Detail profile modal (basic info, analysis count)
 
 ### Tests (Optional)
 
-- [ ] T036 [US2] Create `AdminUserServiceTest.java` testing:
+- [x] T036 [US2] Create `AdminUserServiceTest.java` testing:
   - searchUsers() with various filter combinations
   - getUserProfile() with analysis count
   - Soft Delete filtering correctness
 
-- [ ] T037 [US2] Create `AdminUserManagementControllerTest.java` testing:
+- [x] T037 [US2] Create `AdminUserManagementControllerTest.java` testing:
   - GET /admin/users response time < 2 seconds (1000 records)
   - Soft Delete filtering correctness
   - Pagination functionality
