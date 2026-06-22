@@ -27,6 +27,7 @@ import ssafy.SSAju.exception.InvalidPasswordException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.exception.PublicDataApiException;
+import ssafy.SSAju.exception.AnalyticsNotFoundException;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.exception.UserNotFoundException;
 
@@ -209,6 +210,16 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.SAJU_RESULT_NOT_FOUND.getCode(),
+                        e.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(AnalyticsNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAnalyticsNotFound(
+            AnalyticsNotFoundException e, HttpServletRequest request) {
+        log.warn("Analytics not found: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.ANALYTICS_NOT_FOUND.getCode(),
                         e.getMessage(), generateRequestId())));
     }
 

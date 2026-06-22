@@ -8,6 +8,7 @@ import ssafy.SSAju.admin.config.AdminConfig;
 import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.repository.AdminAnalyticsQueryRepository;
+import ssafy.SSAju.exception.AnalyticsNotFoundException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -43,7 +44,7 @@ public class AdminAnalyticsService extends AdminBaseService {
 
     public AnalyticsDetailDTO getAnalyticsDetail(Long id, String analysisType) {
         return analyticsRepository.findAnalyticsById(id, analysisType)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new AnalyticsNotFoundException(
                         "분석 기록을 찾을 수 없습니다: id=" + id + ", type=" + analysisType));
     }
 
