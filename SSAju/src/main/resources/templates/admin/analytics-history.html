@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle} ?: 'SSAju 관리자'">SSAju 분석 기록</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #f5f5f5; display: flex; min-height: 100vh; }
+        .sidebar { width: 240px; background: #1a1a2e; color: #eee; padding: 24px 0; flex-shrink: 0; }
+        .sidebar .brand { padding: 0 24px 24px; font-size: 1.2rem; font-weight: bold; color: #e94560; border-bottom: 1px solid #333; }
+        .sidebar nav ul { list-style: none; margin-top: 16px; }
+        .sidebar nav ul li a { display: block; padding: 12px 24px; color: #ccc; text-decoration: none; transition: background 0.2s; }
+        .sidebar nav ul li a:hover, .sidebar nav ul li a.active { background: #16213e; color: #fff; border-left: 3px solid #e94560; }
+        .main-wrapper { flex: 1; display: flex; flex-direction: column; }
+        .header { background: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 1.1rem; color: #333; }
+        .logout-btn { background: #e94560; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        .content { flex: 1; padding: 24px; }
+        .footer { background: #fff; text-align: center; padding: 12px; font-size: 0.8rem; color: #999; border-top: 1px solid #eee; }
+
+        /* Search/filter form */
+        .search-card { background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .search-card h2 { font-size: 0.95rem; color: #555; margin-bottom: 14px; font-weight: 600; }
+        .search-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 0.78rem; color: #888; font-weight: 500; }
+        .form-group input, .form-group select { padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; color: #333; min-width: 140px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #e94560; }
+        .search-btn { background: #e94560; color: #fff; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; height: 36px; }
+        .reset-btn { background: #fff; color: #555; border: 1px solid #ddd; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; height: 36px; text-decoration: none; display: inline-flex; align-items: center; }
+        .range-note { font-size: 0.78rem; color: #aaa; align-self: flex-end; padding-bottom: 8px; }
+
+        /* Table */
+        .table-card { background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .table-header h2 { font-size: 0.95rem; color: #555; font-weight: 600; }
+        .result-count { font-size: 0.85rem; color: #888; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        thead tr { background: #f9f9f9; }
+        th { padding: 10px 12px; text-align: left; color: #666; font-weight: 600; font-size: 0.82rem; border-bottom: 2px solid #eee; }
+        td { padding: 12px; border-bottom: 1px solid #f0f0f0; color: #333; }
+        tr:hover td { background: #fafafa; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+        .badge-saju { background: #e3f2fd; color: #1565c0; }
+        .badge-consultation { background: #e8f5e9; color: #2e7d32; }
+        .badge-compatibility { background: #fce4ec; color: #c62828; }
+        .detail-btn { background: none; border: 1px solid #ddd; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82rem; color: #555; }
+        .detail-btn:hover { background: #f0f0f0; }
+        .reset-usage-btn { background: none; border: 1px solid #e94560; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82rem; color: #e94560; }
+        .reset-usage-btn:hover { background: #fce4ec; }
+        .empty-row td { text-align: center; color: #aaa; padding: 32px; }
+
+        /* Pagination */
+        .pagination { display: flex; justify-content: flex-end; margin-top: 16px; gap: 8px; align-items: center; }
+        .pagination a { padding: 6px 14px; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; font-size: 0.88rem; color: #555; }
+        .pagination a:hover { background: #f0f0f0; }
+        .pagination .page-info { font-size: 0.85rem; color: #888; padding: 6px 4px; }
+
+        /* Detail Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #fff; border-radius: 8px; padding: 28px; width: 640px; max-width: 90vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { font-size: 1rem; color: #1a1a2e; }
+        .modal-close { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: #888; }
+        .modal-meta { display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; margin-bottom: 16px; font-size: 0.88rem; }
+        .modal-meta dt { color: #888; font-weight: 600; display: flex; align-items: center; }
+        .modal-meta dd { color: #333; }
+        .json-block { background: #1a1a2e; color: #e0e0e0; border-radius: 6px; padding: 16px; font-family: 'Courier New', monospace; font-size: 0.82rem; white-space: pre-wrap; word-break: break-all; max-height: 360px; overflow-y: auto; margin-top: 8px; }
+        .json-label { font-size: 0.82rem; color: #888; font-weight: 600; margin-bottom: 6px; }
+        .modal-loading { text-align: center; color: #aaa; padding: 20px; }
+
+        /* Usage Adjust Modal */
+        .adjust-modal { background: #fff; border-radius: 8px; padding: 28px; width: 400px; max-width: 90vw; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .adjust-form { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+        .radio-group { display: flex; gap: 16px; }
+        .radio-group label { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; cursor: pointer; }
+        .amount-group { display: flex; flex-direction: column; gap: 4px; }
+        .amount-group label { font-size: 0.82rem; color: #888; }
+        .amount-group input { padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; width: 100%; }
+        .adjust-submit-btn { background: #e94560; color: #fff; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+        .adjust-submit-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .adjust-cancel-btn { background: #fff; color: #555; border: 1px solid #ddd; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        .adjust-result { background: #e8f5e9; border-radius: 6px; padding: 12px; font-size: 0.88rem; color: #2e7d32; display: none; }
+        .adjust-result.error { background: #fce4ec; color: #c62828; }
+    </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+    <div class="brand">SSAju Admin</div>
+    <nav>
+        <ul>
+            <li><a th:href="@{/admin/dashboard}" th:classappend="${currentMenu == 'dashboard'} ? 'active'">대시보드</a></li>
+            <li><a th:href="@{/admin/users}" th:classappend="${currentMenu == 'users'} ? 'active'">유저 관리</a></li>
+            <li><a th:href="@{/admin/analytics}" th:classappend="${currentMenu == 'analytics'} ? 'active'">분석 기록</a></li>
+            <li><a th:href="@{/admin/feedback}" th:classappend="${currentMenu == 'feedback'} ? 'active'">피드백 관리</a></li>
+        </ul>
+    </nav>
+</aside>
+
+<div class="main-wrapper">
+    <!-- Header -->
+    <header class="header">
+        <h1 th:text="${pageTitle}">분석 기록</h1>
+        <form th:action="@{/admin/logout}" method="post">
+            <button class="logout-btn" type="submit">로그아웃</button>
+        </form>
+    </header>
+
+    <main class="content">
+
+        <!-- Filter Form -->
+        <div class="search-card">
+            <h2>분석 기록 검색</h2>
+            <form class="search-form" th:action="@{/admin/analytics}" method="get">
+                <div class="form-group">
+                    <label>분석 유형</label>
+                    <select name="type">
+                        <option value="">전체</option>
+                        <option value="SAJU" th:selected="${type == 'SAJU'}">사주 분석</option>
+                        <option value="CAREER_CONSULTATION" th:selected="${type == 'CAREER_CONSULTATION'}">관운 상담</option>
+                        <option value="COMPANY_COMPATIBILITY" th:selected="${type == 'COMPANY_COMPATIBILITY'}">기업 궁합</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>조회 시작일</label>
+                    <input type="date" name="dateFrom" th:value="${dateFrom}">
+                </div>
+                <div class="form-group">
+                    <label>조회 종료일</label>
+                    <input type="date" name="dateTo" th:value="${dateTo}">
+                </div>
+                <button class="search-btn" type="submit">검색</button>
+                <a class="reset-btn" th:href="@{/admin/analytics}">초기화</a>
+                <span class="range-note">* 최근 30일 범위 내 조회</span>
+            </form>
+        </div>
+
+        <!-- Analytics Table -->
+        <div class="table-card">
+            <div class="table-header">
+                <h2>분석 목록</h2>
+                <span class="result-count" th:text="${analytics.size()} + '건 조회됨'">0건 조회됨</span>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>유저 ID</th>
+                        <th>분석 유형</th>
+                        <th>분석 일시</th>
+                        <th>상세</th>
+                        <th>일일 제한</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${analytics.isEmpty()}">
+                        <td colspan="6" class="empty-row" style="text-align:center; color:#aaa; padding:32px;">
+                            조회된 분석 기록이 없습니다.
+                        </td>
+                    </tr>
+                    <tr th:each="item : ${analytics}">
+                        <td th:text="${item.id}">1</td>
+                        <td th:text="${item.userId}">1</td>
+                        <td>
+                            <span th:if="${item.analysisType == 'SAJU'}" class="badge badge-saju">사주 분석</span>
+                            <span th:if="${item.analysisType == 'CAREER_CONSULTATION'}" class="badge badge-consultation">관운 상담</span>
+                            <span th:if="${item.analysisType == 'COMPANY_COMPATIBILITY'}" class="badge badge-compatibility">기업 궁합</span>
+                        </td>
+                        <td th:text="${#temporals.format(item.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
+                        <td>
+                            <button class="detail-btn"
+                                    th:data-id="${item.id}"
+                                    th:data-type="${item.analysisType}"
+                                    onclick="openDetailModal(this)">
+                                원문 보기
+                            </button>
+                        </td>
+                        <td>
+                            <button class="reset-usage-btn"
+                                    th:data-user-id="${item.userId}"
+                                    onclick="openAdjustModal(this)">
+                                제한 조정
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Page-based Pagination -->
+            <div class="pagination" th:if="${hasPrev || hasNext}">
+                <a th:if="${hasPrev}"
+                   th:href="@{/admin/analytics(type=${type}, dateFrom=${dateFrom}, dateTo=${dateTo}, page=${page - 1})}">&larr; 이전</a>
+                <span class="page-info" th:text="'페이지 ' + (${page} + 1)">페이지 1</span>
+                <a th:if="${hasNext}"
+                   th:href="@{/admin/analytics(type=${type}, dateFrom=${dateFrom}, dateTo=${dateTo}, page=${page + 1})}">다음 &rarr;</a>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="footer">
+        &copy; 2026 SSAju Admin
+    </footer>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>분석 원문 조회</h3>
+            <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+        </div>
+        <div id="detailModalBody">
+            <p class="modal-loading">불러오는 중...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Usage Adjust Modal -->
+<div class="modal-overlay" id="adjustModal">
+    <div class="adjust-modal">
+        <div class="modal-header">
+            <h3>일일 제한 조정</h3>
+            <button class="modal-close" onclick="closeAdjustModal()">&times;</button>
+        </div>
+        <p style="font-size:0.88rem; color:#888;">유저 ID: <strong id="adjustUserId"></strong> | 오늘 사용량 기준</p>
+        <div class="adjust-form">
+            <div class="radio-group">
+                <label><input type="radio" name="adjustAction" value="RESET" checked> RESET (0으로 초기화)</label>
+                <label><input type="radio" name="adjustAction" value="DECREMENT"> DECREMENT (감소)</label>
+            </div>
+            <div class="amount-group" id="amountGroup" style="display:none;">
+                <label>감소량</label>
+                <input type="number" id="decrementAmount" min="1" value="1" placeholder="감소할 횟수">
+            </div>
+            <div class="adjust-result" id="adjustResult"></div>
+            <div style="display:flex; gap:8px;">
+                <button class="adjust-submit-btn" onclick="submitAdjust()">적용</button>
+                <button class="adjust-cancel-btn" onclick="closeAdjustModal()">취소</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Detail Modal
+    function openDetailModal(btn) {
+        const id = btn.getAttribute('data-id');
+        const type = btn.getAttribute('data-type');
+        const modal = document.getElementById('detailModal');
+        const body = document.getElementById('detailModalBody');
+
+        modal.classList.add('active');
+        body.innerHTML = '<p class="modal-loading">불러오는 중...</p>';
+
+        fetch(`/admin/analytics/${id}?type=${encodeURIComponent(type)}`, {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(res => {
+                if (!res.ok) throw new Error('데이터를 불러올 수 없습니다.');
+                return res.json();
+            })
+            .then(data => {
+                // 9번: textContent 사용으로 XSS 안전하게 JSON 렌더링
+                const dl = document.createElement('dl');
+                dl.className = 'modal-meta';
+                [
+                    ['ID', data.id],
+                    ['유저 ID', data.userId],
+                    ['분석 유형', data.analysisType],
+                    ['분석 일시', data.createdAt ? String(data.createdAt).replace('T', ' ').slice(0, 19) : '-']
+                ].forEach(([label, value]) => {
+                    const dt = document.createElement('dt');
+                    dt.textContent = label;
+                    const dd = document.createElement('dd');
+                    dd.textContent = value ?? '-';
+                    dl.append(dt, dd);
+                });
+
+                const jsonLabel = document.createElement('p');
+                jsonLabel.className = 'json-label';
+                jsonLabel.textContent = '분석 데이터 원문';
+
+                const pre = document.createElement('pre');
+                pre.className = 'json-block';
+                // textContent 사용: HTML 이스케이프 자동 처리, XSS 방지
+                try {
+                    pre.textContent = JSON.stringify(JSON.parse(data.jsonData), null, 2);
+                } catch (e) {
+                    pre.textContent = data.jsonData ?? '-';
+                }
+
+                body.replaceChildren(dl, jsonLabel, pre);
+            })
+            .catch(err => {
+                const p = document.createElement('p');
+                p.className = 'modal-loading';
+                p.textContent = err.message;
+                body.replaceChildren(p);
+            });
+    }
+
+    function closeDetailModal() {
+        document.getElementById('detailModal').classList.remove('active');
+    }
+
+    document.getElementById('detailModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDetailModal();
+    });
+
+    // Usage Adjust Modal
+    let currentAdjustUserId = null;
+
+    document.querySelectorAll('input[name="adjustAction"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const isDecrement = radio.value === 'DECREMENT' && radio.checked;
+            document.getElementById('amountGroup').style.display = isDecrement ? 'block' : 'none';
+        });
+    });
+
+    function openAdjustModal(btn) {
+        currentAdjustUserId = btn.getAttribute('data-user-id');
+        document.getElementById('adjustUserId').textContent = currentAdjustUserId;
+        document.getElementById('adjustResult').style.display = 'none';
+        document.querySelector('input[name="adjustAction"][value="RESET"]').checked = true;
+        document.getElementById('amountGroup').style.display = 'none';
+        const submitBtn = document.querySelector('.adjust-submit-btn');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '적용';
+        document.getElementById('adjustModal').classList.add('active');
+    }
+
+    function closeAdjustModal() {
+        document.getElementById('adjustModal').classList.remove('active');
+        currentAdjustUserId = null;
+    }
+
+    function submitAdjust() {
+        const submitBtn = document.querySelector('.adjust-submit-btn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '처리 중...';
+
+        const action = document.querySelector('input[name="adjustAction"]:checked').value;
+        const amount = parseInt(document.getElementById('decrementAmount').value, 10);
+        const body = action === 'RESET' ? { action } : { action, amount };
+
+        fetch(`/admin/daily-usages/users/${currentAdjustUserId}/adjust`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(body)
+        })
+            .then(res => res.json().then(data => ({ ok: res.ok, data })))
+            .then(({ ok, data }) => {
+                const resultEl = document.getElementById('adjustResult');
+                resultEl.style.display = 'block';
+                if (ok) {
+                    resultEl.className = 'adjust-result';
+                    resultEl.textContent =
+                        `완료: ${data.action} | ${data.usageCountBefore}회 → ${data.usageCountAfter}회`;
+                    submitBtn.textContent = '완료';
+                } else {
+                    resultEl.className = 'adjust-result error';
+                    resultEl.textContent = data.message ?? '조정에 실패했습니다.';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '적용';
+                }
+            })
+            .catch(() => {
+                const resultEl = document.getElementById('adjustResult');
+                resultEl.style.display = 'block';
+                resultEl.className = 'adjust-result error';
+                resultEl.textContent = '서버 오류가 발생했습니다.';
+                submitBtn.disabled = false;
+                submitBtn.textContent = '적용';
+            });
+    }
+
+    document.getElementById('adjustModal').addEventListener('click', function(e) {
+        if (e.target === this) closeAdjustModal();
+    });
+</script>
+</body>
+</html>
