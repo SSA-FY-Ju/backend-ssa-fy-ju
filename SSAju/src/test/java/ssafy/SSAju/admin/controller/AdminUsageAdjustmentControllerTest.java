@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import ssafy.SSAju.admin.dto.AdjustmentAction;
 import ssafy.SSAju.admin.dto.UsageAdjustmentRequestDTO;
 import ssafy.SSAju.admin.dto.UsageAdjustmentResponseDTO;
 import ssafy.SSAju.admin.service.AdminUsageAdjustmentService;
@@ -51,7 +52,7 @@ class AdminUsageAdjustmentControllerTest {
         mockMvc.perform(post("/admin/daily-usages/users/1/adjust")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new UsageAdjustmentRequestDTO("RESET", null))))
+                                new UsageAdjustmentRequestDTO(AdjustmentAction.RESET, null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.action").value("RESET"))
                 .andExpect(jsonPath("$.usageCountBefore").value(3))
@@ -68,22 +69,18 @@ class AdminUsageAdjustmentControllerTest {
         mockMvc.perform(post("/admin/daily-usages/users/1/adjust")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new UsageAdjustmentRequestDTO("DECREMENT", 1))))
+                                new UsageAdjustmentRequestDTO(AdjustmentAction.DECREMENT, 1))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.usageCountBefore").value(3))
                 .andExpect(jsonPath("$.usageCountAfter").value(2));
     }
 
     @Test
-    @DisplayName("POST /admin/daily-usages/users/{userId}/adjust - 잘못된 action → 400")
+    @DisplayName("POST /admin/daily-usages/users/{userId}/adjust - 잘못된 action → 400 (Jackson 역직렬화 실패)")
     void adjustDailyUsage_invalidAction_returns400() throws Exception {
-        given(usageAdjustmentService.adjustDailyUsage(eq(1L), any()))
-                .willThrow(new IllegalArgumentException("action은 RESET 또는 DECREMENT 이어야 합니다."));
-
         mockMvc.perform(post("/admin/daily-usages/users/1/adjust")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new UsageAdjustmentRequestDTO("DELETE", null))))
+                        .content("{\"action\": \"DELETE\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -96,7 +93,7 @@ class AdminUsageAdjustmentControllerTest {
         mockMvc.perform(post("/admin/daily-usages/users/999/adjust")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new UsageAdjustmentRequestDTO("RESET", null))))
+                                new UsageAdjustmentRequestDTO(AdjustmentAction.RESET, null))))
                 .andExpect(status().isNotFound());
     }
 
@@ -109,7 +106,7 @@ class AdminUsageAdjustmentControllerTest {
         mockMvc.perform(post("/admin/daily-usages/users/1/adjust")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new UsageAdjustmentRequestDTO("DECREMENT", 0))))
+                                new UsageAdjustmentRequestDTO(AdjustmentAction.DECREMENT, 0))))
                 .andExpect(status().isBadRequest());
     }
 }

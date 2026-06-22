@@ -6,6 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ssafy.SSAju.admin.dto.AdjustmentAction;
 import ssafy.SSAju.admin.dto.UsageAdjustmentRequestDTO;
 import ssafy.SSAju.admin.dto.UsageAdjustmentResponseDTO;
 import ssafy.SSAju.admin.dto.UserSearchDTO;
@@ -68,7 +69,7 @@ class AdminUsageAdjustmentServiceTest {
         given(dailyUsageRepository.resetDailyUsage(eq(1L), any())).willReturn(1);
 
         UsageAdjustmentResponseDTO result = usageAdjustmentService.adjustDailyUsage(
-                1L, new UsageAdjustmentRequestDTO("RESET", null));
+                1L, new UsageAdjustmentRequestDTO(AdjustmentAction.RESET, null));
 
         assertThat(result.usageCountBefore()).isEqualTo(3);
         assertThat(result.usageCountAfter()).isEqualTo(0);
@@ -84,7 +85,7 @@ class AdminUsageAdjustmentServiceTest {
         given(dailyUsageRepository.decrementDailyUsage(eq(1L), any(), eq(1))).willReturn(1);
 
         UsageAdjustmentResponseDTO result = usageAdjustmentService.adjustDailyUsage(
-                1L, new UsageAdjustmentRequestDTO("DECREMENT", 1));
+                1L, new UsageAdjustmentRequestDTO(AdjustmentAction.DECREMENT, 1));
 
         assertThat(result.usageCountBefore()).isEqualTo(3);
         assertThat(result.usageCountAfter()).isEqualTo(2);
@@ -99,7 +100,7 @@ class AdminUsageAdjustmentServiceTest {
         given(dailyUsageRepository.decrementDailyUsage(eq(1L), any(), eq(5))).willReturn(1);
 
         UsageAdjustmentResponseDTO result = usageAdjustmentService.adjustDailyUsage(
-                1L, new UsageAdjustmentRequestDTO("DECREMENT", 5));
+                1L, new UsageAdjustmentRequestDTO(AdjustmentAction.DECREMENT, 5));
 
         assertThat(result.usageCountAfter()).isEqualTo(0);
     }
@@ -111,7 +112,7 @@ class AdminUsageAdjustmentServiceTest {
         given(dailyUsageRepository.findUsageByUserAndDate(eq(1L), any())).willReturn(Optional.empty());
 
         UsageAdjustmentResponseDTO result = usageAdjustmentService.adjustDailyUsage(
-                1L, new UsageAdjustmentRequestDTO("RESET", null));
+                1L, new UsageAdjustmentRequestDTO(AdjustmentAction.RESET, null));
 
         assertThat(result.usageCountBefore()).isEqualTo(0);
         assertThat(result.usageCountAfter()).isEqualTo(0);
@@ -124,25 +125,16 @@ class AdminUsageAdjustmentServiceTest {
         given(adminUserQueryRepository.findUserById(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> usageAdjustmentService.adjustDailyUsage(
-                999L, new UsageAdjustmentRequestDTO("RESET", null)))
+                999L, new UsageAdjustmentRequestDTO(AdjustmentAction.RESET, null)))
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessageContaining("999");
-    }
-
-    @Test
-    @DisplayName("adjustDailyUsage - 잘못된 action → IllegalArgumentException 발생")
-    void adjustDailyUsage_invalidAction_throwsException() {
-        assertThatThrownBy(() -> usageAdjustmentService.adjustDailyUsage(
-                1L, new UsageAdjustmentRequestDTO("DELETE", null)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("RESET 또는 DECREMENT");
     }
 
     @Test
     @DisplayName("adjustDailyUsage - DECREMENT, amount == 0 → IllegalArgumentException 발생")
     void adjustDailyUsage_decrementAmountZero_throwsException() {
         assertThatThrownBy(() -> usageAdjustmentService.adjustDailyUsage(
-                1L, new UsageAdjustmentRequestDTO("DECREMENT", 0)))
+                1L, new UsageAdjustmentRequestDTO(AdjustmentAction.DECREMENT, 0)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("amount는 1 이상");
     }
@@ -151,7 +143,7 @@ class AdminUsageAdjustmentServiceTest {
     @DisplayName("adjustDailyUsage - DECREMENT, amount null → IllegalArgumentException 발생")
     void adjustDailyUsage_decrementAmountNull_throwsException() {
         assertThatThrownBy(() -> usageAdjustmentService.adjustDailyUsage(
-                1L, new UsageAdjustmentRequestDTO("DECREMENT", null)))
+                1L, new UsageAdjustmentRequestDTO(AdjustmentAction.DECREMENT, null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("amount는 1 이상");
     }

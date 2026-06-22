@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import ssafy.SSAju.exception.AnalyticsNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AdminAnalyticsService 단위 테스트")
@@ -148,12 +149,12 @@ class AdminAnalyticsServiceTest {
     }
 
     @Test
-    @DisplayName("getAnalyticsDetail - 존재하지 않는 id → IllegalArgumentException 발생")
+    @DisplayName("getAnalyticsDetail - 존재하지 않는 id → AnalyticsNotFoundException 발생")
     void getAnalyticsDetail_notFound_throwsException() {
         given(analyticsRepository.findAnalyticsById(999L, "SAJU")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> adminAnalyticsService.getAnalyticsDetail(999L, "SAJU"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(AnalyticsNotFoundException.class)
                 .hasMessageContaining("999");
     }
 }
