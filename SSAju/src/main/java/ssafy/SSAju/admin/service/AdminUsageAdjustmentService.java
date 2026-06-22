@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ssafy.SSAju.admin.dto.AdjustmentAction;
 import ssafy.SSAju.admin.dto.UsageAdjustmentRequestDTO;
 import ssafy.SSAju.admin.dto.UsageAdjustmentResponseDTO;
 import ssafy.SSAju.admin.repository.AdminDailyUsageQueryRepository;
@@ -20,9 +21,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class AdminUsageAdjustmentService extends AdminBaseService {
 
-    private static final String ACTION_RESET = "RESET";
-    private static final String ACTION_DECREMENT = "DECREMENT";
-
     private final AdminDailyUsageQueryRepository dailyUsageRepository;
     private final AdminUserQueryRepository adminUserQueryRepository;
 
@@ -38,11 +36,11 @@ public class AdminUsageAdjustmentService extends AdminBaseService {
 
         if (usageOpt.isEmpty()) {
             log.debug("오늘 일일 사용량 레코드 없음: userId={}, date={}", userId, today);
-            return new UsageAdjustmentResponseDTO(userId, today.toString(), 0, 0, request.action());
+            return new UsageAdjustmentResponseDTO(userId, today.toString(), 0, 0, request.action().name());
         }
 
         int after;
-        if (ACTION_RESET.equals(request.action())) {
+        if (request.action() == AdjustmentAction.RESET) {
             dailyUsageRepository.resetDailyUsage(userId, today);
             after = 0;
         } else {
@@ -52,20 +50,16 @@ public class AdminUsageAdjustmentService extends AdminBaseService {
 
         log.debug("일일 사용량 조정 완료: userId={}, action={}, before={}, after={}",
                 userId, request.action(), before, after);
-        return new UsageAdjustmentResponseDTO(userId, today.toString(), before, after, request.action());
+        return new UsageAdjustmentResponseDTO(userId, today.toString(), before, after, request.action().name());
     }
 
     private void validateRequest(UsageAdjustmentRequestDTO request) {
-        if (request.action() == null || request.action().isBlank()) {
+        if (request.action() == null) {
             throw new IllegalArgumentException("action은 필수입니다.");
         }
-        if (!ACTION_RESET.equals(request.action()) && !ACTION_DECREMENT.equals(request.action())) {
-            throw new IllegalArgumentException("action은 RESET 또는 DECREMENT 이어야 합니다.");
-        }
-        if (ACTION_DECREMENT.equals(request.action())) {
-            if (request.amount() == null || request.amount() <= 0) {
-                throw new IllegalArgumentException("DECREMENT 시 amount는 1 이상이어야 합니다.");
-            }
+        if (request.action() == AdjustmentAction.DECREMENT
+                && (request.amount() == null || request.amount() <= 0)) {
+            throw new IllegalArgumentException("DECREMENT 시 amount는 1 이상이어야 합니다.");
         }
     }
 

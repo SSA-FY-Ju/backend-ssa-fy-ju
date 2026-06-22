@@ -1,3 +1,3 @@
 package ssafy.SSAju.admin.dto;
 
-public record UsageAdjustmentRequestDTO(String action, Integer amount) {}
+public record UsageAdjustmentRequestDTO(AdjustmentAction action, Integer amount) {}
