@@ -118,14 +118,12 @@
                 <div style="margin-top: 12px; display: flex; gap: 16px;">
                     <div>
                         <div style="font-size: 1.1rem; font-weight: bold; color: #2e7d32;"
-                             th:text="${#maps.isEmpty(stats.satisfiedCountByFeedbackType())} ? 0 :
-                                 ${stats.satisfiedCountByFeedbackType().values().stream().mapToLong(v -> v).sum()}">0</div>
+                             th:text="${stats.totalSatisfied()}">0</div>
                         <div class="stat-label">만족</div>
                     </div>
                     <div>
                         <div style="font-size: 1.1rem; font-weight: bold; color: #c62828;"
-                             th:text="${#maps.isEmpty(stats.unsatisfiedCountByFeedbackType())} ? 0 :
-                                 ${stats.unsatisfiedCountByFeedbackType().values().stream().mapToLong(v -> v).sum()}">0</div>
+                             th:text="${stats.totalUnsatisfied()}">0</div>
                         <div class="stat-label">불만족</div>
                     </div>
                 </div>
