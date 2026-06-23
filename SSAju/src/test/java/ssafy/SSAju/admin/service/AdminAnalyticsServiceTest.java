@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import ssafy.SSAju.exception.AnalyticsNotFoundException;
 import ssafy.SSAju.exception.InvalidDateRangeException;
 
@@ -85,11 +86,12 @@ class AdminAnalyticsServiceTest {
         given(analyticsRepository.findAnalyticsByDateAndType(any(), any(), any(), anyInt(), anyInt()))
                 .willReturn(List.of());
 
-        LocalDate tooEarly = LocalDate.now().minusDays(60);
+        LocalDate seoulToday = LocalDate.now(AdminBaseService.SEOUL_ZONE);
+        LocalDate tooEarly = seoulToday.minusDays(60);
         adminAnalyticsService.getAnalyticsHistory(null, tooEarly, null, 0, 20);
 
         // 실제 전달된 dateFrom은 today - 29일로 조정됨
-        LocalDate expectedFrom = LocalDate.now().minusDays(29);
+        LocalDate expectedFrom = seoulToday.minusDays(29);
         verify(analyticsRepository).findAnalyticsByDateAndType(
                 isNull(), eq(expectedFrom), any(), eq(0), eq(20));
     }
@@ -102,11 +104,12 @@ class AdminAnalyticsServiceTest {
         given(analyticsRepository.findAnalyticsByDateAndType(any(), any(), any(), anyInt(), anyInt()))
                 .willReturn(List.of());
 
-        LocalDate future = LocalDate.now().plusDays(5);
+        LocalDate seoulToday = LocalDate.now(AdminBaseService.SEOUL_ZONE);
+        LocalDate future = seoulToday.plusDays(5);
         adminAnalyticsService.getAnalyticsHistory(null, null, future, 0, 20);
 
         verify(analyticsRepository).findAnalyticsByDateAndType(
-                isNull(), any(), eq(LocalDate.now()), eq(0), eq(20));
+                isNull(), any(), eq(seoulToday), eq(0), eq(20));
     }
 
     @Test
@@ -114,12 +117,15 @@ class AdminAnalyticsServiceTest {
     void getAnalyticsHistory_fromAfterTo_throwsException() {
         stubAnalyticsRangeDays(30);
 
-        LocalDate from = LocalDate.now().minusDays(1);
-        LocalDate to = LocalDate.now().minusDays(5);
+        LocalDate seoulToday = LocalDate.now(AdminBaseService.SEOUL_ZONE);
+        LocalDate from = seoulToday.minusDays(1);
+        LocalDate to = seoulToday.minusDays(5);
 
         assertThatThrownBy(() -> adminAnalyticsService.getAnalyticsHistory(null, from, to, 0, 20))
                 .isInstanceOf(InvalidDateRangeException.class)
                 .hasMessageContaining("시작일");
+
+        verifyNoInteractions(analyticsRepository);
     }
 
     @Test
