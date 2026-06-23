@@ -20,6 +20,8 @@ import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -71,6 +73,7 @@ class AdminUsageAdjustmentControllerTest {
                         .content(objectMapper.writeValueAsString(
                                 new UsageAdjustmentRequestDTO(AdjustmentAction.DECREMENT, 1))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.action").value("DECREMENT"))
                 .andExpect(jsonPath("$.usageCountBefore").value(3))
                 .andExpect(jsonPath("$.usageCountAfter").value(2));
     }
@@ -82,6 +85,8 @@ class AdminUsageAdjustmentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"action\": \"DELETE\"}"))
                 .andExpect(status().isBadRequest());
+
+        verify(usageAdjustmentService, never()).adjustDailyUsage(any(), any());
     }
 
     @Test
