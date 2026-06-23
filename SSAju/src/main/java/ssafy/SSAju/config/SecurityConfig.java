@@ -59,6 +59,7 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth ->
                 auth
+                    .requestMatchers("/favicon.ico", "/.well-known/**").permitAll()
                     .requestMatchers("/swagger-ui/**", swaggerUiPath, "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
                     .requestMatchers("/api/auth/check-email", "/api/auth/signup", "/api/auth/login", "/api/auth/refresh").permitAll()
                     .requestMatchers("/api/auth/**").authenticated()

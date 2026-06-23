@@ -11,8 +11,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import ssafy.SSAju.admin.config.AdminAccessDeniedHandler;
 import ssafy.SSAju.admin.config.AdminAuthenticationEntryPoint;
 import ssafy.SSAju.admin.config.AdminCookieJwtFilter;
@@ -39,9 +37,8 @@ public class AdminSecurityConfig {
 
         http
             .securityMatcher("/admin/**")
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
+            // admin_access_token 쿠키가 SameSite=Strict으로 설정되어 있어 CSRF 공격 불가 → 토큰 불필요
+            .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth ->

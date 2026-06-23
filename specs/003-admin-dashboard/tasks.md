@@ -321,47 +321,47 @@
 
 ### Services
 
-- [ ] T038 [US3] Create `AdminAnalyticsService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+- [x] T038 [US3] Create `AdminAnalyticsService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
   - getAnalyticsHistory(analysisType, dateFrom, dateTo, page, size) - returns paginated list with latest first
-  - getAnalyticsDetail(analysisId) - returns AnalyticsDetailDTO with raw JSON data
-  - validateJsonEncoding(jsonData) - checks UTF-8 Korean character rendering
+  - getAnalyticsDetail(Long id, String analysisType) - returns AnalyticsDetailDTO with raw JSON data
+  - (validateJsonEncoding 미구현)
 
-- [ ] T039 [US3] Create `AdminUsageAdjustmentService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
-  - resetDailyUsage(userId, date) - sets UsageCount to 0
-  - decrementDailyUsage(userId, date, amount) - decreases by amount with validation
+- [x] T039 [US3] Create `AdminUsageAdjustmentService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+  - adjustDailyUsage(Long userId, UsageAdjustmentRequestDTO request) - 단일 진입점, RESET/DECREMENT 처리
+  - (resetDailyUsage / decrementDailyUsage 는 AdminDailyUsageQueryRepository 의 메서드)
 
 ### Controllers
 
-- [ ] T040 [US3] Create `AdminAnalyticsController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [x] T040 [US3] Create `AdminAnalyticsController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - GET /admin/analytics (list with type/date filtering)
-  - GET /admin/analytics/{id} (detail with JSON validation)
+  - GET /admin/analytics/{id}?type={analysisType} (detail - @RequestParam String type 필수)
 
-- [ ] T041 [US3] Create `AdminUsageAdjustmentController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [x] T041 [US3] Create `AdminUsageAdjustmentController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - POST /admin/daily-usages/users/{userId}/adjust (body: {"action": "RESET"} or {"action": "DECREMENT", "amount": N})
 
 ### Views & Templates
 
-- [ ] T042 [US3] Create analytics template `admin/analytics-history.html` with:
+- [x] T042 [US3] Create analytics template `admin/analytics-history.html` with:
   - Analytics list table (type filter, date range picker, pagination)
   - Detail view modal (JSON display in code block with syntax highlighting)
-  - Usage reset form (action dropdown + amount input + confirm modal)
+  - Usage reset form (action 라디오 버튼 RESET/DECREMENT + amount input + confirm modal)
 
 ### Tests (Optional)
 
-- [ ] T043 [US3] Create `AdminAnalyticsServiceTest.java` testing:
+- [x] T043 [US3] Create `AdminAnalyticsServiceTest.java` testing:
   - getAnalyticsHistory() pagination and sorting
   - getAnalyticsDetail() JSON data integrity
   - validateJsonEncoding() with Korean characters
 
-- [ ] T044 [US3] Create `AdminUsageAdjustmentServiceTest.java` testing:
+- [x] T044 [US3] Create `AdminUsageAdjustmentServiceTest.java` testing:
   - resetDailyUsage() with edge cases (already 0)
   - decrementDailyUsage() with validation (cannot go negative)
 
-- [ ] T045 [US3] Create `AdminAnalyticsControllerTest.java` testing:
+- [x] T045 [US3] Create `AdminAnalyticsControllerTest.java` testing:
   - GET /admin/analytics response structure and pagination
   - GET /admin/analytics/{id} detail view with JSON validation
 
-- [ ] T046 [US3] Create `AdminUsageAdjustmentControllerTest.java` testing:
+- [x] T046 [US3] Create `AdminUsageAdjustmentControllerTest.java` testing:
   - POST /admin/daily-usages/users/{userId}/adjust with RESET action
   - POST /admin/daily-usages/users/{userId}/adjust with DECREMENT action and validation
 
