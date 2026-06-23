@@ -146,7 +146,6 @@
                     <label>피드백 유형</label>
                     <select name="type">
                         <option value="">전체</option>
-                        <option value="CAREER_TIMING" th:selected="${type == 'CAREER_TIMING'}">커리어 타이밍</option>
                         <option value="CONSULTATION" th:selected="${type == 'CONSULTATION'}">관운 상담</option>
                         <option value="COMPATIBILITY" th:selected="${type == 'COMPATIBILITY'}">기업 궁합</option>
                     </select>
@@ -243,8 +242,8 @@
         unsatisfied: /*[[${stats.unsatisfiedCountByFeedbackType()}]]*/ {}
     };
 
-    const labels = ['커리어 타이밍', '관운 상담', '기업 궁합'];
-    const keys = ['CAREER_TIMING', 'CONSULTATION', 'COMPATIBILITY'];
+    const labels = ['관운 상담', '기업 궁합'];
+    const keys = ['CONSULTATION', 'COMPATIBILITY'];
 
     const satisfiedData = keys.map(k => statsData.satisfied[k] || 0);
     const unsatisfiedData = keys.map(k => statsData.unsatisfied[k] || 0);
