@@ -94,6 +94,7 @@ public enum ErrorMessageConstants {
     // === 피드백 예외 메시지 ===
     SAJU_RESULT_NOT_FOUND("SAJU_RESULT_NOT_FOUND", "해당 SajuResult를 찾을 수 없습니다."),
     ANALYTICS_NOT_FOUND("ANALYTICS_NOT_FOUND", "해당 분석 기록을 찾을 수 없습니다."),
+    INVALID_DATE_RANGE("INVALID_DATE_RANGE", "시작일이 종료일보다 늦을 수 없습니다."),
     INVALID_FEEDBACK_TYPE("INVALID_FEEDBACK_TYPE", "feedbackType은 CAREER_TIMING, CONSULTATION, COMPATIBILITY 중 하나여야 합니다."),
 
     // === 인증 예외 메시지 ===

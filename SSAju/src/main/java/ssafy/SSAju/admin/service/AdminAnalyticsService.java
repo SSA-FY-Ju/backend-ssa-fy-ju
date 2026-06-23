@@ -9,6 +9,7 @@ import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.repository.AdminAnalyticsQueryRepository;
 import ssafy.SSAju.exception.AnalyticsNotFoundException;
+import ssafy.SSAju.exception.InvalidDateRangeException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -62,7 +63,7 @@ public class AdminAnalyticsService extends AdminBaseService {
 
     private void validateDateRange(LocalDate from, LocalDate to) {
         if (from.isAfter(to)) {
-            throw new IllegalArgumentException("시작일이 종료일보다 늦을 수 없습니다.");
+            throw new InvalidDateRangeException("시작일이 종료일보다 늦을 수 없습니다.");
         }
     }
 }

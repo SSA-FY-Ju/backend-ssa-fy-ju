@@ -28,6 +28,7 @@ import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.exception.PublicDataApiException;
 import ssafy.SSAju.exception.AnalyticsNotFoundException;
+import ssafy.SSAju.exception.InvalidDateRangeException;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.exception.UserNotFoundException;
 
@@ -210,6 +211,16 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.SAJU_RESULT_NOT_FOUND.getCode(),
+                        e.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(InvalidDateRangeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidDateRange(
+            InvalidDateRangeException e, HttpServletRequest request) {
+        log.warn("잘못된 날짜 범위: {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.INVALID_DATE_RANGE.getCode(),
                         e.getMessage(), generateRequestId())));
     }
 

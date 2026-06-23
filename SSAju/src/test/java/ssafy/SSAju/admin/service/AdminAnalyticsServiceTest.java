@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import ssafy.SSAju.exception.AnalyticsNotFoundException;
+import ssafy.SSAju.exception.InvalidDateRangeException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AdminAnalyticsService 단위 테스트")
@@ -109,7 +110,7 @@ class AdminAnalyticsServiceTest {
     }
 
     @Test
-    @DisplayName("getAnalyticsHistory - dateFrom > dateTo → IllegalArgumentException 발생")
+    @DisplayName("getAnalyticsHistory - dateFrom > dateTo → InvalidDateRangeException 발생")
     void getAnalyticsHistory_fromAfterTo_throwsException() {
         stubAnalyticsRangeDays(30);
 
@@ -117,7 +118,7 @@ class AdminAnalyticsServiceTest {
         LocalDate to = LocalDate.now().minusDays(5);
 
         assertThatThrownBy(() -> adminAnalyticsService.getAnalyticsHistory(null, from, to, 0, 20))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidDateRangeException.class)
                 .hasMessageContaining("시작일");
     }
 
