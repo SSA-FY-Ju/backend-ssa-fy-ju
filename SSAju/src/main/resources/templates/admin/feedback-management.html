@@ -146,8 +146,8 @@
                     <label>피드백 유형</label>
                     <select name="type">
                         <option value="">전체</option>
-                        <option value="CONSULTATION" th:selected="${type == 'CONSULTATION'}">관운 상담</option>
-                        <option value="COMPATIBILITY" th:selected="${type == 'COMPATIBILITY'}">기업 궁합</option>
+                        <option value="CONSULTATION" th:selected="${type?.name() == 'CONSULTATION'}">관운 상담</option>
+                        <option value="COMPATIBILITY" th:selected="${type?.name() == 'COMPATIBILITY'}">기업 궁합</option>
                     </select>
                 </div>
                 <button class="search-btn" type="submit">검색</button>
@@ -280,6 +280,10 @@
 </script>
 
 <script>
+    function formatDateTime(isoString) {
+        return isoString ? isoString.replace('T', ' ').slice(0, 19) : '-';
+    }
+
     function openDetailModal(btn) {
         const id = btn.getAttribute('data-id');
         const modal = document.getElementById('detailModal');
@@ -317,7 +321,7 @@
                     ['유저 ID', data.userId ?? '-'],
                     ['유형', typeMap[data.feedbackType] ?? data.feedbackType],
                     ['만족 여부', statusMap[data.satisfactionStatus] ?? data.satisfactionStatus],
-                    ['작성일시', data.createdAt ? data.createdAt.replace('T', ' ').slice(0, 19) : '-']
+                    ['작성일시', formatDateTime(data.createdAt)]
                 ].forEach(([label, value]) => {
                     const dt = document.createElement('dt');
                     dt.textContent = label;
@@ -343,9 +347,7 @@
                     analysisEl = document.createElement('div');
                     analysisEl.className = 'analysis-box';
                     const type = analysisTypeMap[data.analysisType] ?? data.analysisType;
-                    const date = data.analysisCreatedAt
-                        ? data.analysisCreatedAt.replace('T', ' ').slice(0, 19)
-                        : '-';
+                    const date = formatDateTime(data.analysisCreatedAt);
                     analysisEl.textContent = `${type} (ID: ${data.analysisId}) | 생성일: ${date}`;
                 } else {
                     analysisEl = document.createElement('p');
