@@ -31,10 +31,12 @@ public class AdminFeedbackService extends AdminBaseService {
         return stats;
     }
 
-    public Page<FeedbackListDTO> getFeedbackList(String feedbackType, int page, int size) {
-        FeedbackType type = parseFeedbackType(feedbackType);
+    public Page<FeedbackListDTO> getFeedbackList(FeedbackType feedbackType, int page, int size) {
+        if (feedbackType == FeedbackType.CAREER_TIMING) {
+            throw new IllegalArgumentException("CAREER_TIMING은 피드백 조회 대상이 아닙니다.");
+        }
         Pageable pageable = paginationUtil.of(page, size);
-        Page<FeedbackListDTO> result = feedbackRepository.findFeedbackByType(type, pageable);
+        Page<FeedbackListDTO> result = feedbackRepository.findFeedbackByType(feedbackType, pageable);
         log.debug("피드백 목록 조회: type={}, page={}, count={}", feedbackType, page, result.getNumberOfElements());
         return result;
     }
@@ -79,14 +81,5 @@ public class AdminFeedbackService extends AdminBaseService {
                 analysisId,
                 analysisCreatedAt
         );
-    }
-
-    private FeedbackType parseFeedbackType(String type) {
-        if (type == null || type.isBlank()) return null;
-        try {
-            return FeedbackType.valueOf(type.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("유효하지 않은 피드백 유형입니다: " + type);
-        }
     }
 }

@@ -90,18 +90,18 @@ class AdminFeedbackServiceTest {
         given(feedbackRepository.findFeedbackByType(eq(FeedbackType.CONSULTATION), eq(pageable)))
                 .willReturn(new PageImpl<>(List.of(item)));
 
-        Page<FeedbackListDTO> result = adminFeedbackService.getFeedbackList("CONSULTATION", 0, 20);
+        Page<FeedbackListDTO> result = adminFeedbackService.getFeedbackList(FeedbackType.CONSULTATION, 0, 20);
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).feedbackType()).isEqualTo(FeedbackType.CONSULTATION);
     }
 
     @Test
-    @DisplayName("getFeedbackList - 유효하지 않은 type → IllegalArgumentException")
-    void getFeedbackList_invalidType_throwsException() {
-        assertThatThrownBy(() -> adminFeedbackService.getFeedbackList("INVALID_TYPE", 0, 20))
+    @DisplayName("getFeedbackList - type=CAREER_TIMING → IllegalArgumentException (피드백 불가 정책)")
+    void getFeedbackList_careerTimingType_throwsException() {
+        assertThatThrownBy(() -> adminFeedbackService.getFeedbackList(FeedbackType.CAREER_TIMING, 0, 20))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("INVALID_TYPE");
+                .hasMessageContaining("CAREER_TIMING");
 
         verifyNoInteractions(feedbackRepository);
     }
@@ -161,7 +161,7 @@ class AdminFeedbackServiceTest {
 
         assertThatThrownBy(() -> adminFeedbackService.getFeedbackWithAnalysis(999L))
                 .isInstanceOf(FeedbackNotFoundException.class)
-                .hasMessageContaining("999");
+                .hasMessageContainingAll("피드백", "999");
     }
 
     @Test
