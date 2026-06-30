@@ -82,7 +82,7 @@ class AdminFeedbackControllerTest {
     @DisplayName("GET /admin/api/feedback?type=CONSULTATION → type 파라미터 서비스에 전달")
     void getFeedbackApi_withTypeFilter_passesToService() throws Exception {
         Page<FeedbackListDTO> page = new PageImpl<>(List.of(stubFeedbackItem(1L)));
-        given(feedbackService.getFeedbackList(eq("CONSULTATION"), anyInt(), anyInt())).willReturn(page);
+        given(feedbackService.getFeedbackList(eq(FeedbackType.CONSULTATION), anyInt(), anyInt())).willReturn(page);
 
         mockMvc.perform(get("/admin/api/feedback")
                         .param("type", "CONSULTATION")
@@ -156,13 +156,22 @@ class AdminFeedbackControllerTest {
     }
 
     @Test
-    @DisplayName("GET /admin/api/feedback?type=INVALID → 400")
+    @DisplayName("GET /admin/api/feedback?type=INVALID → enum 바인딩 실패 → 400")
     void getFeedbackApi_invalidType_returns400() throws Exception {
-        given(feedbackService.getFeedbackList(eq("INVALID"), anyInt(), anyInt()))
-                .willThrow(new IllegalArgumentException("유효하지 않은 피드백 유형입니다: INVALID"));
-
         mockMvc.perform(get("/admin/api/feedback")
                         .param("type", "INVALID")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /admin/api/feedback?type=CAREER_TIMING → 서비스 정책 위반 → 400")
+    void getFeedbackApi_careerTimingType_returns400() throws Exception {
+        given(feedbackService.getFeedbackList(eq(FeedbackType.CAREER_TIMING), anyInt(), anyInt()))
+                .willThrow(new IllegalArgumentException("CAREER_TIMING은 피드백 조회 대상이 아닙니다."));
+
+        mockMvc.perform(get("/admin/api/feedback")
+                        .param("type", "CAREER_TIMING")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
     }

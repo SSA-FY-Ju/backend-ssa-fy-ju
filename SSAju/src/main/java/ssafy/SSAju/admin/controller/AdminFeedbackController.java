@@ -16,6 +16,7 @@ import ssafy.SSAju.admin.dto.FeedbackDetailDTO;
 import ssafy.SSAju.admin.dto.FeedbackListDTO;
 import ssafy.SSAju.admin.dto.FeedbackStatDTO;
 import ssafy.SSAju.admin.service.AdminFeedbackService;
+import ssafy.SSAju.career.enums.FeedbackType;
 
 import java.util.List;
 
@@ -32,19 +33,18 @@ public class AdminFeedbackController {
 
     @GetMapping("/feedback")
     public String getFeedbackPage(
-            @RequestParam(required = false) String type,
+            @RequestParam(required = false) FeedbackType type,
             @RequestParam(defaultValue = "0") int page,
             Model model) {
 
-        String normalizedType = (type != null && !type.isBlank()) ? type : null;
         int validPage = Math.max(page, 0);
 
-        Page<FeedbackListDTO> feedbackPage = feedbackService.getFeedbackList(normalizedType, validPage, PAGE_SIZE);
+        Page<FeedbackListDTO> feedbackPage = feedbackService.getFeedbackList(type, validPage, PAGE_SIZE);
         FeedbackStatDTO stats = feedbackService.getFeedbackStats();
 
         model.addAttribute("feedbackList", feedbackPage.getContent());
         model.addAttribute("stats", stats);
-        model.addAttribute("type", normalizedType);
+        model.addAttribute("type", type);
         model.addAttribute("page", validPage);
         model.addAttribute("pageSize", PAGE_SIZE);
         model.addAttribute("hasPrev", validPage > 0);
@@ -57,11 +57,10 @@ public class AdminFeedbackController {
     @GetMapping("/api/feedback")
     @ResponseBody
     public ResponseEntity<List<FeedbackListDTO>> getFeedbackApi(
-            @RequestParam(required = false) String type,
+            @RequestParam(required = false) FeedbackType type,
             @RequestParam(defaultValue = "0") int page) {
 
-        String normalizedType = (type != null && !type.isBlank()) ? type : null;
-        Page<FeedbackListDTO> result = feedbackService.getFeedbackList(normalizedType, Math.max(page, 0), PAGE_SIZE);
+        Page<FeedbackListDTO> result = feedbackService.getFeedbackList(type, Math.max(page, 0), PAGE_SIZE);
         return ResponseEntity.ok(result.getContent());
     }
 
