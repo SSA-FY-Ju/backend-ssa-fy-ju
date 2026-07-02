@@ -378,33 +378,33 @@
 
 ### Services
 
-- [ ] T047 [US4] Create `AdminFeedbackService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
+- [x] T047 [US4] Create `AdminFeedbackService.java` in `src/main/java/ssafy/SSAju/admin/service/` with methods:
   - getFeedbackStats() - aggregates satisfaction scores by analysis type (SAJU, GWANWUN, GUNG_HAP)
   - getFeedbackList(analysisType, page, size) - returns paginated feedback with filtering
   - getFeedbackWithAnalysis(feedbackId) - returns linked analysis result for that feedback
 
 ### Controllers
 
-- [ ] T048 [US4] Create `AdminFeedbackController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
+- [x] T048 [US4] Create `AdminFeedbackController.java` in `src/main/java/ssafy/SSAju/admin/controller/` with endpoints:
   - GET /admin/feedback (list with type filtering)
   - GET /admin/feedback/stats (satisfaction statistics)
   - GET /admin/feedback/{id}/analysis/{analysisId} (linked view)
 
 ### Views & Templates
 
-- [ ] T049 [US4] Create feedback template `admin/feedback-management.html` with:
+- [x] T049 [US4] Create feedback template `admin/feedback-management.html` with:
   - Satisfaction stats section (average score by type, distribution chart)
   - Feedback list table (type filter, pagination, content preview)
   - Analysis result linked view (modal or new tab)
 
 ### Tests (Optional)
 
-- [ ] T050 [US4] Create `AdminFeedbackServiceTest.java` testing:
+- [x] T050 [US4] Create `AdminFeedbackServiceTest.java` testing:
   - getFeedbackStats() calculation accuracy (average, distribution)
   - getFeedbackList() filtering and pagination
   - getFeedbackWithAnalysis() data linking correctness
 
-- [ ] T051 [US4] Create `AdminFeedbackControllerTest.java` testing:
+- [x] T051 [US4] Create `AdminFeedbackControllerTest.java` testing:
   - GET /admin/feedback/stats response structure
   - GET /admin/feedback/{id}/analysis/{analysisId} linked data validation
 
