@@ -103,6 +103,7 @@ class AdminFeedbackServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("CAREER_TIMING");
 
+        verifyNoInteractions(paginationUtil);
         verifyNoInteractions(feedbackRepository);
     }
 
