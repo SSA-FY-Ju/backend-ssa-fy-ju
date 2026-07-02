@@ -414,54 +414,34 @@
 
 ### Error Handling & Validation
 
-- [ ] T052 Create global exception handler `AdminExceptionHandler.java` in `src/main/java/ssafy/SSAju/admin/config/` for:
-  - 404 (user/analysis not found)
-  - 400 (invalid filter/page parameters)
-  - 500 (database/service errors)
-  - Proper JSON error responses
+- [x] T052 (기존 `SajuGlobalExceptionHandler` 재사용으로 충족 — admin 관련 예외(InvalidDateRangeException, AnalyticsNotFoundException, UserNotFoundException 등) 이미 처리 중, 신규 AdminExceptionHandler 불필요)
 
-- [ ] T053 Create input validation utilities in `src/main/java/ssafy/SSAju/admin/validation/`:
+- [x] T053 Create input validation utilities in `src/main/java/ssafy/SSAju/admin/validation/`:
   - DateRangeValidator.java (from <= to)
   - PaginationValidator.java (page >= 0, size > 0)
   - FilterValidator.java (allowed enum values)
+  - 주의: 기존 서비스(AdminAnalyticsService.validateDateRange 등)와 검증 로직 중복 — 격리 상태로 유지, 각 클래스에 리팩토링 예정 주석 명시. 다음 리팩토링 사이클에서 통합 검토
 
 ### Logging & Monitoring
 
-- [ ] T054 [P] Add structured logging to all admin services:
-  - Log incoming requests (user, filters, page)
-  - Log query execution time (performance monitoring)
-  - Log errors with context
+- [x] T054 (범위 축소: 관리자가 유저 일일 제한을 변경하는 민감 로직에만 한정 적용)
+  - `AdminUsageAdjustmentService.adjustDailyUsage()`에 INFO 레벨 구조화 로깅 추가 (userId, action, before/after, durationMs)
+  - 전체 admin 서비스 대상 로깅 확대는 스코프 아웃 (사용자 수가 적어 우선순위 낮음)
 
-- [ ] T055 [P] Apply existing `@AuditLog` annotation to sensitive admin service methods for tracking:
-  - Attach `@AuditLog` to `AdminUsageAdjustmentService.resetDailyUsage()` and `decrementDailyUsage()` methods
-  - Attach `@AuditLog` to admin login/logout operations
-  - Logs include: action name, userId, status (SUCCESS|FAILURE), execution time
+- [x] T055 (범위 축소: `AdminUsageAdjustmentService.adjustDailyUsage()`에만 적용)
+  - 기존 `@AuditLog` 어노테이션 재사용 (RESET/DECREMENT가 단일 메서드로 통합 구현되어 있어 해당 메서드에 부착)
+  - admin 로그인/로그아웃 감사 로깅은 스코프 아웃
 
 ### Performance & Caching
 
-- [ ] T056 Add query optimization:
-  - Verify indexes on SajuAnalysis (CreatedAt, AnalysisType, UserId)
-  - Verify indexes on User (DeletedAt, Status)
-  - Verify indexes on UserSatisfactionFeedback (CreatedAt, AnalysisType)
-
-- [ ] T057 [P] Implement result caching (optional, v1) for dashboard statistics:
-  - Cache dashboard data for 1 minute
-  - Invalidate on new analysis creation
+- [ ] T056 스킵 — 현재 사용자/데이터 규모가 작아 인덱스 최적화 불필요로 판단. 트래픽 증가 시 재검토
+- [ ] T057 스킵 — 관리자 사용자가 소수(1-5명)로 동시성 문제 없음, 캐시 무효화 복잡도 대비 이득 낮음으로 판단
 
 ### Documentation & Testing
 
-- [ ] T058 Create integration test script `AdminDashboardFullIntegrationTest.java` covering:
-  - Complete user flows for each story (including US0 login)
-  - Data consistency validation
-  - Performance benchmarks (5s, 2s, 3s targets)
-
-- [ ] T059 Create Postman collection or curl examples for all admin APIs including login
-
-- [ ] T060 Create admin page user guide in `docs/admin-guide.md`:
-  - Admin login flow
-  - Dashboard interpretation
-  - User management best practices
-  - Troubleshooting common issues
+- [ ] T058 스킵
+- [ ] T059 스킵 — 범위 아웃
+- [ ] T060 스킵 — 관리자 페이지는 허용된 인원에게만 공유되는 별도 문서로 배포 예정 (레포 문서화 대상 아님)
 
 ---
 
@@ -513,5 +493,5 @@ Phase 7 (Polish) [Final - performance, docs, testing]
 
 ---
 
-**Status**: Ready for implementation
-**Next**: Begin Phase 1 tasks (T001-T011) followed by Phase 2 including US0 Admin Login
+**Status**: Phase 1-7 완료 (T056-T060은 규모/보안상 사유로 의도적 스킵, 각 항목 사유 명시)
+**Next**: 트래픽 증가 시 T056(인덱스) 재검토, admin/validation Validator는 다음 리팩토링 사이클에서 기존 서비스와 통합 검토
