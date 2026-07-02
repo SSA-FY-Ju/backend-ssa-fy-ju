@@ -28,6 +28,7 @@ import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.exception.PublicDataApiException;
 import ssafy.SSAju.exception.AnalyticsNotFoundException;
+import ssafy.SSAju.exception.FeedbackNotFoundException;
 import ssafy.SSAju.exception.InvalidDateRangeException;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.exception.UserNotFoundException;
@@ -231,6 +232,16 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.ANALYTICS_NOT_FOUND.getCode(),
+                        e.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(FeedbackNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFeedbackNotFound(
+            FeedbackNotFoundException e, HttpServletRequest request) {
+        log.warn("Feedback not found: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.FEEDBACK_NOT_FOUND.getCode(),
                         e.getMessage(), generateRequestId())));
     }
 

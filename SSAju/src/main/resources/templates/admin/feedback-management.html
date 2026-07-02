@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle} ?: 'SSAju 관리자'">SSAju 피드백 관리</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #f5f5f5; display: flex; min-height: 100vh; }
+        .sidebar { width: 240px; background: #1a1a2e; color: #eee; padding: 24px 0; flex-shrink: 0; }
+        .sidebar .brand { padding: 0 24px 24px; font-size: 1.2rem; font-weight: bold; color: #e94560; border-bottom: 1px solid #333; }
+        .sidebar nav ul { list-style: none; margin-top: 16px; }
+        .sidebar nav ul li a { display: block; padding: 12px 24px; color: #ccc; text-decoration: none; transition: background 0.2s; }
+        .sidebar nav ul li a:hover, .sidebar nav ul li a.active { background: #16213e; color: #fff; border-left: 3px solid #e94560; }
+        .main-wrapper { flex: 1; display: flex; flex-direction: column; }
+        .header { background: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 1.1rem; color: #333; }
+        .logout-btn { background: #e94560; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        .content { flex: 1; padding: 24px; }
+        .footer { background: #fff; text-align: center; padding: 12px; font-size: 0.8rem; color: #999; border-top: 1px solid #eee; }
+
+        /* Stats Section */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .stat-card h2 { font-size: 0.95rem; color: #555; font-weight: 600; margin-bottom: 14px; }
+        .stat-total { font-size: 2rem; font-weight: bold; color: #1a1a2e; }
+        .stat-label { font-size: 0.82rem; color: #888; margin-top: 4px; }
+        .chart-container { position: relative; height: 200px; }
+
+        /* Filter */
+        .search-card { background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .search-card h2 { font-size: 0.95rem; color: #555; margin-bottom: 14px; font-weight: 600; }
+        .search-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 0.78rem; color: #888; font-weight: 500; }
+        .form-group select { padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; color: #333; min-width: 160px; }
+        .form-group select:focus { outline: none; border-color: #e94560; }
+        .search-btn { background: #e94560; color: #fff; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; height: 36px; }
+        .reset-btn { background: #fff; color: #555; border: 1px solid #ddd; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; height: 36px; text-decoration: none; display: inline-flex; align-items: center; }
+
+        /* Table */
+        .table-card { background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .table-header h2 { font-size: 0.95rem; color: #555; font-weight: 600; }
+        .result-count { font-size: 0.85rem; color: #888; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        thead tr { background: #f9f9f9; }
+        th { padding: 10px 12px; text-align: left; color: #666; font-weight: 600; font-size: 0.82rem; border-bottom: 2px solid #eee; }
+        td { padding: 12px; border-bottom: 1px solid #f0f0f0; color: #333; }
+        tr:hover td { background: #fafafa; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+        .badge-timing { background: #e3f2fd; color: #1565c0; }
+        .badge-consultation { background: #e8f5e9; color: #2e7d32; }
+        .badge-compatibility { background: #fce4ec; color: #c62828; }
+        .badge-satisfied { background: #e8f5e9; color: #2e7d32; }
+        .badge-dissatisfied { background: #fce4ec; color: #c62828; }
+        .content-preview { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #666; font-size: 0.85rem; }
+        .detail-btn { background: none; border: 1px solid #ddd; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82rem; color: #555; }
+        .detail-btn:hover { background: #f0f0f0; }
+        .empty-row td { text-align: center; color: #aaa; padding: 32px; }
+
+        /* Pagination */
+        .pagination { display: flex; justify-content: flex-end; margin-top: 16px; gap: 8px; align-items: center; }
+        .pagination a { padding: 6px 14px; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; font-size: 0.88rem; color: #555; }
+        .pagination a:hover { background: #f0f0f0; }
+        .pagination .page-info { font-size: 0.85rem; color: #888; padding: 6px 4px; }
+
+        /* Detail Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #fff; border-radius: 8px; padding: 28px; width: 560px; max-width: 90vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { font-size: 1rem; color: #1a1a2e; }
+        .modal-close { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: #888; }
+        .modal-meta { display: grid; grid-template-columns: 130px 1fr; gap: 8px 16px; font-size: 0.88rem; }
+        .modal-meta dt { color: #888; font-weight: 600; display: flex; align-items: center; }
+        .modal-meta dd { color: #333; }
+        .modal-loading { text-align: center; color: #aaa; padding: 20px; }
+        .section-title { font-size: 0.82rem; color: #888; font-weight: 600; margin: 14px 0 6px; }
+        .analysis-box { background: #f5f5f5; border-radius: 6px; padding: 12px 14px; font-size: 0.88rem; color: #333; }
+        .no-analysis { color: #aaa; font-size: 0.85rem; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+    <div class="brand">SSAju Admin</div>
+    <nav>
+        <ul>
+            <li><a th:href="@{/admin/dashboard}" th:classappend="${currentMenu == 'dashboard'} ? 'active'">대시보드</a></li>
+            <li><a th:href="@{/admin/users}" th:classappend="${currentMenu == 'users'} ? 'active'">유저 관리</a></li>
+            <li><a th:href="@{/admin/analytics}" th:classappend="${currentMenu == 'analytics'} ? 'active'">분석 기록</a></li>
+            <li><a th:href="@{/admin/feedback}" th:classappend="${currentMenu == 'feedback'} ? 'active'">피드백 관리</a></li>
+        </ul>
+    </nav>
+</aside>
+
+<div class="main-wrapper">
+    <!-- Header -->
+    <header class="header">
+        <h1 th:text="${pageTitle}">피드백 관리</h1>
+        <form th:action="@{/admin/logout}" method="post">
+            <button class="logout-btn" type="submit">로그아웃</button>
+        </form>
+    </header>
+
+    <main class="content">
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <!-- 전체 통계 수치 -->
+            <div class="stat-card">
+                <h2>피드백 총계</h2>
+                <div class="stat-total" th:text="${stats.totalFeedbackCount()}">0</div>
+                <div class="stat-label">전체 피드백 수</div>
+                <div style="margin-top: 12px; display: flex; gap: 16px;">
+                    <div>
+                        <div style="font-size: 1.1rem; font-weight: bold; color: #2e7d32;"
+                             th:text="${stats.totalSatisfied()}">0</div>
+                        <div class="stat-label">만족</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.1rem; font-weight: bold; color: #c62828;"
+                             th:text="${stats.totalUnsatisfied()}">0</div>
+                        <div class="stat-label">불만족</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 유형별 만족도 차트 -->
+            <div class="stat-card">
+                <h2>유형별 만족도</h2>
+                <div class="chart-container">
+                    <canvas id="satisfactionChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Form -->
+        <div class="search-card">
+            <h2>피드백 검색</h2>
+            <form class="search-form" th:action="@{/admin/feedback}" method="get">
+                <div class="form-group">
+                    <label>피드백 유형</label>
+                    <select name="type">
+                        <option value="">전체</option>
+                        <option value="CONSULTATION" th:selected="${type?.name() == 'CONSULTATION'}">관운 상담</option>
+                        <option value="COMPATIBILITY" th:selected="${type?.name() == 'COMPATIBILITY'}">기업 궁합</option>
+                    </select>
+                </div>
+                <button class="search-btn" type="submit">검색</button>
+                <a class="reset-btn" th:href="@{/admin/feedback}">초기화</a>
+            </form>
+        </div>
+
+        <!-- Feedback Table -->
+        <div class="table-card">
+            <div class="table-header">
+                <h2>피드백 목록</h2>
+                <span class="result-count" th:text="${feedbackList.size()} + '건 조회됨'">0건 조회됨</span>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>유저 ID</th>
+                        <th>유형</th>
+                        <th>만족 여부</th>
+                        <th>내용</th>
+                        <th>작성일시</th>
+                        <th>상세</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${feedbackList.isEmpty()}">
+                        <td colspan="7" class="empty-row">조회된 피드백이 없습니다.</td>
+                    </tr>
+                    <tr th:each="item : ${feedbackList}">
+                        <td th:text="${item.id()}">1</td>
+                        <td th:text="${item.userId() ?: '-'}">1</td>
+                        <td>
+                            <span th:if="${item.feedbackType().name() == 'CAREER_TIMING'}" class="badge badge-timing">커리어 타이밍</span>
+                            <span th:if="${item.feedbackType().name() == 'CONSULTATION'}" class="badge badge-consultation">관운 상담</span>
+                            <span th:if="${item.feedbackType().name() == 'COMPATIBILITY'}" class="badge badge-compatibility">기업 궁합</span>
+                        </td>
+                        <td>
+                            <span th:if="${item.satisfactionStatus().name() == 'SATISFIED'}" class="badge badge-satisfied">만족</span>
+                            <span th:if="${item.satisfactionStatus().name() == 'DISSATISFIED'}" class="badge badge-dissatisfied">불만족</span>
+                        </td>
+                        <td>
+                            <span class="content-preview" th:text="${item.feedbackContent() ?: '-'}">내용</span>
+                        </td>
+                        <td th:text="${#temporals.format(item.createdAt(), 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
+                        <td>
+                            <button class="detail-btn"
+                                    th:data-id="${item.id()}"
+                                    onclick="openDetailModal(this)">
+                                상세 보기
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            <div class="pagination" th:if="${hasPrev || hasNext}">
+                <a th:if="${hasPrev}"
+                   th:href="@{/admin/feedback(type=${type}, page=${page - 1})}">&larr; 이전</a>
+                <span class="page-info" th:text="'페이지 ' + (${page} + 1)">페이지 1</span>
+                <a th:if="${hasNext}"
+                   th:href="@{/admin/feedback(type=${type}, page=${page + 1})}">다음 &rarr;</a>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="footer">
+        &copy; 2026 SSAju Admin
+    </footer>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>피드백 상세 조회</h3>
+            <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+        </div>
+        <div id="detailModalBody">
+            <p class="modal-loading">불러오는 중...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js 통계 차트 -->
+<script th:inline="javascript">
+    const statsData = {
+        satisfied: /*[[${stats.satisfiedCountByFeedbackType()}]]*/ {},
+        unsatisfied: /*[[${stats.unsatisfiedCountByFeedbackType()}]]*/ {}
+    };
+
+    const labels = ['관운 상담', '기업 궁합'];
+    const keys = ['CONSULTATION', 'COMPATIBILITY'];
+
+    const satisfiedData = keys.map(k => statsData.satisfied[k] || 0);
+    const unsatisfiedData = keys.map(k => statsData.unsatisfied[k] || 0);
+
+    new Chart(document.getElementById('satisfactionChart'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '만족',
+                    data: satisfiedData,
+                    backgroundColor: 'rgba(46, 125, 50, 0.7)',
+                    borderRadius: 4
+                },
+                {
+                    label: '불만족',
+                    data: unsatisfiedData,
+                    backgroundColor: 'rgba(198, 40, 40, 0.7)',
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } } },
+                x: { ticks: { font: { size: 11 } } }
+            }
+        }
+    });
+</script>
+
+<script>
+    function formatDateTime(isoString) {
+        return isoString ? isoString.replace('T', ' ').slice(0, 19) : '-';
+    }
+
+    function openDetailModal(btn) {
+        const id = btn.getAttribute('data-id');
+        const modal = document.getElementById('detailModal');
+        const body = document.getElementById('detailModalBody');
+
+        modal.classList.add('active');
+        body.innerHTML = '<p class="modal-loading">불러오는 중...</p>';
+
+        fetch(`/admin/api/feedback/${id}`, {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(res => {
+                if (!res.ok) throw new Error('데이터를 불러올 수 없습니다.');
+                return res.json();
+            })
+            .then(data => {
+                const typeMap = {
+                    CAREER_TIMING: '커리어 타이밍',
+                    CONSULTATION: '관운 상담',
+                    COMPATIBILITY: '기업 궁합'
+                };
+                const statusMap = {
+                    SATISFIED: '만족',
+                    DISSATISFIED: '불만족'
+                };
+                const analysisTypeMap = {
+                    CONSULTATION: '관운 상담',
+                    COMPATIBILITY: '기업 궁합'
+                };
+
+                const dl = document.createElement('dl');
+                dl.className = 'modal-meta';
+                [
+                    ['피드백 ID', data.feedbackId],
+                    ['유저 ID', data.userId ?? '-'],
+                    ['유형', typeMap[data.feedbackType] ?? data.feedbackType],
+                    ['만족 여부', statusMap[data.satisfactionStatus] ?? data.satisfactionStatus],
+                    ['작성일시', formatDateTime(data.createdAt)]
+                ].forEach(([label, value]) => {
+                    const dt = document.createElement('dt');
+                    dt.textContent = label;
+                    const dd = document.createElement('dd');
+                    dd.textContent = value ?? '-';
+                    dl.append(dt, dd);
+                });
+
+                const contentTitle = document.createElement('p');
+                contentTitle.className = 'section-title';
+                contentTitle.textContent = '피드백 내용';
+
+                const contentBox = document.createElement('div');
+                contentBox.className = 'analysis-box';
+                contentBox.textContent = data.feedbackContent ?? '(내용 없음)';
+
+                const analysisTitle = document.createElement('p');
+                analysisTitle.className = 'section-title';
+                analysisTitle.textContent = '연결된 분석';
+
+                let analysisEl;
+                if (data.analysisId) {
+                    analysisEl = document.createElement('div');
+                    analysisEl.className = 'analysis-box';
+                    const type = analysisTypeMap[data.analysisType] ?? data.analysisType;
+                    const date = formatDateTime(data.analysisCreatedAt);
+                    analysisEl.textContent = `${type} (ID: ${data.analysisId}) | 생성일: ${date}`;
+                } else {
+                    analysisEl = document.createElement('p');
+                    analysisEl.className = 'no-analysis';
+                    analysisEl.textContent = '연결된 분석 정보가 없습니다.';
+                }
+
+                body.replaceChildren(dl, contentTitle, contentBox, analysisTitle, analysisEl);
+            })
+            .catch(err => {
+                const p = document.createElement('p');
+                p.className = 'modal-loading';
+                p.textContent = err.message;
+                body.replaceChildren(p);
+            });
+    }
+
+    function closeDetailModal() {
+        document.getElementById('detailModal').classList.remove('active');
+    }
+
+    document.getElementById('detailModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDetailModal();
+    });
+</script>
+</body>
+</html>
