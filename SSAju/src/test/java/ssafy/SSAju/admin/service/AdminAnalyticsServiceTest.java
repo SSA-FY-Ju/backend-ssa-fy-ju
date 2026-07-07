@@ -11,6 +11,7 @@ import ssafy.SSAju.admin.config.AdminConfig;
 import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.repository.AdminAnalyticsQueryRepository;
+import ssafy.SSAju.career.enums.AnalysisType;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -137,7 +138,7 @@ class AdminAnalyticsServiceTest {
                 .willReturn(List.of(stubListItem(1L, "SAJU")));
 
         List<AnalyticsListDTO> result = adminAnalyticsService.getAnalyticsHistory(
-                "SAJU", null, null, 0, 20);
+                AnalysisType.SAJU, null, null, 0, 20);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).analysisType()).isEqualTo("SAJU");
@@ -149,7 +150,7 @@ class AdminAnalyticsServiceTest {
         AnalyticsDetailDTO stub = new AnalyticsDetailDTO(1L, 10L, "SAJU", "{\"test\":\"data\"}", Instant.now());
         given(analyticsRepository.findAnalyticsById(1L, "SAJU")).willReturn(Optional.of(stub));
 
-        AnalyticsDetailDTO result = adminAnalyticsService.getAnalyticsDetail(1L, "SAJU");
+        AnalyticsDetailDTO result = adminAnalyticsService.getAnalyticsDetail(1L, AnalysisType.SAJU);
 
         assertThat(result.id()).isEqualTo(1L);
         assertThat(result.jsonData()).isEqualTo("{\"test\":\"data\"}");
@@ -160,7 +161,7 @@ class AdminAnalyticsServiceTest {
     void getAnalyticsDetail_notFound_throwsException() {
         given(analyticsRepository.findAnalyticsById(999L, "SAJU")).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> adminAnalyticsService.getAnalyticsDetail(999L, "SAJU"))
+        assertThatThrownBy(() -> adminAnalyticsService.getAnalyticsDetail(999L, AnalysisType.SAJU))
                 .isInstanceOf(AnalyticsNotFoundException.class)
                 .hasMessageContaining("999");
     }

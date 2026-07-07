@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.service.AdminAnalyticsService;
+import ssafy.SSAju.career.enums.AnalysisType;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,19 +33,18 @@ public class AdminAnalyticsController {
 
     @GetMapping
     public String getAnalyticsPage(
-            @RequestParam(required = false) String type,
+            @RequestParam(required = false) AnalysisType type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(defaultValue = "0") int page,
             Model model) {
 
-        String normalizedType = (type != null && !type.isBlank()) ? type : null;
         int validPage = Math.max(page, 0);
         List<AnalyticsListDTO> analytics = adminAnalyticsService.getAnalyticsHistory(
-                normalizedType, dateFrom, dateTo, validPage, PAGE_SIZE);
+                type, dateFrom, dateTo, validPage, PAGE_SIZE);
 
         model.addAttribute("analytics", analytics);
-        model.addAttribute("type", normalizedType);
+        model.addAttribute("type", type);
         model.addAttribute("dateFrom", dateFrom);
         model.addAttribute("dateTo", dateTo);
         model.addAttribute("page", validPage);
@@ -59,14 +59,13 @@ public class AdminAnalyticsController {
     @GetMapping("/api")
     @ResponseBody
     public ResponseEntity<List<AnalyticsListDTO>> getAnalyticsApi(
-            @RequestParam(required = false) String type,
+            @RequestParam(required = false) AnalysisType type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(defaultValue = "0") int page) {
 
-        String normalizedType = (type != null && !type.isBlank()) ? type : null;
         List<AnalyticsListDTO> analytics = adminAnalyticsService.getAnalyticsHistory(
-                normalizedType, dateFrom, dateTo, page, PAGE_SIZE);
+                type, dateFrom, dateTo, page, PAGE_SIZE);
         return ResponseEntity.ok(analytics);
     }
 
@@ -74,7 +73,7 @@ public class AdminAnalyticsController {
     @ResponseBody
     public ResponseEntity<AnalyticsDetailDTO> getAnalyticsDetail(
             @PathVariable Long id,
-            @RequestParam String type) {
+            @RequestParam AnalysisType type) {
         AnalyticsDetailDTO detail = adminAnalyticsService.getAnalyticsDetail(id, type);
         return ResponseEntity.ok(detail);
     }

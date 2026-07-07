@@ -6,6 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import ssafy.SSAju.admin.dto.AdjustmentAction;
 import ssafy.SSAju.admin.dto.UsageAdjustmentRequestDTO;
 import ssafy.SSAju.admin.dto.UsageAdjustmentResponseDTO;
@@ -40,6 +41,9 @@ class AdminUsageAdjustmentServiceTest {
 
     @Mock
     private AdminUserQueryRepository adminUserQueryRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private AdminUsageAdjustmentService usageAdjustmentService;

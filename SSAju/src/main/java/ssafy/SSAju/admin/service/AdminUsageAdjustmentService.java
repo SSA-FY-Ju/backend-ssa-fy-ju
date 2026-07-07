@@ -2,13 +2,18 @@ package ssafy.SSAju.admin.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import ssafy.SSAju.admin.dto.AdjustmentAction;
+import ssafy.SSAju.admin.dto.UsageAdjustedEvent;
 import ssafy.SSAju.admin.dto.UsageAdjustmentRequestDTO;
 import ssafy.SSAju.admin.dto.UsageAdjustmentResponseDTO;
 import ssafy.SSAju.admin.repository.AdminDailyUsageQueryRepository;
 import ssafy.SSAju.admin.repository.AdminUserQueryRepository;
+import ssafy.SSAju.annotation.AuditLog;
 import ssafy.SSAju.entity.DailyApiUsage;
 import ssafy.SSAju.exception.UserNotFoundException;
 
@@ -23,8 +28,11 @@ public class AdminUsageAdjustmentService extends AdminBaseService {
 
     private final AdminDailyUsageQueryRepository dailyUsageRepository;
     private final AdminUserQueryRepository adminUserQueryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
+    // 관리자가 유저의 일일 제한을 직접 변경하는 민감 작업 → 구조화 로깅(INFO) + @AuditLog 감사 로그 적용
     @Transactional
+    @AuditLog
     public UsageAdjustmentResponseDTO adjustDailyUsage(Long userId, UsageAdjustmentRequestDTO request) {
         validateRequest(request);
         validateUserExists(userId);
@@ -35,7 +43,8 @@ public class AdminUsageAdjustmentService extends AdminBaseService {
         int before = usageOpt.map(DailyApiUsage::getRequestCount).orElse(0);
 
         if (usageOpt.isEmpty()) {
-            log.debug("오늘 일일 사용량 레코드 없음: userId={}, date={}", userId, today);
+            log.info("일일 사용량 조정 시도: userId={}, action={}, 사용 기록 없음(before=0, after=0)",
+                    userId, request.action());
             return new UsageAdjustmentResponseDTO(userId, today.toString(), 0, 0, request.action().name());
         }
 
@@ -48,9 +57,15 @@ public class AdminUsageAdjustmentService extends AdminBaseService {
             after = Math.max(0, before - request.amount());
         }
 
-        log.debug("일일 사용량 조정 완료: userId={}, action={}, before={}, after={}",
-                userId, request.action(), before, after);
+        eventPublisher.publishEvent(new UsageAdjustedEvent(userId, request.action(), before, after));
         return new UsageAdjustmentResponseDTO(userId, today.toString(), before, after, request.action().name());
+    }
+
+    // 실제 커밋 이후에만 로그를 남겨, 커밋 실패 시 "완료"로 오기록되는 것을 방지
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onUsageAdjusted(UsageAdjustedEvent event) {
+        log.info("일일 사용량 조정 완료: userId={}, action={}, before={}, after={}",
+                event.userId(), event.action(), event.before(), event.after());
     }
 
     private void validateRequest(UsageAdjustmentRequestDTO request) {

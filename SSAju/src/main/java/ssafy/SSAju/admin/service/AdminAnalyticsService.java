@@ -8,6 +8,7 @@ import ssafy.SSAju.admin.config.AdminConfig;
 import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.repository.AdminAnalyticsQueryRepository;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.exception.AnalyticsNotFoundException;
 import ssafy.SSAju.exception.InvalidDateRangeException;
 
@@ -25,7 +26,7 @@ public class AdminAnalyticsService extends AdminBaseService {
     private final AdminConfig adminConfig;
 
     public List<AnalyticsListDTO> getAnalyticsHistory(
-            String analysisType, LocalDate dateFrom, LocalDate dateTo, int page, int size) {
+            AnalysisType analysisType, LocalDate dateFrom, LocalDate dateTo, int page, int size) {
 
         LocalDate today = todaySeoul();
         LocalDate effectiveDateFrom = resolveFrom(dateFrom, today);
@@ -35,18 +36,20 @@ public class AdminAnalyticsService extends AdminBaseService {
         int validSize = paginationUtil.of(page, size).getPageSize();
         int validPage = Math.max(page, 0);
 
+        String analysisTypeName = analysisType != null ? analysisType.name() : null;
         List<AnalyticsListDTO> result = analyticsRepository.findAnalyticsByDateAndType(
-                analysisType, effectiveDateFrom, effectiveDateTo, validPage, validSize);
+                analysisTypeName, effectiveDateFrom, effectiveDateTo, validPage, validSize);
 
         log.debug("분석 기록 조회: type={}, dateFrom={}, dateTo={}, page={}, size={}, count={}",
-                analysisType, effectiveDateFrom, effectiveDateTo, validPage, validSize, result.size());
+                analysisTypeName, effectiveDateFrom, effectiveDateTo, validPage, validSize, result.size());
         return result;
     }
 
-    public AnalyticsDetailDTO getAnalyticsDetail(Long id, String analysisType) {
-        return analyticsRepository.findAnalyticsById(id, analysisType)
+    public AnalyticsDetailDTO getAnalyticsDetail(Long id, AnalysisType analysisType) {
+        String analysisTypeName = analysisType != null ? analysisType.name() : null;
+        return analyticsRepository.findAnalyticsById(id, analysisTypeName)
                 .orElseThrow(() -> new AnalyticsNotFoundException(
-                        "분석 기록을 찾을 수 없습니다: id=" + id + ", type=" + analysisType));
+                        "분석 기록을 찾을 수 없습니다: id=" + id + ", type=" + analysisTypeName));
     }
 
     // 30일 범위 제한: dateFrom이 최대 범위를 벗어나면 자동으로 범위 내로 조정
