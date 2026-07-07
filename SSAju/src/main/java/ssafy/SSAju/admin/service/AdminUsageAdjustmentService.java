@@ -13,8 +13,6 @@ import ssafy.SSAju.annotation.AuditLog;
 import ssafy.SSAju.entity.DailyApiUsage;
 import ssafy.SSAju.exception.UserNotFoundException;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -31,7 +29,6 @@ public class AdminUsageAdjustmentService extends AdminBaseService {
     @Transactional
     @AuditLog
     public UsageAdjustmentResponseDTO adjustDailyUsage(Long userId, UsageAdjustmentRequestDTO request) {
-        Instant start = Instant.now();
         validateRequest(request);
         validateUserExists(userId);
 
@@ -41,9 +38,8 @@ public class AdminUsageAdjustmentService extends AdminBaseService {
         int before = usageOpt.map(DailyApiUsage::getRequestCount).orElse(0);
 
         if (usageOpt.isEmpty()) {
-            long durationMs = Duration.between(start, Instant.now()).toMillis();
-            log.info("일일 사용량 조정 시도: userId={}, action={}, 사용 기록 없음(before=0, after=0), durationMs={}",
-                    userId, request.action(), durationMs);
+            log.info("일일 사용량 조정 시도: userId={}, action={}, 사용 기록 없음(before=0, after=0)",
+                    userId, request.action());
             return new UsageAdjustmentResponseDTO(userId, today.toString(), 0, 0, request.action().name());
         }
 
@@ -56,9 +52,8 @@ public class AdminUsageAdjustmentService extends AdminBaseService {
             after = Math.max(0, before - request.amount());
         }
 
-        long durationMs = Duration.between(start, Instant.now()).toMillis();
-        log.info("일일 사용량 조정 완료: userId={}, action={}, before={}, after={}, durationMs={}",
-                userId, request.action(), before, after, durationMs);
+        log.info("일일 사용량 조정 완료: userId={}, action={}, before={}, after={}",
+                userId, request.action(), before, after);
         return new UsageAdjustmentResponseDTO(userId, today.toString(), before, after, request.action().name());
     }
 
