@@ -41,7 +41,7 @@ public class AdminAnalyticsController {
 
         int validPage = Math.max(page, 0);
         List<AnalyticsListDTO> analytics = adminAnalyticsService.getAnalyticsHistory(
-                type != null ? type.name() : null, dateFrom, dateTo, validPage, PAGE_SIZE);
+                type, dateFrom, dateTo, validPage, PAGE_SIZE);
 
         model.addAttribute("analytics", analytics);
         model.addAttribute("type", type);
@@ -65,7 +65,7 @@ public class AdminAnalyticsController {
             @RequestParam(defaultValue = "0") int page) {
 
         List<AnalyticsListDTO> analytics = adminAnalyticsService.getAnalyticsHistory(
-                type != null ? type.name() : null, dateFrom, dateTo, page, PAGE_SIZE);
+                type, dateFrom, dateTo, page, PAGE_SIZE);
         return ResponseEntity.ok(analytics);
     }
 
@@ -74,7 +74,7 @@ public class AdminAnalyticsController {
     public ResponseEntity<AnalyticsDetailDTO> getAnalyticsDetail(
             @PathVariable Long id,
             @RequestParam AnalysisType type) {
-        AnalyticsDetailDTO detail = adminAnalyticsService.getAnalyticsDetail(id, type.name());
+        AnalyticsDetailDTO detail = adminAnalyticsService.getAnalyticsDetail(id, type);
         return ResponseEntity.ok(detail);
     }
 }

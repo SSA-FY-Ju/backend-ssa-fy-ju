@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.service.AdminAnalyticsService;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
 
 import java.time.Instant;
@@ -69,7 +70,7 @@ class AdminAnalyticsControllerTest {
     @Test
     @DisplayName("GET /admin/analytics/api?type=SAJU → type 파라미터 서비스에 전달")
     void getAnalyticsApi_withTypeFilter_passesToService() throws Exception {
-        given(adminAnalyticsService.getAnalyticsHistory(eq("SAJU"), any(), any(), anyInt(), anyInt()))
+        given(adminAnalyticsService.getAnalyticsHistory(eq(AnalysisType.SAJU), any(), any(), anyInt(), anyInt()))
                 .willReturn(List.of(stubListItem(1L, "SAJU")));
 
         mockMvc.perform(get("/admin/analytics/api")
@@ -97,7 +98,7 @@ class AdminAnalyticsControllerTest {
     void getAnalyticsDetail_existingId_returns200() throws Exception {
         AnalyticsDetailDTO detail = new AnalyticsDetailDTO(
                 1L, 10L, "SAJU", "{\"key\":\"값\"}", Instant.now());
-        given(adminAnalyticsService.getAnalyticsDetail(1L, "SAJU")).willReturn(detail);
+        given(adminAnalyticsService.getAnalyticsDetail(1L, AnalysisType.SAJU)).willReturn(detail);
 
         mockMvc.perform(get("/admin/analytics/1")
                         .param("type", "SAJU")
@@ -111,7 +112,7 @@ class AdminAnalyticsControllerTest {
     @Test
     @DisplayName("GET /admin/analytics/{id}?type=SAJU → 존재하지 않는 id → 400")
     void getAnalyticsDetail_notFound_returns400() throws Exception {
-        given(adminAnalyticsService.getAnalyticsDetail(999L, "SAJU"))
+        given(adminAnalyticsService.getAnalyticsDetail(999L, AnalysisType.SAJU))
                 .willThrow(new IllegalArgumentException("분석 기록을 찾을 수 없습니다: id=999"));
 
         mockMvc.perform(get("/admin/analytics/999")
