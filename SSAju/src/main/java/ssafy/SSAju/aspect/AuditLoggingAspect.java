@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import ssafy.SSAju.annotation.AuditableRequest;
@@ -24,10 +26,16 @@ import java.time.Instant;
  *               AuditableRequest 구현체면 {@code getAuditUserId()} 호출</li>
  *   <li>개인정보(email, password 등)는 로그에 포함하지 않음</li>
  * </ul>
+ *
+ * <p>{@code @Order(LOWEST_PRECEDENCE - 1)}로 트랜잭션 어드바이저(기본 {@code LOWEST_PRECEDENCE})보다
+ * 바깥쪽에 위치시킵니다. 이 어드바이스가 감싸는 트랜잭션 커밋까지 끝난 뒤 감사 로그가 기록되도록
+ * 순서를 고정하기 위함이며, 순서를 지정하지 않으면 두 어드바이스 모두 동일한 기본 우선순위를 가져
+ * 어느 쪽이 바깥쪽인지 보장되지 않습니다.</p>
  */
 @Slf4j
 @Aspect
 @Component
+@Order(Ordered.LOWEST_PRECEDENCE - 1)
 public class AuditLoggingAspect {
 
     @Around("@annotation(ssafy.SSAju.annotation.AuditLog)")
