@@ -71,7 +71,7 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 ### Implementation for User Story 1
 
 - [ ] T014 [US1] `security/redis/RefreshTokenRedisRepository.java` 생성 — `save(jti, userId, tokenHash, ttl)`, `find(jti)`, `delete(jti)` (T004, T006 의존)
-- [ ] T015 [US1] `security/redis/AccessTokenBlacklistService.java` 생성 — `blacklist(jti, remainingTtl)`, `isBlacklisted(jti)` (T004, T006 의존)
+- [ ] T015 [US1] `security/redis/AccessTokenBlacklistService.java` 생성 — `blacklist(jti, tokenExpiry)`, `isBlacklisted(jti)` (T004, T006 의존). 남은 유효시간은 시스템 시간이 아닌 주입된 `Clock`(T008/`config/ClockConfig.java`) 기준으로 계산하고, 클럭 스큐(앱 서버-Redis 서버 간 시간 오차) 및 계산~저장 사이 지연을 방어하기 위해 계산된 TTL에 고정 패딩(상수화된 최소 60초)을 더해 `SETEX`하도록 구현
 - [ ] T016 [US1] `security/AbstractJwtValidationFilter.java` 생성 — 사용자/관리자 필터 공통 로직(토큰 파싱→서명/만료 검증→블랙리스트 확인→SecurityContext 설정) 템플릿 메서드로 추출(C5); `filter/JwtAuthenticationFilter.java`, `admin/config/AdminCookieJwtFilter.java`가 이를 상속하도록 리팩토링(T015 의존)
 - [ ] T017 [US1] `filter/TokenValidationFilter.java` 수정 — `Refresh-Token` 헤더 대신 `Cookie`에서 읽고, `shouldNotFilter`를 반전하여 `/api/auth/refresh`·`/api/auth/logout` **에서만** 검사하도록 축소(이해관계자 결정 #2)
 - [ ] T018 [US1] `service/AuthService.java` 수정 — `login`/`refreshAccessToken`/`logout`/`deleteUser`가 `entity/RefreshToken`/`repository/RefreshTokenRepository` 대신 T014/T015를 사용하도록 교체, `Instant.now()` 호출부를 주입된 `Clock`으로 교체(C7)
@@ -95,8 +95,8 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] `service/DailyApiUsageService.java` 수정 — 쿼터 복원(보상) 메서드 추가(예: `restoreDailyUsage(userId, date)`) 또는 차감 호출 시점 자체를 성공 이후로 이동
-- [ ] T024 [US2] `service/CompanyMatchingService.java` `analyzeCompatibility` 수정 — `dailyApiUsageService.checkAndIncrementDailyUsage` 호출을 외부 호출 성공 이후로 이동하거나, 실패 시 T023의 복원 메서드를 호출하도록 감싸기(메서드는 여전히 `@Transactional` 미적용 유지 — 외부 I/O 포함)
+- [ ] T023 [US2] `service/DailyApiUsageService.java` 수정 — 쿼터 복원(보상) 메서드 `restoreDailyUsage(userId, date)` 추가(결정: "성공 후 차감"으로 순서만 옮기는 방식 대신 **보상 트랜잭션 방식을 채택** — 아직 US5(T035)의 분산락이 적용되기 전 단계이므로, 락 유무와 무관하게 안전하게 동작해야 하기 때문)
+- [ ] T024 [US2] `service/CompanyMatchingService.java` `analyzeCompatibility` 수정 — 외부 호출(FastAPI/공공데이터) 실패 시 T023의 `restoreDailyUsage`를 호출하도록 try/catch로 감싸기(메서드는 여전히 `@Transactional` 미적용 유지 — 외부 I/O 포함). **⚠️ US5(T035)와 강한 상호의존**: 이 시점에는 아직 `CompanyCompatibility` 생성 구간에 분산락이 없으므로 우선 "요청 단위 차감 → 실패 시 복원"으로만 구현한다. T035에서 분산락 + 캐시 재확인(double-checked locking)을 적용할 때, 락 획득 후 캐시에 이미 결과가 존재하면(다른 스레드가 먼저 생성 완료) **쿼터를 차감하지 않고** 기존 결과만 반환하도록 반드시 재조정할 것 — 그렇지 않으면 락 대기 후 캐시 히트로 끝난 요청까지 쿼터가 차감되는 이중 차감/누수가 재발한다
 
 **Checkpoint**: `./gradlew test` 통과 — US1+US2 모두 독립적으로 동작
 
@@ -114,7 +114,7 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] `service/CompanyInfoService.java` 수정 — 5xx(`RestClientResponseException.is5xxServerError()`) 분기에서 `PublicDataApiException` 변환 로직 제거, 원본 예외 그대로 rethrow; `@Retryable(retryFor = {...})`에 `HttpServerErrorException` 포함 확인(4xx 변환 로직은 유지)
+- [ ] T026 [US3] `service/CompanyInfoService.java` 수정 — 5xx(`RestClientResponseException.is5xxServerError()`) 분기에서 `PublicDataApiException` 변환 로직 제거, 원본 예외 그대로 rethrow; `@Retryable(retryFor = {...})`에 `HttpServerErrorException` 포함 확인(4xx 변환 로직은 유지). **트랜잭션 전파 방어**: 이 메서드 및 호출 체인 상위(공공데이터/기업정보 조회를 오케스트레이션하는 서비스)가 실제로 활성 `@Transactional` 경계 안에서 호출되지 않는지 확인(기존 컨벤션상 외부 I/O 메서드는 `@Transactional` 금지이므로 정상 경로에서는 해당 없음이 확인되어야 함). 만약 호출 스택 중 어딘가 활성 트랜잭션 내부에서 호출되는 경로가 발견되면, 재시도 도중 발생하는 예외가 상위 트랜잭션을 rollback-only로 마킹해 최종 재시도가 성공해도 커밋 시 롤백되는 것을 막기 위해 해당 지점에 `@Transactional(propagation = Propagation.NOT_SUPPORTED)`를 명시적으로 적용한다
 
 **Checkpoint**: `./gradlew test` 통과
 
@@ -183,7 +183,7 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 - [ ] T044 [US6] (Git 커밋 대상 제외, 스크래치패드에만 생성) 운영 DB 마이그레이션 스크립트 작성 — 중복 정본 그룹별 생존 정본 선정 → 하위 테이블(`career_consultation` 등)의 `saju_result_id` UPDATE → `UserSajuAccess` 백필 INSERT → 중복 행 삭제 → `user_id` 컬럼/제약 DROP → `user_profile_id` 단독 유니크 생성 (data-model.md 마이그레이션 순서 그대로 반영, **이 파일은 git add 대상에서 제외**)
 - [ ] T045 [US6] `service/CareerFortuneService.java` 수정 — Quota 차감 로직 완전 제거, 정본 최초 생성/최초 접근 시 `UserSajuAccessRepository`로 매핑 행 생성
 - [ ] T046 [US6] `service/FeedbackService.java` 수정 — 기존 `SajuResult.user_id` 기반 소유권 검증을 `UserSajuAccessRepository.existsByUserIdAndSajuResultId` 기반으로 전면 교체
-- [ ] T047 [US6] `career/enums/FeedbackType.java` 삭제 및 다음 참조 파일들을 `career/enums/AnalysisType.java`로 치환(매핑: `CAREER_TIMING→SAJU`, `CONSULTATION→CAREER_CONSULTATION`, `COMPATIBILITY→COMPANY_COMPATIBILITY`): `career/entity/UserSatisfactionFeedback.java`, `admin/controller/AdminFeedbackController.java`, `admin/service/AdminFeedbackService.java`, `admin/dto/FeedbackListDTO.java`, `admin/dto/FeedbackStatDTO.java`, `admin/repository/AdminFeedbackQueryRepository.java`, `dto/request/SatisfactionFeedbackRequest.java`
+- [ ] T047 [US6] `career/enums/FeedbackType.java` 삭제 및 다음 참조 파일들을 `career/enums/AnalysisType.java`로 치환(매핑: `CAREER_TIMING→SAJU`, `CONSULTATION→CAREER_CONSULTATION`, `COMPATIBILITY→COMPANY_COMPATIBILITY`): `career/entity/UserSatisfactionFeedback.java`, `admin/controller/AdminFeedbackController.java`, `admin/service/AdminFeedbackService.java`, `admin/dto/FeedbackListDTO.java`, `admin/dto/FeedbackStatDTO.java`, `admin/repository/AdminFeedbackQueryRepository.java`. **C1 선행 결합**: 같은 작업 단위에서 `controller/FeedbackController.java`→`career/controller/FeedbackController.java`, `dto/request/SatisfactionFeedbackRequest.java`→`career/dto/request/SatisfactionFeedbackRequest.java`, `dto/response/SatisfactionFeedbackResponse.java`→`career/dto/response/SatisfactionFeedbackResponse.java`로 함께 이동한다(패키지 이동과 Enum 치환을 서로 다른 Phase에서 나눠 하면 동일 파일에 대한 "수정 후 이동"으로 git 이력이 흩어지고 중간 빌드 리스크가 커지므로, 피드백 관련 파일만 여기서 선제적으로 이동 — 나머지 C1 대상은 Phase 11에서 그대로 진행)
 
 **Checkpoint**: `./gradlew test` 통과 — 마이그레이션 스크립트는 실행하지 않고 존재만 확인(운영 적용은 배포 절차 별도)
 
@@ -206,7 +206,7 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 - [ ] T051 [US7] `entity/User.java` 수정 — `birthDate`(`nullable=false`), `birthTime`(`nullable=true`) 컬럼 추가
 - [ ] T052 [US7] `service/AuthService.java` `signup()` 수정 — 요청의 `birthDate`/`birthTime`을 `User` 엔티티에 저장
 - [ ] T053 [US7] 더미 시간 상수 추가(예: 기존 `CompatibilityConstants.DEFAULT_FOUNDING_TIME` 관례를 따르는 신규 상수, `"12:00"`) 및 `birthTime`이 없을 때 FastAPI 호출 경로(`career/provider/UserProfileProvider.java` 또는 관련 서비스)에서 더미값 사용하도록 연결
-- [ ] T054 [US7] `service/AnalysisResultMaskingService.java` 확장 — 기존 책임을 먼저 확인한 뒤, `birthTime`이 없는 소스에 대해 시(時) 기반 파생 필드(시주/시 기반 십신·지장간 세부값 등, `contracts/career-quota-and-retry.md` 목록 참고)를 분석 응답에서 제외하는 로직 추가
+- [ ] T054 [US7] `service/AnalysisResultMaskingService.java` 확장 — 기존 책임을 먼저 확인한 뒤, `birthTime`이 없는 소스에 대해 시(時) 기반 파생 필드(시주/시 기반 십신·지장간 세부값 등, `contracts/career-quota-and-retry.md` 목록 참고)를 분석 응답에서 제외하는 로직 추가. **직렬화 하드닝**: 단순히 필드를 `null`로 채우면 Jackson이 `"필드명": null`을 그대로 JSON에 노출하므로, 해당 필드를 갖는 응답 record(또는 그 상위 response record)에 `@JsonInclude(JsonInclude.Include.NON_NULL)`을 적용해 값이 없을 때 키 자체가 응답 JSON에서 누락되도록 처리
 
 **Checkpoint**: `./gradlew test` 통과
 
@@ -239,8 +239,8 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 ### Implementation for User Story 9
 
-- [ ] T058 [P] [US9] `controller/CareerTimingController.java`, `controller/CompatibilityController.java`, `controller/ConsultationController.java`, `controller/FeedbackController.java`를 `career/controller/`로 이동, 패키지 선언 및 import 갱신(C1)
-- [ ] T059 [P] [US9] `dto/request/CareerTimingRequest.java`, `CompatibilityRequest.java`, `ConsultationRequest.java`, `SatisfactionFeedbackRequest.java` 및 `dto/response/CareerTimingResponse.java`, `CompatibilityResponse.java`, `ConsultationResponse.java`, `SatisfactionFeedbackResponse.java`를 `career/dto/request/`, `career/dto/response/`로 이동(C1) — 이동 후 T064의 `CompatibilityRequest` 검증 추가 위치도 새 경로 기준으로 적용
+- [ ] T058 [P] [US9] `controller/CareerTimingController.java`, `controller/CompatibilityController.java`, `controller/ConsultationController.java`를 `career/controller/`로 이동, 패키지 선언 및 import 갱신(C1) — `FeedbackController.java`는 T047에서 이미 이동 완료
+- [ ] T059 [P] [US9] `dto/request/CareerTimingRequest.java`, `CompatibilityRequest.java`, `ConsultationRequest.java` 및 `dto/response/CareerTimingResponse.java`, `CompatibilityResponse.java`, `ConsultationResponse.java`를 `career/dto/request/`, `career/dto/response/`로 이동(C1) — `SatisfactionFeedbackRequest`/`Response`는 T047에서 이미 이동 완료. 이동 후 T064의 `CompatibilityRequest` 검증 추가 위치도 새 경로 기준으로 적용
 - [ ] T060 [US9] 빈 클래스 `config/WebMvcConfig.java` 삭제(C6)
 - [ ] T061 [US9] `config/AsyncConfig.java`에 `AsyncUncaughtExceptionHandler` 구현체 등록(C8)
 - [ ] T062 [US9] 코드베이스 전수 검색(`Instant.now()`/`LocalDateTime.now()`)으로 잔여 시스템 시간 직접 호출 지점을 찾아 주입된 `Clock`으로 교체(C7, T018에서 다룬 `AuthService` 외 잔여 지점)
@@ -282,10 +282,10 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 ### User Story Dependencies
 
 - **US1(P1)**: Foundational 이후 즉시 시작 가능, 다른 스토리에 의존 없음
-- **US2(P1)**: Foundational 이후 즉시 시작 가능, US1과 파일이 겹치지 않아 독립적
+- **US2(P1)**: Foundational 이후 즉시 시작 가능, US1과 파일이 겹치지 않아 독립적. 단, `CompanyMatchingService.analyzeCompatibility`의 쿼터 로직(T024)은 이후 US5(T035)의 분산락 적용 시 반드시 재조정되어야 하는 **전방 의존**이 있음(아래 US5 항목 참고)
 - **US3(P2)**: Foundational 이후 시작 가능, 독립적
 - **US4(P2)**: Foundational 이후 시작 가능, 독립적
-- **US5(P2)**: Foundational(특히 T007 `DistributedLock`) 이후 시작 가능, 독립적
+- **US5(P2)**: Foundational(특히 T007 `DistributedLock`) 이후 시작 가능. `CompanyMatchingService`에 락을 적용하는 T035는 US2(T024)의 쿼터 차감/복원 로직과 같은 메서드를 다루므로, 락+캐시 재확인(double-checked locking) 도입 시 쿼터 차감 시점을 반드시 재검토해야 함(T024 참고) — 이 부분만 US2에 약한 후행 의존이 있고 나머지는 독립적
 - **US6(P3)**: Foundational 이후 시작 가능하나, US5에서 `SajuResultProvider`/`ConsultationSaveService`에 분산락을 적용해 둔 상태에서 진행하는 것을 권장(정본 생성 경로를 두 번 건드리지 않기 위함) — 강한 기술적 의존은 아니나 순서 권장
 - **US7(P3)**: Foundational 이후 시작 가능, 독립적(단 `AnalysisResultMaskingService` 기존 책임 확인 필요)
 - **US8(P3)**: Foundational 이후 시작 가능, 독립적
