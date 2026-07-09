@@ -7,7 +7,11 @@
 **After**:
 - 쿼터 차감은 분석이 **성공적으로 완료된 시점**(모든 외부 호출 + DB 저장 성공 후)으로 이동하거나, 기존 순서를 유지하되 외부 호출 실패 시 보상 트랜잭션(`dailyApiUsageService.restoreDailyUsage(userId)` 등)으로 복구.
 - 응답 스키마 변경 없음. 실패 시 사용자에게 보이는 오류 메시지도 기존과 동일(내부 쿼터 정합성만 개선).
-- 동시 요청에 대해 정본(`CompanyCompatibility`) 생성은 `lock:company-compatibility:{userProfileId}:{companyName}:{targetRoleCategory}` 분산락으로 보호 — 락 획득 실패(경합) 시에도 최종적으로는 하나의 결과가 만들어지고 모든 요청자가 그 결과를 받음(대기 후 재조회).
+- 동시 요청에 대해 정본(`CompanyCompatibility`) 생성은 `lock:company-compatibility:{userProfileId}:{companyName}:{targetRoleCategory}` 분산락으로 보호:
+  - **Lease Time (TTL)**: 30초 (락 획득 후 최대 보유 시간)
+  - **Wait/Acquire Timeout**: 10초 (락 획득 시도 시 최대 대기 시간)
+  - **Retry/Recheck Bound**: "대기 후 재조회"는 락 획득 성공 직후 단 1회만 수행 (무한 루프 방지)
+  - 정책: 락 획득 실패(경합) 시에도 최종적으로는 하나의 결과가 만들어지고 모든 요청자가 그 결과를 받음 — 대기 후 재조회 1회로 대부분의 경우 캐시 히트, 극히 드물게 Timeout 발생 시 사용자에게 일시적 오류로 응답.
 
 ## `GET /api/companies/{name}/info` 계열 (`CompanyInfoService`)
 

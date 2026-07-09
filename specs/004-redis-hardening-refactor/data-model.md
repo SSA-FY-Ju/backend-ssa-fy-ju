@@ -8,10 +8,14 @@
 
 | 필드 | 타입 | 제약 | 설명 |
 |---|---|---|---|
-| `birthDate` | `LocalDate` | `nullable=false` | 회원가입 시 필수 입력 (FR-018) |
+| `birthDate` | `LocalDate` | 2단계 롤아웃(아래 참고) | 회원가입 시 필수 입력 (FR-018) |
 | `birthTime` | `LocalTime` | `nullable=true` | 회원가입 시 선택 입력 (FR-018) — 값이 없으면 시간 기반 결과 제외 처리(FR-020)의 기준 |
 
-기존 사용자 마이그레이션: `birthDate`가 없는 기존 행에 대한 백필 값은 운영 데이터 이슈이므로 이번 스펙 범위(신규 가입 로직) 밖 — Assumptions 참고.
+**`birthDate` 2단계 롤아웃**:
+1. **Phase 1 (초기)**: `birthDate` 컬럼을 `nullable=true`로 추가 → 신규 가입자만 입력, 기존 행은 `NULL` 유지
+2. **Phase 2 (사후)**: 기존 사용자 행에 대한 백필(운영 별도 절차) → `birthDate` 제약을 `nullable=false`로 전환
+
+이유: 기존 사용자 행을 한 번에 NOT NULL로 변경하면 스키마 변경 자체가 실패하거나 긴 lock-time을 야기하므로, 먼저 nullable 컬럼을 추가 후 별도 마이그레이션 과정에서 값을 채우는 방식을 채택.
 
 ### `career/entity/SajuResult` (변경 — B1)
 
