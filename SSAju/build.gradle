@@ -49,6 +49,14 @@ dependencies {
 	// Security (Phase 2에서 활성화 예정)
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 
+	// Redis / Redisson (세션 저장, 블랙리스트, 분산락)
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	// redisson-spring-boot-starter 3.25.1(tasks.md 명시값)은 Spring Boot 3.2 대상이라
+	// Boot 4.0.5의 리패키징된 org.springframework.boot.data.redis.autoconfigure 패키지와
+	// 충돌(ClassNotFoundException: 구 패키지 org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration)한다.
+	// Boot 4.0.x를 명시적으로 지원하는 4.0.0으로 대체.
+	implementation 'org.redisson:redisson-spring-boot-starter:4.0.0'
+
 	// Retry
 	// spring-boot-starter-aop는 Spring Boot 4.0.5-M에서 제공되지 않아 spring-aspects 직접 사용
 	implementation 'org.springframework.retry:spring-retry:2.0.11'
@@ -75,6 +83,7 @@ dependencies {
 	testRuntimeOnly 'com.h2database:h2'
 
 	// Testcontainers (MySQL 통합 테스트용 - INSERT IGNORE 등 MySQL 전용 문법 검증)
+	// Redis 통합 테스트는 별도 아티팩트 없이 junit-jupiter가 포함하는 core GenericContainer로 수행
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
 	testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
 	testImplementation 'org.testcontainers:mysql:1.20.4'
