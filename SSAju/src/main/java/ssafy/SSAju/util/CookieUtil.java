@@ -28,7 +28,7 @@ public class CookieUtil {
                 .secure(secureCookie)
                 .sameSite("Strict")
                 .maxAge(maxAgeSecs)
-                .path("/")
+                .path("/api/auth")
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());
     }
@@ -40,7 +40,7 @@ public class CookieUtil {
                 .secure(secureCookie)
                 .sameSite("Strict")
                 .maxAge(0)
-                .path("/")
+                .path("/api/auth")
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());
     }
