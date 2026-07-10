@@ -20,6 +20,12 @@ spring:
       hibernate:
         format_sql: true
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+
   ai:
     openai:
       api-key: ${OPENAI_API_KEY}
@@ -69,6 +75,11 @@ server:
   shutdown: graceful
   cookie:
     secure: true   # 로컬 개발 시 application-local.yaml에서 false로 오버라이드
+
+redisson:
+  lock:
+    wait-time-ms: ${REDISSON_LOCK_WAIT_TIME_MS:2000}
+    lease-time-ms: ${REDISSON_LOCK_LEASE_TIME_MS:5000}
 
 saju:
   fastapi:
