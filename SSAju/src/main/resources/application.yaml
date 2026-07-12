@@ -88,7 +88,7 @@ saju:
     max-retries: 2
 
   openai:
-    timeout-seconds: 30
+    timeout-seconds: 60
     max-retries: 1
 
   public-data:
