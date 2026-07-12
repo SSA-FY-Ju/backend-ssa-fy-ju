@@ -22,6 +22,7 @@ import ssafy.SSAju.config.RedissonLockProperties;
 import ssafy.SSAju.exception.LockAcquisitionException;
 
 import java.lang.reflect.Method;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -44,6 +45,7 @@ public class DistributedLockAspect {
 
     private static final ExpressionParser PARSER = new SpelExpressionParser();
     private static final DefaultParameterNameDiscoverer PARAMETER_NAME_DISCOVERER = new DefaultParameterNameDiscoverer();
+    private static final ConcurrentHashMap<String, Expression> EXPRESSION_CACHE = new ConcurrentHashMap<>();
 
     private final RedissonClient redissonClient;
     private final RedissonLockProperties lockProperties;
@@ -62,12 +64,14 @@ public class DistributedLockAspect {
                     lockProperties.getWaitTimeMs(), lockProperties.getLeaseTimeMs(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new LockAcquisitionException("락 대기 중 스레드가 중단되었습니다: " + lockKey, e);
+            throw new LockAcquisitionException("락 대기 중 스레드가 중단되었습니다.", e);
         }
 
         if (!acquired) {
-            log.warn("분산락 획득 실패: key={}", lockKey);
-            throw new LockAcquisitionException("락 획득에 실패했습니다: " + lockKey);
+            // 락 키는 SpEL로 계산되어 생년월일 등 개인정보를 포함할 수 있으므로
+            // 로그/예외 메시지에 원문을 남기지 않고 메서드명만 기록한다.
+            log.warn("분산락 획득 실패: method={}", method.getName());
+            throw new LockAcquisitionException("락 획득에 실패했습니다.");
         }
 
         try {
@@ -88,7 +92,12 @@ public class DistributedLockAspect {
             }
         }
 
-        Expression expression = PARSER.parseExpression(keyExpression);
-        return expression.getValue(context, String.class);
+        Expression expression = EXPRESSION_CACHE.computeIfAbsent(keyExpression, PARSER::parseExpression);
+        String lockKey = expression.getValue(context, String.class);
+        if (lockKey == null) {
+            throw new LockAcquisitionException(
+                    "락 키 계산 결과가 null입니다. @DistributedLock SpEL 표현식을 확인하세요: method=" + method.getName());
+        }
+        return lockKey;
     }
 }
