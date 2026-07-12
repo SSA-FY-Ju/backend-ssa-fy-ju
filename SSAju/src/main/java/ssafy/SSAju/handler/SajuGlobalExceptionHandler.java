@@ -19,6 +19,7 @@ import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.FeedbackNotAllowedException;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidTokenException;
+import ssafy.SSAju.exception.LockAcquisitionException;
 import ssafy.SSAju.exception.DailyLimitExceededException;
 import ssafy.SSAju.exception.DuplicateEmailException;
 import ssafy.SSAju.exception.ExternalApiException;
@@ -318,6 +319,16 @@ public class SajuGlobalExceptionHandler {
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.DATABASE_ERROR.getCode(),
                         ErrorMessageConstants.DATABASE_ERROR.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(LockAcquisitionException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLockAcquisitionException(
+            LockAcquisitionException e, HttpServletRequest request) {
+        log.warn("분산락 획득 실패: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.LOCK_ACQUISITION_FAILED.getCode(),
+                        ErrorMessageConstants.LOCK_ACQUISITION_FAILED.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
