@@ -30,9 +30,9 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 **Purpose**: Redis/Redisson 의존성 및 설정값 도입 (사용자 지시 "[Redis 인프라 및 신규 아키텍처 세팅]" 1단계)
 
-- [ ] T001 `SSAju/build.gradle`에 `implementation 'org.springframework.boot:spring-boot-starter-data-redis'`, `implementation 'org.redisson:redisson-spring-boot-starter:3.25.1'` 추가
-- [ ] T002 [P] `SSAju/build.gradle`의 `testImplementation`에 Redis Testcontainers 의존성 추가(`org.testcontainers:testcontainers` 하위 Redis 모듈 또는 GenericContainer용 core 모듈 — 기존 MySQL Testcontainers와 동일 버전 라인(`1.20.4`) 사용)
-- [ ] T003 [P] `SSAju/src/main/resources/application.yaml`에 `spring.data.redis.host/port`(env `${REDIS_HOST:localhost}`/`${REDIS_PORT:6379}`), `redisson.lock.wait-time-ms`/`redisson.lock.lease-time-ms` 등 신규 설정 키 추가(매직넘버 금지 원칙에 따라 상수 클래스에서 읽도록 `@ConfigurationProperties`로 매핑할 위치도 함께 준비)
+- [x] T001 `SSAju/build.gradle`에 `implementation 'org.springframework.boot:spring-boot-starter-data-redis'`, `implementation 'org.redisson:redisson-spring-boot-starter:3.25.1'` 추가 — *Boot 4.0.5 호환을 위해 `redisson-spring-boot-starter:4.0.0`으로 상향 적용*
+- [x] T002 [P] `SSAju/build.gradle`의 `testImplementation`에 Redis Testcontainers 의존성 추가(`org.testcontainers:testcontainers` 하위 Redis 모듈 또는 GenericContainer용 core 모듈 — 기존 MySQL Testcontainers와 동일 버전 라인(`1.20.4`) 사용)
+- [x] T003 [P] `SSAju/src/main/resources/application.yaml`에 `spring.data.redis.host/port`(env `${REDIS_HOST:localhost}`/`${REDIS_PORT:6379}`), `redisson.lock.wait-time-ms`/`redisson.lock.lease-time-ms` 등 신규 설정 키 추가(매직넘버 금지 원칙에 따라 상수 클래스에서 읽도록 `@ConfigurationProperties`로 매핑할 위치도 함께 준비)
 
 **Checkpoint**: `./gradlew build` 성공(신규 의존성 다운로드 확인) — 아직 신규 기능 코드는 없으므로 `./gradlew test`는 기존과 동일하게 통과해야 함
 
@@ -44,15 +44,15 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 **⚠️ CRITICAL**: 이 phase가 끝나기 전에는 어떤 User Story 작업도 시작할 수 없음
 
-- [ ] T004 `config/RedisConfig.java` 생성 — Lettuce `RedisConnectionFactory` + `StringRedisTemplate`(또는 `RedisTemplate<String,String>`) 빈 등록
-- [ ] T005 [P] `config/RedissonConfig.java` 생성 — `application.yaml`의 host/port를 읽어 `RedissonClient` 빈 등록
-- [ ] T006 [P] `util/RedisKeyConstants.java`(또는 `career/enums`/`util` 컨벤션에 맞는 위치) 생성 — `refresh-token:`, `access-blacklist:`, `lock:saju-result:`, `lock:user-profile:`, `lock:career-consultation:`, `lock:company-compatibility:` 등 키 prefix를 상수화(`data-model.md` Redis 스키마 표 반영)
-- [ ] T007 `annotation/DistributedLock.java`(락 키 SpEL 표현식 속성 포함) + `aspect/DistributedLockAspect.java` 생성 — Redisson `RLock.tryLock(waitTime, leaseTime, TimeUnit)` 래핑, 락 획득 실패 시 전용 예외(`exception/` 하위 신규 또는 기존 계층 재사용) 발생, 성공 시 메서드 실행 후 `unlock()` 보장(try-finally)
-- [ ] T008 `config/JpaAuditingConfig.java`에 커스텀 `DateTimeProvider` 빈 등록 — 기존 `config/ClockConfig.java`의 `Clock` 빈을 주입받아 `@CreatedDate`/`@LastModifiedDate`가 시스템 시간이 아닌 주입된 `Clock` 기준으로 기록되도록 연결(이해관계자 결정 #4)
-- [ ] T009 [P] `SSAju/src/test/java/ssafy/SSAju/aspect/DistributedLockAspectTest.java` 작성 — 락 획득/해제, `tryLock` 타임아웃 시 예외 발생을 검증(Redis Testcontainers 사용)
-- [ ] T010 [P] `SSAju/src/test/java/ssafy/SSAju/config/JpaAuditingConfigTest.java` 작성 — 테스트용 고정 `Clock`을 주입했을 때 엔티티의 `createdAt`이 시스템 시간이 아닌 그 `Clock` 값과 일치하는지 검증
+- [x] T004 `config/RedisConfig.java` 생성 — Lettuce `RedisConnectionFactory` + `StringRedisTemplate`(또는 `RedisTemplate<String,String>`) 빈 등록
+- [x] T005 [P] `config/RedissonConfig.java` 생성 — `application.yaml`의 host/port를 읽어 `RedissonClient` 빈 등록 — *`redisson-spring-boot-starter:4.0.0`의 `RedissonAutoConfigurationV4`(`@ConditionalOnMissingBean`)가 `spring.data.redis.*`로 `RedissonClient`를 이미 자동 구성함을 바이트코드로 확인 → 별도 `RedissonConfig.java`는 생성하지 않고 자동 구성에 위임(`DistributedLockAspect`에서 자동 구성된 빈 사용으로 검증 완료)*
+- [x] T006 [P] `util/RedisKeyConstants.java`(또는 `career/enums`/`util` 컨벤션에 맞는 위치) 생성 — `refresh-token:`, `access-blacklist:`, `lock:saju-result:`, `lock:user-profile:`, `lock:career-consultation:`, `lock:company-compatibility:` 등 키 prefix를 상수화(`data-model.md` Redis 스키마 표 반영)
+- [x] T007 `annotation/DistributedLock.java`(락 키 SpEL 표현식 속성 포함) + `aspect/DistributedLockAspect.java` 생성 — Redisson `RLock.tryLock(waitTime, leaseTime, TimeUnit)` 래핑, 락 획득 실패 시 전용 예외(`exception/` 하위 신규 또는 기존 계층 재사용) 발생, 성공 시 메서드 실행 후 `unlock()` 보장(try-finally)
+- [x] T008 `config/JpaAuditingConfig.java`에 커스텀 `DateTimeProvider` 빈 등록 — 기존 `config/ClockConfig.java`의 `Clock` 빈을 주입받아 `@CreatedDate`/`@LastModifiedDate`가 시스템 시간이 아닌 주입된 `Clock` 기준으로 기록되도록 연결(이해관계자 결정 #4)
+- [x] T009 [P] `SSAju/src/test/java/ssafy/SSAju/aspect/DistributedLockAspectTest.java` 작성 — 락 획득/해제, `tryLock` 타임아웃 시 예외 발생을 검증(Redis Testcontainers 사용)
+- [x] T010 [P] `SSAju/src/test/java/ssafy/SSAju/config/JpaAuditingConfigTest.java` 작성 — 테스트용 고정 `Clock`을 주입했을 때 엔티티의 `createdAt`이 시스템 시간이 아닌 그 `Clock` 값과 일치하는지 검증
 
-**Checkpoint**: 인프라 준비 완료 — 이후 User Story는 우선순위 순서(P1→P4)대로 진행하되, 서로 다른 담당자가 있다면 병렬 진행 가능
+**Checkpoint**: ✅ 완료 (`./gradlew clean test` BUILD SUCCESSFUL, `feat/redis-foundational-infra` 브랜치) — 인프라 준비 완료. 이후 User Story는 우선순위 순서(P1→P4)대로 진행하되, 서로 다른 담당자가 있다면 병렬 진행 가능
 
 ---
 
