@@ -91,10 +91,11 @@ public class AdminLoginController {
     @PostMapping("/logout")
     public String logout(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = extractCookieValue(request, AdminCookieJwtFilter.ADMIN_REFRESH_TOKEN_COOKIE);
+        String accessToken = extractCookieValue(request, AdminCookieJwtFilter.ADMIN_TOKEN_COOKIE);
         if (refreshToken != null) {
             Long userId = jwtUtil.extractUserId(refreshToken);
             if (userId != null) {
-                authService.logout(userId, refreshToken);
+                authService.logout(userId, refreshToken, accessToken);
             }
         }
 

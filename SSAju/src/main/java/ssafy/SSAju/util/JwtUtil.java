@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -30,6 +31,7 @@ public class JwtUtil {
     private static final String CLAIM_EMAIL = "email";
     private static final String CLAIM_TYPE = "type";
     private static final String CLAIM_ROLE = "role";
+    private static final String CLAIM_JTI = "jti";
 
     private final SecretKey secretKey;
     private final long accessTokenExpirationMs;
@@ -116,6 +118,24 @@ public class JwtUtil {
         }
     }
 
+    /**
+     * 토큰에서 jti(JWT ID)를 추출합니다. 만료된 토큰에서도 추출 가능합니다.
+     *
+     * <p>Redis 기반 Refresh Token 저장/조회 및 Access Token 블랙리스트 등록·조회의 키로 사용됩니다.
+     *
+     * @param token JWT 토큰 (만료 여부 무관)
+     * @return jti, 위조·손상된 토큰이면 null
+     */
+    public String extractJti(String token) {
+        try {
+            return parseClaims(token).get(CLAIM_JTI, String.class);
+        } catch (ExpiredJwtException ex) {
+            return ex.getClaims().get(CLAIM_JTI, String.class);
+        } catch (JwtException ex) {
+            return null;
+        }
+    }
+
     private String buildTokenWithRole(Long userId, String email, String role, String type, long expirationMs) {
         // Instant 기반으로 생성하여 타임존 독립성 보장 (M-7).
         Instant nowInstant = Instant.now();
@@ -125,6 +145,7 @@ public class JwtUtil {
         var builder = Jwts.builder()
                 .claim(CLAIM_USER_ID, userId)
                 .claim(CLAIM_TYPE, type)
+                .claim(CLAIM_JTI, UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(secretKey);

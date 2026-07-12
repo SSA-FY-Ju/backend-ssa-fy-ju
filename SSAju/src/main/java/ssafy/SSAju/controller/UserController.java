@@ -1,5 +1,6 @@
 package ssafy.SSAju.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -38,10 +39,22 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> deleteUser(
             @Valid @RequestBody DeleteUserRequest request,
             @AuthenticationPrincipal Long userId,
+            HttpServletRequest httpRequest,
             HttpServletResponse response) {
+        String accessToken = extractBearerToken(httpRequest);
+        String refreshToken = ssafy.SSAju.util.CookieUtil.getRefreshTokenFromCookie(httpRequest);
         authService.deleteUser(userId, request.password());
+        authService.invalidateSession(userId, refreshToken, accessToken);
         cookieUtil.clearRefreshTokenCookie(response);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    private String extractBearerToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring("Bearer ".length());
+        }
+        return null;
     }
 
     @GetMapping("/api/mypage")

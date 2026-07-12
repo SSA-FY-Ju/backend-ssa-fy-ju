@@ -17,10 +17,11 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import ssafy.SSAju.filter.JwtAuthenticationFilter;
 import ssafy.SSAju.filter.TokenValidationFilter;
-import ssafy.SSAju.repository.RefreshTokenRepository;
 import ssafy.SSAju.security.JwtAccessDeniedHandler;
 import ssafy.SSAju.security.JwtAuthenticationEntryPoint;
 import ssafy.SSAju.security.JwtExceptionFilter;
+import ssafy.SSAju.security.redis.AccessTokenBlacklistService;
+import ssafy.SSAju.security.redis.RefreshTokenRedisRepository;
 import ssafy.SSAju.util.JwtUtil;
 
 import java.util.Arrays;
@@ -51,7 +52,8 @@ public class SecurityConfig {
                                            JwtAuthenticationEntryPoint entryPoint,
                                            JwtAccessDeniedHandler accessDeniedHandler,
                                            ObjectMapper objectMapper,
-                                           RefreshTokenRepository refreshTokenRepository) throws Exception {
+                                           AccessTokenBlacklistService blacklistService,
+                                           RefreshTokenRedisRepository refreshTokenRedisRepository) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -69,10 +71,10 @@ public class SecurityConfig {
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler))
-            .addFilterBefore(new JwtAuthenticationFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, blacklistService), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new JwtExceptionFilter(objectMapper), JwtAuthenticationFilter.class)
-            // RefreshToken 검증 필터: /api/auth/refresh 엔드포인트 요청 시 Refresh-Token 헤더 유효성 검증
-            .addFilterAfter(new TokenValidationFilter(refreshTokenRepository, objectMapper), JwtAuthenticationFilter.class)
+            // RefreshToken 쿠키 검증 필터: /api/auth/refresh, /api/auth/logout 요청에만 적용
+            .addFilterAfter(new TokenValidationFilter(jwtUtil, refreshTokenRedisRepository, objectMapper), JwtAuthenticationFilter.class)
             .httpBasic(AbstractHttpConfigurer::disable);
 
         return http.build();
@@ -93,7 +95,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "Refresh-Token"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

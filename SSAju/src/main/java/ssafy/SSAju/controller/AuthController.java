@@ -6,8 +6,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +21,7 @@ import ssafy.SSAju.dto.response.SignupResponse;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.service.AuthService;
 import ssafy.SSAju.util.ClientIpUtil;
+import ssafy.SSAju.util.CookieUtil;
 
 /**
  * 인증 관련 REST 컨트롤러.
@@ -38,7 +38,11 @@ import ssafy.SSAju.util.ClientIpUtil;
 @RequiredArgsConstructor
 public class AuthController {
 
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
+
     private final AuthService authService;
+    private final CookieUtil cookieUtil;
 
     /**
      * 회원가입 요청을 처리합니다.
@@ -71,7 +75,7 @@ public class AuthController {
      *   <li>이메일로 사용자 조회</li>
      *   <li>비밀번호 일치 확인</li>
      *   <li>AccessToken (1시간) 및 RefreshToken (7일) 생성</li>
-     *   <li>AccessToken은 Authorization 헤더, RefreshToken은 Refresh-Token 헤더로 전달</li>
+     *   <li>AccessToken은 Authorization 헤더, RefreshToken은 HttpOnly 쿠키로 전달</li>
      *   <li>로그인 시도 이벤트 발행 (비동기)</li>
      * </ul>
      *
@@ -95,8 +99,8 @@ public class AuthController {
             HttpServletResponse httpResponse) {
         String clientIp = ClientIpUtil.getClientIp(httpRequest);
         AuthTokenPair tokenPair = authService.login(request, clientIp);
-        httpResponse.setHeader("Authorization", "Bearer " + tokenPair.accessToken());
-        httpResponse.setHeader("Refresh-Token", tokenPair.refreshTokenValue());
+        httpResponse.setHeader(AUTHORIZATION_HEADER, BEARER_PREFIX + tokenPair.accessToken());
+        cookieUtil.setRefreshTokenCookie(httpResponse, tokenPair.refreshTokenValue());
         return ResponseEntity.ok(ApiResponse.success(
                 new AuthTokenResponse(tokenPair.expiresIn())));
     }
@@ -106,46 +110,46 @@ public class AuthController {
      *
      * <p><b>프로세스:</b>
      * <ul>
-     *   <li>SecurityContext에서 현재 사용자 ID 추출</li>
-     *   <li>Refresh-Token 요청 헤더에서 토큰값 추출</li>
-     *   <li>RefreshToken을 revoked 상태로 표시</li>
+     *   <li>현재 AccessToken을 블랙리스트에 등록(즉시 무효화)</li>
+     *   <li>RefreshToken 쿠키에서 토큰값 추출 후 Redis에서 삭제</li>
+     *   <li>RefreshToken 쿠키 제거</li>
      * </ul>
      *
-     * @param request HTTP 요청 (RefreshToken 쿠키 추출용)
+     * @param userId 인증된 사용자 ID (Access Token으로부터)
+     * @param request HTTP 요청 (Authorization 헤더, RefreshToken 쿠키 추출용)
      * @param response HTTP 응답 (쿠키 제거용)
      * @return 200 OK
-     * @throws AuthException 인증 정보를 찾을 수 없는 경우
      */
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
+            @AuthenticationPrincipal Long userId,
             HttpServletRequest request,
             HttpServletResponse response) {
-        Long userId = getCurrentUserId();
-        String refreshToken = request.getHeader("Refresh-Token");
-        if (refreshToken == null || refreshToken.isBlank()) {
-            throw new AuthException("리프레시 토큰이 없습니다.");
-        }
-        authService.logout(userId, refreshToken);
+        String accessToken = extractBearerToken(request);
+        String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
+        authService.logout(userId, refreshToken, accessToken);
+        cookieUtil.clearRefreshTokenCookie(response);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**
-     * RefreshToken으로 새로운 AccessToken을 발급합니다.
+     * RefreshToken으로 새로운 AccessToken을 발급하고, RefreshToken을 회전합니다.
      *
      * <p>{@link ssafy.SSAju.filter.TokenValidationFilter}에서 RefreshToken의 유효성을
      * 이미 검증한 후 이 엔드포인트에 도달합니다.
      *
-     * @param request HTTP 요청 (Refresh-Token 헤더 추출용)
+     * @param request HTTP 요청 (RefreshToken 쿠키 추출용)
+     * @param response HTTP 응답 (새 RefreshToken 쿠키 설정용)
      * @return 200 OK, 새 AccessToken 및 만료 시간
      * @throws ssafy.SSAju.exception.InvalidTokenException RefreshToken이 유효하지 않은 경우
      */
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthTokenResponse>> refresh(HttpServletRequest request,
                                                                    HttpServletResponse response) {
-        String refreshToken = request.getHeader("Refresh-Token");
+        String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
         AuthTokenPair tokenPair = authService.refreshAccessToken(refreshToken);
-        response.setHeader("Authorization", "Bearer " + tokenPair.accessToken());
-        response.setHeader("Refresh-Token", tokenPair.refreshTokenValue());
+        response.setHeader(AUTHORIZATION_HEADER, BEARER_PREFIX + tokenPair.accessToken());
+        cookieUtil.setRefreshTokenCookie(response, tokenPair.refreshTokenValue());
         return ResponseEntity.ok(ApiResponse.success(new AuthTokenResponse(tokenPair.expiresIn())));
     }
 
@@ -166,11 +170,11 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
-    private Long getCurrentUserId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof Long)) {
-            throw new AuthException("인증 정보를 찾을 수 없습니다.");
+    private String extractBearerToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
+        if (bearerToken != null && bearerToken.startsWith(BEARER_PREFIX)) {
+            return bearerToken.substring(BEARER_PREFIX.length());
         }
-        return (Long) auth.getPrincipal();
+        return null;
     }
 }

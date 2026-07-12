@@ -15,6 +15,7 @@ import ssafy.SSAju.admin.config.AdminAccessDeniedHandler;
 import ssafy.SSAju.admin.config.AdminAuthenticationEntryPoint;
 import ssafy.SSAju.admin.config.AdminCookieJwtFilter;
 import ssafy.SSAju.security.JwtExceptionFilter;
+import ssafy.SSAju.security.redis.AccessTokenBlacklistService;
 import ssafy.SSAju.util.JwtUtil;
 import tools.jackson.databind.ObjectMapper;
 
@@ -32,8 +33,9 @@ public class AdminSecurityConfig {
 
     @Bean
     public SecurityFilterChain adminFilterChain(HttpSecurity http, JwtUtil jwtUtil,
-                                                ObjectMapper objectMapper) throws Exception {
-        AdminCookieJwtFilter cookieJwtFilter = new AdminCookieJwtFilter(jwtUtil, cookieSecure);
+                                                ObjectMapper objectMapper,
+                                                AccessTokenBlacklistService blacklistService) throws Exception {
+        AdminCookieJwtFilter cookieJwtFilter = new AdminCookieJwtFilter(jwtUtil, blacklistService, cookieSecure);
 
         http
             .securityMatcher("/admin/**")
