@@ -107,7 +107,10 @@ public enum ErrorMessageConstants {
     DAILY_LIMIT_EXCEEDED("DAILY_LIMIT_EXCEEDED", "하루 3회 분석 제한에 도달했습니다."),
     TERMS_AGREEMENT_REQUIRED("TERMS_AGREEMENT_REQUIRED", "이용약관 및 개인정보 수집에 동의해야 합니다."),
     UNAUTHORIZED("UNAUTHORIZED", "인증이 필요합니다."),
-    ACCESS_DENIED("ACCESS_DENIED", "접근 권한이 없습니다.");
+    ACCESS_DENIED("ACCESS_DENIED", "접근 권한이 없습니다."),
+
+    // === 분산락 예외 메시지 ===
+    LOCK_ACQUISITION_FAILED("LOCK_ACQUISITION_FAILED", "요청이 몰려 처리 중입니다. 잠시 후 다시 시도해주세요.");
 
     private final String code;
     private final String message;
