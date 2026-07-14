@@ -1,39 +1,34 @@
 package ssafy.SSAju.security;
 
-import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
-import ssafy.SSAju.dto.response.ApiResponse;
-import ssafy.SSAju.dto.response.ErrorInfo;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.IOException;
-import java.util.UUID;
 
+/**
+ * 인증은 되었으나 권한이 없는 접근 시 403 JSON 응답을 반환한다.
+ *
+ * <p>{@link HandlerExceptionResolver}를 통해 {@link ssafy.SSAju.handler.SajuGlobalExceptionHandler}의
+ * {@code AccessDeniedException} 처리기로 위임하여, 메서드 보안({@code @PreAuthorize})에서 발생한
+ * 동일 예외와 응답 형식을 통일한다.
+ */
 @Slf4j
 public class JwtAccessDeniedHandler implements AccessDeniedHandler {
 
-    private final ObjectMapper objectMapper;
+    private final HandlerExceptionResolver exceptionResolver;
 
-    public JwtAccessDeniedHandler(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public JwtAccessDeniedHandler(HandlerExceptionResolver exceptionResolver) {
+        this.exceptionResolver = exceptionResolver;
     }
 
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        AccessDeniedException accessDeniedException) throws IOException {
         log.warn("권한 없는 접근: path={}", request.getRequestURI());
-
-        response.setStatus(HttpStatus.FORBIDDEN.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
-
-        String requestId = "req-" + UUID.randomUUID().toString().substring(0, 8);
-        ApiResponse<Void> body = ApiResponse.failure(
-                new ErrorInfo("AUTH-003", "접근 권한이 없습니다.", requestId));
-        objectMapper.writeValue(response.getWriter(), body);
+        exceptionResolver.resolveException(request, response, null, accessDeniedException);
     }
 }

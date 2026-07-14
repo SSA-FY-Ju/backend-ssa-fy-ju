@@ -1,6 +1,5 @@
 package ssafy.SSAju.filter;
 
-import tools.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -8,11 +7,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
-import ssafy.SSAju.dto.response.ApiResponse;
-import ssafy.SSAju.dto.response.ErrorInfo;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.TokenExpiredException;
 import ssafy.SSAju.security.redis.RefreshTokenRedisRepository;
@@ -23,7 +19,6 @@ import ssafy.SSAju.util.TokenHashUtil;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * RefreshToken 쿠키 검증 필터.
@@ -47,7 +42,7 @@ public class TokenValidationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final RefreshTokenRedisRepository refreshTokenRedisRepository;
-    private final ObjectMapper objectMapper;
+    private final HandlerExceptionResolver exceptionResolver;
 
     /**
      * {@code /api/auth/refresh}, {@code /api/auth/logout}에만 이 필터를 적용합니다.
@@ -66,7 +61,8 @@ public class TokenValidationFilter extends OncePerRequestFilter {
         String tokenValue = CookieUtil.getRefreshTokenFromCookie(request);
 
         if (tokenValue == null) {
-            sendErrorResponse(response, "리프레시 토큰이 없습니다.");
+            exceptionResolver.resolveException(request, response, null,
+                    new InvalidTokenException("리프레시 토큰이 없습니다."));
             return;
         }
 
@@ -75,7 +71,7 @@ public class TokenValidationFilter extends OncePerRequestFilter {
             claims = jwtUtil.parseAndValidateClaims(tokenValue);
         } catch (TokenExpiredException | InvalidTokenException ex) {
             log.warn("RefreshToken 검증 실패: {}", ex.getMessage());
-            sendErrorResponse(response, "유효하지 않은 리프레시 토큰입니다.");
+            exceptionResolver.resolveException(request, response, null, ex);
             return;
         }
 
@@ -84,18 +80,11 @@ public class TokenValidationFilter extends OncePerRequestFilter {
 
         if (stored.isEmpty() || !stored.get().tokenHash().equals(TokenHashUtil.sha256(tokenValue))) {
             log.warn("유효하지 않은 RefreshToken으로 갱신/로그아웃 시도");
-            sendErrorResponse(response, "유효하지 않은 리프레시 토큰입니다.");
+            exceptionResolver.resolveException(request, response, null,
+                    new InvalidTokenException("유효하지 않은 리프레시 토큰입니다."));
             return;
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    private void sendErrorResponse(HttpServletResponse response, String message) throws IOException {
-        response.setStatus(HttpStatus.UNAUTHORIZED.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
-        String requestId = "req-" + UUID.randomUUID().toString().substring(0, 8);
-        ApiResponse<Void> body = ApiResponse.failure(new ErrorInfo("INVALID_TOKEN", message, requestId));
-        objectMapper.writeValue(response.getWriter(), body);
     }
 }

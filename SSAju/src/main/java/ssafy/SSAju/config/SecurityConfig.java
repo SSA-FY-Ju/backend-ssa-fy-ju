@@ -1,6 +1,6 @@
 package ssafy.SSAju.config;
 
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 import ssafy.SSAju.filter.JwtAuthenticationFilter;
 import ssafy.SSAju.filter.TokenValidationFilter;
 import ssafy.SSAju.security.JwtAccessDeniedHandler;
@@ -38,20 +39,22 @@ public class SecurityConfig {
     private String corsAllowedOrigins;
 
     @Bean
-    public JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint(ObjectMapper objectMapper) {
-        return new JwtAuthenticationEntryPoint(objectMapper);
+    public JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint(
+            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
+        return new JwtAuthenticationEntryPoint(exceptionResolver);
     }
 
     @Bean
-    public JwtAccessDeniedHandler jwtAccessDeniedHandler(ObjectMapper objectMapper) {
-        return new JwtAccessDeniedHandler(objectMapper);
+    public JwtAccessDeniedHandler jwtAccessDeniedHandler(
+            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
+        return new JwtAccessDeniedHandler(exceptionResolver);
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil,
                                            JwtAuthenticationEntryPoint entryPoint,
                                            JwtAccessDeniedHandler accessDeniedHandler,
-                                           ObjectMapper objectMapper,
+                                           @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
                                            AccessTokenBlacklistService blacklistService,
                                            RefreshTokenRedisRepository refreshTokenRedisRepository) throws Exception {
         http
@@ -72,9 +75,9 @@ public class SecurityConfig {
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler))
             .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, blacklistService), UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(new JwtExceptionFilter(objectMapper), JwtAuthenticationFilter.class)
+            .addFilterBefore(new JwtExceptionFilter(exceptionResolver), JwtAuthenticationFilter.class)
             // RefreshToken 쿠키 검증 필터: /api/auth/refresh, /api/auth/logout 요청에만 적용
-            .addFilterAfter(new TokenValidationFilter(jwtUtil, refreshTokenRedisRepository, objectMapper), JwtAuthenticationFilter.class)
+            .addFilterAfter(new TokenValidationFilter(jwtUtil, refreshTokenRedisRepository, exceptionResolver), JwtAuthenticationFilter.class)
             .httpBasic(AbstractHttpConfigurer::disable);
 
         return http.build();

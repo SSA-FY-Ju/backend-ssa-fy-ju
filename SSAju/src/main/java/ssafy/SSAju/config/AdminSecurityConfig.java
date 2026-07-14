@@ -1,6 +1,7 @@
 package ssafy.SSAju.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,13 +12,13 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 import ssafy.SSAju.admin.config.AdminAccessDeniedHandler;
 import ssafy.SSAju.admin.config.AdminAuthenticationEntryPoint;
 import ssafy.SSAju.admin.config.AdminCookieJwtFilter;
 import ssafy.SSAju.security.JwtExceptionFilter;
 import ssafy.SSAju.security.redis.AccessTokenBlacklistService;
 import ssafy.SSAju.util.JwtUtil;
-import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 @Order(0)
@@ -33,7 +34,7 @@ public class AdminSecurityConfig {
 
     @Bean
     public SecurityFilterChain adminFilterChain(HttpSecurity http, JwtUtil jwtUtil,
-                                                ObjectMapper objectMapper,
+                                                @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
                                                 AccessTokenBlacklistService blacklistService) throws Exception {
         AdminCookieJwtFilter cookieJwtFilter = new AdminCookieJwtFilter(jwtUtil, blacklistService, cookieSecure);
 
@@ -53,7 +54,7 @@ public class AdminSecurityConfig {
                 .accessDeniedHandler(adminAccessDeniedHandler))
             // JwtAuthenticationFilter 대신 쿠키도 지원하는 AdminCookieJwtFilter 사용
             .addFilterBefore(cookieJwtFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(new JwtExceptionFilter(objectMapper), AdminCookieJwtFilter.class)
+            .addFilterBefore(new JwtExceptionFilter(exceptionResolver), AdminCookieJwtFilter.class)
             .httpBasic(AbstractHttpConfigurer::disable);
 
         return http.build();

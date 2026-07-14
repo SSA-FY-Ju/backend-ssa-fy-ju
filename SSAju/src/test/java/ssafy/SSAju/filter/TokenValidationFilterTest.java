@@ -2,6 +2,7 @@ package ssafy.SSAju.filter;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,16 +12,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.servlet.HandlerExceptionResolver;
+import org.springframework.web.servlet.ModelAndView;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.security.redis.RefreshTokenRedisRepository;
 import ssafy.SSAju.util.JwtUtil;
 import ssafy.SSAju.util.TokenHashUtil;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -34,12 +38,20 @@ class TokenValidationFilterTest {
 
     @Mock private JwtUtil jwtUtil;
     @Mock private RefreshTokenRedisRepository refreshTokenRedisRepository;
+    @Mock private HandlerExceptionResolver exceptionResolver;
 
     private TokenValidationFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new TokenValidationFilter(jwtUtil, refreshTokenRedisRepository, new ObjectMapper());
+        filter = new TokenValidationFilter(jwtUtil, refreshTokenRedisRepository, exceptionResolver);
+        // SajuGlobalExceptionHandler가 실제로 하는 일(401 상태 설정)을 흉내낸다.
+        lenient().when(exceptionResolver.resolveException(any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    HttpServletResponse response = invocation.getArgument(1);
+                    response.setStatus(401);
+                    return new ModelAndView();
+                });
     }
 
     @Test
@@ -94,6 +106,27 @@ class TokenValidationFilterTest {
         given(claims.get("jti", String.class)).willReturn("jti-1");
         given(jwtUtil.parseAndValidateClaims(tokenValue)).willReturn(claims);
         given(refreshTokenRedisRepository.find("jti-1")).willReturn(Optional.empty());
+
+        filter.doFilterInternal(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(chain.getRequest()).isNull();
+    }
+
+    @Test
+    @DisplayName("T013-5b: Redis에 저장된 해시와 요청 토큰의 해시가 다르면 401을 반환한다")
+    void doFilterInternal_hashMismatch_returns401() throws Exception {
+        String tokenValue = "some-refresh-token";
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/refresh");
+        request.setCookies(new Cookie("refreshToken", tokenValue));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        Claims claims = mock(Claims.class);
+        given(claims.get("jti", String.class)).willReturn("jti-1");
+        given(jwtUtil.parseAndValidateClaims(tokenValue)).willReturn(claims);
+        given(refreshTokenRedisRepository.find("jti-1")).willReturn(
+                Optional.of(new RefreshTokenRedisRepository.StoredRefreshToken(1L, "different-hash")));
 
         filter.doFilterInternal(request, response, chain);
 
