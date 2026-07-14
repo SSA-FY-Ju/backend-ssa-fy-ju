@@ -27,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -137,10 +138,11 @@ class SoftDeleteIntegrationTest {
     }
 
     @Test
-    @DisplayName("T046-4: 탈퇴 후 RefreshToken 삭제 → 토큰 갱신 불가")
+    @DisplayName("T046-4: 탈퇴 후 RefreshToken 삭제 → 토큰 갱신 불가, 기존 AccessToken도 즉시 무효화")
     void deleteUser_refreshTokenInvalidated() throws Exception {
         signup("revoke@example.com", "password123", "토큰테스터");
         MvcResult loginResult = login("revoke@example.com", "password123");
+        String accessToken = loginResult.getResponse().getHeader("Authorization");
         String refreshTokenValue = extractRefreshTokenCookie(loginResult);
 
         deleteAccount(loginResult, "password123");
@@ -148,6 +150,14 @@ class SoftDeleteIntegrationTest {
         // 탈퇴 후 RefreshToken으로 갱신 시도 → 401
         mockMvc.perform(post("/api/auth/refresh")
                         .cookie(new Cookie("refreshToken", refreshTokenValue)))
+                .andExpect(status().isUnauthorized());
+
+        // 탈퇴 시 사용한 AccessToken도 블랙리스트 등록되어 재사용 시 401
+        // (탈퇴 경로가 RefreshToken만 무효화하고 AccessToken 블랙리스트 등록을 누락해도
+        //  위 갱신 실패 검증만으로는 놓칠 수 있으므로 별도로 확인한다)
+        mockMvc.perform(get("/api/mypage/analyses/999999")
+                        .param("type", "SAJU")
+                        .header("Authorization", accessToken))
                 .andExpect(status().isUnauthorized());
     }
 

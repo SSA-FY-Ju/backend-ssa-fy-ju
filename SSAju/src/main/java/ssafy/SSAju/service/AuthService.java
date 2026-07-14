@@ -129,7 +129,6 @@ public class AuthService {
             }
             throw e;
         }
-        log.info("회원가입 완료");
 
         return new SignupResponse("회원가입 완료. 로그인해주세요.", "/login");
     }
@@ -181,8 +180,6 @@ public class AuthService {
         user.updateLastLoginAt();
         publishLoginEvent(request.email(), true, LoginFailureReason.SUCCESS, clientIp);
 
-        log.info("로그인 성공");
-
         return tokenPair;
     }
 
@@ -203,7 +200,6 @@ public class AuthService {
     @Transactional
     public void logout(Long userId, String refreshTokenValue, String accessTokenValue) {
         invalidateTokens(userId, refreshTokenValue, accessTokenValue);
-        log.info("로그아웃 완료");
     }
 
     /**
@@ -238,7 +234,6 @@ public class AuthService {
 
         user.softDelete();
         userRepository.save(user);
-        log.info("회원 탈퇴 완료");
     }
 
     /**
@@ -293,7 +288,6 @@ public class AuthService {
 
         AuthTokenPair tokenPair = issueTokenPair(user);
 
-        log.info("AccessToken/RefreshToken 갱신 완료");
         return tokenPair;
     }
 
