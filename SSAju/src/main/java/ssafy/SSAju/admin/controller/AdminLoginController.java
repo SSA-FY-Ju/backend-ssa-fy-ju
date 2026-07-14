@@ -92,11 +92,15 @@ public class AdminLoginController {
     public String logout(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = extractCookieValue(request, AdminCookieJwtFilter.ADMIN_REFRESH_TOKEN_COOKIE);
         String accessToken = extractCookieValue(request, AdminCookieJwtFilter.ADMIN_TOKEN_COOKIE);
-        if (refreshToken != null) {
-            Long userId = jwtUtil.extractUserId(refreshToken);
-            if (userId != null) {
-                authService.logout(userId, refreshToken, accessToken);
-            }
+
+        // refreshToken이 없거나 위조/만료되어 userId를 구할 수 없으면 accessToken에서 폴백 추출.
+        // 그래야 refreshToken 쿠키가 유실된 상태에서도 accessToken을 블랙리스트에 등록할 수 있다.
+        Long userId = refreshToken != null ? jwtUtil.extractUserId(refreshToken) : null;
+        if (userId == null && accessToken != null) {
+            userId = jwtUtil.extractUserId(accessToken);
+        }
+        if (userId != null) {
+            authService.logout(userId, refreshToken, accessToken);
         }
 
         response.addHeader(HttpHeaders.SET_COOKIE, expireCookie(
