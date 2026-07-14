@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -118,6 +119,18 @@ class AuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("T044-3b: 로그인 응답의 RefreshToken 쿠키는 HttpOnly로 설정된다")
+    void login_success_refreshTokenCookieIsHttpOnly() throws Exception {
+        signup("httponly-login@example.com", "password123", "HttpOnly테스터");
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody("httponly-login@example.com", "password123")))
+                .andExpect(status().isOk())
+                .andExpect(cookie().httpOnly("refreshToken", true));
+    }
+
+    @Test
     @DisplayName("T044-4: 잘못된 비밀번호 로그인 → 401 Unauthorized")
     void login_wrongPassword_returns401() throws Exception {
         signup("fail@example.com", "correctPass1", "사용자");
@@ -174,6 +187,7 @@ class AuthIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.accessTokenExpiresIn").isNumber())
+                .andExpect(cookie().httpOnly("refreshToken", true))
                 .andReturn();
 
         assertThat(result.getResponse().getHeader("Authorization")).startsWith("Bearer ");

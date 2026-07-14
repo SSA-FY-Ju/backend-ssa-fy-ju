@@ -103,7 +103,10 @@ class AuthServiceTest {
         assertThat(result.accessToken()).isEqualTo("new-access-token");
         assertThat(result.refreshTokenValue()).isEqualTo("new-refresh-token");
         assertThat(result.expiresIn()).isEqualTo(3600L);
-        verify(refreshTokenRedisRepository).save(eq("jti-2"), eq(1L), anyString(), any(Duration.class));
+        verify(refreshTokenRedisRepository).save(
+                eq("jti-2"), eq(1L),
+                eq(TokenHashUtil.sha256("new-refresh-token")),
+                eq(Duration.ofSeconds(604800L)));
     }
 
     @Test
