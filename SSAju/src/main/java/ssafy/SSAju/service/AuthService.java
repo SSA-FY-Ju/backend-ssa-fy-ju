@@ -262,10 +262,13 @@ public class AuthService {
      *
      * <p><b>프로세스:</b>
      * <ol>
-     *   <li>RefreshToken의 jti로 Redis 조회 후 소유 사용자 확인</li>
-     *   <li>기존 RefreshToken 삭제(회전)</li>
+     *   <li>RefreshToken의 jti로 Redis에서 원자적으로 조회+삭제(소비) 후 해시/소유 사용자 확인</li>
      *   <li>새 AccessToken + RefreshToken 생성 및 Redis 저장</li>
      * </ol>
+     *
+     * <p>조회와 삭제를 하나의 Redis 원자적 연산({@code consume})으로 묶어 처리하므로,
+     * 동일한 RefreshToken으로 동시에 여러 갱신 요청이 들어와도 정확히 하나만 성공한다
+     * (분리된 조회~삭제 사이의 경쟁 조건으로 토큰이 중복 소비되는 것을 방지).
      *
      * @param refreshTokenValue 쿠키에서 추출한 RefreshToken 원본값
      * @return 새 AccessToken, 새 RefreshToken 및 만료 시간 (초)
@@ -281,17 +284,13 @@ public class AuthService {
         Claims claims = jwtUtil.parseAndValidateClaims(refreshTokenValue);
         String jti = claims.get("jti", String.class);
 
-        RefreshTokenRedisRepository.StoredRefreshToken stored = refreshTokenRedisRepository.find(jti)
-                .orElseThrow(() -> new InvalidTokenException("유효하지 않은 리프레시 토큰입니다."));
-
-        if (!stored.tokenHash().equals(TokenHashUtil.sha256(refreshTokenValue))) {
-            throw new InvalidTokenException("유효하지 않은 리프레시 토큰입니다.");
-        }
+        RefreshTokenRedisRepository.StoredRefreshToken stored =
+                refreshTokenRedisRepository.consume(jti, TokenHashUtil.sha256(refreshTokenValue))
+                        .orElseThrow(() -> new InvalidTokenException("유효하지 않은 리프레시 토큰입니다."));
 
         User user = userRepository.findById(stored.userId())
                 .orElseThrow(() -> new InvalidTokenException("유효하지 않은 리프레시 토큰입니다."));
 
-        refreshTokenRedisRepository.delete(jti);
         AuthTokenPair tokenPair = issueTokenPair(user);
 
         log.info("AccessToken/RefreshToken 갱신 완료: userId={}", user.getId());

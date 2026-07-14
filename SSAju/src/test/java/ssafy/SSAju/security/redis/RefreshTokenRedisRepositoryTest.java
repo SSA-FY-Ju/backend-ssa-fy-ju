@@ -11,7 +11,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -87,5 +93,82 @@ class RefreshTokenRedisRepositoryTest {
     @DisplayName("T012-4: 존재하지 않는 jti 조회 시 빈 Optional 반환")
     void find_unknownJti_returnsEmpty() {
         assertThat(refreshTokenRedisRepository.find("never-saved-jti")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T012-5: consume은 해시가 일치하면 값을 반환하고 즉시 삭제한다")
+    void consume_matchingHash_returnsValueAndDeletes() {
+        // Given
+        String jti = "consume-jti-" + System.nanoTime();
+        refreshTokenRedisRepository.save(jti, 5L, "correct-hash", Duration.ofMinutes(5));
+
+        // When
+        Optional<RefreshTokenRedisRepository.StoredRefreshToken> consumed =
+                refreshTokenRedisRepository.consume(jti, "correct-hash");
+
+        // Then
+        assertThat(consumed).isPresent();
+        assertThat(consumed.get().userId()).isEqualTo(5L);
+        assertThat(refreshTokenRedisRepository.find(jti)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T012-6: consume은 해시가 불일치해도 항목을 삭제하고 빈 Optional을 반환한다 (재사용 방지)")
+    void consume_mismatchingHash_returnsEmptyAndStillDeletes() {
+        // Given
+        String jti = "consume-mismatch-jti-" + System.nanoTime();
+        refreshTokenRedisRepository.save(jti, 5L, "correct-hash", Duration.ofMinutes(5));
+
+        // When
+        Optional<RefreshTokenRedisRepository.StoredRefreshToken> consumed =
+                refreshTokenRedisRepository.consume(jti, "wrong-hash");
+
+        // Then
+        assertThat(consumed).isEmpty();
+        assertThat(refreshTokenRedisRepository.find(jti)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T012-7: 존재하지 않는 jti를 consume하면 빈 Optional 반환")
+    void consume_unknownJti_returnsEmpty() {
+        assertThat(refreshTokenRedisRepository.consume("never-saved-jti", "any-hash")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T012-8: 동일한 RefreshToken으로 동시에 갱신 요청이 들어와도 consume은 정확히 하나만 성공한다 (원자적 GETDEL)")
+    void consume_concurrentCallsWithSameToken_onlyOneSucceeds() throws Exception {
+        // Given
+        String jti = "concurrent-jti-" + System.nanoTime();
+        String hash = "shared-hash";
+        refreshTokenRedisRepository.save(jti, 9L, hash, Duration.ofMinutes(5));
+
+        int threadCount = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch ready = new CountDownLatch(threadCount);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Boolean>> futures = new ArrayList<>();
+
+        // When: 모든 스레드가 동시에 같은 토큰으로 consume 시도
+        for (int i = 0; i < threadCount; i++) {
+            futures.add(executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return refreshTokenRedisRepository.consume(jti, hash).isPresent();
+            }));
+        }
+        ready.await();
+        start.countDown();
+
+        long successCount = 0;
+        for (Future<Boolean> future : futures) {
+            if (future.get()) {
+                successCount++;
+            }
+        }
+        executor.shutdown();
+
+        // Then: 정확히 하나의 요청만 값을 가져가고, 이후 재조회는 불가능하다
+        assertThat(successCount).isEqualTo(1);
+        assertThat(refreshTokenRedisRepository.find(jti)).isEmpty();
     }
 }

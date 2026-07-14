@@ -87,7 +87,7 @@ class AuthServiceTest {
         Claims claims = mock(Claims.class);
         given(claims.get("jti", String.class)).willReturn("jti-1");
         given(jwtUtil.parseAndValidateClaims(tokenValue)).willReturn(claims);
-        given(refreshTokenRedisRepository.find("jti-1")).willReturn(
+        given(refreshTokenRedisRepository.consume("jti-1", TokenHashUtil.sha256(tokenValue))).willReturn(
                 Optional.of(new RefreshTokenRedisRepository.StoredRefreshToken(1L, TokenHashUtil.sha256(tokenValue))));
         given(userRepository.findById(1L)).willReturn(Optional.of(testUser));
         given(jwtUtil.generateAccessToken(1L, "test@test.com", "USER")).willReturn("new-access-token");
@@ -103,7 +103,6 @@ class AuthServiceTest {
         assertThat(result.accessToken()).isEqualTo("new-access-token");
         assertThat(result.refreshTokenValue()).isEqualTo("new-refresh-token");
         assertThat(result.expiresIn()).isEqualTo(3600L);
-        verify(refreshTokenRedisRepository).delete("jti-1");
         verify(refreshTokenRedisRepository).save(eq("jti-2"), eq(1L), anyString(), any(Duration.class));
     }
 
@@ -114,7 +113,8 @@ class AuthServiceTest {
         Claims claims = mock(Claims.class);
         given(claims.get("jti", String.class)).willReturn("missing-jti");
         given(jwtUtil.parseAndValidateClaims(tokenValue)).willReturn(claims);
-        given(refreshTokenRedisRepository.find("missing-jti")).willReturn(Optional.empty());
+        given(refreshTokenRedisRepository.consume("missing-jti", TokenHashUtil.sha256(tokenValue)))
+                .willReturn(Optional.empty());
 
         // When & Then
         assertThatThrownBy(() -> authService.refreshAccessToken(tokenValue))
@@ -123,13 +123,14 @@ class AuthServiceTest {
 
     @Test
     void refreshAccessToken_토큰해시불일치_InvalidTokenException발생() {
-        // Given: Redis에는 다른 원본 토큰의 해시가 저장되어 있음 (재사용/탈취 시도)
+        // Given: consume()은 해시가 일치하지 않아도 원자적으로 이미 삭제(소비)하고 empty를 반환한다
+        // (재사용/탈취 시도된 토큰도 이후 정상 토큰으로 재사용할 수 없도록 방어).
         String tokenValue = "tampered-token";
         Claims claims = mock(Claims.class);
         given(claims.get("jti", String.class)).willReturn("jti-1");
         given(jwtUtil.parseAndValidateClaims(tokenValue)).willReturn(claims);
-        given(refreshTokenRedisRepository.find("jti-1")).willReturn(
-                Optional.of(new RefreshTokenRedisRepository.StoredRefreshToken(1L, "different-hash")));
+        given(refreshTokenRedisRepository.consume("jti-1", TokenHashUtil.sha256(tokenValue)))
+                .willReturn(Optional.empty());
 
         // When & Then
         assertThatThrownBy(() -> authService.refreshAccessToken(tokenValue))
