@@ -9,6 +9,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.util.StringUtils;
 import ssafy.SSAju.security.AbstractJwtValidationFilter;
 import ssafy.SSAju.security.redis.AccessTokenBlacklistService;
+import ssafy.SSAju.util.BearerTokenUtil;
 import ssafy.SSAju.util.JwtUtil;
 
 import java.util.Arrays;
@@ -25,8 +26,6 @@ public class AdminCookieJwtFilter extends AbstractJwtValidationFilter {
 
     public static final String ADMIN_TOKEN_COOKIE = "admin_access_token";
     public static final String ADMIN_REFRESH_TOKEN_COOKIE = "admin_refresh_token";
-    private static final String AUTHORIZATION_HEADER = "Authorization";
-    private static final String BEARER_PREFIX = "Bearer ";
 
     private final boolean cookieSecure;
 
@@ -38,9 +37,9 @@ public class AdminCookieJwtFilter extends AbstractJwtValidationFilter {
     @Override
     protected String extractToken(HttpServletRequest request) {
         // 1순위: Authorization 헤더 (AJAX 요청)
-        String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
-            return bearerToken.substring(BEARER_PREFIX.length());
+        String bearerToken = BearerTokenUtil.extractBearerToken(request);
+        if (StringUtils.hasText(bearerToken)) {
+            return bearerToken;
         }
 
         // 2순위: 쿠키 (브라우저 SSR 페이지 이동)

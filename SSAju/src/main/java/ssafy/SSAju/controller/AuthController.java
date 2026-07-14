@@ -20,6 +20,7 @@ import ssafy.SSAju.dto.response.AuthTokenResponse;
 import ssafy.SSAju.dto.response.SignupResponse;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.service.AuthService;
+import ssafy.SSAju.util.BearerTokenUtil;
 import ssafy.SSAju.util.ClientIpUtil;
 import ssafy.SSAju.util.CookieUtil;
 
@@ -125,7 +126,7 @@ public class AuthController {
             @AuthenticationPrincipal Long userId,
             HttpServletRequest request,
             HttpServletResponse response) {
-        String accessToken = extractBearerToken(request);
+        String accessToken = BearerTokenUtil.extractBearerToken(request);
         String refreshToken = CookieUtil.getRefreshTokenFromCookie(request);
         authService.logout(userId, refreshToken, accessToken);
         cookieUtil.clearRefreshTokenCookie(response);
@@ -168,13 +169,5 @@ public class AuthController {
             @Valid @RequestBody EmailCheckRequest request) {
         authService.checkEmailAvailability(request.email());
         return ResponseEntity.ok(ApiResponse.success(null));
-    }
-
-    private String extractBearerToken(HttpServletRequest request) {
-        String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
-        if (bearerToken != null && bearerToken.startsWith(BEARER_PREFIX)) {
-            return bearerToken.substring(BEARER_PREFIX.length());
-        }
-        return null;
     }
 }

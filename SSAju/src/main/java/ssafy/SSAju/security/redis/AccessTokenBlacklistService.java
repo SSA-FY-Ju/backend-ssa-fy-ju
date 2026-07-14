@@ -2,7 +2,6 @@ package ssafy.SSAju.security.redis;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-import ssafy.SSAju.security.SecurityConstants;
 import ssafy.SSAju.util.RedisKeyConstants;
 
 import java.time.Clock;
@@ -20,6 +19,14 @@ public class AccessTokenBlacklistService {
 
     private static final String BLACKLISTED_VALUE = "1";
 
+    /**
+     * 블랙리스트 TTL에 더하는 고정 패딩(초).
+     *
+     * <p>클럭 스큐(앱 서버-Redis 서버 간 시간 오차) 및 만료 시각 계산~SETEX 사이의
+     * 지연을 방어하기 위해, 계산된 남은 유효시간에 이 값을 더해 저장한다.
+     */
+    private static final int BLACKLIST_TTL_PADDING_SECONDS = 60;
+
     private final StringRedisTemplate redisTemplate;
     private final Clock clock;
 
@@ -31,7 +38,7 @@ public class AccessTokenBlacklistService {
     public void blacklist(String jti, Instant tokenExpiry) {
         Duration remaining = Duration.between(clock.instant(), tokenExpiry);
         Duration ttl = (remaining.isNegative() ? Duration.ZERO : remaining)
-                .plusSeconds(SecurityConstants.BLACKLIST_TTL_PADDING_SECONDS);
+                .plusSeconds(BLACKLIST_TTL_PADDING_SECONDS);
         redisTemplate.opsForValue().set(key(jti), BLACKLISTED_VALUE, ttl);
     }
 
