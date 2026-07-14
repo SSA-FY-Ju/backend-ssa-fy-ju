@@ -1,5 +1,6 @@
 package ssafy.SSAju.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -22,6 +23,8 @@ import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.MyPageResponse;
 import ssafy.SSAju.service.AuthService;
 import ssafy.SSAju.service.UserService;
+import ssafy.SSAju.util.BearerTokenUtil;
+import ssafy.SSAju.util.CookieUtil;
 
 @Slf4j
 @Validated
@@ -31,15 +34,18 @@ public class UserController {
 
     private final AuthService authService;
     private final UserService userService;
-    private final ssafy.SSAju.util.CookieUtil cookieUtil;
-
+    private final CookieUtil cookieUtil;
 
     @DeleteMapping("/api/users/me")
     public ResponseEntity<ApiResponse<Void>> deleteUser(
             @Valid @RequestBody DeleteUserRequest request,
             @AuthenticationPrincipal Long userId,
+            HttpServletRequest httpRequest,
             HttpServletResponse response) {
+        String accessToken = BearerTokenUtil.extractBearerToken(httpRequest);
+        String refreshToken = CookieUtil.getRefreshTokenFromCookie(httpRequest);
         authService.deleteUser(userId, request.password());
+        authService.invalidateSession(userId, refreshToken, accessToken);
         cookieUtil.clearRefreshTokenCookie(response);
         return ResponseEntity.ok(ApiResponse.success(null));
     }

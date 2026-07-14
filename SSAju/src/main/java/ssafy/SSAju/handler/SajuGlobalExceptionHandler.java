@@ -9,6 +9,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.response.ApiResponse;
@@ -19,6 +20,7 @@ import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.FeedbackNotAllowedException;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidTokenException;
+import ssafy.SSAju.exception.TokenExpiredException;
 import ssafy.SSAju.exception.LockAcquisitionException;
 import ssafy.SSAju.exception.DailyLimitExceededException;
 import ssafy.SSAju.exception.DuplicateEmailException;
@@ -78,6 +80,48 @@ public class SajuGlobalExceptionHandler {
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.INVALID_TOKEN.getCode(),
                         ErrorMessageConstants.INVALID_TOKEN.getMessage(), generateRequestId())));
+    }
+
+    /**
+     * 토큰 만료 예외를 처리합니다.
+     *
+     * <p>Access/Refresh Token이 서명은 유효하나 만료 시각이 지난 경우 발생합니다.
+     * {@link ssafy.SSAju.security.AbstractJwtValidationFilter}, {@link ssafy.SSAju.filter.TokenValidationFilter}
+     * 등 필터 체인에서 발생한 예외도 {@code HandlerExceptionResolver}를 통해 이 핸들러로 위임된다.
+     *
+     * @param e TokenExpiredException
+     * @param request HTTP 요청
+     * @return 401 Unauthorized, 에러 코드: TOKEN_EXPIRED
+     */
+    @ExceptionHandler(TokenExpiredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTokenExpired(
+            TokenExpiredException e, HttpServletRequest request) {
+        log.warn("토큰 만료: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.TOKEN_EXPIRED.getCode(),
+                        ErrorMessageConstants.TOKEN_EXPIRED.getMessage(), generateRequestId())));
+    }
+
+    /**
+     * Spring Security 접근 거부 예외를 처리합니다.
+     *
+     * <p>{@code @PreAuthorize} 등 메서드 보안에서 발생한 예외뿐 아니라,
+     * {@link ssafy.SSAju.security.JwtAccessDeniedHandler}가 필터 체인에서 위임한 예외도
+     * {@code HandlerExceptionResolver}를 통해 이 핸들러로 수렴한다.
+     *
+     * @param e AccessDeniedException
+     * @param request HTTP 요청
+     * @return 403 Forbidden, 에러 코드: ACCESS_DENIED
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleSecurityAccessDenied(
+            AccessDeniedException e, HttpServletRequest request) {
+        log.warn("권한 없는 접근: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.ACCESS_DENIED.getCode(),
+                        ErrorMessageConstants.ACCESS_DENIED.getMessage(), generateRequestId())));
     }
 
     /**

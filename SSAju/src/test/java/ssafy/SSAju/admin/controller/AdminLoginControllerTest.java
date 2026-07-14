@@ -21,6 +21,7 @@ import ssafy.SSAju.util.JwtUtil;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
@@ -139,7 +140,7 @@ class AdminLoginControllerTest {
     void logout_withRefreshTokenCookie_callsLogoutAndRedirects() throws Exception {
         // Given
         given(jwtUtil.extractUserId("valid-refresh-token")).willReturn(1L);
-        willDoNothing().given(authService).logout(any(), any());
+        willDoNothing().given(authService).logout(any(), any(), any());
 
         // When & Then
         mockMvc.perform(post("/admin/logout")
@@ -151,7 +152,7 @@ class AdminLoginControllerTest {
                 .andExpect(cookie().secure("admin_access_token", true))
                 .andExpect(cookie().sameSite("admin_access_token", "Strict"));
 
-        verify(authService).logout(eq(1L), eq("valid-refresh-token"));
+        verify(authService).logout(eq(1L), eq("valid-refresh-token"), isNull());
     }
 
     @Test
@@ -164,7 +165,7 @@ class AdminLoginControllerTest {
                 .andExpect(cookie().maxAge("admin_access_token", 0))
                 .andExpect(cookie().maxAge("admin_refresh_token", 0));
 
-        verify(authService, never()).logout(any(), any());
+        verify(authService, never()).logout(any(), any(), any());
     }
 
     @Test
@@ -172,7 +173,7 @@ class AdminLoginControllerTest {
     void logout_withExpiredAccessToken_stillRevokesViaRefreshToken() throws Exception {
         // Given: access token이 없어도 refresh token만으로 로그아웃 가능
         given(jwtUtil.extractUserId("refresh-only-token")).willReturn(2L);
-        willDoNothing().given(authService).logout(any(), any());
+        willDoNothing().given(authService).logout(any(), any(), any());
 
         // When & Then (access token 쿠키 없이 refresh token만 전송)
         mockMvc.perform(post("/admin/logout")
@@ -182,6 +183,24 @@ class AdminLoginControllerTest {
                 .andExpect(cookie().maxAge("admin_access_token", 0))
                 .andExpect(cookie().maxAge("admin_refresh_token", 0));
 
-        verify(authService).logout(eq(2L), eq("refresh-only-token"));
+        verify(authService).logout(eq(2L), eq("refresh-only-token"), isNull());
+    }
+
+    @Test
+    @DisplayName("POST /admin/logout - refresh token 없음, access token만 있음 → access token에서 userId 추출 후 로그아웃")
+    void logout_withoutRefreshToken_fallsBackToAccessTokenForUserId() throws Exception {
+        // Given: refreshToken 쿠키가 없어 userId를 구할 수 없으므로 accessToken에서 폴백 추출
+        given(jwtUtil.extractUserId("admin-access-token")).willReturn(3L);
+        willDoNothing().given(authService).logout(any(), any(), any());
+
+        // When & Then (access token 쿠키만 전송)
+        mockMvc.perform(post("/admin/logout")
+                        .cookie(new Cookie("admin_access_token", "admin-access-token")))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/login"))
+                .andExpect(cookie().maxAge("admin_access_token", 0))
+                .andExpect(cookie().maxAge("admin_refresh_token", 0));
+
+        verify(authService).logout(eq(3L), isNull(), eq("admin-access-token"));
     }
 }
