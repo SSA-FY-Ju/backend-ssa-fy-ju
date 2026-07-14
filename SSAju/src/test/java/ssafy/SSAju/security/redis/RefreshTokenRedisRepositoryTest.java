@@ -20,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 /**
  * RefreshTokenRedisRepository 통합 테스트 (T012).
@@ -61,17 +62,15 @@ class RefreshTokenRedisRepositoryTest {
 
     @Test
     @DisplayName("T012-2: TTL이 만료되면 별도 삭제 없이도 조회 불가능해진다")
-    void save_afterTtlExpires_findReturnsEmpty() throws InterruptedException {
+    void save_afterTtlExpires_findReturnsEmpty() {
         // Given
         String jti = "ttl-jti-" + System.nanoTime();
         refreshTokenRedisRepository.save(jti, 1L, "hash", Duration.ofSeconds(1));
         assertThat(refreshTokenRedisRepository.find(jti)).isPresent();
 
-        // When: 자연 만료 대기 (별도 delete 호출 없음)
-        Thread.sleep(1500);
-
-        // Then
-        assertThat(refreshTokenRedisRepository.find(jti)).isEmpty();
+        // When & Then: 자연 만료 대기 (별도 delete 호출 없음) — 만료 즉시 폴링을 종료해 불필요한 대기를 없앤다
+        await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(refreshTokenRedisRepository.find(jti)).isEmpty());
     }
 
     @Test

@@ -19,14 +19,24 @@ public final class BearerTokenUtil {
     /**
      * 요청의 {@code Authorization} 헤더에서 Bearer 토큰 원본값을 추출한다.
      *
+     * <p>스킴({@code Bearer})은 RFC 7235에 따라 대소문자를 구분하지 않고 인식하며,
+     * 헤더 값과 스킴 이후의 토큰 모두 앞뒤 공백을 제거한 뒤 비교/반환한다.
+     *
      * @param request HTTP 요청
-     * @return 토큰 원본값, 헤더가 없거나 Bearer 형식이 아니면 {@code null}
+     * @return 토큰 원본값, 헤더가 없거나 Bearer 형식이 아니거나 토큰이 비어 있으면 {@code null}
      */
     public static String extractBearerToken(HttpServletRequest request) {
-        String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
-            return bearerToken.substring(BEARER_PREFIX.length());
+        String header = request.getHeader(AUTHORIZATION_HEADER);
+        if (!StringUtils.hasText(header)) {
+            return null;
         }
-        return null;
+
+        String trimmedHeader = header.trim();
+        if (!trimmedHeader.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
+            return null;
+        }
+
+        String token = trimmedHeader.substring(BEARER_PREFIX.length()).trim();
+        return token.isEmpty() ? null : token;
     }
 }

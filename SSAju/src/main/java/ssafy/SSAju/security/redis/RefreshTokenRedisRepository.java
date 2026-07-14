@@ -5,6 +5,8 @@ import org.springframework.stereotype.Repository;
 import ssafy.SSAju.util.RedisKeyConstants;
 import tools.jackson.databind.ObjectMapper;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -54,7 +56,7 @@ public class RefreshTokenRedisRepository {
             return Optional.empty();
         }
         StoredRefreshToken stored = objectMapper.readValue(value, StoredRefreshToken.class);
-        return expectedHash.equals(stored.tokenHash()) ? Optional.of(stored) : Optional.empty();
+        return hashEquals(expectedHash, stored.tokenHash()) ? Optional.of(stored) : Optional.empty();
     }
 
     public void delete(String jti) {
@@ -63,6 +65,15 @@ public class RefreshTokenRedisRepository {
 
     private String key(String jti) {
         return RedisKeyConstants.REFRESH_TOKEN_PREFIX + jti;
+    }
+
+    /**
+     * 타이밍 공격을 방지하기 위해 해시값을 상수 시간(constant-time)으로 비교한다.
+     */
+    private boolean hashEquals(String expectedHash, String actualHash) {
+        return MessageDigest.isEqual(
+                expectedHash.getBytes(StandardCharsets.UTF_8),
+                actualHash.getBytes(StandardCharsets.UTF_8));
     }
 
     public record StoredRefreshToken(Long userId, String tokenHash) {}
