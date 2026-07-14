@@ -85,18 +85,21 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 ## Phase 4: User Story 2 - API 외부 호출 실패 시 사용자 쿼터 보존 (Priority: P1)
 
-**Goal**: 궁합 분석 등에서 외부 호출 실패 시 일일 쿼터가 소진된 채 남지 않도록 차감 시점/보상 로직 수정
+**Goal**: 궁합 분석(FastAPI/공공데이터) 및 커리어 컨설팅(OpenAI) 등에서 외부 호출 실패 시 일일 쿼터가 소진된 채 남지 않도록 차감 시점/보상 로직 수정
 
 **Independent Test**: 외부 분석 호출을 실패하도록 만든 뒤 쿼터가 요청 전과 동일한지 확인, 성공 시 정확히 1 차감 확인 (quickstart.md "US2")
 
 ### Tests for User Story 2
 
 - [ ] T022 [P] [US2] 통합 테스트 `SSAju/src/test/java/ssafy/SSAju/integration/DailyQuotaIntegrityIntegrationTest.java` — 외부 호출 실패 시 쿼터 불변, 성공 시 1 차감 확인
+- [ ] T022-1 [P] [US2] 통합/단위 테스트 `SSAju/src/test/java/ssafy/SSAju/service/ConsultationServiceQuotaTest.java` — `ConsultationService.getCareerConsultation`에서 캐시 미스 후 OpenAI 호출이 실패(타임아웃/`RestClientException`/응답 검증 실패)하면 쿼터가 요청 전과 동일하게 복원되는지, 캐시 히트 시에는 애초에 차감되지 않는지, 성공 시 정확히 1 차감되는지 확인(운영 로그에서 실제 관측된 회귀 케이스 — `ConsultationOpenAICaller`의 read-timeout이 `ResourceAccessException`이 아닌 `RestClientException`으로 감싸져 `@Retryable`을 우회하는 케이스 포함)
 
 ### Implementation for User Story 2
 
 - [ ] T023 [US2] `service/DailyApiUsageService.java` 수정 — 쿼터 복원(보상) 메서드 `restoreDailyUsage(userId, date)` 추가(결정: "성공 후 차감"으로 순서만 옮기는 방식 대신 **보상 트랜잭션 방식을 채택** — 아직 US5(T035)의 분산락이 적용되기 전 단계이므로, 락 유무와 무관하게 안전하게 동작해야 하기 때문)
 - [ ] T024 [US2] `service/CompanyMatchingService.java` `analyzeCompatibility` 수정 — 외부 호출(FastAPI/공공데이터) 실패 시 T023의 `restoreDailyUsage`를 호출하도록 try/catch로 감싸기(메서드는 여전히 `@Transactional` 미적용 유지 — 외부 I/O 포함). **⚠️ US5(T035)와 강한 상호의존**: 이 시점에는 아직 `CompanyCompatibility` 생성 구간에 분산락이 없으므로 우선 "요청 단위 차감 → 실패 시 복원"으로만 구현한다. T035에서 분산락 + 캐시 재확인(double-checked locking)을 적용할 때, 락 획득 후 캐시에 이미 결과가 존재하면(다른 스레드가 먼저 생성 완료) **쿼터를 차감하지 않고** 기존 결과만 반환하도록 반드시 재조정할 것 — 그렇지 않으면 락 대기 후 캐시 히트로 끝난 요청까지 쿼터가 차감되는 이중 차감/누수가 재발한다
+- [ ] T024-1 [US2] `service/ConsultationService.java` `getCareerConsultation` 수정 — 현재 L118(`dailyApiUsageService.checkAndIncrementDailyUsage(userId)`)과 L119(`openAICaller.call(...)`) 사이에서 OpenAI 호출이 실패하면 쿼터가 복원되지 않고 남는 회귀가 운영 로그로 실측 확인됨(2026-07-12, `statusCode=0` / "재시도 불가" 케이스). L118~L120을 try/catch로 감싸 OpenAI 호출 실패 시 T023의 `restoreDailyUsage`를 호출하도록 수정(메서드는 여전히 `@Transactional` 미적용 유지 — 클래스 Javadoc의 "외부 I/O 동안 DB 커넥션 미점유" 원칙과 동일). 캐시 히트 경로(L102-114)는 이미 L118 이전에 반환되므로 영향 없음. **US5와 독립적** — `ConsultationSaveService`(T036)의 분산락은 저장 단계에만 적용되고 쿼터 차감/OpenAI 호출 지점과는 무관하므로 T024와 달리 후행 재조정 불필요
+- [ ] T024-2 [P] [US2] `caller/ConsultationOpenAICaller.java` 수정(원인 규명 후속 조치) — `@Retryable(retryFor = {ResourceAccessException.class, HttpServerErrorException.class})`에 read-timeout이 실제로 감싸지는 `RestClientException`을 추가(또는 하위 4xx 케이스를 `noRetryFor`로 명시적으로 제외한 뒤 상위 타입을 재시도 대상에 포함)하여, catch-all("재시도 불가") 경로로 떨어지던 타임아웃이 정상적으로 재시도되도록 수정. T024-1(보상 로직)과 별개로 실패 자체의 빈도를 줄이는 조치이므로 두 태스크 모두 필요
 
 **Checkpoint**: `./gradlew test` 통과 — US1+US2 모두 독립적으로 동작
 
@@ -283,7 +286,7 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 ### User Story Dependencies
 
 - **US1(P1)**: Foundational 이후 즉시 시작 가능, 다른 스토리에 의존 없음
-- **US2(P1)**: Foundational 이후 즉시 시작 가능, US1과 파일이 겹치지 않아 독립적. 단, `CompanyMatchingService.analyzeCompatibility`의 쿼터 로직(T024)은 이후 US5(T035)의 분산락 적용 시 반드시 재조정되어야 하는 **전방 의존**이 있음(아래 US5 항목 참고)
+- **US2(P1)**: Foundational 이후 즉시 시작 가능, US1과 파일이 겹치지 않아 독립적. `CompanyMatchingService.analyzeCompatibility`의 쿼터 로직(T024)은 이후 US5(T035)의 분산락 적용 시 반드시 재조정되어야 하는 **전방 의존**이 있음(아래 US5 항목 참고). `ConsultationService.getCareerConsultation`의 쿼터 로직(T024-1)은 US5의 분산락 대상(`ConsultationSaveService`, T036)이 저장 단계에만 적용되므로 이런 전방 의존이 없음 — T024-1/T024-2는 다른 태스크와 독립적으로 아무 때나 진행 가능
 - **US3(P2)**: Foundational 이후 시작 가능, 독립적
 - **US4(P2)**: Foundational 이후 시작 가능, 독립적
 - **US5(P2)**: Foundational(특히 T007 `DistributedLock`) 이후 시작 가능. `CompanyMatchingService`에 락을 적용하는 T035는 US2(T024)의 쿼터 차감/복원 로직과 같은 메서드를 다루므로, 락+캐시 재확인(double-checked locking) 도입 시 쿼터 차감 시점을 반드시 재검토해야 함(T024 참고) — 이 부분만 US2에 약한 후행 의존이 있고 나머지는 독립적
