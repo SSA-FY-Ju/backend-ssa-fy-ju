@@ -115,9 +115,15 @@ public class ConsultationService {
 
         // ─── 4. OpenAI 호출 (캐시 미스, 외부 I/O) ───────────────────────────────
         // 캐시 히트 경로는 위에서 이미 반환 → 여기까지 온 경우만 신규 OpenAI 호출, 차감
+        // 호출 실패 시 쿼터가 소진된 채 남지 않도록 차감 이후 구간을 보상 트랜잭션으로 감싼다
         dailyApiUsageService.checkAndIncrementDailyUsage(userId);
-        CareerAdviceResponse advice = openAICaller.call(
-                sajuData, tenGodDistribution, hiddenStems, dayMaster);
+        CareerAdviceResponse advice;
+        try {
+            advice = openAICaller.call(sajuData, tenGodDistribution, hiddenStems, dayMaster);
+        } catch (RuntimeException e) {
+            dailyApiUsageService.restoreDailyUsage(userId);
+            throw e;
+        }
 
         // ─── 5. 저장 (C-7: @Transactional 보장) ─────────────────────────────────
         Long consultationId = consultationSaveService.saveOrUpdate(sajuResult, advice, modelVersion, consultationMonth);

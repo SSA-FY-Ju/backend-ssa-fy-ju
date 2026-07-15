@@ -216,8 +216,9 @@ class ConsultationServiceTest {
 
         verify(consultationSaveService).saveOrUpdate(any(), any(), any(), any());
         verify(sajuResultProvider).findOrCreate(MOCK_USER, userProfile, sajuResult);
-        // 캐시 미스 → 신규 OpenAI 호출 발생 → 일일 한도 1회 차감 필수
+        // 캐시 미스 → 신규 OpenAI 호출 발생 → 일일 한도 1회 차감 필수, 성공했으므로 복원은 없어야 함
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService, never()).restoreDailyUsage(any());
     }
 
     // ─────────────────────────────────────────
@@ -247,6 +248,7 @@ class ConsultationServiceTest {
         verify(sajuResultProvider).findOrCreate(MOCK_USER, userProfile, newSajuResult);
         verify(consultationSaveService).saveOrUpdate(any(), any(), any(), any());
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService, never()).restoreDailyUsage(any());
     }
 
     // ─────────────────────────────────────────
@@ -291,9 +293,10 @@ class ConsultationServiceTest {
 
         service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
-        // 캐시 히트 → OpenAI 미호출, 일일 한도 차감 없음
+        // 캐시 히트 → OpenAI 미호출, 일일 한도 차감/복원 모두 없음
         verify(openAICaller, never()).call(any(), any(), any(), any());
         verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(any());
+        verify(dailyApiUsageService, never()).restoreDailyUsage(any());
     }
 
     // ─────────────────────────────────────────
@@ -318,8 +321,9 @@ class ConsultationServiceTest {
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("OpenAI API 호출 실패");
-        // 캐시 미스 → charge 후 OpenAI 실패: 차감은 이미 발생
+        // 캐시 미스 → charge 후 OpenAI 실패: 차감 후 보상(복원)까지 발생해야 함 (US2)
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService).restoreDailyUsage(USER_ID);
     }
 
     @Test
@@ -341,6 +345,7 @@ class ConsultationServiceTest {
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("비어있습니다");
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService).restoreDailyUsage(USER_ID);
     }
 
     @Test
@@ -362,5 +367,6 @@ class ConsultationServiceTest {
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("산업 추천 정보가 누락");
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService).restoreDailyUsage(USER_ID);
     }
 }
