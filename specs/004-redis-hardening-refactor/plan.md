@@ -6,7 +6,7 @@
 
 ## Summary
 
-SSAju 백엔드(Spring Boot 4.0.5 / Java 21)에 Redis 인프라(Refresh Token TTL 저장, Access Token 블랙리스트, Redisson 분산락)를 도입하고, 이를 기반으로 세션 보안 결함(A2, 필터 범위), API 쿼터 증발 버그(quota), 외부 제공자 재시도 정책(A1), CORS 헤더(A3), 사주 정본 캐싱/소유권 재설계(B1/B2), 패키지·예외·검증·죽은 코드·감사로그·쿼리 계층 일관성(C~H)을 순차적으로 해결한다. 기술적 접근은 기존 계층형 아키텍처(Controller→Service→Repository)와 RestClient+`@Retryable` 패턴을 그대로 유지하면서, 동시성 제어 수단만 "DB 예외 기반 재시도"에서 "Redisson 분산락 선점"으로 교체하고, 세션 상태 저장소를 "RDBMS 영구 저장"에서 "Redis TTL 저장"으로 교체한다.
+SSAju 백엔드(Spring Boot 4.0.5 / Java 21)에 Redis 인프라(Refresh Token TTL 저장, Access Token 블랙리스트, Redisson 분산락)를 도입하고, 이를 기반으로 세션 보안 결함(A2, 필터 범위), API 쿼터 증발 버그(quota — `CompanyMatchingService`뿐 아니라 `ConsultationService`의 OpenAI 호출 경로도 동일 결함을 가짐), 외부 제공자 재시도 정책(A1), CORS 헤더(A3), 사주 정본 캐싱/소유권 재설계(B1/B2), 패키지·예외·검증·죽은 코드·감사로그·쿼리 계층 일관성(C~H)을 순차적으로 해결한다. 기술적 접근은 기존 계층형 아키텍처(Controller→Service→Repository)와 RestClient+`@Retryable` 패턴을 그대로 유지하면서, 동시성 제어 수단만 "DB 예외 기반 재시도"에서 "Redisson 분산락 선점"으로 교체하고, 세션 상태 저장소를 "RDBMS 영구 저장"에서 "Redis TTL 저장"으로 교체한다.
 
 ## Technical Context
 
@@ -43,7 +43,7 @@ SSAju 백엔드(Spring Boot 4.0.5 / Java 21)에 Redis 인프라(Refresh Token TT
 | Gate | 판정 | 근거 |
 |---|---|---|
 | 계층 분리(Controller 얇게/Service에 로직 집중/Repository는 DB만) | PASS | C3(AuthController 로직 이관), C4(admin 리포지토리 경계) 항목이 이 원칙을 강화하는 방향이며 위반 없음 |
-| 외부 I/O 메서드에 `@Transactional` 금지 | PASS | `CompanyMatchingService.analyzeCompatibility`, `AuthService.login` 등은 현재도 미적용 상태 유지, 쿼터 차감 순서 변경도 이 원칙과 상충하지 않음(§B: 성공 후 차감은 로컬 DB 연산이므로 트랜잭션 경계는 Repository/짧은 서비스 메서드 단위로 유지) |
+| 외부 I/O 메서드에 `@Transactional` 금지 | PASS | `CompanyMatchingService.analyzeCompatibility`, `ConsultationService.getCareerConsultation`, `AuthService.login` 등은 현재도 미적용 상태 유지, 쿼터 차감/복원 로직 추가도 이 원칙과 상충하지 않음(§B: 차감·복원은 각각 독립된 로컬 DB 연산이므로 트랜잭션 경계는 Repository/짧은 서비스 메서드 단위로 유지) |
 | 상수: 도메인=Enum, 기술=Static Class, 매직넘버/문자열 금지 | PASS | 신규 Redis 키 패턴, TTL 값, 분산락 lease/wait time은 static 상수 클래스(`RedisKeyConstants`, `LockConstants` 등)로 관리 예정 |
 | DTO는 record | PASS | 신규/수정 DTO(가입 시 birthTime 추가, 쿼터 조정 검증 등) 모두 record 유지 |
 | Lombok 제약(@Getter/@NoArgsConstructor(PROTECTED)/@Builder만, equals/hashCode ID 수기) | PASS | 신규 엔티티(`UserSajuAccess`)도 동일 규칙 적용 |
@@ -108,6 +108,7 @@ SSAju/src/main/java/ssafy/SSAju/
 │   ├── CareerFortuneService.java      # [수정] Quota 차감 로직 제거 (B1)
 │   ├── CompanyInfoService.java        # [수정] 5xx 원본 예외 유지 (A1)
 │   ├── CompanyMatchingService.java    # [수정] 성공 후 쿼터 차감 + 분산락 (Redis 항목 #3, C2)
+│   ├── ConsultationService.java       # [수정] OpenAI 호출 실패 시 보상(restoreDailyUsage) 적용 (User Story 2 확장)
 │   ├── DailyApiUsageService.java      # [수정] 차감 시점/보상 트랜잭션
 │   ├── AuthService.java               # [수정] Clock 사용, Redis 세션 연동, signup birthTime 처리
 │   ├── FeedbackService.java           # [수정] 소유권 검증을 UserSajuAccess 참조로 변경 (B1)
