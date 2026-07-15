@@ -33,4 +33,17 @@ public class DailyApiUsageService {
             throw new DailyLimitExceededException("하루 3회 분석 제한에 도달했습니다.");
         }
     }
+
+    /**
+     * 외부 API(FastAPI/공공데이터/OpenAI) 호출 실패 시 차감된 쿼터를 보상(복원)합니다.
+     * 차감과 별개의 트랜잭션으로 실행되는 보상 트랜잭션 방식이므로, 분산락 도입 여부와 무관하게 안전합니다.
+     */
+    public void restoreDailyUsage(Long userId) {
+        LocalDate today = LocalDate.now(ZoneId.of(KST_ZONE));
+
+        int affectedRows = dailyApiUsageRepository.restoreUsage(userId, today);
+        if (affectedRows == 0) {
+            log.warn("쿼터 복원 대상 없음: userId={}, date={}", userId, today);
+        }
+    }
 }

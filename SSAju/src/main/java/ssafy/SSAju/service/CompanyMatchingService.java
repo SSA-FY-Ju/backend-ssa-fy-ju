@@ -104,32 +104,25 @@ public class CompanyMatchingService {
             return childReadService.buildFromExisting(cachedOpt.get(), request);
         }
 
-        // ─── 사용자 사주 계산 ──────────────────────────────────────
-        // 이른 캐시 히트(completed=true) 경로는 위에서 반환됨 → 여기서부터는 FastAPI 호출이 발생하는 신규 분석
+        // ─── 사주 계산 (사용자 + 기업, 외부 I/O) ──────────────────────
+        // 이른 캐시 히트(completed=true) 경로는 위에서 반환됨 → 여기서부터는 FastAPI/공공데이터 호출이 발생하는 신규 분석
+        // 호출 실패 시 쿼터가 소진된 채 남지 않도록 차감 이후 구간 전체를 보상 트랜잭션으로 감싼다
         dailyApiUsageService.checkAndIncrementDailyUsage(userId);
-        FastAPIResponse userSaju = sajuDataService.fetchSajuFromFastAPI(
-                request.userBirthDate(), userBirthTime);
-        sajuValidator.validate(userSaju);
-
-        HiddenStems userHiddenStems = hiddenStemCalculator.calculate(userSaju.earthlyBranches());
-        String userDayMaster = userSaju.heavenlyStems().get(SajuPillarIndex.DAY_INDEX);
-        FiveElements userFiveElements = new FiveElements(userSaju.fiveElements());
-
-        // ─── 기업 사주 계산 ──────────────────────────────────────
-        LocalDate companyDate = resolveCompanyFoundingDate(request);
-        LocalTime companyTime = request.companyFoundingTime() != null
-                ? request.companyFoundingTime() : DEFAULT_BIRTH_TIME;
-
-        FastAPIResponse companySaju = sajuDataService.fetchSajuFromFastAPI(companyDate, companyTime);
-        sajuValidator.validate(companySaju);
-
-        HiddenStems companyHiddenStems = hiddenStemCalculator.calculate(companySaju.earthlyBranches());
-        String companyDayMaster = companySaju.heavenlyStems().get(SajuPillarIndex.DAY_INDEX);
-        FiveElements companyFiveElements = new FiveElements(companySaju.fiveElements());
+        SajuCalculationResult sajuCalc;
+        try {
+            sajuCalc = calculateSajuData(request, userBirthTime);
+        } catch (RuntimeException e) {
+            dailyApiUsageService.restoreDailyUsage(userId);
+            throw e;
+        }
+        HiddenStems userHiddenStems = sajuCalc.userHiddenStems();
+        FiveElements userFiveElements = sajuCalc.userFiveElements();
+        HiddenStems companyHiddenStems = sajuCalc.companyHiddenStems();
+        FiveElements companyFiveElements = sajuCalc.companyFiveElements();
 
         // ─── 분석 계산 ──────────────────────────────────────────
         int compatibilityScore = compatibilityScoreCalculator.calculate(
-                userHiddenStems, userDayMaster, companyHiddenStems, companyDayMaster);
+                userHiddenStems, sajuCalc.userDayMaster(), companyHiddenStems, sajuCalc.companyDayMaster());
 
         CompatibilityAnalysisData analysisData = new CompatibilityAnalysisData(
                 jobRoleAnalyzer.analyze(userFiveElements, request.targetRole().category()),
@@ -188,6 +181,40 @@ public class CompanyMatchingService {
 
         log.info("기업 궁합 분석 완료: compatibilityScore={}", compatibilityScore);
         return buildNewResponse(saved, request, analysisData);
+    }
+
+    // ─────────────────────────────────────────
+    // private: 사주 계산
+    // ─────────────────────────────────────────
+
+    /** 사용자·기업 사주(FastAPI/공공데이터 호출 포함)를 계산한 결과. */
+    private record SajuCalculationResult(
+            HiddenStems userHiddenStems, String userDayMaster, FiveElements userFiveElements,
+            HiddenStems companyHiddenStems, String companyDayMaster, FiveElements companyFiveElements
+    ) {}
+
+    private SajuCalculationResult calculateSajuData(CompatibilityRequest request, LocalTime userBirthTime) {
+        FastAPIResponse userSaju = sajuDataService.fetchSajuFromFastAPI(
+                request.userBirthDate(), userBirthTime);
+        sajuValidator.validate(userSaju);
+
+        HiddenStems userHiddenStems = hiddenStemCalculator.calculate(userSaju.earthlyBranches());
+        String userDayMaster = userSaju.heavenlyStems().get(SajuPillarIndex.DAY_INDEX);
+        FiveElements userFiveElements = new FiveElements(userSaju.fiveElements());
+
+        LocalDate companyDate = resolveCompanyFoundingDate(request);
+        LocalTime companyTime = request.companyFoundingTime() != null
+                ? request.companyFoundingTime() : DEFAULT_BIRTH_TIME;
+
+        FastAPIResponse companySaju = sajuDataService.fetchSajuFromFastAPI(companyDate, companyTime);
+        sajuValidator.validate(companySaju);
+
+        HiddenStems companyHiddenStems = hiddenStemCalculator.calculate(companySaju.earthlyBranches());
+        String companyDayMaster = companySaju.heavenlyStems().get(SajuPillarIndex.DAY_INDEX);
+        FiveElements companyFiveElements = new FiveElements(companySaju.fiveElements());
+
+        return new SajuCalculationResult(userHiddenStems, userDayMaster, userFiveElements,
+                companyHiddenStems, companyDayMaster, companyFiveElements);
     }
 
     // ─────────────────────────────────────────
