@@ -32,4 +32,15 @@ public class DailyApiUsageRepositoryImpl implements DailyApiUsageCustomRepositor
         // → 단일 쿼리 결과로 원자적 판정 가능, 후속 SELECT 불필요 (TOCTOU 없음)
         return jdbcTemplate.update(sql, userId, date, limit);
     }
+
+    @Override
+    public int restoreUsage(Long userId, LocalDate date) {
+        String sql = """
+                UPDATE daily_api_usage
+                SET request_count = GREATEST(request_count - 1, 0)
+                WHERE user_id = ? AND usage_date = ?
+                """;
+
+        return jdbcTemplate.update(sql, userId, date);
+    }
 }

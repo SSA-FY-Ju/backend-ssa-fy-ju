@@ -12,6 +12,8 @@ spring:
     show-sql: false
 
   ai:
+    retry:
+      max-attempts: 0   # Spring AI 자체 재시도 비활성화 (US2/T022-2) — 운영 설정과 일치
     openai:
       api-key: ${OPENAI_API_KEY:test-key}
       chat:
