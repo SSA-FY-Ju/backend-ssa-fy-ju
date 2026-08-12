@@ -114,13 +114,14 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 ### Tests for User Story 3
 
-- [ ] T025 [P] [US3] 단위 테스트 `SSAju/src/test/java/ssafy/SSAju/service/CompanyInfoServiceRetryTest.java` — 5xx 응답 시 원본 예외가 그대로 전파되어 `@Retryable`이 재시도하는지, 4xx는 즉시 커스텀 예외로 변환되는지 확인(기존 `SajuDataServiceTest` 패턴 참고)
+- [x] T025 [P] [US3] 단위 테스트 `SSAju/src/test/java/ssafy/SSAju/service/CompanyInfoServiceRetryTest.java` — 5xx 응답 시 원본 예외(`HttpServerErrorException`)가 그대로 전파되어 `@Retryable`이 재시도하는지, 4xx는 즉시 `Optional.empty()`로 처리되는지 확인(기존 `SajuDataServiceTest` 패턴 참고). *(계획 문구 정정: 4xx는 "커스텀 예외 변환"이 아니라 기존부터 `Optional.empty()` 반환이었음 — 이 부분은 변경 범위 밖이라 그대로 유지)*. 기존 `CompanyInfoServiceTest.shouldThrowException_WhenServerError`도 새 기대값(원본 예외 재전파)으로 갱신
+- [x] T025 검증: 수정 전 두 테스트 모두 `AssertionError`로 실패 확인(구현 전 실패 필수 확인 완료) → T026 적용 후 전체 통과
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] `service/CompanyInfoService.java` 수정 — 5xx(`RestClientResponseException.is5xxServerError()`) 분기에서 `PublicDataApiException` 변환 로직 제거, 원본 예외 그대로 rethrow; `@Retryable(retryFor = {...})`에 `HttpServerErrorException` 포함 확인(4xx 변환 로직은 유지). **트랜잭션 전파 방어**: 이 메서드 및 호출 체인 상위(공공데이터/기업정보 조회를 오케스트레이션하는 서비스)가 실제로 활성 `@Transactional` 경계 안에서 호출되지 않는지 확인(기존 컨벤션상 외부 I/O 메서드는 `@Transactional` 금지이므로 정상 경로에서는 해당 없음이 확인되어야 함). 만약 호출 스택 중 어딘가 활성 트랜잭션 내부에서 호출되는 경로가 발견되면, 재시도 도중 발생하는 예외가 상위 트랜잭션을 rollback-only로 마킹해 최종 재시도가 성공해도 커밋 시 롤백되는 것을 막기 위해 해당 지점에 `@Transactional(propagation = Propagation.NOT_SUPPORTED)`를 명시적으로 적용한다
+- [x] T026 [US3] `service/CompanyInfoService.java` 수정 — 5xx 분기에서 `PublicDataApiException` 변환 로직 제거, 원본 예외 그대로 rethrow; `@Retryable(retryFor = {...})`에 `HttpServerErrorException` 추가(4xx는 기존 `Optional.empty()` 로직 유지). **트랜잭션 전파 방어**: `CompanyMatchingService.analyzeCompatibility`(호출 체인 상위)에 `@Transactional`이 없음을 소스 확인(외부 I/O 메서드 `@Transactional` 금지 컨벤션 준수 확인됨) → `Propagation.NOT_SUPPORTED` 추가 조치 불필요
 
-**Checkpoint**: `./gradlew test` 통과
+**Checkpoint**: ✅ `cd SSAju && ./gradlew clean test` BUILD SUCCESSFUL 확인 (`fix/us3-company-info-retry` 브랜치)
 
 ---
 
