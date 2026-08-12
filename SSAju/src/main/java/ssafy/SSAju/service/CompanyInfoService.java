@@ -9,13 +9,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 import ssafy.SSAju.dto.external.PublicDataApiResponse;
-import ssafy.SSAju.exception.PublicDataApiException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -30,8 +30,9 @@ import java.util.Optional;
  * URL: /getCorpOutline_V2
  * 검색: corpNm (법인명) 필수 사용
  * <p>
- * 조회 결과가 없거나 API 오류 시 {@code Optional.empty()} 반환 →
- * 호출자가 {@link PublicDataApiException}으로 처리하거나 사용자 직접 입력 요청.
+ * 조회 결과가 없거나 4xx 오류 시 {@code Optional.empty()} 반환 →
+ * 호출자가 {@code PublicDataApiException}으로 처리하거나 사용자 직접 입력 요청.
+ * 5xx/네트워크 오류는 원본 예외를 그대로 전파해 {@code @Retryable}이 재시도한다.
  */
 @Slf4j
 @Service
@@ -58,7 +59,7 @@ public class CompanyInfoService {
      * @return 설립일자 Optional, 조회 실패/결과 없음/설립일 미제공 시 empty
      */
     @Retryable(
-            retryFor = {ResourceAccessException.class},
+            retryFor = {ResourceAccessException.class, HttpServerErrorException.class},
             maxAttempts = 2,
             backoff = @Backoff(delay = 1000)
     )
@@ -93,9 +94,9 @@ public class CompanyInfoService {
                 log.info("공공데이터 API 클라이언트 오류 ({}): corpNm 생략", e.getStatusCode().value());
                 return Optional.empty();
             }
-            // 5xx는 @Retryable 대상(ResourceAccessException)이 아니므로 즉시 실패
-            log.warn("공공데이터 API 서버 오류 ({}), 즉시 실패 (재시도 없음)", e.getStatusCode().value());
-            throw new PublicDataApiException("공공데이터 API 서버 오류", e);
+            // 5xx는 @Retryable 대상이므로 원본 예외 그대로 재전파
+            log.warn("공공데이터 API 서버 오류 ({}), 재시도 예정", e.getStatusCode().value());
+            throw e;
         } catch (ResourceAccessException e) {
             log.warn("공공데이터 API 네트워크 오류 발생, 재시도 예정: {}", e.getMessage());
             throw e;
