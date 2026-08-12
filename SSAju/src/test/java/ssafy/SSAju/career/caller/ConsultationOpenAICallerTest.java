@@ -79,6 +79,43 @@ class ConsultationOpenAICallerTest {
     }
 
     @Test
+    @DisplayName("NonTransientAiException(401) → OpenAIApiException에 statusCode 401이 보존된다")
+    void nonTransientAiException_preservesStatusCode401() {
+        // Spring AI RetryUtils.DEFAULT_RESPONSE_ERROR_HANDLER가 실제로 구성하는 포맷: "%s - %s"
+        given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
+                .willThrow(new NonTransientAiException("401 - Incorrect API key provided"));
+
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+                .isInstanceOf(OpenAIApiException.class)
+                .extracting(ex -> ((OpenAIApiException) ex).getStatusCode())
+                .isEqualTo(401);
+    }
+
+    @Test
+    @DisplayName("NonTransientAiException(429) → OpenAIApiException에 statusCode 429가 보존된다")
+    void nonTransientAiException_preservesStatusCode429() {
+        given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
+                .willThrow(new NonTransientAiException("429 - Rate limit reached for requests"));
+
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+                .isInstanceOf(OpenAIApiException.class)
+                .extracting(ex -> ((OpenAIApiException) ex).getStatusCode())
+                .isEqualTo(429);
+    }
+
+    @Test
+    @DisplayName("NonTransientAiException 메시지가 상태 코드 포맷이 아니면 statusCode는 0으로 폴백한다")
+    void nonTransientAiException_fallsBackToZero_whenMessageHasNoStatusCodePrefix() {
+        given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
+                .willThrow(new NonTransientAiException("Unauthorized"));
+
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+                .isInstanceOf(OpenAIApiException.class)
+                .extracting(ex -> ((OpenAIApiException) ex).getStatusCode())
+                .isEqualTo(0);
+    }
+
+    @Test
     @DisplayName("TransientAiException(5xx 상당) → 변환하지 않고 그대로 재전파 (재시도 대상으로 분류됨을 의미)")
     void transientAiException_propagatesAsIs_forRetry() {
         given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
