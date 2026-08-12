@@ -70,11 +70,12 @@ public class ConsultationOpenAICaller {
             log.error("OpenAI API 일시적 오류(5xx 상당), 재시도 예정");
             throw e;
         } catch (NonTransientAiException e) {
-            // 4xx 상당 (401 인증 실패, 429 rate limit 등): 재시도 불가
-            log.error("OpenAI API 클라이언트 오류(4xx 상당)");
+            // 4xx 상당 (401 인증 실패, 429 rate limit 등): 재시도 불가, 우리 쪽 설정/사용량 문제일 가능성이 커 원인 로깅
+            log.error("OpenAI API 클라이언트 오류(4xx 상당)", e);
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
         } catch (Exception e) {
-            log.error("OpenAI API 응답 처리 실패 (재시도 불가)");
+            // 응답 역직렬화 실패 등 우리 쪽 코드/스키마 문제일 가능성이 커 원인 로깅
+            log.error("OpenAI API 응답 처리 실패 (재시도 불가)", e);
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
         }
         validate(response);
