@@ -5,24 +5,25 @@ import org.springframework.stereotype.Service;
 import ssafy.SSAju.exception.DailyLimitExceededException;
 import ssafy.SSAju.repository.DailyApiUsageRepository;
 
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 
 @Slf4j
 @Service
 public class DailyApiUsageService {
 
     private static final int DAILY_REQUEST_LIMIT = 3;
-    private static final String KST_ZONE = "Asia/Seoul";
 
     private final DailyApiUsageRepository dailyApiUsageRepository;
+    private final Clock clock;
 
-    public DailyApiUsageService(DailyApiUsageRepository dailyApiUsageRepository) {
+    public DailyApiUsageService(DailyApiUsageRepository dailyApiUsageRepository, Clock clock) {
         this.dailyApiUsageRepository = dailyApiUsageRepository;
+        this.clock = clock;
     }
 
     public void checkAndIncrementDailyUsage(Long userId) {
-        LocalDate today = LocalDate.now(ZoneId.of(KST_ZONE));
+        LocalDate today = LocalDate.now(clock);
 
         int affectedRows = dailyApiUsageRepository.upsertUsageIfUnderLimit(userId, today, DAILY_REQUEST_LIMIT);
 
@@ -39,7 +40,7 @@ public class DailyApiUsageService {
      * 차감과 별개의 트랜잭션으로 실행되는 보상 트랜잭션 방식이므로, 분산락 도입 여부와 무관하게 안전합니다.
      */
     public void restoreDailyUsage(Long userId) {
-        LocalDate today = LocalDate.now(ZoneId.of(KST_ZONE));
+        LocalDate today = LocalDate.now(clock);
 
         int affectedRows = dailyApiUsageRepository.restoreUsage(userId, today);
         if (affectedRows == 0) {
