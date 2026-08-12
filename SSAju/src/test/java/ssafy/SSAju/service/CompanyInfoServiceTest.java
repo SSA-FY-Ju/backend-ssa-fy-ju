@@ -9,7 +9,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 import ssafy.SSAju.dto.external.PublicDataApiResponse;
-import ssafy.SSAju.exception.PublicDataApiException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -187,8 +186,8 @@ class CompanyInfoServiceTest {
     }
 
     @Test
-    @DisplayName("HTTP 5xx 서버 오류 → PublicDataApiException 발생")
-    void shouldThrowException_WhenServerError() {
+    @DisplayName("HTTP 5xx 서버 오류 → 원본 예외 그대로 전파 (재시도 대상, CompanyInfoServiceRetryTest 참고)")
+    void shouldRethrowOriginalException_WhenServerError() {
         // Given
         given(publicDataRestClient.get()).willReturn((RestClient.RequestHeadersUriSpec) requestHeadersUriSpec);
         given(requestHeadersUriSpec.uri(any(java.net.URI.class))).willReturn((RestClient.RequestHeadersSpec) requestHeadersSpec);
@@ -199,7 +198,7 @@ class CompanyInfoServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> companyInfoService.lookupCompanyFoundingDate("현대오토에버"))
-                .isInstanceOf(PublicDataApiException.class);
+                .isInstanceOf(org.springframework.web.client.HttpServerErrorException.class);
     }
 
     // ────────────────────────────────────────────────────────────
