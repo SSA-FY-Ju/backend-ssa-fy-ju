@@ -12,6 +12,7 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import ssafy.SSAju.career.util.JobCategoryEnum;
+import ssafy.SSAju.config.ClockConfig;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.CompatibilityRequest;
 import ssafy.SSAju.entity.User;
@@ -113,7 +114,7 @@ class DailyQuotaIntegrityIntegrationTest {
         assertThatThrownBy(() -> companyMatchingService.analyzeCompatibility(request, testUser.getId()))
                 .isInstanceOf(ExternalApiException.class);
 
-        assertThat(dailyApiUsageRepository.findByUserIdAndUsageDate(testUser.getId(), LocalDate.now())
+        assertThat(dailyApiUsageRepository.findByUserIdAndUsageDate(testUser.getId(), LocalDate.now(ClockConfig.SERVICE_ZONE))
                 .map(usage -> usage.getRequestCount())
                 .orElse(0))
                 .isZero();
@@ -127,7 +128,7 @@ class DailyQuotaIntegrityIntegrationTest {
 
         companyMatchingService.analyzeCompatibility(request, testUser.getId());
 
-        assertThat(dailyApiUsageRepository.findByUserIdAndUsageDate(testUser.getId(), LocalDate.now())
+        assertThat(dailyApiUsageRepository.findByUserIdAndUsageDate(testUser.getId(), LocalDate.now(ClockConfig.SERVICE_ZONE))
                 .map(usage -> usage.getRequestCount())
                 .orElse(0))
                 .isEqualTo(1);
