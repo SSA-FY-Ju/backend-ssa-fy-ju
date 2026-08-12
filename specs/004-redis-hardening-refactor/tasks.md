@@ -64,22 +64,22 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] 통합 테스트 `SSAju/src/test/java/ssafy/SSAju/integration/AuthTokenSecurityIntegrationTest.java` — 로그인→보호 API 성공→로그아웃→동일 Access Token으로 보호 API 재호출 시 401 확인
-- [ ] T012 [P] [US1] 단위/통합 테스트 `SSAju/src/test/java/ssafy/SSAju/security/redis/RefreshTokenRedisRepositoryTest.java` — TTL 만료 후 자동 조회 불가(수동 삭제 없이) 확인(Redis Testcontainers)
-- [ ] T013 [P] [US1] 필터 테스트 `SSAju/src/test/java/ssafy/SSAju/filter/TokenValidationFilterTest.java` — `/api/auth/refresh`, `/api/auth/logout` 이외 경로는 Refresh Token 쿠키 없이도 필터를 통과하는지 확인
+- [x] T011 [P] [US1] 통합 테스트 `SSAju/src/test/java/ssafy/SSAju/integration/AuthTokenSecurityIntegrationTest.java` — 로그인→보호 API 성공→로그아웃→동일 Access Token으로 보호 API 재호출 시 401 확인
+- [x] T012 [P] [US1] 단위/통합 테스트 `SSAju/src/test/java/ssafy/SSAju/security/redis/RefreshTokenRedisRepositoryTest.java` — TTL 만료 후 자동 조회 불가(수동 삭제 없이) 확인(Redis Testcontainers)
+- [x] T013 [P] [US1] 필터 테스트 `SSAju/src/test/java/ssafy/SSAju/filter/TokenValidationFilterTest.java` — `/api/auth/refresh`, `/api/auth/logout` 이외 경로는 Refresh Token 쿠키 없이도 필터를 통과하는지 확인
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] `security/redis/RefreshTokenRedisRepository.java` 생성 — `save(jti, userId, tokenHash, ttl)`, `find(jti)`, `delete(jti)` (T004, T006 의존)
-- [ ] T015 [US1] `security/redis/AccessTokenBlacklistService.java` 생성 — `blacklist(jti, tokenExpiry)`, `isBlacklisted(jti)` (T004, T006 의존). 남은 유효시간은 시스템 시간이 아닌 주입된 `Clock`(T008/`config/ClockConfig.java`) 기준으로 계산하고, 클럭 스큐(앱 서버-Redis 서버 간 시간 오차) 및 계산~저장 사이 지연을 방어하기 위해 계산된 TTL에 고정 패딩(상수화된 최소 60초)을 더해 `SETEX`하도록 구현
-- [ ] T016 [US1] `security/AbstractJwtValidationFilter.java` 생성 — 사용자/관리자 필터 공통 로직(토큰 파싱→서명/만료 검증→블랙리스트 확인→SecurityContext 설정) 템플릿 메서드로 추출(C5); `filter/JwtAuthenticationFilter.java`, `admin/config/AdminCookieJwtFilter.java`가 이를 상속하도록 리팩토링(T015 의존)
-- [ ] T017 [US1] `filter/TokenValidationFilter.java` 수정 — `Refresh-Token` 헤더 대신 `Cookie`에서 읽고, `shouldNotFilter`를 반전하여 `/api/auth/refresh`·`/api/auth/logout` **에서만** 검사하도록 축소(이해관계자 결정 #2)
-- [ ] T018 [US1] `service/AuthService.java` 수정 — `login`/`refreshAccessToken`/`logout`/`deleteUser`가 `entity/RefreshToken`/`repository/RefreshTokenRepository` 대신 T014/T015를 사용하도록 교체, `Instant.now()` 호출부를 주입된 `Clock`으로 교체(C7)
-- [ ] T019 [US1] `controller/AuthController.java` 수정 — `login`/`refresh` 응답에서 Refresh Token을 `HttpOnly; Secure; Path=/api/auth; SameSite=Strict` 쿠키로만 내려보내고 응답 바디에서 제거, `logout` 시 `Set-Cookie ...Max-Age=0`로 명시적 삭제; `logout`/`getCurrentUserId`의 세부 로직을 `AuthService`로 이관(C3, 컨트롤러는 위임만)
-- [ ] T020 [US1] `dto/response/AuthTokenResponse.java`/`AuthTokenPair.java` 수정 — `refreshToken` 필드 제거 및 관련 매핑 코드 정리
-- [ ] T021 [US1] `config/SecurityConfig.java` 수정 — T016에서 생성/변경된 필터 빈 등록 순서 확인 및 조정
+- [x] T014 [US1] `security/redis/RefreshTokenRedisRepository.java` 생성 — `save(jti, userId, tokenHash, ttl)`, `find(jti)`, `delete(jti)` (T004, T006 의존)
+- [x] T015 [US1] `security/redis/AccessTokenBlacklistService.java` 생성 — `blacklist(jti, tokenExpiry)`, `isBlacklisted(jti)` (T004, T006 의존). 남은 유효시간은 시스템 시간이 아닌 주입된 `Clock`(T008/`config/ClockConfig.java`) 기준으로 계산하고, 클럭 스큐(앱 서버-Redis 서버 간 시간 오차) 및 계산~저장 사이 지연을 방어하기 위해 계산된 TTL에 고정 패딩(상수화된 최소 60초)을 더해 `SETEX`하도록 구현
+- [x] T016 [US1] `security/AbstractJwtValidationFilter.java` 생성 — 사용자/관리자 필터 공통 로직(토큰 파싱→서명/만료 검증→블랙리스트 확인→SecurityContext 설정) 템플릿 메서드로 추출(C5); `filter/JwtAuthenticationFilter.java`, `admin/config/AdminCookieJwtFilter.java`가 이를 상속하도록 리팩토링(T015 의존)
+- [x] T017 [US1] `filter/TokenValidationFilter.java` 수정 — `Refresh-Token` 헤더 대신 `Cookie`에서 읽고, `shouldNotFilter`를 반전하여 `/api/auth/refresh`·`/api/auth/logout` **에서만** 검사하도록 축소(이해관계자 결정 #2)
+- [x] T018 [US1] `service/AuthService.java` 수정 — `login`/`refreshAccessToken`/`logout`/`deleteUser`가 `entity/RefreshToken`/`repository/RefreshTokenRepository` 대신 T014/T015를 사용하도록 교체, `Instant.now()` 호출부를 주입된 `Clock`으로 교체(C7)
+- [x] T019 [US1] `controller/AuthController.java` 수정 — `login`/`refresh` 응답에서 Refresh Token을 `HttpOnly; Secure; Path=/api/auth; SameSite=Strict` 쿠키로만 내려보내고 응답 바디에서 제거, `logout` 시 `Set-Cookie ...Max-Age=0`로 명시적 삭제; `logout`/`getCurrentUserId`의 세부 로직을 `AuthService`로 이관(C3, 컨트롤러는 위임만)
+- [x] T020 [US1] `dto/response/AuthTokenResponse.java`/`AuthTokenPair.java` 수정 — `refreshToken` 필드 제거 및 관련 매핑 코드 정리
+- [x] T021 [US1] `config/SecurityConfig.java` 수정 — T016에서 생성/변경된 필터 빈 등록 순서 확인 및 조정
 
-**Checkpoint**: `cd SSAju && ./gradlew test` 실행, `BUILD SUCCESSFUL` 확인 — User Story 1은 이 시점에서 독립적으로 완전히 동작해야 함
+**Checkpoint**: ✅ 완료 (PR #40 `feat/redis-session-token-security`, main 병합됨: `9c97f34`/`f93de67`/`09970ba`/`ae6d913`) — `./gradlew test` BUILD SUCCESSFUL 확인됨. User Story 1은 독립적으로 완전히 동작함
 
 ---
 
