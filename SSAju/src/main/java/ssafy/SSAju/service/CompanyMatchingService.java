@@ -107,12 +107,12 @@ public class CompanyMatchingService {
         // ─── 사주 계산 (사용자 + 기업, 외부 I/O) ──────────────────────
         // 이른 캐시 히트(completed=true) 경로는 위에서 반환됨 → 여기서부터는 FastAPI/공공데이터 호출이 발생하는 신규 분석
         // 호출 실패 시 쿼터가 소진된 채 남지 않도록 차감 이후 구간 전체를 보상 트랜잭션으로 감싼다
-        dailyApiUsageService.checkAndIncrementDailyUsage(userId);
+        LocalDate usageDate = dailyApiUsageService.checkAndIncrementDailyUsage(userId);
         SajuCalculationResult sajuCalc;
         try {
             sajuCalc = calculateSajuData(request, userBirthTime);
         } catch (RuntimeException e) {
-            dailyApiUsageService.restoreDailyUsage(userId);
+            dailyApiUsageService.restoreDailyUsage(userId, usageDate);
             throw e;
         }
         HiddenStems userHiddenStems = sajuCalc.userHiddenStems();
