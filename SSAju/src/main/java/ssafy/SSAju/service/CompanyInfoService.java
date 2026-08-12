@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpServerErrorException;
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 import ssafy.SSAju.dto.external.PublicDataApiResponse;
+import ssafy.SSAju.exception.ExternalApiException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -32,7 +34,8 @@ import java.util.Optional;
  * <p>
  * 조회 결과가 없거나 4xx 오류 시 {@code Optional.empty()} 반환 →
  * 호출자가 {@code PublicDataApiException}으로 처리하거나 사용자 직접 입력 요청.
- * 5xx/네트워크 오류는 원본 예외를 그대로 전파해 {@code @Retryable}이 재시도한다.
+ * 5xx/네트워크 오류는 원본 예외를 그대로 전파해 {@code @Retryable}이 재시도하며,
+ * 재시도 소진 시 {@code @Recover}가 {@link ExternalApiException}으로 변환해 던진다.
  */
 @Slf4j
 @Service
@@ -101,6 +104,18 @@ public class CompanyInfoService {
             log.warn("공공데이터 API 네트워크 오류 발생, 재시도 예정: {}", e.getMessage());
             throw e;
         }
+    }
+
+    @Recover
+    public Optional<LocalDate> recoverFromServerError(HttpServerErrorException ex, String corpNm) {
+        log.error("공공데이터 API 서버 오류: 재시도 후 최종 실패", ex);
+        throw new ExternalApiException("공공데이터 API 서버 오류", ex);
+    }
+
+    @Recover
+    public Optional<LocalDate> recoverFromNetworkError(ResourceAccessException ex, String corpNm) {
+        log.error("공공데이터 API 네트워크 오류: 재시도 후 최종 실패", ex);
+        throw new ExternalApiException("공공데이터 API 네트워크 오류", ex);
     }
 
     /**
