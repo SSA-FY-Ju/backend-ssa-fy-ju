@@ -116,6 +116,7 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 - [x] T025 [P] [US3] 단위 테스트 `SSAju/src/test/java/ssafy/SSAju/service/CompanyInfoServiceRetryTest.java` — 5xx 응답 시 원본 예외(`HttpServerErrorException`)가 그대로 전파되어 `@Retryable`이 재시도하는지, 4xx는 즉시 `Optional.empty()`로 처리되는지 확인(기존 `SajuDataServiceTest` 패턴 참고). *(계획 문구 정정: 4xx는 "커스텀 예외 변환"이 아니라 기존부터 `Optional.empty()` 반환이었음 — 이 부분은 변경 범위 밖이라 그대로 유지)*. 기존 `CompanyInfoServiceTest.shouldThrowException_WhenServerError`도 새 기대값(원본 예외 재전파)으로 갱신
 - [x] T025 검증: 수정 전 두 테스트 모두 `AssertionError`로 실패 확인(구현 전 실패 필수 확인 완료) → T026 적용 후 전체 통과
+- [x] T025 보강(코드 리뷰 반영): `CompanyInfoServiceRetryTest`는 `new CompanyInfoService(...)`로 직접 생성한 인스턴스를 호출해 `@Retryable`/`@Recover` AOP 프록시를 거치지 않으므로(원본 예외 재전파 1회 호출까지만 검증 가능) 신규 `SSAju/src/test/java/ssafy/SSAju/service/CompanyInfoServiceRetryProxyTest.java`(`@SpringBootTest` + `@MockitoBean(name="publicDataRestClient")`)를 추가해 실제 프록시 빈으로 (1) 5xx 1회 실패 후 재시도 성공 시 호출 횟수 2회, (2) 5xx 2회 연속 실패 시 `ExternalApiException`으로 복구, (3) `ResourceAccessException` 2회 연속 실패 시 `ExternalApiException`으로 복구, (4) 4xx는 호출 횟수 1회(재시도 없음)를 검증. 기존 `CompanyInfoServiceRetryTest`(순수 단위 테스트, 직접 생성)는 그대로 유지 — 목적이 다름(비즈니스 분기 검증 vs AOP 동작 검증)
 
 ### Implementation for User Story 3
 
