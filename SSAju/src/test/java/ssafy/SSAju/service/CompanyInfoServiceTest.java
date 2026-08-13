@@ -1,15 +1,8 @@
 package ssafy.SSAju.service;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.RestClient;
 import ssafy.SSAju.dto.external.PublicDataApiResponse;
-import ssafy.SSAju.exception.PublicDataApiException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -17,37 +10,13 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 
-@ExtendWith(MockitoExtension.class)
 @DisplayName("CompanyInfoService 단위 테스트")
-class CompanyInfoServiceTest {
+class CompanyInfoServiceTest extends CompanyInfoServiceTestSupport {
 
-    @Mock
-    private RestClient publicDataRestClient;
-
-    private CompanyInfoService companyInfoService;
-
-    // RestClient 체이닝 mock
-    @Mock private RestClient.RequestHeadersUriSpec<?> requestHeadersUriSpec;
-    @Mock private RestClient.RequestHeadersSpec<?> requestHeadersSpec;
-    @Mock private RestClient.ResponseSpec responseSpec;
-
-    @BeforeEach
-    void setUp() {
-        companyInfoService = new CompanyInfoService(publicDataRestClient);
-        ReflectionTestUtils.setField(companyInfoService, "apiKey", "test-api-key");
-        // URI.create(publicDataUrl) 호출을 위해 반드시 주입 필요
-        ReflectionTestUtils.setField(companyInfoService, "publicDataUrl",
-                "https://apis.data.go.kr/1160100/service/GetCorpBasicInfoService_V2");
-    }
-
-    @SuppressWarnings("unchecked")
     private void givenApiReturns(PublicDataApiResponse response) {
-        given(publicDataRestClient.get()).willReturn((RestClient.RequestHeadersUriSpec) requestHeadersUriSpec);
-        given(requestHeadersUriSpec.uri(any(java.net.URI.class))).willReturn((RestClient.RequestHeadersSpec) requestHeadersSpec);
-        given(requestHeadersSpec.retrieve()).willReturn(responseSpec);
+        stubRetrieve();
         // 실제 운영 코드는 .retrieve().body(Class) 를 호출하므로 .body() mock
         given(responseSpec.body(PublicDataApiResponse.class)).willReturn(response);
     }
@@ -187,19 +156,17 @@ class CompanyInfoServiceTest {
     }
 
     @Test
-    @DisplayName("HTTP 5xx 서버 오류 → PublicDataApiException 발생")
-    void shouldThrowException_WhenServerError() {
+    @DisplayName("HTTP 5xx 서버 오류 → 원본 예외 그대로 전파 (재시도 대상, CompanyInfoServiceRetryTest 참고)")
+    void shouldRethrowOriginalException_WhenServerError() {
         // Given
-        given(publicDataRestClient.get()).willReturn((RestClient.RequestHeadersUriSpec) requestHeadersUriSpec);
-        given(requestHeadersUriSpec.uri(any(java.net.URI.class))).willReturn((RestClient.RequestHeadersSpec) requestHeadersSpec);
-        given(requestHeadersSpec.retrieve()).willReturn(responseSpec);
+        stubRetrieve();
         given(responseSpec.body(PublicDataApiResponse.class))
                 .willThrow(new org.springframework.web.client.HttpServerErrorException(
                         org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR));
 
         // When & Then
         assertThatThrownBy(() -> companyInfoService.lookupCompanyFoundingDate("현대오토에버"))
-                .isInstanceOf(PublicDataApiException.class);
+                .isInstanceOf(org.springframework.web.client.HttpServerErrorException.class);
     }
 
     // ────────────────────────────────────────────────────────────
