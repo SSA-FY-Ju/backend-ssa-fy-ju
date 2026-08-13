@@ -76,7 +76,7 @@ description: "Task list for 기업 궁합 분석 AI 해설 전환 및 점수 산
 
 ### Tests for User Story 2
 
-- [ ] T010 [P] [US2] `SSAju/src/test/java/ssafy/SSAju/career/util/RoleCompatibilityCalculatorTest.java` 갱신 — `calculatePrimary(int matchScore)`가 입력값을 그대로 반환(cap 100)하는지, `calculateSecondary`가 `-15` 페널티(하한 0)를 적용하는지 검증(구현 전 컴파일 실패 확인 — 시그니처 변경 대상)
+- [ ] T010 [P] [US2] `SSAju/src/test/java/ssafy/SSAju/career/util/RoleCompatibilityCalculatorTest.java` 갱신 — `calculatePrimary(int matchScore)`가 입력값을 그대로 반환(cap 100)하는지, `calculateSecondary`가 `-15` 페널티를 적용하되 결과가 음수면 0으로 하한 적용하는지(예: `matchScore=10` → `secondaryScore=0`, `matchScore=50` → `secondaryScore=35`) 검증(구현 전 컴파일 실패 확인 — 시그니처 변경 대상)
 - [ ] T011 [P] [US2] `SSAju/src/test/java/ssafy/SSAju/career/util/JobRoleAnalyzerTest.java` 갱신 — 텍스트(synergy/warning) 관련 단언 제거, `matchScore` 계산 케이스만 유지·검증
 
 ### Implementation for User Story 2

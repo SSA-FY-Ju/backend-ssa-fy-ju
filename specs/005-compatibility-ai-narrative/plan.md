@@ -22,7 +22,7 @@
 
 **Project Type**: 단일 Spring Boot 백엔드 웹 서비스(web-service) — `specs/004-redis-hardening-refactor`와 동일 저장소, 별도 프로젝트 아님
 
-**Performance Goals**: 궁합 분석 응답을 15초 이내(SC-004)에 반환. 기존 OpenAI 호출 타임아웃 예산(`ApiTimeoutConstants.OPENAI_TIMEOUT_SECONDS`, 8초) 및 재시도 정책(`@Retryable` maxAttempts=3, 지수 백오프)을 그대로 재사용
+**Performance Goals**: 궁합 분석 응답을 15초 이내(SC-004, 재시도 없이 1회 호출에 성공하는 정상 경로 기준)에 반환. 기존 OpenAI 호출 타임아웃 예산(`ApiTimeoutConstants.OPENAI_TIMEOUT_SECONDS`, 8초) 및 재시도 정책(`@Retryable` maxAttempts=3, 지수 백오프 1s/2s/4s)을 그대로 재사용 — 재시도가 모두 소진되는 최악의 경우 8초×3회+백오프 3초 ≈ 27초까지 소요될 수 있으며, 이 경로는 SC-004 대상이 아니라 FR-005의 오류 응답으로 처리된다([contracts/compatibility-narrative-contract.md](./contracts/compatibility-narrative-contract.md) 참고)
 
 **Constraints**:
 - 외부 I/O(OpenAI)를 호출하는 `CompanyMatchingService.analyzeCompatibility`는 `@Transactional` 금지 원칙 유지(`skills/code-style-guide.md` 트랜잭션 절)

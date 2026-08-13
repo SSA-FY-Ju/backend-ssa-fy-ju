@@ -21,7 +21,7 @@
 
 1. 같은 오행 분포를 가진 요청에 대해 응답의 `targetRoleAnalysis.matchScore`와 `roleCompatibility[0].score`(전문가 역할)를 비교
 
-**기대 결과**: `roleCompatibility[0].score == targetRoleAnalysis.matchScore` (data-model.md "산식 통합에 따른 계산 흐름 변화" 참고). `roleCompatibility[1].score`(리드 역할)는 `matchScore - 15`.
+**기대 결과**: `roleCompatibility[0].score == targetRoleAnalysis.matchScore` (data-model.md "산식 통합에 따른 계산 흐름 변화" 참고). `roleCompatibility[1].score`(리드 역할)는 `max(matchScore - 15, 0)` — `matchScore`가 15 미만이면 음수 대신 0으로 하한 적용(예: `matchScore=10` → `roleCompatibility[1].score=0`).
 
 2. 단위 테스트로 검증: `RoleCompatibilityCalculatorTest`(수정) / `JobRoleAnalyzerTest`(수정) — 다양한 `primaryCount`/`secondaryCount` 조합에서 두 지표가 항상 일관된 관계를 유지하는지, `matchScore < 15`일 때 `secondaryScore`가 0 미만으로 내려가지 않는지 확인
 
