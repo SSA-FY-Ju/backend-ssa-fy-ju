@@ -20,11 +20,11 @@
 
 ## 3. AI 실패 시 쿼터 보상 범위
 
-**Decision**: 기존 `CompanyMatchingService.analyzeCompatibility`의 `try { calculateSajuData(...) } catch (RuntimeException e) { restoreDailyUsage(...); throw e; }` 블록을 AI 해설 호출까지 확장한다 — 사주 계산이 성공한 뒤 AI 호출이 실패해도 동일하게 쿼터를 복원한다.
+**Decision**: 기존 `CompanyMatchingService.analyzeCompatibility`의 `try { calculateSajuData(...) } catch (RuntimeException e) { restoreDailyUsage(...); throw e; }` 블록을, AI 해설 호출뿐 아니라 그 결과를 엔티티에 매핑해 저장하는 최종 단계(`companyCompatibilityJdbcRepository.insertOrIgnore` + `childSaveService.saveAllAndMarkCompleted`)까지 포함하도록 확장한다 — 사주 계산 성공 이후 AI 호출이 실패하든, AI 호출은 성공했지만 최종 저장이 실패하든 동일하게 쿼터를 복원한다.
 
-**Rationale**: FR-004/FR-005 및 User Story 3 acceptance scenario가 "AI 해설 생성 실패 시에도 쿼터가 소진된 채 남지 않아야 한다"를 명시. 기존 `restoreDailyUsage`(보상 트랜잭션, `specs/004-redis-hardening-refactor` US2)를 그대로 재사용하면 신규 보상 로직을 만들 필요가 없다.
+**Rationale**: FR-004/FR-005 및 User Story 3 Acceptance Scenario 2("AI 해설 생성이 성공했으나 ... 최종 저장까지 실패, Then 사용자의 일일 분석 가능 횟수는 요청 전과 동일하게 유지된다")가 저장 단계 실패도 명시적으로 보상 대상에 포함하도록 요구한다. AI 호출까지만 범위를 확장하면 이 인수 기준을 충족하지 못한다. `specs/004-redis-hardening-refactor` US6(T045-2)가 `ConsultationService`에서 동일한 이유로 try 범위를 `consultationSaveService.saveOrUpdate` 호출까지 확장하기로 한 선례를 그대로 따른다. 기존 `restoreDailyUsage`(보상 트랜잭션, `specs/004-redis-hardening-refactor` US2)를 재사용하므로 신규 보상 로직은 필요 없다.
 
-**Alternatives considered**: AI 호출 실패는 보상하지 않고 사용자가 재시도하도록 안내 — 기존 프로젝트 전반의 "쿼터 증발 방지" 원칙(US2)과 상충해 기각.
+**Alternatives considered**: AI 호출까지만 보상 범위를 확장하고 저장 실패는 보상하지 않음 — User Story 3 Acceptance Scenario 2와 직접 상충해 기각. AI 호출 실패는 보상하지 않고 사용자가 재시도하도록 안내 — 기존 프로젝트 전반의 "쿼터 증발 방지" 원칙(US2)과 상충해 기각.
 
 ## 4. 응답 캐싱 정책
 

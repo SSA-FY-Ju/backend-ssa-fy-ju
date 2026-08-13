@@ -9,7 +9,7 @@
 - `fiveElements.synergyDescription`
 - `actionableStrategy.weaknessDefense`
 - `expectedInterviewQuestions[]`
-- `roleCompatibility[].reason`, `roleCompatibility[].score`(산식 통합으로 수치 변경 가능), `roleCompatibility[].tag`
+- `roleCompatibility[].reason`(AI 생성), `roleCompatibility[].score`(산식 통합으로 수치 변경 가능), `roleCompatibility[].tag`(생성 로직 자체는 불변인 규칙 기반 임계값 판정이나, `score`가 산식 통합으로 바뀌므로 그 결과값은 간접적으로 달라질 수 있음)
 - `monthlyForecast[].advice`
 - `cautions[]`
 
@@ -35,6 +35,8 @@
 | 응답 검증 실패(필수 필드 누락 등) | `OpenAIApiException`, 재시도 안 함 |
 | 재시도 소진 | `@Recover`가 `OpenAIApiException`으로 변환 후 상위로 전파 |
 
+**SC-004(15초 이내)와의 관계**: 재시도 3회 × 타임아웃 8초 + 백오프(1s+2s)를 모두 소진하는 최악의 경우 총 소요 시간은 약 27초로 SC-004를 초과한다. SC-004는 **정상 응답 경로(재시도 없이 1회 호출 성공)** 기준의 목표이며, 재시도가 소진되는 실패 경로는 SC-004 대상이 아니라 FR-005의 오류 응답 경로로 처리된다(즉, "15초 이내 정상 응답" 또는 "그보다 늦더라도 명확한 오류 응답" 둘 중 하나이지, "항상 15초 이내에 응답"을 보장하지는 않는다).
+
 **호출자(`CompanyMatchingService`) 계약**: 위 예외가 전파되면 `DailyApiUsageService.restoreDailyUsage(userId, usageDate)`를 호출해 쿼터를 복원한 뒤 재throw한다(FR-004, FR-005). 이 컴포넌트 자신은 쿼터 로직을 알지 못한다 — 순수하게 프롬프트 입력을 받아 해설 텍스트를 반환하는 책임만 가진다.
 
 ## 프롬프트 계약: `PromptProvider.getCompatibilityNarrativePrompt(...)`
@@ -43,4 +45,4 @@
 
 - 위 8개 응답 필드에 대한 JSON 스키마 명시(`CompatibilityNarrativeResponse` 구조와 1:1 대응)
 - 이미 계산된 점수(궁합/직군매칭/역할별)를 "다시 계산하지 말고 해설만 작성하라"는 지시 — AI가 점수를 임의로 바꾸지 않도록 방지
-- `monthlyAdvices`는 정확히 5개, 순서는 이번 달부터 5개월 순서 고정
+- `monthlyAdvices`는 정확히 5개, 인덱스 `i`(0~4)는 `((현재월 - 1 + i) % 12) + 1`로 계산된 월에 대응(기존 `AnalysisResponseBuilder.buildMonthlyForecasts`의 월 순환 규칙과 동일, 12월→1월 등 연도 경계는 월 값만 순환하고 별도 연도 필드는 없음). 프롬프트에는 이 5개 대상 월을 실제 월 번호 목록으로 명시해 AI가 임의로 월을 선택하지 않도록 한다

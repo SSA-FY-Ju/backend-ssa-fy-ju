@@ -57,7 +57,7 @@ description: "Task list for 기업 궁합 분석 AI 해설 전환 및 점수 산
 
 ### Implementation for User Story 1
 
-- [ ] T004 [P] [US1] `career/dto/external/CompatibilityNarrativeResponse.java` 생성 — [data-model.md](./data-model.md)의 필드 정의(`summary`, `roleSynergy`, `roleWarning`, `fiveElementsSynergyDescription`, `weaknessDefense`, `interviewQuestions[]`, `primaryRoleReason`, `secondaryRoleReason`, `monthlyAdvices[]`, `cautions[]`) 그대로 record로 작성
+- [ ] T004 [P] [US1] `dto/external/CompatibilityNarrativeResponse.java` 생성(최상위 `ssafy.SSAju.dto.external` 패키지 — 기존 `FastAPIResponse`/`CareerAdviceResponse`와 동일 위치, `career/` 하위 아님) — [data-model.md](./data-model.md)의 필드 정의(`summary`, `roleSynergy`, `roleWarning`, `fiveElementsSynergyDescription`, `weaknessDefense`, `interviewQuestions[]`, `primaryRoleReason`, `secondaryRoleReason`, `monthlyAdvices[]`, `cautions[]`) 그대로 record로 작성
 - [ ] T005 [US1] `career/provider/PromptProvider.java`에 `getCompatibilityNarrativePrompt(...)` 메서드 추가 — [contracts/compatibility-narrative-contract.md](./contracts/compatibility-narrative-contract.md)의 입력(사용자/기업 오행·지장간·일간, 이미 계산된 점수 3종, 직군)을 받아 프롬프트 문자열 조립, "점수는 재계산하지 말고 해설만 작성" 지시 포함, `monthlyAdvices` 5개 고정 명시 (T004 의존)
 - [ ] T006 [US1] `career/caller/CompanyMatchingOpenAICaller.java` 생성 — `ConsultationOpenAICaller`와 동일하게 `@Retryable(retryFor={ResourceAccessException.class, TransientAiException.class}, noRetryFor={OpenAIApiException.class, HttpMessageConversionException.class}, maxAttempts=3)` + `@Recover` 3종 + `validate()`(null/blank 금지, `interviewQuestions` 최소 1개, `monthlyAdvices` 정확히 5개, `cautions` 최소 1개) 구현 (T004, T005 의존)
 - [ ] T007 [US1] `career/util/JobRoleAnalyzer.java` 수정 — `buildSynergyText`/`buildWarningText`(및 관련 문구 상수 `SYNERGY_*_FMT`/`WARNING_*_FMT`) 삭제, `analyze()`는 `matchScore` 계산만 반환하도록 축소(문구는 AI 응답으로 대체되므로 `RoleAnalysis` VO의 synergy/warning은 호출부에서 AI 값으로 채움)
@@ -93,15 +93,15 @@ description: "Task list for 기업 궁합 분석 AI 해설 전환 및 점수 산
 
 **Goal**: AI 해설 생성이 실패해도 사용자의 일일 분석 가능 횟수가 소진된 채 남지 않도록 기존 쿼터 보상 범위를 AI 호출까지 확장
 
-**Independent Test**: AI 해설 생성 호출이 재시도 소진 후 최종 실패하는 상황에서 사용자의 일일 사용 횟수가 요청 전과 동일하게 유지되고, 응답이 명확한 오류로 반환되는지 확인 (quickstart.md "US3" 시나리오)
+**Independent Test**: AI 해설 생성 호출이 재시도 소진 후 최종 실패하거나, AI 해설은 성공했지만 최종 저장이 실패하는 상황 모두에서 사용자의 일일 사용 횟수가 요청 전과 동일하게 유지되고, 응답이 명확한 오류로 반환되는지 확인 (quickstart.md "US3" 시나리오, spec.md US3 Acceptance Scenario 1·2)
 
 ### Tests for User Story 3
 
-- [ ] T015 [US3] `SSAju/src/test/java/ssafy/SSAju/service/CompanyMatchingServiceTest.java`에 케이스 추가 — `CompanyMatchingOpenAICaller.call(...)`이 예외를 던지도록 mock 설정 시 `dailyApiUsageService.restoreDailyUsage(userId, usageDate)`가 호출되고 원본 예외가 그대로 전파되는지 검증(구현 전 실패 확인 필수, T009 완료 후 작성 — 같은 대상 메서드)
+- [ ] T015 [US3] `SSAju/src/test/java/ssafy/SSAju/service/CompanyMatchingServiceTest.java`에 케이스 2종 추가 — (1) `CompanyMatchingOpenAICaller.call(...)`이 예외를 던지도록 mock 설정 시, (2) AI 호출은 성공하지만 이후 `companyCompatibilityJdbcRepository.insertOrIgnore`/`childSaveService.saveAllAndMarkCompleted`가 예외를 던지도록 mock 설정 시 — 두 경우 모두 `dailyApiUsageService.restoreDailyUsage(userId, usageDate)`가 호출되고 원본 예외가 그대로 전파되는지 검증(구현 전 실패 확인 필수, T009 완료 후 작성 — 같은 대상 메서드)
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] `service/CompanyMatchingService.java` 수정 — 기존 `try { calculateSajuData(...) } catch (RuntimeException e) { restoreDailyUsage(...); throw e; }` 블록의 범위를 T009에서 추가한 `CompanyMatchingOpenAICaller.call(...)` 호출까지 확장(사주 계산과 AI 호출을 하나의 try 블록으로 묶어 두 지점 중 어디서 실패하든 동일하게 보상) (T009, T015 의존)
+- [ ] T016 [US3] `service/CompanyMatchingService.java` 수정 — 기존 `try { calculateSajuData(...) } catch (RuntimeException e) { restoreDailyUsage(...); throw e; }` 블록의 범위를 T009에서 추가한 `CompanyMatchingOpenAICaller.call(...)` 호출과 이후 `insertOrIgnore`/`childSaveService.saveAllAndMarkCompleted` 저장 단계까지 확장(사주 계산·AI 호출·최종 저장 중 어디서 실패하든 동일하게 보상 — spec.md US3 Acceptance Scenario 2, `specs/004-redis-hardening-refactor` US6/T045-2와 동일한 확장 방식) (T009, T015 의존)
 
 **Checkpoint**: `cd SSAju && ./gradlew test`로 US1+US2+US3 전체 테스트 통과 확인 — AI 실패가 쿼터에 영향을 주지 않음이 검증됨
 

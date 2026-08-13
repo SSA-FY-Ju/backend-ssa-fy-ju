@@ -16,7 +16,7 @@
 
 **Storage**: MySQL 8(JPA/Hibernate) — 신규 테이블/컬럼 없음. `TargetRoleAnalysis.synergy/warning`, `FiveElementsAnalysis.synergyDescription`, `ActionableStrategy.weaknessDefense`, `ExpectedInterviewQuestion`, `RoleCompatibility.reason`, `MonthlyForecast.advice`, `Caution.content`, `CompanyCompatibility.summary` 등 기존 컬럼의 **값 생성 방식만** 규칙 기반 → AI 생성으로 전환
 
-**Testing**: JUnit 5 + AssertJ(Given-When-Then), H2(단위), MySQL Testcontainers(통합, 기존 인프라 재사용) — 신규: `CompanyMatchingOpenAICallerTest`(`ConsultationOpenAICallerTest` 패턴, 재시도/예외 경로), `FiveElementMatchScoreCalculatorTest`(점수 통합 검증), 기존 `CompanyMatchingServiceTest`/`JobRoleAnalyzerTest`/`RoleCompatibilityCalculatorTest` 확장
+**Testing**: JUnit 5 + AssertJ(Given-When-Then), H2(단위), MySQL Testcontainers(통합, 기존 인프라 재사용) — 신규: `CompanyMatchingOpenAICallerTest`(`ConsultationOpenAICallerTest` 패턴, 재시도/예외 경로). 점수 산식 통합 검증은 별도 신규 계산기 클래스 없이(research.md Decision 2) 기존 `RoleCompatibilityCalculatorTest`/`JobRoleAnalyzerTest`/`CompanyMatchingServiceTest` 확장으로 커버
 
 **Target Platform**: 기존과 동일 — Linux 서버(Docker), JSON REST API
 

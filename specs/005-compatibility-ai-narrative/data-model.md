@@ -14,7 +14,7 @@
 | `FiveElementsAnalysis` | `synergyDescription` | `AnalysisResponseBuilder.buildElementSynergyText()`(템플릿) | AI 응답 |
 | `ActionableStrategy` | `weaknessDefense` | `AnalysisResponseBuilder.buildActionableStrategy()`(템플릿) | AI 응답 |
 | `ActionableStrategy` | `luckyDays`, `preferredTime` | 고정 오프셋/상수 | 변경 없음(규칙 기반 유지) |
-| `ExpectedInterviewQuestion` | `question`, `intent` | 고정 2문항 템플릿 | AI 응답(개수는 가변 가능, 최소 2개 이상 검증) |
+| `ExpectedInterviewQuestion` | `question`, `intent` | 고정 2문항 템플릿 | AI 응답(개수는 가변 가능, 최소 1개 이상 검증 — 검증 규칙 및 [tasks.md](./tasks.md) T006과 동일) |
 | `RoleCompatibility` | `reason` | 고정 템플릿 | AI 응답 |
 | `RoleCompatibility` | `score`, `tag` | `RoleCompatibilityCalculator`(자체 산식) | `RoleCompatibilityCalculator`(`JobRoleAnalyzer.matchScore` 재사용, 산식 통합 — Decision 2 참고) |
 | `MonthlyForecast` | `advice` | `AnalysisResponseBuilder.buildForecastMessage()`(템플릿) | AI 응답 |
@@ -23,7 +23,7 @@
 
 ## 신규 내부 DTO (영속화되지 않음, AI 응답 매핑 전용)
 
-`career/dto/external/CompatibilityNarrativeResponse.java` — `ConsultationOpenAICaller`의 `CareerAdviceResponse`와 동일한 위치·역할(외부 AI 응답 역직렬화 전용 record). DB에는 저장되지 않고, `CompanyMatchingService`가 이 record의 값을 기존 자식 엔티티 필드에 매핑해 저장한다.
+`dto/external/CompatibilityNarrativeResponse.java`(최상위 `ssafy.SSAju.dto.external` 패키지) — 기존 `FastAPIResponse`/`CareerAdviceResponse`와 동일한 위치·역할(외부 AI 응답 역직렬화 전용 record). `career/` 서브패키지가 아닌 최상위 `dto/external`에 두는 이유는 이 두 기존 클래스와 동일한 컨벤션을 따르기 위함([plan.md](./plan.md) Project Structure 참고). DB에는 저장되지 않고, `CompanyMatchingService`가 이 record의 값을 기존 자식 엔티티 필드에 매핑해 저장한다.
 
 ```java
 public record CompatibilityNarrativeResponse(
@@ -62,7 +62,7 @@ RoleCompatibilityCalculator.secondaryScore = primaryScore − 15
 ```
 JobRoleAnalyzer.matchScore = primaryCount×40 + secondaryCount×20 (cap 100)   ← 변경 없음
 RoleCompatibilityCalculator.primaryScore = matchScore                        ← JobRoleAnalyzer 결과 재사용
-RoleCompatibilityCalculator.secondaryScore = primaryScore − 15               ← 변경 없음
+RoleCompatibilityCalculator.secondaryScore = max(primaryScore − 15, 0)       ← 변경 없음(기존 코드가 이미 하한 0 클램프 적용 중)
 ```
 
 `RoleCompatibilityCalculator.calculatePrimary(FiveElements, JobCategoryEnum)` 시그니처는 `calculatePrimary(int matchScore)`로 단순화되며, 오행 분포로부터 직접 재계산하지 않는다.

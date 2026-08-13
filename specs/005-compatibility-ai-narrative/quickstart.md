@@ -8,10 +8,10 @@
 
 ## US1: 개인화된 해설 텍스트 확인
 
-1. 서로 다른 두 사용자(또는 동일 사용자, 서로 다른 기업명 2건)로 `POST /api/compatibility` 요청
-2. 응답의 `summary`, `targetRoleAnalysis.synergy/warning`, `fiveElements.synergyDescription`, `actionableStrategy.weaknessDefense`, `expectedInterviewQuestions[]`, `roleCompatibility[].reason`, `monthlyForecast[].advice`, `cautions[]` 를 두 응답 간 비교
+1. 서로 다른 사용자/기업명/직군 조합으로 `POST /api/compatibility`를 5회 이상 요청(spec.md User Story 1의 Independent Test와 동일 표본 수)
+2. 응답의 `summary`, `targetRoleAnalysis.synergy/warning`, `fiveElements.synergyDescription`, `actionableStrategy.weaknessDefense`, `expectedInterviewQuestions[]`, `roleCompatibility[].reason`, `monthlyForecast[].advice`, `cautions[]`를 표본 전체에서 서로 비교
 
-**기대 결과**: 8개 필드 모두 두 응답에서 문구가 다르게 나온다(완전히 동일한 템플릿 문자열이 반복되지 않음). [contracts/compatibility-narrative-contract.md](contracts/compatibility-narrative-contract.md) 참고.
+**기대 결과**: 8개 영역 모두, 표본 내에서 동일한 문구가 반복되는 비율이 5% 미만이다(SC-001과 동일 기준). [contracts/compatibility-narrative-contract.md](contracts/compatibility-narrative-contract.md) 참고.
 
 3. 동일한 사용자·기업·직군으로 같은 달에 재요청
 
@@ -23,7 +23,7 @@
 
 **기대 결과**: `roleCompatibility[0].score == targetRoleAnalysis.matchScore` (data-model.md "산식 통합에 따른 계산 흐름 변화" 참고). `roleCompatibility[1].score`(리드 역할)는 `matchScore - 15`.
 
-2. 단위 테스트로 검증: `FiveElementMatchScoreCalculatorTest`(신규) / `RoleCompatibilityCalculatorTest`(수정) — 다양한 `primaryCount`/`secondaryCount` 조합에서 두 지표가 항상 일관된 관계를 유지하는지 확인
+2. 단위 테스트로 검증: `RoleCompatibilityCalculatorTest`(수정) / `JobRoleAnalyzerTest`(수정) — 다양한 `primaryCount`/`secondaryCount` 조합에서 두 지표가 항상 일관된 관계를 유지하는지, `matchScore < 15`일 때 `secondaryScore`가 0 미만으로 내려가지 않는지 확인
 
 ## US3: AI 실패 시 쿼터 보상 확인
 
@@ -43,4 +43,4 @@ cd SSAju
 ./gradlew clean test
 ```
 
-`BUILD SUCCESSFUL` 확인 및 [SSAju/CLAUDE.md](../../../SSAju/CLAUDE.md) 기준 커밋 전 필수 테스트 통과 확인.
+`BUILD SUCCESSFUL` 확인 및 [SSAju/CLAUDE.md](../../SSAju/CLAUDE.md) 기준 커밋 전 필수 테스트 통과 확인.
