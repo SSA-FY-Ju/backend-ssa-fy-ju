@@ -82,7 +82,7 @@ class CompanyMatchingOpenAICallerTest {
     void setUp() {
         chatClient = mock(ChatClient.class, RETURNS_DEEP_STUBS);
         caller = new CompanyMatchingOpenAICaller(chatClient, promptProvider);
-        given(promptProvider.getCompatibilityNarrativePrompt(any())).willReturn("prompt");
+        given(promptProvider.getCompatibilityNarrativePrompt(any(), any())).willReturn("prompt");
         given(promptProvider.currentForecastTargetMonths()).willReturn(TARGET_MONTHS);
     }
 

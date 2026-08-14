@@ -12,6 +12,7 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import ssafy.SSAju.career.caller.CompanyMatchingOpenAICaller;
+import ssafy.SSAju.career.provider.PromptProvider;
 import ssafy.SSAju.career.util.JobCategoryEnum;
 import ssafy.SSAju.config.ClockConfig;
 import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
@@ -67,6 +68,9 @@ class DailyQuotaIntegrityIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private PromptProvider promptProvider;
+
     // 외부 API 경계만 mock (FastAPI, OpenAI)
     @MockitoBean
     private SajuDataService sajuDataService;
@@ -110,12 +114,17 @@ class DailyQuotaIntegrityIntegrationTest {
         );
     }
 
+    /**
+     * 실제 {@link PromptProvider#currentForecastTargetMonths()}와 동일한 월 목록으로 조언을
+     * 생성한다 — 고정된 월(예: 1~5)을 쓰면 테스트 실행 시점의 실제 월과 어긋나
+     * AnalysisResponseBuilder가 advice를 찾지 못해 null로 저장되는 문제(리뷰 지적 사항)를 방지한다.
+     */
     private CompatibilityNarrativeResponse fakeNarrativeResponse() {
         return new CompatibilityNarrativeResponse(
                 "요약", "시너지", "경고", "오행 시너지", "약점 방어",
                 List.of(new CompatibilityNarrativeResponse.InterviewQuestion("질문", "의도")),
                 "전문가 사유", "리드 사유",
-                List.of(1, 2, 3, 4, 5).stream()
+                promptProvider.currentForecastTargetMonths().stream()
                         .map(month -> new CompatibilityNarrativeResponse.MonthlyAdvice(month, month + "월 조언"))
                         .toList(),
                 List.of("주의사항")

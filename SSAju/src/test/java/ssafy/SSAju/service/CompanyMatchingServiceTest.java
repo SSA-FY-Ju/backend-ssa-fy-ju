@@ -203,6 +203,8 @@ class CompanyMatchingServiceTest {
         verify(childSaveService).saveAllAndMarkCompleted(any(), any());
         // 캐시 미스 → FastAPI 호출 직전 차감: 1회 필수
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        // 저장까지 성공한 정상 흐름 → 쿼터 복원은 절대 호출되면 안 됨(이중 지급 방지 회귀 검증)
+        verify(dailyApiUsageService, never()).restoreDailyUsage(any(), any());
     }
 
     // ─────────────────────────────────────────

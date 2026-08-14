@@ -89,12 +89,15 @@ public class PromptProvider {
      * <p>점수(궁합/직군매칭/역할별)는 이미 규칙 기반으로 계산되어 있으므로, AI에게는
      * 해당 점수를 그대로 전제로 해설 텍스트만 작성하도록 지시하고 재계산을 금지한다.
      *
-     * @param request 사용자/기업 사주 데이터 및 계산 완료된 점수, 직군 정보
+     * @param request      사용자/기업 사주 데이터 및 계산 완료된 점수, 직군 정보
+     * @param targetMonths 월별 조언 대상 월 목록 — 호출자가 {@link #currentForecastTargetMonths()}로
+     *                     한 번만 계산해 프롬프트 생성과 응답 검증 양쪽에 동일하게 전달해야 한다
+     *                     (여기서 다시 계산하면 네트워크 호출 전후로 월이 바뀌는 경계 조건에서
+     *                     프롬프트가 요청한 월과 검증 기준 월이 어긋날 수 있다)
      * @return OpenAI에 전달할 한국어 프롬프트 문자열
      */
-    public String getCompatibilityNarrativePrompt(CompatibilityNarrativeRequest request) {
-        List<Integer> targetMonths = currentForecastTargetMonths();
-
+    public String getCompatibilityNarrativePrompt(CompatibilityNarrativeRequest request,
+                                                    List<Integer> targetMonths) {
         return """
                 당신은 사주 명리학 전문가이자 기업 궁합 분석 컨설턴트입니다.
                 아래 사용자와 기업의 사주 데이터, 그리고 이미 계산이 끝난 점수를 바탕으로

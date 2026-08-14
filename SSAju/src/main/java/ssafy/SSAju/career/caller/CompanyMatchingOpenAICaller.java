@@ -3,7 +3,6 @@ package ssafy.SSAju.career.caller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.ai.retry.TransientAiException;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.retry.annotation.Backoff;
@@ -54,45 +53,27 @@ public class CompanyMatchingOpenAICaller {
             backoff = @Backoff(delay = 1000, multiplier = 2.0)
     )
     public CompatibilityNarrativeResponse call(CompatibilityNarrativeRequest request) {
-        String prompt = promptProvider.getCompatibilityNarrativePrompt(request);
-        CompatibilityNarrativeResponse response;
-        try {
-            response = chatClient.prompt()
-                    .user(prompt)
-                    .call()
-                    .entity(CompatibilityNarrativeResponse.class);
-        } catch (OpenAIApiException e) {
-            throw e;
-        } catch (ResourceAccessException e) {
-            log.error("OpenAI API 타임아웃, 재시도 예정");
-            throw e;
-        } catch (TransientAiException e) {
-            log.error("OpenAI API 일시적 오류(5xx 상당), 재시도 예정");
-            throw e;
-        } catch (NonTransientAiException e) {
-            int statusCode = OpenAIRetrySupport.extractStatusCode(e.getMessage());
-            log.error("OpenAI API 클라이언트 오류(4xx 상당) statusCode={}", statusCode, e);
-            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), statusCode, e);
-        } catch (Exception e) {
-            log.error("OpenAI API 응답 처리 실패 (재시도 불가)", e);
-            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
-        }
-        validate(response, promptProvider.currentForecastTargetMonths());
+        // 프롬프트 생성과 응답 검증이 같은 "대상 월" 기준을 쓰도록 한 번만 계산해 재사용한다.
+        // 네트워크 호출 전후로 각각 다시 계산하면 자정/월 경계를 넘는 순간 두 기준이 어긋날 수 있다.
+        List<Integer> targetMonths = promptProvider.currentForecastTargetMonths();
+        String prompt = promptProvider.getCompatibilityNarrativePrompt(request, targetMonths);
+        CompatibilityNarrativeResponse response = OpenAIRetrySupport.callAndClassifyErrors(
+                () -> chatClient.prompt().user(prompt).call().entity(CompatibilityNarrativeResponse.class),
+                log);
+        validate(response, targetMonths);
         return response;
     }
 
     @Recover
     public CompatibilityNarrativeResponse recoverFromTimeout(ResourceAccessException ex,
                                                               CompatibilityNarrativeRequest request) {
-        log.error("OpenAI API 타임아웃: 재시도 후 최종 실패");
-        throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), ex);
+        throw OpenAIRetrySupport.wrapAsTimeout(ex, log);
     }
 
     @Recover
     public CompatibilityNarrativeResponse recoverFromTransientError(TransientAiException ex,
                                                                      CompatibilityNarrativeRequest request) {
-        log.error("OpenAI API 일시적 오류(5xx 상당): 재시도 후 최종 실패");
-        throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), ex);
+        throw OpenAIRetrySupport.wrapAsTransientError(ex, log);
     }
 
     @Recover
@@ -102,9 +83,8 @@ public class CompanyMatchingOpenAICaller {
     }
 
     private void validate(CompatibilityNarrativeResponse response, List<Integer> expectedTargetMonths) {
-        if (response == null) {
-            throw new OpenAIApiException(ErrorMessageConstants.COMPATIBILITY_NARRATIVE_EMPTY_RESPONSE.getMessage());
-        }
+        OpenAIRetrySupport.requireNonNullResponse(
+                response, ErrorMessageConstants.COMPATIBILITY_NARRATIVE_EMPTY_RESPONSE);
         validateBlank(response.summary());
         validateBlank(response.roleSynergy());
         validateBlank(response.roleWarning());

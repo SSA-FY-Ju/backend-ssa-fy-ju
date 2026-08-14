@@ -122,7 +122,14 @@ public class CompanyMatchingService {
             persisted = analyzeAndPersist(
                     request, userId, user, userProfile, compatibilityMonth, userBirthTime);
         } catch (RuntimeException e) {
-            dailyApiUsageService.restoreDailyUsage(userId, usageDate);
+            // 보상(쿼터 복원) 자체가 실패해도 원본 예외가 유실되면 안 되므로 별도로 잡아 로그만 남기고
+            // 원인으로 덧붙인 뒤, 항상 원본 예외를 그대로 던진다.
+            try {
+                dailyApiUsageService.restoreDailyUsage(userId, usageDate);
+            } catch (RuntimeException restoreException) {
+                log.error("쿼터 복원 실패 (userId={}, usageDate={})", userId, usageDate, restoreException);
+                e.addSuppressed(restoreException);
+            }
             throw e;
         }
         return persisted.rendered() != null
