@@ -46,9 +46,9 @@ class CompanyMatchingOpenAICallerRetryTest {
     private static final HiddenStems HIDDEN_STEMS = new HiddenStems(Map.of("午", List.of("丁")));
 
     private static final CompatibilityNarrativeRequest REQUEST = new CompatibilityNarrativeRequest(
-            FIVE_ELEMENTS, HIDDEN_STEMS, "己",
-            FIVE_ELEMENTS, HIDDEN_STEMS, "庚",
-            80, 70, 70, 55,
+            new CompatibilityNarrativeRequest.SajuInfo(FIVE_ELEMENTS, HIDDEN_STEMS, "己"),
+            new CompatibilityNarrativeRequest.SajuInfo(FIVE_ELEMENTS, HIDDEN_STEMS, "庚"),
+            new CompatibilityNarrativeRequest.ScoreSet(80, 70, 70, 55),
             JobCategoryEnum.TECH_BACKEND, "백엔드 개발자"
     );
 

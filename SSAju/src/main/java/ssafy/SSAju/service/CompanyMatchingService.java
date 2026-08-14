@@ -175,9 +175,12 @@ public class CompanyMatchingService {
         int secondaryScore = roleCompatibilityCalculator.calculateSecondary(primaryScore);
 
         CompatibilityNarrativeRequest narrativeRequest = new CompatibilityNarrativeRequest(
-                userFiveElements, userHiddenStems, sajuCalc.userDayMaster(),
-                companyFiveElements, companyHiddenStems, sajuCalc.companyDayMaster(),
-                compatibilityScore, matchScore, primaryScore, secondaryScore,
+                new CompatibilityNarrativeRequest.SajuInfo(
+                        userFiveElements, userHiddenStems, sajuCalc.userDayMaster()),
+                new CompatibilityNarrativeRequest.SajuInfo(
+                        companyFiveElements, companyHiddenStems, sajuCalc.companyDayMaster()),
+                new CompatibilityNarrativeRequest.ScoreSet(
+                        compatibilityScore, matchScore, primaryScore, secondaryScore),
                 category, request.targetRole().detailName());
         CompatibilityNarrativeResponse narrative = companyMatchingOpenAICaller.call(narrativeRequest);
 
