@@ -15,6 +15,7 @@ import ssafy.SSAju.career.domain.CompatibilityNarrativeRequest;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.provider.PromptProvider;
+import ssafy.SSAju.career.util.ForecastMonthCalculator;
 import ssafy.SSAju.career.util.JobCategoryEnum;
 import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 import ssafy.SSAju.exception.OpenAIApiException;
@@ -44,6 +45,9 @@ class CompanyMatchingOpenAICallerTest {
 
     @Mock
     private PromptProvider promptProvider;
+
+    @Mock
+    private ForecastMonthCalculator forecastMonthCalculator;
 
     private ChatClient chatClient;
     private CompanyMatchingOpenAICaller caller;
@@ -81,9 +85,9 @@ class CompanyMatchingOpenAICallerTest {
     @BeforeEach
     void setUp() {
         chatClient = mock(ChatClient.class, RETURNS_DEEP_STUBS);
-        caller = new CompanyMatchingOpenAICaller(chatClient, promptProvider);
+        caller = new CompanyMatchingOpenAICaller(chatClient, promptProvider, forecastMonthCalculator);
         given(promptProvider.getCompatibilityNarrativePrompt(any(), any())).willReturn("prompt");
-        given(promptProvider.currentForecastTargetMonths()).willReturn(TARGET_MONTHS);
+        given(forecastMonthCalculator.currentTargetMonths()).willReturn(TARGET_MONTHS);
     }
 
     @Test

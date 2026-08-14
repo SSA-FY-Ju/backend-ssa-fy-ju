@@ -6,7 +6,6 @@ import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.enums.FiveElement;
 import ssafy.SSAju.career.enums.ForecastStatus;
-import ssafy.SSAju.career.provider.PromptProvider;
 import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 
 import java.time.Clock;
@@ -28,7 +27,7 @@ import java.util.stream.Collectors;
 public class AnalysisResponseBuilder {
 
     private final ForecastScoreCalculator forecastScoreCalculator;
-    private final PromptProvider promptProvider;
+    private final ForecastMonthCalculator forecastMonthCalculator;
     /** KST 기준 현재 날짜 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
     private final Clock clock;
 
@@ -106,7 +105,7 @@ public class AnalysisResponseBuilder {
      * {@code monthlyAdvices}가 대상 월 전체를 정확히 커버함은 {@code CompanyMatchingOpenAICaller.validate}
      * 가 이미 보장하므로, 여기서는 {@code Map.get}이 항상 값을 찾는다고 가정한다.
      *
-     * <p>대상 월 목록은 {@link PromptProvider#currentForecastTargetMonths()}를 그대로 재사용한다 —
+     * <p>대상 월 목록은 {@link ForecastMonthCalculator#currentTargetMonths()}를 그대로 재사용한다 —
      * 여기서 별도로 계산하면 AI 프롬프트/검증이 쓴 기준과 어긋날 수 있고(자정/월 경계),
      * 같은 계산 로직이 두 곳에 중복되는 것도 방지한다.
      */
@@ -119,7 +118,7 @@ public class AnalysisResponseBuilder {
                         CompatibilityNarrativeResponse.MonthlyAdvice::advice));
 
         List<CompatibilityAnalysisData.MonthlyForecast> forecasts = new ArrayList<>();
-        for (int forecastMonth : promptProvider.currentForecastTargetMonths()) {
+        for (int forecastMonth : forecastMonthCalculator.currentTargetMonths()) {
             String seasonElement = FiveElement.fromMonth(forecastMonth).getSymbol();
             int elementCount = userFiveElements.getCount(seasonElement);
 

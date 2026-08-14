@@ -14,6 +14,7 @@ import ssafy.SSAju.career.domain.CompatibilityNarrativeRequest;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.provider.PromptProvider;
 import ssafy.SSAju.career.util.AnalysisConstants;
+import ssafy.SSAju.career.util.ForecastMonthCalculator;
 import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 import ssafy.SSAju.exception.OpenAIApiException;
 
@@ -35,6 +36,7 @@ public class CompanyMatchingOpenAICaller {
 
     private final ChatClient chatClient;
     private final PromptProvider promptProvider;
+    private final ForecastMonthCalculator forecastMonthCalculator;
 
     /**
      * OpenAI API를 호출하여 기업 궁합 해설을 받습니다.
@@ -55,7 +57,7 @@ public class CompanyMatchingOpenAICaller {
     public CompatibilityNarrativeResponse call(CompatibilityNarrativeRequest request) {
         // 프롬프트 생성과 응답 검증이 같은 "대상 월" 기준을 쓰도록 한 번만 계산해 재사용한다.
         // 네트워크 호출 전후로 각각 다시 계산하면 자정/월 경계를 넘는 순간 두 기준이 어긋날 수 있다.
-        List<Integer> targetMonths = promptProvider.currentForecastTargetMonths();
+        List<Integer> targetMonths = forecastMonthCalculator.currentTargetMonths();
         String prompt = promptProvider.getCompatibilityNarrativePrompt(request, targetMonths);
         CompatibilityNarrativeResponse response = OpenAIRetrySupport.callAndClassifyErrors(
                 () -> chatClient.prompt().user(prompt).call().entity(CompatibilityNarrativeResponse.class),

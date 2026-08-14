@@ -10,7 +10,6 @@ import ssafy.SSAju.dto.external.FastAPIResponse;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -90,10 +89,11 @@ public class PromptProvider {
      * 해당 점수를 그대로 전제로 해설 텍스트만 작성하도록 지시하고 재계산을 금지한다.
      *
      * @param request      사용자/기업 사주 데이터 및 계산 완료된 점수, 직군 정보
-     * @param targetMonths 월별 조언 대상 월 목록 — 호출자가 {@link #currentForecastTargetMonths()}로
-     *                     한 번만 계산해 프롬프트 생성과 응답 검증 양쪽에 동일하게 전달해야 한다
-     *                     (여기서 다시 계산하면 네트워크 호출 전후로 월이 바뀌는 경계 조건에서
-     *                     프롬프트가 요청한 월과 검증 기준 월이 어긋날 수 있다)
+     * @param targetMonths 월별 조언 대상 월 목록 — {@code ForecastMonthCalculator.currentTargetMonths()}로
+     *                     호출자가 한 번만 계산해 프롬프트 생성과 응답 검증 양쪽에 동일하게 전달해야 한다
+     *                     (이 클래스는 프롬프트 "텍스트 조립"만 담당하고 월 계산 자체는 소유하지 않는다 —
+     *                     같은 값이 AI 응답 검증/월별 운세 조립에도 쓰이므로 프롬프트 생성 클래스가
+     *                     아닌 별도 도메인 계산 클래스에 둔다)
      * @return OpenAI에 전달할 한국어 프롬프트 문자열
      */
     public String getCompatibilityNarrativePrompt(CompatibilityNarrativeRequest request,
@@ -152,19 +152,5 @@ public class PromptProvider {
                 AnalysisConstants.FORECAST_MONTH_COUNT,
                 targetMonths
         );
-    }
-
-    /**
-     * 이번 요청의 월별 운세 대상 월 목록(현재 월부터 {@link AnalysisConstants#FORECAST_MONTH_COUNT}개,
-     * 12월 경계는 순환)을 계산합니다. 프롬프트 생성과 AI 응답 검증(월별 조언이 정확히 이 월들을
-     * 커버하는지) 양쪽에서 동일한 기준으로 재사용됩니다.
-     */
-    public List<Integer> currentForecastTargetMonths() {
-        int currentMonth = LocalDate.now(clock).getMonthValue();
-        List<Integer> targetMonths = new ArrayList<>();
-        for (int i = 0; i < AnalysisConstants.FORECAST_MONTH_COUNT; i++) {
-            targetMonths.add(((currentMonth - 1 + i) % 12) + 1);
-        }
-        return targetMonths;
     }
 }
