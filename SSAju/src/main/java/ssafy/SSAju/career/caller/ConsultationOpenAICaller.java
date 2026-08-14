@@ -55,30 +55,9 @@ public class ConsultationOpenAICaller {
                                      HiddenStems hiddenStems,
                                      String dayMaster) {
         String prompt = promptProvider.getCareerConsultationPrompt(sajuData, tenGodDistribution, hiddenStems, dayMaster);
-        CareerAdviceResponse response;
-        try {
-            response = chatClient.prompt()
-                    .user(prompt)
-                    .call()
-                    .entity(CareerAdviceResponse.class);
-        } catch (OpenAIApiException e) {
-            throw e;
-        } catch (ResourceAccessException e) {
-            log.error("OpenAI API 타임아웃, 재시도 예정");
-            throw e;
-        } catch (TransientAiException e) {
-            log.error("OpenAI API 일시적 오류(5xx 상당), 재시도 예정");
-            throw e;
-        } catch (NonTransientAiException e) {
-            // 4xx 상당 (401 인증 실패, 429 rate limit 등): 재시도 불가, 우리 쪽 설정/사용량 문제일 가능성이 커 원인 로깅
-            int statusCode = OpenAIRetrySupport.extractStatusCode(e.getMessage());
-            log.error("OpenAI API 클라이언트 오류(4xx 상당) statusCode={}", statusCode, e);
-            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), statusCode, e);
-        } catch (Exception e) {
-            // 응답 역직렬화 실패 등 우리 쪽 코드/스키마 문제일 가능성이 커 원인 로깅
-            log.error("OpenAI API 응답 처리 실패 (재시도 불가)", e);
-            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
-        }
+        CareerAdviceResponse response = OpenAIRetrySupport.callAndClassifyErrors(
+                () -> chatClient.prompt().user(prompt).call().entity(CareerAdviceResponse.class),
+                log);
         validate(response);
         return response;
     }
@@ -89,8 +68,7 @@ public class ConsultationOpenAICaller {
                                                    TenGodDistribution tenGodDistribution,
                                                    HiddenStems hiddenStems,
                                                    String dayMaster) {
-        log.error("OpenAI API 타임아웃: 재시도 후 최종 실패");
-        throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), ex);
+        throw OpenAIRetrySupport.wrapAsTimeout(ex, log);
     }
 
     @Recover
@@ -99,8 +77,7 @@ public class ConsultationOpenAICaller {
                                                        TenGodDistribution tenGodDistribution,
                                                        HiddenStems hiddenStems,
                                                        String dayMaster) {
-        log.error("OpenAI API 일시적 오류(5xx 상당): 재시도 후 최종 실패");
-        throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), ex);
+        throw OpenAIRetrySupport.wrapAsTransientError(ex, log);
     }
 
     @Recover
@@ -113,9 +90,7 @@ public class ConsultationOpenAICaller {
     }
 
     private void validate(CareerAdviceResponse response) {
-        if (response == null) {
-            throw new OpenAIApiException(ErrorMessageConstants.OPENAI_EMPTY_RESPONSE.getMessage());
-        }
+        OpenAIRetrySupport.requireNonNullResponse(response, ErrorMessageConstants.OPENAI_EMPTY_RESPONSE);
         if (response.industries() == null || response.industries().isEmpty()) {
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_MISSING_INDUSTRIES.getMessage());
         }
