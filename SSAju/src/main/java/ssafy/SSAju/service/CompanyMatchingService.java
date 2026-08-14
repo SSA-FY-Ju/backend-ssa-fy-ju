@@ -3,7 +3,9 @@ package ssafy.SSAju.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ssafy.SSAju.career.caller.CompanyMatchingOpenAICaller;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
+import ssafy.SSAju.career.domain.CompatibilityNarrativeRequest;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.entity.*;
@@ -11,6 +13,7 @@ import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.*;
 import ssafy.SSAju.career.validator.SajuValidator;
+import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.CompatibilityRequest;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
@@ -66,7 +69,9 @@ public class CompanyMatchingService {
     private final HiddenStemCalculator hiddenStemCalculator;
     private final CompatibilityScoreCalculator compatibilityScoreCalculator;
     private final JobRoleAnalyzer jobRoleAnalyzer;
+    private final RoleCompatibilityCalculator roleCompatibilityCalculator;
     private final AnalysisResponseBuilder responseBuilder;
+    private final CompanyMatchingOpenAICaller companyMatchingOpenAICaller;
 
     // ─────────────────────────────────────────
     // 레포지토리 / 자식 서비스
@@ -104,37 +109,102 @@ public class CompanyMatchingService {
             return childReadService.buildFromExisting(cachedOpt.get(), request);
         }
 
-        // ─── 사주 계산 (사용자 + 기업, 외부 I/O) ──────────────────────
-        // 이른 캐시 히트(completed=true) 경로는 위에서 반환됨 → 여기서부터는 FastAPI/공공데이터 호출이 발생하는 신규 분석
-        // 호출 실패 시 쿼터가 소진된 채 남지 않도록 차감 이후 구간 전체를 보상 트랜잭션으로 감싼다
+        // ─── 사주 계산 → AI 해설 생성 → 저장 (외부 I/O 포함, 신규 분석) ──────
+        // 이른 캐시 히트(completed=true) 경로는 위에서 반환됨 → 여기서부터는 FastAPI/공공데이터/
+        // OpenAI 호출과 DB 저장이 발생하는 신규 분석. 이 구간 어디서 실패하든 쿼터가 소진된 채
+        // 남지 않도록 차감 이후 구간(사주 계산·AI 호출·DB 저장)을 보상 트랜잭션으로 감싼다.
+        // 단, 이 요청이 직접 저장까지 성공시킨 뒤의 최종 응답 조립(순수 객체 조립, 외부 I/O 없음)은
+        // 보상 범위 밖에 둔다 — 저장이 끝난 뒤에 실패한다면 그건 쿼터 낭비가 아니라 코드 결함이므로
+        // 쿼터를 복원하면 오히려 이미 저장된 분석 + 복원된 쿼터라는 이중 지급이 된다.
         LocalDate usageDate = dailyApiUsageService.checkAndIncrementDailyUsage(userId);
-        SajuCalculationResult sajuCalc;
+        SavedAnalysis persisted;
         try {
-            sajuCalc = calculateSajuData(request, userBirthTime);
+            persisted = analyzeAndPersist(
+                    request, userId, user, userProfile, compatibilityMonth, userBirthTime);
         } catch (RuntimeException e) {
-            dailyApiUsageService.restoreDailyUsage(userId, usageDate);
+            // 보상(쿼터 복원) 자체가 실패해도 원본 예외가 유실되면 안 되므로 별도로 잡아 로그만 남기고
+            // 원인으로 덧붙인 뒤, 항상 원본 예외를 그대로 던진다.
+            try {
+                dailyApiUsageService.restoreDailyUsage(userId, usageDate);
+            } catch (RuntimeException restoreException) {
+                log.error("쿼터 복원 실패 (userId={}, usageDate={})", userId, usageDate, restoreException);
+                e.addSuppressed(restoreException);
+            }
             throw e;
         }
+        return persisted.rendered() != null
+                ? persisted.rendered()
+                : buildNewResponse(persisted.saved(), request, persisted.data());
+    }
+
+    /**
+     * 저장까지는 끝났지만 아직 최종 응답으로 조립되지 않은 상태를 나타내는 내부 VO.
+     *
+     * <p>{@code rendered}가 채워져 있으면 이미 완성된 응답(캐시 재사용/race-condition 분기),
+     * {@code saved}/{@code data}만 채워져 있으면 이 요청이 직접 저장에 성공했으니
+     * {@link #analyzeCompatibility}가 쿼터 보상 범위 밖에서 응답을 조립해야 함을 의미한다.
+     */
+    private record SavedAnalysis(CompatibilityResponse rendered,
+                                  CompanyCompatibility saved,
+                                  CompatibilityAnalysisData data) {
+        static SavedAnalysis rendered(CompatibilityResponse response) {
+            return new SavedAnalysis(response, null, null);
+        }
+
+        static SavedAnalysis pendingRender(CompanyCompatibility saved, CompatibilityAnalysisData data) {
+            return new SavedAnalysis(null, saved, data);
+        }
+    }
+
+    /**
+     * 사주 계산부터 AI 해설 생성, DB 저장까지의 신규 분석 흐름.
+     *
+     * <p>{@link #analyzeCompatibility}가 이 메서드 전체를 쿼터 보상 범위로 감싼다(US3, T016) —
+     * 사주 계산·AI 호출·DB 저장 중 어디서 실패하든 동일하게 보상되어야 하기 때문이다. 이 요청이
+     * 직접 저장에 성공한 이후의 최종 응답 조립은 이 메서드가 아니라 {@link #analyzeCompatibility}가
+     * 보상 범위 밖에서 수행한다({@link SavedAnalysis#pendingRender}).
+     */
+    private SavedAnalysis analyzeAndPersist(CompatibilityRequest request, Long userId,
+                                              User user, UserProfile userProfile,
+                                              Integer compatibilityMonth, LocalTime userBirthTime) {
+        SajuCalculationResult sajuCalc = calculateSajuData(request, userBirthTime);
         HiddenStems userHiddenStems = sajuCalc.userHiddenStems();
         FiveElements userFiveElements = sajuCalc.userFiveElements();
         HiddenStems companyHiddenStems = sajuCalc.companyHiddenStems();
         FiveElements companyFiveElements = sajuCalc.companyFiveElements();
 
-        // ─── 분석 계산 ──────────────────────────────────────────
+        // ─── 분석 계산 (점수는 규칙 기반, 해설은 AI 생성) ──────────────
+        JobCategoryEnum category = request.targetRole().category();
         int compatibilityScore = compatibilityScoreCalculator.calculate(
                 userHiddenStems, sajuCalc.userDayMaster(), companyHiddenStems, sajuCalc.companyDayMaster());
+        int matchScore = jobRoleAnalyzer.analyze(userFiveElements, category);
+        int primaryScore = matchScore;
+        int secondaryScore = roleCompatibilityCalculator.calculateSecondary(primaryScore);
+
+        CompatibilityNarrativeRequest narrativeRequest = new CompatibilityNarrativeRequest(
+                new CompatibilityNarrativeRequest.SajuInfo(
+                        userFiveElements, userHiddenStems, sajuCalc.userDayMaster()),
+                new CompatibilityNarrativeRequest.SajuInfo(
+                        companyFiveElements, companyHiddenStems, sajuCalc.companyDayMaster()),
+                new CompatibilityNarrativeRequest.ScoreSet(
+                        compatibilityScore, matchScore, primaryScore, secondaryScore),
+                category, request.targetRole().detailName());
+        CompatibilityNarrativeResponse narrative = companyMatchingOpenAICaller.call(narrativeRequest);
 
         CompatibilityAnalysisData analysisData = new CompatibilityAnalysisData(
-                jobRoleAnalyzer.analyze(userFiveElements, request.targetRole().category()),
-                responseBuilder.buildFiveElementsData(userFiveElements, companyFiveElements),
+                new CompatibilityAnalysisData.RoleAnalysis(matchScore, narrative.roleSynergy(), narrative.roleWarning()),
+                responseBuilder.buildFiveElementsData(
+                        userFiveElements, companyFiveElements, narrative.fiveElementsSynergyDescription()),
                 responseBuilder.buildAnalysisBreakdown(compatibilityScore),
-                responseBuilder.buildActionableStrategy(request.targetRole().category()),
-                responseBuilder.buildInterviewQuestions(request.targetRole().category()),
-                responseBuilder.buildRoleCompatibilities(request.targetRole().category(), userFiveElements),
-                responseBuilder.buildMonthlyForecasts(userFiveElements),
-                responseBuilder.buildCautions(userFiveElements, request.targetRole().category())
+                responseBuilder.buildActionableStrategy(category, narrative.weaknessDefense()),
+                responseBuilder.buildInterviewQuestions(narrative.interviewQuestions()),
+                responseBuilder.buildRoleCompatibilities(
+                        category, primaryScore, secondaryScore,
+                        narrative.primaryRoleReason(), narrative.secondaryRoleReason()),
+                responseBuilder.buildMonthlyForecasts(userFiveElements, narrative.monthlyAdvices()),
+                narrative.cautions()
         );
-        String summary = responseBuilder.buildSummary(compatibilityScore, request.targetRole().category());
+        String summary = narrative.summary();
 
         // ───────────────────────────────────────────────────────────────────
         // 캐시 미스: INSERT IGNORE로 root 엔티티 삽입
@@ -168,19 +238,19 @@ public class CompanyMatchingService {
             if (saved.isCompleted()) {
                 // completed=true → 자식 데이터가 완전히 저장된 캐시만 재사용
                 log.info("완료된 궁합 분석 캐시 재사용 (compatibilityId={})", saved.getId());
-                return childReadService.buildFromExisting(saved, request);
+                return SavedAnalysis.rendered(childReadService.buildFromExisting(saved, request));
             }
             // completed=false: 다른 요청이 자식 저장 진행 중 → 현재 계산 결과로 응답
             log.info("자식 저장 진행 중인 기존 레코드 감지 (compatibilityId={}), 현재 계산 결과로 응답",
                     saved.getId());
-            return buildNewResponse(saved, request, analysisData);
+            return SavedAnalysis.rendered(buildNewResponse(saved, request, analysisData));
         }
 
         // 자식 엔티티 전체 저장을 단일 트랜잭션(REQUIRES_NEW)으로 위임
         childSaveService.saveAllAndMarkCompleted(saved, analysisData);
 
         log.info("기업 궁합 분석 완료: compatibilityScore={}", compatibilityScore);
-        return buildNewResponse(saved, request, analysisData);
+        return SavedAnalysis.pendingRender(saved, analysisData);
     }
 
     // ─────────────────────────────────────────
