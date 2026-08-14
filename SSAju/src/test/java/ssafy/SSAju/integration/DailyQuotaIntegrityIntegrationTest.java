@@ -115,7 +115,9 @@ class DailyQuotaIntegrityIntegrationTest {
                 "요약", "시너지", "경고", "오행 시너지", "약점 방어",
                 List.of(new CompatibilityNarrativeResponse.InterviewQuestion("질문", "의도")),
                 "전문가 사유", "리드 사유",
-                List.of("1월", "2월", "3월", "4월", "5월"),
+                List.of(1, 2, 3, 4, 5).stream()
+                        .map(month -> new CompatibilityNarrativeResponse.MonthlyAdvice(month, month + "월 조언"))
+                        .toList(),
                 List.of("주의사항")
         );
     }

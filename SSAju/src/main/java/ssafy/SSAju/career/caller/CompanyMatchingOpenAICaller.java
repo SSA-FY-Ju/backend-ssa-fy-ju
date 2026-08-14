@@ -18,6 +18,9 @@ import ssafy.SSAju.career.util.AnalysisConstants;
 import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 import ssafy.SSAju.exception.OpenAIApiException;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -79,7 +82,7 @@ public class CompanyMatchingOpenAICaller {
             log.error("OpenAI API 응답 처리 실패 (재시도 불가)", e);
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), e);
         }
-        validate(response);
+        validate(response, promptProvider.currentForecastTargetMonths());
         return response;
     }
 
@@ -111,7 +114,7 @@ public class CompanyMatchingOpenAICaller {
         return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
     }
 
-    private void validate(CompatibilityNarrativeResponse response) {
+    private void validate(CompatibilityNarrativeResponse response, List<Integer> expectedTargetMonths) {
         if (response == null) {
             throw new OpenAIApiException(ErrorMessageConstants.COMPATIBILITY_NARRATIVE_EMPTY_RESPONSE.getMessage());
         }
@@ -141,8 +144,21 @@ public class CompanyMatchingOpenAICaller {
             throw new OpenAIApiException(
                     ErrorMessageConstants.COMPATIBILITY_NARRATIVE_INVALID_MONTHLY_ADVICES_COUNT.getMessage());
         }
-        for (String advice : response.monthlyAdvices()) {
-            validateBlank(advice);
+        Set<Integer> actualMonths = new HashSet<>();
+        for (var advice : response.monthlyAdvices()) {
+            if (advice == null) {
+                throw new OpenAIApiException(
+                        ErrorMessageConstants.COMPATIBILITY_NARRATIVE_BLANK_FIELD.getMessage());
+            }
+            validateBlank(advice.advice());
+            actualMonths.add(advice.month());
+        }
+        if (!actualMonths.equals(Set.copyOf(expectedTargetMonths))) {
+            // 응답 리스트의 "순서"는 검증하지 않는다 — AnalysisResponseBuilder가 month 값으로
+            // 매칭하므로 순서 불일치는 문제가 안 되지만, month 값 자체가 대상 월 집합과
+            // 다르면(누락/중복/엉뚱한 달) 잘못된 응답이므로 거부한다.
+            throw new OpenAIApiException(
+                    ErrorMessageConstants.COMPATIBILITY_NARRATIVE_INVALID_MONTHLY_ADVICES_MONTHS.getMessage());
         }
 
         if (response.cautions() == null || response.cautions().isEmpty()) {

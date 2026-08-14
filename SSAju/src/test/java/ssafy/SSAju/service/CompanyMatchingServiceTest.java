@@ -122,7 +122,9 @@ class CompanyMatchingServiceTest {
             "AI 요약", "AI 시너지", "AI 경고", "AI 오행 시너지", "AI 약점 방어",
             List.of(new CompatibilityNarrativeResponse.InterviewQuestion("AI 질문", "AI 의도")),
             "AI 전문가 사유", "AI 리드 사유",
-            List.of("AI 1월", "AI 2월", "AI 3월", "AI 4월", "AI 5월"),
+            List.of(1, 2, 3, 4, 5).stream()
+                    .map(month -> new CompatibilityNarrativeResponse.MonthlyAdvice(month, "AI " + month + "월"))
+                    .toList(),
             List.of("AI 주의사항")
     );
 

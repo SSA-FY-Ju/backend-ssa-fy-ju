@@ -93,11 +93,7 @@ public class PromptProvider {
      * @return OpenAI에 전달할 한국어 프롬프트 문자열
      */
     public String getCompatibilityNarrativePrompt(CompatibilityNarrativeRequest request) {
-        int currentMonth = LocalDate.now(clock).getMonthValue();
-        List<Integer> targetMonths = new ArrayList<>();
-        for (int i = 0; i < AnalysisConstants.FORECAST_MONTH_COUNT; i++) {
-            targetMonths.add(((currentMonth - 1 + i) % 12) + 1);
-        }
+        List<Integer> targetMonths = currentForecastTargetMonths();
 
         return """
                 당신은 사주 명리학 전문가이자 기업 궁합 분석 컨설턴트입니다.
@@ -134,7 +130,8 @@ public class PromptProvider {
                 - interviewQuestions: 예상 면접 질문 목록(question, intent 포함, 최소 1개)
                 - primaryRoleReason: 전문가 역할 적합 사유
                 - secondaryRoleReason: 리드 역할 적합 사유
-                - monthlyAdvices: 월별 조언 문자열 배열, 반드시 정확히 %d개, 대상 월 순서는 %s
+                - monthlyAdvices: {month, advice} 객체 배열, 반드시 정확히 %d개, month는 %s 각각 정확히
+                  한 번씩만 포함(순서는 상관없음, month 값으로 어느 달인지 식별함)
                 - cautions: 주의사항 목록(최소 1개)
                 """.formatted(
                 request.scores().compatibilityScore(),
@@ -152,5 +149,19 @@ public class PromptProvider {
                 AnalysisConstants.FORECAST_MONTH_COUNT,
                 targetMonths
         );
+    }
+
+    /**
+     * 이번 요청의 월별 운세 대상 월 목록(현재 월부터 {@link AnalysisConstants#FORECAST_MONTH_COUNT}개,
+     * 12월 경계는 순환)을 계산합니다. 프롬프트 생성과 AI 응답 검증(월별 조언이 정확히 이 월들을
+     * 커버하는지) 양쪽에서 동일한 기준으로 재사용됩니다.
+     */
+    public List<Integer> currentForecastTargetMonths() {
+        int currentMonth = LocalDate.now(clock).getMonthValue();
+        List<Integer> targetMonths = new ArrayList<>();
+        for (int i = 0; i < AnalysisConstants.FORECAST_MONTH_COUNT; i++) {
+            targetMonths.add(((currentMonth - 1 + i) % 12) + 1);
+        }
+        return targetMonths;
     }
 }

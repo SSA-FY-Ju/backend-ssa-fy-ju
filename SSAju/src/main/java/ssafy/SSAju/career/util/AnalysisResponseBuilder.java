@@ -12,6 +12,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 궁합 분석 내부 VO({@link CompatibilityAnalysisData}) 구성 전담 클래스.
@@ -97,10 +99,19 @@ public class AnalysisResponseBuilder {
      * 사용자 오행 분포와 AI가 생성한 월별 조언으로 향후 5개월 운세 데이터를 빌드합니다.
      *
      * <p>월/점수/상태는 계절 오행과 사용자 오행 분포의 일치 정도로 규칙 기반 산정하고(변경 없음),
-     * 조언 문구만 {@code monthlyAdvices}(인덱스 0~4, 대상 월과 동일 순서)를 그대로 사용한다.
+     * 조언 문구는 {@code monthlyAdvices}의 각 항목이 담고 있는 {@code month} 값으로 매칭한다
+     * (리스트 순서에 의존하지 않음 — AI 응답 순서가 대상 월 순서와 달라도 정확히 매핑됨).
+     * {@code monthlyAdvices}가 대상 월 전체를 정확히 커버함은 {@code CompanyMatchingOpenAICaller.validate}
+     * 가 이미 보장하므로, 여기서는 {@code Map.get}이 항상 값을 찾는다고 가정한다.
      */
-    public List<CompatibilityAnalysisData.MonthlyForecast> buildMonthlyForecasts(FiveElements userFiveElements,
-                                                                                   List<String> monthlyAdvices) {
+    public List<CompatibilityAnalysisData.MonthlyForecast> buildMonthlyForecasts(
+            FiveElements userFiveElements,
+            List<CompatibilityNarrativeResponse.MonthlyAdvice> monthlyAdvices) {
+        Map<Integer, String> adviceByMonth = monthlyAdvices.stream()
+                .collect(Collectors.toMap(
+                        CompatibilityNarrativeResponse.MonthlyAdvice::month,
+                        CompatibilityNarrativeResponse.MonthlyAdvice::advice));
+
         int currentMonth = LocalDate.now(clock).getMonthValue();
         List<CompatibilityAnalysisData.MonthlyForecast> forecasts = new ArrayList<>();
 
@@ -113,7 +124,7 @@ public class AnalysisResponseBuilder {
             ForecastStatus status = toForecastStatus(score);
 
             forecasts.add(new CompatibilityAnalysisData.MonthlyForecast(
-                    forecastMonth, score, status, monthlyAdvices.get(i)));
+                    forecastMonth, score, status, adviceByMonth.get(forecastMonth)));
         }
         return forecasts;
     }
