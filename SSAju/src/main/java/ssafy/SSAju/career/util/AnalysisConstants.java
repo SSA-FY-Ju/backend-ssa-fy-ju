@@ -65,13 +65,6 @@ public final class AnalysisConstants {
     public static final int TAG_NORMAL_THRESHOLD = 60;
 
     // ─────────────────────────────────────────
-    // 상극 강도 임계값
-    // ─────────────────────────────────────────
-
-    /** 이 개수 이상이면 "강한 상극" 경고 문구를 출력 */
-    public static final int STRONG_OPPOSING_THRESHOLD = 2;
-
-    // ─────────────────────────────────────────
     // 월별 운세(ForecastScoreCalculator)
     // ─────────────────────────────────────────
 

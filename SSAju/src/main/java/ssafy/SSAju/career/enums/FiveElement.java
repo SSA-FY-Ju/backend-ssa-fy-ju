@@ -87,21 +87,4 @@ public enum FiveElement {
                 .orElseThrow(() -> new InvalidSajuDataException("알 수 없는 오행 값입니다: " + symbol));
     }
 
-    /**
-     * 이 오행과 상극(相剋) 관계인 오행을 반환합니다.
-     * <pre>
-     *   木 → 金(金克木), 金 → 木(木克金)
-     *   火 → 水(水克火), 水 → 火(火克水)
-     *   土 → 木(木克土)
-     * </pre>
-     */
-    public FiveElement opposing() {
-        return switch (this) {
-            case WOOD  -> METAL;
-            case METAL -> WOOD;
-            case FIRE  -> WATER;
-            case WATER -> FIRE;
-            case EARTH -> WOOD;
-        };
-    }
 }
