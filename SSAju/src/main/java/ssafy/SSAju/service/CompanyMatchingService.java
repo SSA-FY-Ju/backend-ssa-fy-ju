@@ -130,7 +130,7 @@ public class CompanyMatchingService {
         int compatibilityScore = compatibilityScoreCalculator.calculate(
                 userHiddenStems, sajuCalc.userDayMaster(), companyHiddenStems, sajuCalc.companyDayMaster());
         int matchScore = jobRoleAnalyzer.analyze(userFiveElements, category);
-        int primaryScore = roleCompatibilityCalculator.calculatePrimary(userFiveElements, category);
+        int primaryScore = roleCompatibilityCalculator.calculatePrimary(matchScore);
         int secondaryScore = roleCompatibilityCalculator.calculateSecondary(primaryScore);
 
         CompatibilityNarrativeRequest narrativeRequest = new CompatibilityNarrativeRequest(

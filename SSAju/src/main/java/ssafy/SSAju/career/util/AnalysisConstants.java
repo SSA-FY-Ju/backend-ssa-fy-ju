@@ -55,12 +55,6 @@ public final class AnalysisConstants {
     // RoleCompatibility 점수 산출
     // ─────────────────────────────────────────
 
-    /** 주 역할(primary) 점수 = 주오행 수 × 이 값 + BASE_OFFSET */
-    public static final int PRIMARY_ROLE_SCORE_MULTIPLIER = 30;
-
-    /** 주 역할 점수 기본 오프셋 */
-    public static final int PRIMARY_ROLE_SCORE_BASE = 40;
-
     /** 보조 역할(secondary) 점수 페널티 */
     public static final int SECONDARY_ROLE_SCORE_PENALTY = 15;
 
