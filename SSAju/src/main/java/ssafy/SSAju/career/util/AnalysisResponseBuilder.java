@@ -6,6 +6,7 @@ import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.enums.FiveElement;
 import ssafy.SSAju.career.enums.ForecastStatus;
+import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -16,38 +17,24 @@ import java.util.List;
  * 궁합 분석 내부 VO({@link CompatibilityAnalysisData}) 구성 전담 클래스.
  *
  * <p>CompanyMatchingService에서 분석 데이터 생성 책임을 분리합니다.
- * 비즈니스 점수 계산은 각 Calculator 클래스에, 텍스트 생성 로직은 여기서 담당합니다.
- * 생성된 VO는 Persistence Layer에 저장되거나 CompatibilityResponse로 변환됩니다.
+ * 점수(궁합/직군매칭/역할별) 계산은 각 Calculator 클래스에서, 해설 텍스트는
+ * AI({@link CompatibilityNarrativeResponse})에서 생성되며, 이 클래스는 순수 조립만 담당합니다.
  */
 @Component
 @RequiredArgsConstructor
 public class AnalysisResponseBuilder {
 
     private final ForecastScoreCalculator forecastScoreCalculator;
-    private final RoleCompatibilityCalculator roleCompatibilityCalculator;
     /** KST 기준 현재 날짜 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
     private final Clock clock;
 
     /**
-     * 오행 분포 분석 데이터를 빌드합니다.
+     * 오행 분포와 AI가 생성한 상생 설명 문구로 오행 분포 분석 데이터를 빌드합니다.
      */
     public CompatibilityAnalysisData.FiveElementsInfo buildFiveElementsData(FiveElements user,
-                                                                              FiveElements company) {
-        String synergy = buildElementSynergyText(user, company);
-        return new CompatibilityAnalysisData.FiveElementsInfo(user.asMap(), company.asMap(), synergy);
-    }
-
-    /**
-     * 사용자와 기업의 오행 분포를 비교하여 상생 설명 문구를 생성합니다.
-     */
-    private String buildElementSynergyText(FiveElements user, FiveElements company) {
-        for (String symbol : FiveElement.allSymbols()) {
-            if (user.getCount(symbol) == 0 && company.getCount(symbol) > 0) {
-                return String.format(
-                        "기업의 강한 '%s' 기운이 사용자의 부족한 오행을 보완하는 상생 구조입니다.", symbol);
-            }
-        }
-        return "사용자와 기업의 오행 분포가 균형 잡혀 안정적인 궁합을 보입니다.";
+                                                                              FiveElements company,
+                                                                              String synergyDescription) {
+        return new CompatibilityAnalysisData.FiveElementsInfo(user.asMap(), company.asMap(), synergyDescription);
     }
 
     /**
@@ -64,12 +51,10 @@ public class AnalysisResponseBuilder {
     }
 
     /**
-     * 직군 카테고리 기반으로 실행 전략을 빌드합니다.
+     * 직군 카테고리와 AI가 생성한 약점 방어 전략 문구로 실행 전략을 빌드합니다.
      */
-    public CompatibilityAnalysisData.StrategyInfo buildActionableStrategy(JobCategoryEnum category) {
-        String weaknessDefense = String.format(
-                "%s 분야 관련 약점 질문 시, 지속적인 학습과 성장 의지를 강조하세요.",
-                category.getDisplayName());
+    public CompatibilityAnalysisData.StrategyInfo buildActionableStrategy(JobCategoryEnum category,
+                                                                            String weaknessDefense) {
         // 자정 경계에서 서로 다른 날짜 기준으로 계산되는 것을 방지하기 위해 한 번만 호출
         LocalDate today = LocalDate.now(clock);
         List<String> luckyDays = List.of(
@@ -82,54 +67,40 @@ public class AnalysisResponseBuilder {
     }
 
     /**
-     * 직군 카테고리 기반으로 예상 면접 질문 목록을 빌드합니다.
+     * AI가 생성한 예상 면접 질문 목록을 내부 VO로 변환합니다.
      */
-    public List<CompatibilityAnalysisData.InterviewQuestion> buildInterviewQuestions(JobCategoryEnum category) {
-        return List.of(
-                new CompatibilityAnalysisData.InterviewQuestion(
-                        String.format("%s 분야에서 가장 도전적인 문제를 해결한 경험을 말씀해주세요.",
-                                category.getDisplayName()),
-                        "문제 해결 능력과 직군 전문성 검증"
-                ),
-                new CompatibilityAnalysisData.InterviewQuestion(
-                        "팀 내 갈등 상황에서 어떻게 대처하셨나요?",
-                        "협업 능력 및 대인관계 역량 평가"
-                )
-        );
+    public List<CompatibilityAnalysisData.InterviewQuestion> buildInterviewQuestions(
+            List<CompatibilityNarrativeResponse.InterviewQuestion> aiQuestions) {
+        return aiQuestions.stream()
+                .map(q -> new CompatibilityAnalysisData.InterviewQuestion(q.question(), q.intent()))
+                .toList();
     }
 
     /**
-     * 직군 카테고리와 사용자 오행을 기반으로 역할 적합도 목록을 빌드합니다.
+     * 이미 계산된 역할별 점수와 AI가 생성한 사유 문구로 역할 적합도 목록을 빌드합니다.
      */
     public List<CompatibilityAnalysisData.RoleCompatibility> buildRoleCompatibilities(
-            JobCategoryEnum category, FiveElements userFiveElements) {
-        int primaryScore   = roleCompatibilityCalculator.calculatePrimary(userFiveElements, category);
-        int secondaryScore = roleCompatibilityCalculator.calculateSecondary(primaryScore);
-
+            JobCategoryEnum category, int primaryScore, int secondaryScore,
+            String primaryReason, String secondaryReason) {
         String primaryTag   = primaryScore   >= AnalysisConstants.TAG_STRONG_RECOMMEND_THRESHOLD ? "강력 추천" : "보통";
         String secondaryTag = secondaryScore >= AnalysisConstants.TAG_NORMAL_THRESHOLD            ? "보통"     : "신중 검토";
 
         return List.of(
                 new CompatibilityAnalysisData.RoleCompatibility(
-                        category.getDisplayName() + " 전문가",
-                        primaryScore,
-                        String.format("%s 오행 기반 적성이 높습니다.", category.getPrimaryElement()),
-                        primaryTag),
+                        category.getDisplayName() + " 전문가", primaryScore, primaryReason, primaryTag),
                 new CompatibilityAnalysisData.RoleCompatibility(
-                        category.getDisplayName() + " 리드",
-                        secondaryScore,
-                        "리더십 역량과 기술 전문성을 함께 요구합니다.",
-                        secondaryTag)
+                        category.getDisplayName() + " 리드", secondaryScore, secondaryReason, secondaryTag)
         );
     }
 
     /**
-     * 사용자 오행 분포를 기반으로 향후 5개월 운세 데이터를 빌드합니다.
+     * 사용자 오행 분포와 AI가 생성한 월별 조언으로 향후 5개월 운세 데이터를 빌드합니다.
      *
-     * 각 월의 계절 오행(겨울=水, 봄=木, 여름=火, 가을=金)과 사용자 오행 분포의
-     * 일치 정도로 점수를 산정합니다.
+     * <p>월/점수/상태는 계절 오행과 사용자 오행 분포의 일치 정도로 규칙 기반 산정하고(변경 없음),
+     * 조언 문구만 {@code monthlyAdvices}(인덱스 0~4, 대상 월과 동일 순서)를 그대로 사용한다.
      */
-    public List<CompatibilityAnalysisData.MonthlyForecast> buildMonthlyForecasts(FiveElements userFiveElements) {
+    public List<CompatibilityAnalysisData.MonthlyForecast> buildMonthlyForecasts(FiveElements userFiveElements,
+                                                                                   List<String> monthlyAdvices) {
         int currentMonth = LocalDate.now(clock).getMonthValue();
         List<CompatibilityAnalysisData.MonthlyForecast> forecasts = new ArrayList<>();
 
@@ -140,9 +111,9 @@ public class AnalysisResponseBuilder {
 
             int score = forecastScoreCalculator.calculate(elementCount);
             ForecastStatus status = toForecastStatus(score);
-            String message = buildForecastMessage(forecastMonth, seasonElement, elementCount, status);
 
-            forecasts.add(new CompatibilityAnalysisData.MonthlyForecast(forecastMonth, score, status, message));
+            forecasts.add(new CompatibilityAnalysisData.MonthlyForecast(
+                    forecastMonth, score, status, monthlyAdvices.get(i)));
         }
         return forecasts;
     }
@@ -151,45 +122,5 @@ public class AnalysisResponseBuilder {
         if (score >= AnalysisConstants.HIGH_COMPATIBILITY_THRESHOLD) return ForecastStatus.LUCKY;
         if (score >= AnalysisConstants.MEDIUM_COMPATIBILITY_THRESHOLD) return ForecastStatus.NORMAL;
         return ForecastStatus.CAUTION;
-    }
-
-    private String buildForecastMessage(int month, String element, int elementCount, ForecastStatus status) {
-        return switch (status) {
-            case LUCKY   -> String.format("%d월은 '%s' 기운이 강해 사용자의 오행과 조화를 이루는 시기입니다. 적극적인 행동을 추천합니다.", month, element);
-            case CAUTION -> String.format("%d월은 '%s' 기운이 부족한 시기입니다. 신중하게 결정하세요.", month, element);
-            default      -> elementCount > 0
-                    ? String.format("%d월은 '%s' 기운이 안정적인 시기입니다. 꾸준한 준비를 지속하세요.", month, element)
-                    : String.format("%d월은 '%s' 기운을 보완할 역량 강화에 집중하세요.", month, element);
-        };
-    }
-
-    /**
-     * 사용자 오행과 직군 카테고리 기반으로 주의사항 목록을 빌드합니다.
-     */
-    public List<String> buildCautions(FiveElements userFiveElements, JobCategoryEnum category) {
-        return List.of(
-                String.format("%s 분야의 빠른 변화 속도에 적응하는 시간이 필요할 수 있습니다.",
-                        category.getDisplayName()),
-                "초기 입사 후 조직 문화 적응에 시간이 다소 걸릴 수 있습니다."
-        );
-    }
-
-    /**
-     * 점수와 직군 카테고리를 기반으로 한 줄 요약 문구를 생성합니다.
-     */
-    public String buildSummary(int score, JobCategoryEnum category) {
-        if (score >= AnalysisConstants.HIGH_COMPATIBILITY_THRESHOLD) {
-            return String.format(
-                    "'%s' 분야에서 사용자의 사주와 기업이 높은 시너지를 보이는 상생(相生)의 궁합입니다.",
-                    category.getDisplayName());
-        }
-        if (score >= AnalysisConstants.MEDIUM_COMPATIBILITY_THRESHOLD) {
-            return String.format(
-                    "'%s' 분야에서 사용자와 기업 간 균형 잡힌 궁합을 보입니다.",
-                    category.getDisplayName());
-        }
-        return String.format(
-                "'%s' 분야에서 추가적인 역량 개발이 필요한 궁합입니다.",
-                category.getDisplayName());
     }
 }

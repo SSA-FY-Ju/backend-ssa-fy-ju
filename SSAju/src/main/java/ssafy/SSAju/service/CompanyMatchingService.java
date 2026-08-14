@@ -3,7 +3,9 @@ package ssafy.SSAju.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ssafy.SSAju.career.caller.CompanyMatchingOpenAICaller;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
+import ssafy.SSAju.career.domain.CompatibilityNarrativeRequest;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.entity.*;
@@ -11,6 +13,7 @@ import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.provider.UserProfileProvider;
 import ssafy.SSAju.career.util.*;
 import ssafy.SSAju.career.validator.SajuValidator;
+import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.CompatibilityRequest;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
@@ -66,7 +69,9 @@ public class CompanyMatchingService {
     private final HiddenStemCalculator hiddenStemCalculator;
     private final CompatibilityScoreCalculator compatibilityScoreCalculator;
     private final JobRoleAnalyzer jobRoleAnalyzer;
+    private final RoleCompatibilityCalculator roleCompatibilityCalculator;
     private final AnalysisResponseBuilder responseBuilder;
+    private final CompanyMatchingOpenAICaller companyMatchingOpenAICaller;
 
     // ─────────────────────────────────────────
     // 레포지토리 / 자식 서비스
@@ -120,21 +125,35 @@ public class CompanyMatchingService {
         HiddenStems companyHiddenStems = sajuCalc.companyHiddenStems();
         FiveElements companyFiveElements = sajuCalc.companyFiveElements();
 
-        // ─── 분석 계산 ──────────────────────────────────────────
+        // ─── 분석 계산 (점수는 규칙 기반, 해설은 AI 생성) ──────────────
+        JobCategoryEnum category = request.targetRole().category();
         int compatibilityScore = compatibilityScoreCalculator.calculate(
                 userHiddenStems, sajuCalc.userDayMaster(), companyHiddenStems, sajuCalc.companyDayMaster());
+        int matchScore = jobRoleAnalyzer.analyze(userFiveElements, category);
+        int primaryScore = roleCompatibilityCalculator.calculatePrimary(userFiveElements, category);
+        int secondaryScore = roleCompatibilityCalculator.calculateSecondary(primaryScore);
+
+        CompatibilityNarrativeRequest narrativeRequest = new CompatibilityNarrativeRequest(
+                userFiveElements, userHiddenStems, sajuCalc.userDayMaster(),
+                companyFiveElements, companyHiddenStems, sajuCalc.companyDayMaster(),
+                compatibilityScore, matchScore, primaryScore, secondaryScore,
+                category, request.targetRole().detailName());
+        CompatibilityNarrativeResponse narrative = companyMatchingOpenAICaller.call(narrativeRequest);
 
         CompatibilityAnalysisData analysisData = new CompatibilityAnalysisData(
-                jobRoleAnalyzer.analyze(userFiveElements, request.targetRole().category()),
-                responseBuilder.buildFiveElementsData(userFiveElements, companyFiveElements),
+                new CompatibilityAnalysisData.RoleAnalysis(matchScore, narrative.roleSynergy(), narrative.roleWarning()),
+                responseBuilder.buildFiveElementsData(
+                        userFiveElements, companyFiveElements, narrative.fiveElementsSynergyDescription()),
                 responseBuilder.buildAnalysisBreakdown(compatibilityScore),
-                responseBuilder.buildActionableStrategy(request.targetRole().category()),
-                responseBuilder.buildInterviewQuestions(request.targetRole().category()),
-                responseBuilder.buildRoleCompatibilities(request.targetRole().category(), userFiveElements),
-                responseBuilder.buildMonthlyForecasts(userFiveElements),
-                responseBuilder.buildCautions(userFiveElements, request.targetRole().category())
+                responseBuilder.buildActionableStrategy(category, narrative.weaknessDefense()),
+                responseBuilder.buildInterviewQuestions(narrative.interviewQuestions()),
+                responseBuilder.buildRoleCompatibilities(
+                        category, primaryScore, secondaryScore,
+                        narrative.primaryRoleReason(), narrative.secondaryRoleReason()),
+                responseBuilder.buildMonthlyForecasts(userFiveElements, narrative.monthlyAdvices()),
+                narrative.cautions()
         );
-        String summary = responseBuilder.buildSummary(compatibilityScore, request.targetRole().category());
+        String summary = narrative.summary();
 
         // ───────────────────────────────────────────────────────────────────
         // 캐시 미스: INSERT IGNORE로 root 엔티티 삽입
