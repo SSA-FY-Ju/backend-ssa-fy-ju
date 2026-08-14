@@ -11,8 +11,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import ssafy.SSAju.career.caller.CompanyMatchingOpenAICaller;
 import ssafy.SSAju.career.util.JobCategoryEnum;
 import ssafy.SSAju.config.ClockConfig;
+import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.CompatibilityRequest;
 import ssafy.SSAju.entity.User;
@@ -65,9 +67,12 @@ class DailyQuotaIntegrityIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    // 외부 API 경계만 mock (FastAPI)
+    // 외부 API 경계만 mock (FastAPI, OpenAI)
     @MockitoBean
     private SajuDataService sajuDataService;
+
+    @MockitoBean
+    private CompanyMatchingOpenAICaller companyMatchingOpenAICaller;
 
     private User testUser;
     private CompatibilityRequest request;
@@ -105,6 +110,16 @@ class DailyQuotaIntegrityIntegrationTest {
         );
     }
 
+    private CompatibilityNarrativeResponse fakeNarrativeResponse() {
+        return new CompatibilityNarrativeResponse(
+                "요약", "시너지", "경고", "오행 시너지", "약점 방어",
+                List.of(new CompatibilityNarrativeResponse.InterviewQuestion("질문", "의도")),
+                "전문가 사유", "리드 사유",
+                List.of("1월", "2월", "3월", "4월", "5월"),
+                List.of("주의사항")
+        );
+    }
+
     @Test
     @DisplayName("FastAPI 호출 실패 시 쿼터가 요청 전과 동일하게 유지된다")
     void quotaRestoredWhenFastApiCallFails() {
@@ -125,6 +140,8 @@ class DailyQuotaIntegrityIntegrationTest {
     void quotaDecrementedByOneWhenAnalysisSucceeds() {
         given(sajuDataService.fetchSajuFromFastAPI(any(), any()))
                 .willReturn(fakeFastApiResponse());
+        given(companyMatchingOpenAICaller.call(any()))
+                .willReturn(fakeNarrativeResponse());
 
         companyMatchingService.analyzeCompatibility(request, testUser.getId());
 
