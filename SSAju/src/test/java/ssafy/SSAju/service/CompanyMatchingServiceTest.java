@@ -30,7 +30,9 @@ import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
+import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
+import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.UserRepository;
@@ -424,6 +426,73 @@ class CompanyMatchingServiceTest {
                 .isInstanceOf(FastAPITimeoutException.class);
         // 캐시 미스 → charge 후 FastAPI 실패: 차감은 이미 발생
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+    }
+
+    // ─────────────────────────────────────────
+    // AI 실패/최종 저장 실패 시 쿼터 보상 (US3, T015)
+    // ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("AI 해설 생성 실패 → 쿼터 복원 후 원본 예외 전파")
+    void shouldRestoreQuota_WhenAiNarrativeCallFails() {
+        // Given
+        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
+        HiddenStems mockHiddenStems = new HiddenStems(
+                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
+                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
+        LocalDate usageDate = LocalDate.of(2026, 5, 27);
+        OpenAIApiException aiFailure = new OpenAIApiException("AI 호출 실패");
+
+        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
+        given(dailyApiUsageService.checkAndIncrementDailyUsage(USER_ID)).willReturn(usageDate);
+        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
+        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
+        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
+                .willReturn(78);
+        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
+                .willReturn(85);
+        given(companyMatchingOpenAICaller.call(any())).willThrow(aiFailure);
+
+        // When & Then
+        assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
+                .isSameAs(aiFailure);
+        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, usageDate);
+        verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
+    }
+
+    @Test
+    @DisplayName("AI 해설 생성은 성공했지만 최종 저장 실패 → 쿼터 복원 후 원본 예외 전파")
+    void shouldRestoreQuota_WhenFinalSaveFails() {
+        // Given
+        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
+        HiddenStems mockHiddenStems = new HiddenStems(
+                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
+                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
+        CompanyCompatibility savedEntity = buildCompatibility(MOCK_USER_PROFILE);
+        LocalDate usageDate = LocalDate.of(2026, 5, 27);
+        DataAccessException saveFailure = new DataAccessException("DB 저장 실패");
+
+        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
+        given(dailyApiUsageService.checkAndIncrementDailyUsage(USER_ID)).willReturn(usageDate);
+        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
+        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
+        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
+                .willReturn(78);
+        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
+                .willReturn(85);
+        given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
+        given(companyCompatibilityRepository
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
+                .willReturn(Optional.empty())
+                .willReturn(Optional.of(savedEntity));
+        org.mockito.BDDMockito.willThrow(saveFailure)
+                .given(childSaveService).saveAllAndMarkCompleted(any(), any());
+
+        // When & Then
+        assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
+                .isSameAs(saveFailure);
+        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, usageDate);
     }
 
     // ─────────────────────────────────────────

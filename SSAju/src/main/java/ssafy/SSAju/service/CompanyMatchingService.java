@@ -109,17 +109,31 @@ public class CompanyMatchingService {
             return childReadService.buildFromExisting(cachedOpt.get(), request);
         }
 
-        // ─── 사주 계산 (사용자 + 기업, 외부 I/O) ──────────────────────
-        // 이른 캐시 히트(completed=true) 경로는 위에서 반환됨 → 여기서부터는 FastAPI/공공데이터 호출이 발생하는 신규 분석
-        // 호출 실패 시 쿼터가 소진된 채 남지 않도록 차감 이후 구간 전체를 보상 트랜잭션으로 감싼다
+        // ─── 사주 계산 → AI 해설 생성 → 저장 (외부 I/O 포함, 신규 분석) ──────
+        // 이른 캐시 히트(completed=true) 경로는 위에서 반환됨 → 여기서부터는 FastAPI/공공데이터/
+        // OpenAI 호출과 DB 저장이 발생하는 신규 분석. 이 구간 어디서 실패하든 쿼터가 소진된 채
+        // 남지 않도록 차감 이후 구간 전체(사주 계산·AI 호출·최종 저장)를 보상 트랜잭션으로 감싼다.
         LocalDate usageDate = dailyApiUsageService.checkAndIncrementDailyUsage(userId);
-        SajuCalculationResult sajuCalc;
         try {
-            sajuCalc = calculateSajuData(request, userBirthTime);
+            return analyzeAndSaveNewCompatibility(
+                    request, userId, user, userProfile, compatibilityMonth);
         } catch (RuntimeException e) {
             dailyApiUsageService.restoreDailyUsage(userId, usageDate);
             throw e;
         }
+    }
+
+    /**
+     * 사주 계산부터 AI 해설 생성, DB 저장까지의 신규 분석 흐름.
+     *
+     * <p>{@link #analyzeCompatibility}가 이 메서드 전체를 쿼터 보상 범위로 감싼다(US3, T016) —
+     * 사주 계산·AI 호출·최종 저장 중 어디서 실패하든 동일하게 보상되어야 하기 때문이다.
+     */
+    private CompatibilityResponse analyzeAndSaveNewCompatibility(CompatibilityRequest request, Long userId,
+                                                                    User user, UserProfile userProfile,
+                                                                    Integer compatibilityMonth) {
+        LocalTime userBirthTime = resolveUserBirthTime(request);
+        SajuCalculationResult sajuCalc = calculateSajuData(request, userBirthTime);
         HiddenStems userHiddenStems = sajuCalc.userHiddenStems();
         FiveElements userFiveElements = sajuCalc.userFiveElements();
         HiddenStems companyHiddenStems = sajuCalc.companyHiddenStems();
