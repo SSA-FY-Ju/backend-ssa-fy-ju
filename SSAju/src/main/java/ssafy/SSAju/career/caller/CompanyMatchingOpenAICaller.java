@@ -21,23 +21,18 @@ import ssafy.SSAju.exception.OpenAIApiException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 기업 궁합 분석 해설(8개 텍스트 필드)을 생성하는 OpenAI 1-call JSON 모드 호출 컴포넌트.
  *
- * <p>{@link ConsultationOpenAICaller}와 동일한 재시도/예외 변환 정책을 따른다.
- * 점수(궁합/직군매칭/역할별)는 이 컴포넌트가 알지 못하며, 이미 계산된 값을
- * {@link CompatibilityNarrativeRequest}로 입력받아 해설만 생성한다.
+ * <p>{@link ConsultationOpenAICaller}와 동일한 재시도/예외 변환 정책을 따른다(상태 코드 복원/
+ * 공백 검증 로직은 {@link OpenAIRetrySupport}로 공유). 점수(궁합/직군매칭/역할별)는 이 컴포넌트가
+ * 알지 못하며, 이미 계산된 값을 {@link CompatibilityNarrativeRequest}로 입력받아 해설만 생성한다.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class CompanyMatchingOpenAICaller {
-
-    /** {@link ConsultationOpenAICaller}와 동일한 상태 코드 복원 패턴. */
-    private static final Pattern STATUS_CODE_PREFIX = Pattern.compile("^(\\d{3})\\s*-");
 
     private final ChatClient chatClient;
     private final PromptProvider promptProvider;
@@ -75,7 +70,7 @@ public class CompanyMatchingOpenAICaller {
             log.error("OpenAI API 일시적 오류(5xx 상당), 재시도 예정");
             throw e;
         } catch (NonTransientAiException e) {
-            int statusCode = extractStatusCode(e.getMessage());
+            int statusCode = OpenAIRetrySupport.extractStatusCode(e.getMessage());
             log.error("OpenAI API 클라이언트 오류(4xx 상당) statusCode={}", statusCode, e);
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), statusCode, e);
         } catch (Exception e) {
@@ -106,14 +101,6 @@ public class CompanyMatchingOpenAICaller {
         throw ex;
     }
 
-    private int extractStatusCode(String message) {
-        if (message == null) {
-            return 0;
-        }
-        Matcher matcher = STATUS_CODE_PREFIX.matcher(message);
-        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
-    }
-
     private void validate(CompatibilityNarrativeResponse response, List<Integer> expectedTargetMonths) {
         if (response == null) {
             throw new OpenAIApiException(ErrorMessageConstants.COMPATIBILITY_NARRATIVE_EMPTY_RESPONSE.getMessage());
@@ -132,8 +119,8 @@ public class CompanyMatchingOpenAICaller {
         }
         for (var question : response.interviewQuestions()) {
             if (question == null
-                    || isBlank(question.question())
-                    || isBlank(question.intent())) {
+                    || OpenAIRetrySupport.isBlank(question.question())
+                    || OpenAIRetrySupport.isBlank(question.intent())) {
                 throw new OpenAIApiException(
                         ErrorMessageConstants.COMPATIBILITY_NARRATIVE_INVALID_INTERVIEW_ITEM.getMessage());
             }
@@ -170,12 +157,8 @@ public class CompanyMatchingOpenAICaller {
     }
 
     private void validateBlank(String value) {
-        if (isBlank(value)) {
+        if (OpenAIRetrySupport.isBlank(value)) {
             throw new OpenAIApiException(ErrorMessageConstants.COMPATIBILITY_NARRATIVE_BLANK_FIELD.getMessage());
         }
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.isBlank();
     }
 }

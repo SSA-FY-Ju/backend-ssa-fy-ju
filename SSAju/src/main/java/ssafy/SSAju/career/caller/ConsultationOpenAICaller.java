@@ -19,21 +19,10 @@ import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.exception.OpenAIApiException;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ConsultationOpenAICaller {
-
-    /**
-     * Spring AI {@code RetryUtils.DEFAULT_RESPONSE_ERROR_HANDLER}가 {@link NonTransientAiException}/
-     * {@link TransientAiException}의 메시지를 {@code "%s - %s"}(HTTP 상태 코드 - 응답 바디) 포맷으로
-     * 구성한다는 점을 이용해 상태 코드를 복원한다. 라이브러리가 포맷을 바꿔 매칭에 실패하면 0으로
-     * 폴백한다(기존 동작과 동일, statusCode 미기록).
-     */
-    private static final Pattern STATUS_CODE_PREFIX = Pattern.compile("^(\\d{3})\\s*-");
 
     private final ChatClient chatClient;
     private final PromptProvider promptProvider;
@@ -82,7 +71,7 @@ public class ConsultationOpenAICaller {
             throw e;
         } catch (NonTransientAiException e) {
             // 4xx 상당 (401 인증 실패, 429 rate limit 등): 재시도 불가, 우리 쪽 설정/사용량 문제일 가능성이 커 원인 로깅
-            int statusCode = extractStatusCode(e.getMessage());
+            int statusCode = OpenAIRetrySupport.extractStatusCode(e.getMessage());
             log.error("OpenAI API 클라이언트 오류(4xx 상당) statusCode={}", statusCode, e);
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_CALL_FAILED.getMessage(), statusCode, e);
         } catch (Exception e) {
@@ -123,14 +112,6 @@ public class ConsultationOpenAICaller {
         throw ex;
     }
 
-    private int extractStatusCode(String message) {
-        if (message == null) {
-            return 0;
-        }
-        Matcher matcher = STATUS_CODE_PREFIX.matcher(message);
-        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
-    }
-
     private void validate(CareerAdviceResponse response) {
         if (response == null) {
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_EMPTY_RESPONSE.getMessage());
@@ -140,8 +121,8 @@ public class ConsultationOpenAICaller {
         }
         for (var industry : response.industries()) {
             if (industry == null
-                    || industry.name() == null || industry.name().isBlank()
-                    || industry.reason() == null || industry.reason().isBlank()) {
+                    || OpenAIRetrySupport.isBlank(industry.name())
+                    || OpenAIRetrySupport.isBlank(industry.reason())) {
                 throw new OpenAIApiException(ErrorMessageConstants.OPENAI_INVALID_INDUSTRY_ITEM.getMessage());
             }
         }
@@ -149,7 +130,7 @@ public class ConsultationOpenAICaller {
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_MISSING_INTERVIEW_TIPS.getMessage());
         }
         for (var tip : response.interviewTips()) {
-            if (tip == null || tip.isBlank()) {
+            if (OpenAIRetrySupport.isBlank(tip)) {
                 throw new OpenAIApiException(ErrorMessageConstants.OPENAI_INVALID_INTERVIEW_ITEM.getMessage());
             }
         }
@@ -157,7 +138,7 @@ public class ConsultationOpenAICaller {
             throw new OpenAIApiException(ErrorMessageConstants.OPENAI_MISSING_STRENGTHS.getMessage());
         }
         for (var strength : response.strengths()) {
-            if (strength == null || strength.isBlank()) {
+            if (OpenAIRetrySupport.isBlank(strength)) {
                 throw new OpenAIApiException(ErrorMessageConstants.OPENAI_INVALID_STRENGTH_ITEM.getMessage());
             }
         }
