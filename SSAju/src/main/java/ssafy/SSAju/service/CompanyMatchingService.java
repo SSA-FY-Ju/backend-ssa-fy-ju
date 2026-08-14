@@ -112,14 +112,40 @@ public class CompanyMatchingService {
         // ─── 사주 계산 → AI 해설 생성 → 저장 (외부 I/O 포함, 신규 분석) ──────
         // 이른 캐시 히트(completed=true) 경로는 위에서 반환됨 → 여기서부터는 FastAPI/공공데이터/
         // OpenAI 호출과 DB 저장이 발생하는 신규 분석. 이 구간 어디서 실패하든 쿼터가 소진된 채
-        // 남지 않도록 차감 이후 구간 전체(사주 계산·AI 호출·최종 저장)를 보상 트랜잭션으로 감싼다.
+        // 남지 않도록 차감 이후 구간(사주 계산·AI 호출·DB 저장)을 보상 트랜잭션으로 감싼다.
+        // 단, 이 요청이 직접 저장까지 성공시킨 뒤의 최종 응답 조립(순수 객체 조립, 외부 I/O 없음)은
+        // 보상 범위 밖에 둔다 — 저장이 끝난 뒤에 실패한다면 그건 쿼터 낭비가 아니라 코드 결함이므로
+        // 쿼터를 복원하면 오히려 이미 저장된 분석 + 복원된 쿼터라는 이중 지급이 된다.
         LocalDate usageDate = dailyApiUsageService.checkAndIncrementDailyUsage(userId);
+        SavedAnalysis persisted;
         try {
-            return analyzeAndSaveNewCompatibility(
-                    request, userId, user, userProfile, compatibilityMonth);
+            persisted = analyzeAndPersist(
+                    request, userId, user, userProfile, compatibilityMonth, userBirthTime);
         } catch (RuntimeException e) {
             dailyApiUsageService.restoreDailyUsage(userId, usageDate);
             throw e;
+        }
+        return persisted.rendered() != null
+                ? persisted.rendered()
+                : buildNewResponse(persisted.saved(), request, persisted.data());
+    }
+
+    /**
+     * 저장까지는 끝났지만 아직 최종 응답으로 조립되지 않은 상태를 나타내는 내부 VO.
+     *
+     * <p>{@code rendered}가 채워져 있으면 이미 완성된 응답(캐시 재사용/race-condition 분기),
+     * {@code saved}/{@code data}만 채워져 있으면 이 요청이 직접 저장에 성공했으니
+     * {@link #analyzeCompatibility}가 쿼터 보상 범위 밖에서 응답을 조립해야 함을 의미한다.
+     */
+    private record SavedAnalysis(CompatibilityResponse rendered,
+                                  CompanyCompatibility saved,
+                                  CompatibilityAnalysisData data) {
+        static SavedAnalysis rendered(CompatibilityResponse response) {
+            return new SavedAnalysis(response, null, null);
+        }
+
+        static SavedAnalysis pendingRender(CompanyCompatibility saved, CompatibilityAnalysisData data) {
+            return new SavedAnalysis(null, saved, data);
         }
     }
 
@@ -127,12 +153,13 @@ public class CompanyMatchingService {
      * 사주 계산부터 AI 해설 생성, DB 저장까지의 신규 분석 흐름.
      *
      * <p>{@link #analyzeCompatibility}가 이 메서드 전체를 쿼터 보상 범위로 감싼다(US3, T016) —
-     * 사주 계산·AI 호출·최종 저장 중 어디서 실패하든 동일하게 보상되어야 하기 때문이다.
+     * 사주 계산·AI 호출·DB 저장 중 어디서 실패하든 동일하게 보상되어야 하기 때문이다. 이 요청이
+     * 직접 저장에 성공한 이후의 최종 응답 조립은 이 메서드가 아니라 {@link #analyzeCompatibility}가
+     * 보상 범위 밖에서 수행한다({@link SavedAnalysis#pendingRender}).
      */
-    private CompatibilityResponse analyzeAndSaveNewCompatibility(CompatibilityRequest request, Long userId,
-                                                                    User user, UserProfile userProfile,
-                                                                    Integer compatibilityMonth) {
-        LocalTime userBirthTime = resolveUserBirthTime(request);
+    private SavedAnalysis analyzeAndPersist(CompatibilityRequest request, Long userId,
+                                              User user, UserProfile userProfile,
+                                              Integer compatibilityMonth, LocalTime userBirthTime) {
         SajuCalculationResult sajuCalc = calculateSajuData(request, userBirthTime);
         HiddenStems userHiddenStems = sajuCalc.userHiddenStems();
         FiveElements userFiveElements = sajuCalc.userFiveElements();
@@ -144,7 +171,7 @@ public class CompanyMatchingService {
         int compatibilityScore = compatibilityScoreCalculator.calculate(
                 userHiddenStems, sajuCalc.userDayMaster(), companyHiddenStems, sajuCalc.companyDayMaster());
         int matchScore = jobRoleAnalyzer.analyze(userFiveElements, category);
-        int primaryScore = roleCompatibilityCalculator.calculatePrimary(matchScore);
+        int primaryScore = matchScore;
         int secondaryScore = roleCompatibilityCalculator.calculateSecondary(primaryScore);
 
         CompatibilityNarrativeRequest narrativeRequest = new CompatibilityNarrativeRequest(
@@ -201,19 +228,19 @@ public class CompanyMatchingService {
             if (saved.isCompleted()) {
                 // completed=true → 자식 데이터가 완전히 저장된 캐시만 재사용
                 log.info("완료된 궁합 분석 캐시 재사용 (compatibilityId={})", saved.getId());
-                return childReadService.buildFromExisting(saved, request);
+                return SavedAnalysis.rendered(childReadService.buildFromExisting(saved, request));
             }
             // completed=false: 다른 요청이 자식 저장 진행 중 → 현재 계산 결과로 응답
             log.info("자식 저장 진행 중인 기존 레코드 감지 (compatibilityId={}), 현재 계산 결과로 응답",
                     saved.getId());
-            return buildNewResponse(saved, request, analysisData);
+            return SavedAnalysis.rendered(buildNewResponse(saved, request, analysisData));
         }
 
         // 자식 엔티티 전체 저장을 단일 트랜잭션(REQUIRES_NEW)으로 위임
         childSaveService.saveAllAndMarkCompleted(saved, analysisData);
 
         log.info("기업 궁합 분석 완료: compatibilityScore={}", compatibilityScore);
-        return buildNewResponse(saved, request, analysisData);
+        return SavedAnalysis.pendingRender(saved, analysisData);
     }
 
     // ─────────────────────────────────────────

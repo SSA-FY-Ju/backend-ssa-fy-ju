@@ -134,7 +134,7 @@ public class PromptProvider {
                 - interviewQuestions: 예상 면접 질문 목록(question, intent 포함, 최소 1개)
                 - primaryRoleReason: 전문가 역할 적합 사유
                 - secondaryRoleReason: 리드 역할 적합 사유
-                - monthlyAdvices: 월별 조언 문자열 배열, 반드시 정확히 5개, 대상 월 순서는 %s
+                - monthlyAdvices: 월별 조언 문자열 배열, 반드시 정확히 %d개, 대상 월 순서는 %s
                 - cautions: 주의사항 목록(최소 1개)
                 """.formatted(
                 request.compatibilityScore(),
@@ -149,6 +149,7 @@ public class PromptProvider {
                 request.companyHiddenStems(),
                 request.category().getDisplayName(),
                 request.detailName(),
+                AnalysisConstants.FORECAST_MONTH_COUNT,
                 targetMonths
         );
     }
