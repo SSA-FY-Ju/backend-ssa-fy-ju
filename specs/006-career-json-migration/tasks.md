@@ -75,15 +75,17 @@ description: "Task list for 커리어 분석 결과 JSON 저장 마이그레이�
 
 ## Phase 4: User Story 2 - AI 응답 정합성 검사를 저장 방식과 무관하게 유지 (Priority: P1)
 
-**Goal**: 저장 형식이 JSON으로 바뀌어도 OpenAI 응답 검증 시점(파싱 직후, 직렬화 이전)과 항목이 기존과 동일하게 유지되고, 엔티티가 사라지며 없어질 range 검사가 `validate()`로 이관됨
+**Goal**: 저장 형식이 JSON으로 바뀌어도 OpenAI 응답 검증 시점(파싱 직후, 직렬화 이전)과 항목이 기존과 동일하게 유지됨
 
-**Independent Test**: 필수 필드 누락, 기대 대상월 불일치, 범위(1~12/0~100) 초과 응답을 주입했을 때 저장이 거부되는지 확인 (quickstart.md §3.2)
+**Independent Test**: 필수 필드 누락, 기대 대상월 불일치 응답을 주입했을 때 저장이 거부되는지 확인 (quickstart.md §3.2)
+
+> **범위 정정 (코드 리뷰 반영)**: 최초 계획은 `MonthlyForecast.score`/`TargetRoleAnalysis.matchScore`의 `@Min`/`@Max`를 `validate()`로 이관하는 것이었으나, 실제 코드 확인 결과 이 두 값은 `CompanyMatchingOpenAICaller.validate()`가 받는 `CompatibilityNarrativeResponse` DTO에 필드로 존재하지 않는다(OpenAI 응답이 아니라 `JobRoleAnalyzer`/`AnalysisResponseBuilder`의 내부 계산값이며, 공식 자체가 0~100으로 자체 유계). month 범위도 기존 대상월 집합 일치 검사가 이미 포괄한다. 따라서 이 스토리는 **신규 검증 코드 추가가 아니라 기존 검사가 이미 요구사항을 충족함을 확인하는 회귀 테스트 위주**로 축소되었다 — research.md #4 참고.
 
 ### Implementation for User Story 2
 
-- [ ] T018 [P] [US2] `CompanyMatchingOpenAICaller.validate()`에 `monthlyAdvices[i].month`(1~12) 및 `monthlyAdvices[i].score`/`targetRoleAnalysis.matchScore`(0~100) range 검사를 추가 — 파일: `SSAju/src/main/java/ssafy/SSAju/career/caller/CompanyMatchingOpenAICaller.java` (contracts/json-storage-and-validation-contract.md 참조)
+- [ ] T018 [P] [US2] `CompanyMatchingOpenAICaller.validate()` 메서드 바로 위에, month 범위는 대상월 집합 일치 검사가 이미 포괄하고 `score`/`matchScore`는 이 DTO의 필드가 아니라 내부 계산값이라 이 메서드의 검증 대상이 아니라는 설계 근거를 코드 주석으로 남김 — 파일: `SSAju/src/main/java/ssafy/SSAju/career/caller/CompanyMatchingOpenAICaller.java` (contracts/json-storage-and-validation-contract.md 참조, 코드 로직 변경 없음)
 - [ ] T019 [P] [US2] `ConsultationOpenAICaller.validate()`의 기존 null/blank/필수 컬렉션 검사가 엔티티 제거 후에도 변경 없이 유지되는지 회귀 확인 및 필요 시 보강 — 파일: `SSAju/src/main/java/ssafy/SSAju/career/caller/ConsultationOpenAICaller.java`
-- [ ] T020 [P] [US2] T018의 range 검사에 대한 실패 케이스(월 0/13, 점수 -1/101) 단위 테스트 추가 — 파일: `SSAju/src/test/java/ssafy/SSAju/career/caller/CompanyMatchingOpenAICallerTest.java` (depends on T018)
+- [ ] T020 [P] [US2] 범위를 벗어나거나(13 이상 등) 기대 대상월과 다른 month 값을 담은 `monthlyAdvices` 응답이 기존 "대상월 집합 일치" 검사만으로 이미 거부됨을 확인하는 회귀 테스트 추가(신규 검증 코드 없음) — 파일: `SSAju/src/test/java/ssafy/SSAju/career/caller/CompanyMatchingOpenAICallerTest.java`
 - [ ] T021 [P] [US2] 검증 실패 시 어떤 데이터도 `resultJson`에 부분 저장되지 않음을 확인하는 회귀 테스트 추가 — 파일: `SSAju/src/test/java/ssafy/SSAju/career/caller/ConsultationOpenAICallerTest.java`, `CompanyMatchingOpenAICallerTest.java` (depends on T012, T013)
 
 **Checkpoint**: User Story 2 독립 검증 가능 — quickstart.md §3.2 실행 가능
@@ -98,9 +100,9 @@ description: "Task list for 커리어 분석 결과 JSON 저장 마이그레이�
 
 ### Implementation for User Story 3
 
-- [ ] T022 [US3] 로컬/개발 DB에 신규 스키마를 수동 적용 (`career_consultation`+자식, `company_compatibility`+자식, `saju_result`의 `ten_god_data`/`hidden_stem_data` 테이블 TRUNCATE/DROP, `result_json`/`ten_god_hidden_stem_analysis` JSON 컬럼 추가) — 절차: `specs/006-career-json-migration/quickstart.md` §2, 버전관리에 스크립트 커밋하지 않음(FR-009) (depends on T009, T010, T011)
-- [ ] T023 [P] [US3] 마이그레이션 후 삭제된 자식 테이블에 잔존 데이터가 0건인지, 삭제된 엔티티에 대응하는 Repository 빈이 더 이상 존재하지 않는지 확인하는 통합 테스트 추가 — 파일: `SSAju/src/test/java/ssafy/SSAju/integration/CareerResultLegacyDataCleanupIntegrationTest.java` (depends on T022)
-- [ ] T024 [US3] 동일 식별 키(예: 같은 사용자+대상월)로 재요청 시 마이그레이션 이전 데이터를 재사용하지 않고 새로 생성된 JSON 결과가 반환되는지 수동/통합 검증 — quickstart.md §3.4 절차 실행 (depends on T022)
+- [ ] T022 [US3] 로컬/개발 DB에 신규 스키마를 수동 적용: (a) 자식/손자 테이블(`industry`, `monthly_forecast`, `ten_god_data`, `hidden_stem_data` 등 data-model.md 전체 목록)은 **DROP TABLE**, (b) 루트 테이블(`career_consultation`, `company_compatibility`, `saju_result`)은 **ALTER TABLE**로 `result_json`/`ten_god_hidden_stem_analysis` 컬럼 추가 후 **TRUNCATE** — 절차: `specs/006-career-json-migration/quickstart.md` §2, 버전관리에 스크립트 커밋하지 않음(FR-009) (depends on T009, T010, T011)
+- [ ] T023 [P] [US3] 마이그레이션 후 (a) DROP된 자식/손자 테이블이 `SHOW TABLES`에서 더 이상 조회되지 않는지, (b) TRUNCATE된 루트 테이블(`career_consultation`, `company_compatibility`, `saju_result`)의 행 수가 0건인지, (c) 삭제된 엔티티에 대응하는 Repository 빈이 더 이상 존재하지 않는지 확인하는 통합 테스트 추가 — 파일: `SSAju/src/test/java/ssafy/SSAju/integration/CareerResultLegacyDataCleanupIntegrationTest.java` (depends on T022)
+- [ ] T024 [US3] 동일 식별 키(예: 같은 사용자+대상월)로 재요청 시 마이그레이션 이전 데이터를 재사용하지 않고 새로 생성된 JSON 결과가 반환되는지 수동/통합 검증 — quickstart.md §3.4 절차 실행. 정리 대상은 T022에서 DROP된 자식/손자 테이블의 구버전 행(테이블째 사라짐)과 TRUNCATE된 루트 테이블(`career_consultation`/`company_compatibility`/`saju_result`)의 구버전 행이며, 보존되는 것은 ALTER된 루트 테이블 자체(스키마만 바뀐 채 존재)다 — 신규 요청은 이 보존된 루트 테이블에 새 스키마로 다시 INSERT된다 (depends on T022)
 
 **Checkpoint**: User Story 3 독립 검증 가능
 
@@ -186,7 +188,7 @@ Task: "TenGodData/HiddenStemData 삭제"
 1. Setup + Foundational을 함께 완료
 2. Foundational 완료 후:
    - 개발자 A: User Story 1 (엔티티/컨버터/서비스)
-   - 개발자 B: User Story 2 (caller validate() 이관, T021 제외 전부 US1과 독립)
+   - 개발자 B: User Story 2 (caller validate() 회귀 확인/주석화, T021 제외 전부 US1과 독립)
 3. User Story 1 완료 후 개발자 A 또는 B가 User Story 3 착수
 
 ---

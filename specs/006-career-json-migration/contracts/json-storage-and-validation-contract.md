@@ -10,9 +10,10 @@
 
 ## `CareerConsultation.resultJson`
 
-**입력 계약**: `ConsultationOpenAICaller.validate(CareerAdviceResponse)`가 `true`(또는 예외 없이 반환)일 때만 `resultJson`에 직렬화 가능.
+**입력 계약**: `ConsultationOpenAICaller.validate(CareerAdviceResponse)`가 예외 없이 정상 반환(`void`)했을 때만 `resultJson`에 직렬화 가능. 검증 실패 시 이 메서드는 `boolean false`를 반환하는 것이 아니라 `OpenAIApiException`을 던진다 — 호출부는 이 예외를 그대로 전파하고 저장을 시도하지 않는다.
 
 **검증 항목**:
+
 | 항목 | 규칙 |
 |------|------|
 | 응답 전체 | non-null |
@@ -20,23 +21,27 @@
 
 ## `CompanyCompatibility.resultJson`
 
-**입력 계약**: `CompanyMatchingOpenAICaller.validate(CompatibilityNarrativeResponse, expectedTargetMonths)`가 통과했을 때만 `resultJson`에 직렬화 가능.
+**입력 계약**: `CompanyMatchingOpenAICaller.validate(CompatibilityNarrativeResponse, expectedTargetMonths)`가 예외 없이 정상 반환(`void`)했을 때만 `resultJson`에 직렬화 가능. 검증 실패 시 `OpenAIApiException`을 던진다.
 
-**검증 항목**:
-| 항목 | 규칙 |
+**검증 항목** (`CompanyMatchingOpenAICaller.java:87-139` 기준, DTO 필드 경로 전수):
+
+| 필드 경로 | 규칙 |
 |------|------|
-| 7개 텍스트 필드 | non-blank |
-| `interviewQuestions`, `cautions` | non-empty |
-| `monthlyAdvices` 개수 | `== AnalysisConstants.FORECAST_MONTH_COUNT` |
-| `monthlyAdvices`의 month 집합 | `== expectedTargetMonths` (순서 무관, 원소 집합 일치) |
-| `monthlyAdvices[i].month` (신규) | `1 <= month <= 12` |
-| `monthlyAdvices[i].score`, `targetRoleAnalysis.matchScore` (신규) | `0 <= score <= 100` |
+| `response` (전체) | non-null |
+| `summary`, `roleSynergy`, `roleWarning`, `fiveElementsSynergyDescription`, `weaknessDefense`, `primaryRoleReason`, `secondaryRoleReason` | 각각 non-blank |
+| `interviewQuestions` | non-null, non-empty |
+| `interviewQuestions[i].question`, `interviewQuestions[i].intent` | 각각 non-null, non-blank |
+| `monthlyAdvices` 개수 | non-null, `== AnalysisConstants.FORECAST_MONTH_COUNT` |
+| `monthlyAdvices[i]` (원소 자체) | non-null |
+| `monthlyAdvices[i].advice` | non-blank |
+| `monthlyAdvices[i].month`의 집합 전체 | `== expectedTargetMonths`의 집합 (순서 무관, 원소 완전 일치 — 범위를 벗어나거나 중복된 month는 이 일치 검사에서 자동으로 거부됨, 별도 range 검사 불필요) |
+| `cautions` | non-null, non-empty, 각 원소 non-blank |
 
-이 표의 "신규" 두 항목은 기존에 `MonthlyForecast`/`TargetRoleAnalysis` 엔티티의 `@Min`/`@Max`로 강제되던 것을 이관한 것이다 (엔티티가 사라지면서 Hibernate Validator가 더 이상 개입하지 않으므로).
+**DTO에 존재하지 않아 이 계약의 범위 밖인 값**: `TargetRoleAnalysis.matchScore`, `MonthlyForecast.score`는 `CompatibilityNarrativeResponse`(위 DTO)에 애초에 필드로 존재하지 않는다 — OpenAI 응답이 아니라 `JobRoleAnalyzer.analyze()`/`AnalysisResponseBuilder.buildMonthlyForecasts()`가 오행 데이터로 내부 계산하는 값이다. 이 두 값은 계산 공식 자체가 0~100을 벗어날 수 없도록 설계되어 있어(`Math.min(score, MAX_SCORE)` + 입력이 항상 0 이상) 이 문서의 "저장 전 검증" 대상이 아니며, `SajuResult.tenGodHiddenStemAnalysis`와 동일하게 취급한다(아래 참고).
 
 ## `SajuResult.tenGodHiddenStemAnalysis`
 
-**입력 계약**: `TenGodCalculator`/`HiddenStemCalculator`의 계산 결과가 그대로 직렬화 대상이다. 이 값은 외부 응답이 아닌 내부 결정론적 계산이므로 별도의 저장-전 검증 절차는 두지 않는다(계산 로직 자체의 정확성이 곧 데이터 정합성 — 기존과 동일).
+**입력 계약**: `TenGodCalculator`/`HiddenStemCalculator`의 계산 결과가 그대로 직렬화 대상이다. 이 값은 외부 응답이 아닌 내부 결정론적 계산이므로 별도의 저장-전 검증 절차는 두지 않는다(계산 로직 자체의 정확성이 곧 데이터 정합성 — 기존과 동일). 다만 다음 최소 계약은 지킨다: 계산 결과가 `null`이거나 JSON 직렬화 자체가 실패하는 경우(예: 순환 참조, 지원하지 않는 타입) 저장 메서드를 호출하지 않고 기존과 동일하게 예외를 전파한다 — 이 두 케이스는 "정합성 검사"가 아니라 저장 가능 여부에 대한 최소 전제조건이다.
 
 ## 위반 시 동작
 

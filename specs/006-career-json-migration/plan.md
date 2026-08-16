@@ -6,7 +6,7 @@
 
 ## Summary
 
-관운분석(`CareerFortune`), 커리어 컨설팅(`CareerConsultation`), 기업 궁합 분석(`CompanyCompatibility`) 세 루트 엔티티에 딸린 정규화 자식 엔티티(각각 0/14/8개 직계, 다수의 손자 엔티티 포함)를 제거하고, AI/외부 분석 응답을 루트 엔티티당 JSON 컬럼 하나로 직렬화해 저장한다. 식별/조회에 쓰이는 스칼라 컬럼(예: `compatibilityMonth`, `consultationMonth`, 유니크 제약 필드)은 그대로 유지한다. 정합성 검사는 기존과 동일하게 AI 응답 DTO가 JSON으로 직렬화되기 *전* 단계(`ConsultationOpenAICaller.validate()` / `CompanyMatchingOpenAICaller.validate()`)에서 수행하며, 현재 자식 엔티티의 `@Min`/`@Max` 제약(`MonthlyForecast.month` 1~12, `MonthlyForecast.score`/`TargetRoleAnalysis.matchScore` 0~100)을 이 validate() 안으로 명시적으로 이관한다. 기존 저장 데이터는 개발 단계이므로 마이그레이션 스크립트 없이 TRUNCATE로 제거한다.
+관운분석(`SajuResult`에 딸린 `TenGodData`/`HiddenStemData`), 커리어 컨설팅(`CareerConsultation`), 기업 궁합 분석(`CompanyCompatibility`) — 세 루트 엔티티에 딸린 정규화 자식 엔티티(각각 2/14/8개 직계, 다수의 손자 엔티티 포함)를 제거하고, AI/내부 분석 결과를 루트 엔티티당 JSON 컬럼 하나로 직렬화해 저장한다. (`CareerFortune` 자체는 이미 스칼라 컬럼뿐이라 변경 대상이 아니다.) 식별/조회에 쓰이는 스칼라 컬럼(예: `compatibilityMonth`, `consultationMonth`, 유니크 제약 필드)은 그대로 유지한다. 정합성 검사는 기존과 동일하게 AI 응답 DTO가 JSON으로 직렬화되기 *전* 단계(`ConsultationOpenAICaller.validate()` / `CompanyMatchingOpenAICaller.validate()`)에서 수행한다. 월(month) 범위는 기존 대상월 일치 검사가 이미 포괄하고, 점수(`MonthlyForecast.score`/`TargetRoleAnalysis.matchScore`)는 AI 응답 필드가 아니라 내부 결정론적 계산값(공식 자체가 0~100으로 자체 유계)이라 별도 caller 검증 코드 추가는 필요하지 않다 — 자세한 근거는 research.md #4 참고. 기존 저장 데이터는 개발 단계이므로 마이그레이션 스크립트 없이, 자식 테이블은 DROP, 컬럼 구조가 바뀌는 루트 테이블은 스키마 변경 후 TRUNCATE로 제거한다.
 
 ## Technical Context
 
@@ -26,7 +26,7 @@
 
 **Constraints**: 응답 스키마(컨트롤러가 반환하는 JSON) 변경 없음; AI 응답 검증 시점/항목은 저장 전 DTO 단계로 통일되어야 함; DB 마이그레이션 스크립트는 버전관리에 커밋하지 않음(FR-009)
 
-**Scale/Scope**: 3개 루트 엔티티, 직계 자식 엔티티 22개(CareerConsultation 14 + CompanyCompatibility 8) + 손자 엔티티 다수(총 목록은 data-model.md 참조) 제거 대상
+**Scale/Scope**: 3개 루트 엔티티(`SajuResult`/`CareerConsultation`/`CompanyCompatibility`, `CareerFortune`은 변경 없음), 직계 자식 엔티티 24개(SajuResult 2 + CareerConsultation 14 + CompanyCompatibility 8) + 손자 엔티티 다수(총 목록은 data-model.md 참조) 제거 대상
 
 ## Constitution Check
 
@@ -62,10 +62,11 @@ specs/006-career-json-migration/
 SSAju/src/main/java/ssafy/SSAju/
 ├── career/
 │   ├── entity/
-│   │   ├── CareerFortune.java              # 변경: 분석 결과 JSON 컬럼 추가
+│   │   ├── SajuResult.java                 # 변경: tenGodDataList/hiddenStemDataList 연관관계 제거, tenGodHiddenStemAnalysis JSON 컬럼 추가
+│   │   ├── CareerFortune.java              # 변경 없음 (이미 스칼라 컬럼뿐, 자식 엔티티 없음)
 │   │   ├── CareerConsultation.java         # 변경: 14개 직계 자식 연관관계 제거, JSON 컬럼 추가
 │   │   ├── CompanyCompatibility.java       # 변경: 8개 직계 자식 연관관계 제거, JSON 컬럼 추가
-│   │   └── (Industry.java, InterviewTip.java, ... 22개 직계 + 손자 자식 엔티티)  # 삭제 대상
+│   │   └── (Industry.java, InterviewTip.java, TenGodData.java, HiddenStemData.java, ... 24개 직계 + 손자 자식 엔티티)  # 삭제 대상
 │   ├── converter/
 │   │   ├── ObjectMapConverter.java         # 기존 패턴 참고
 │   │   └── (신규 JSON 컬럼용 AttributeConverter 추가 — Phase 0에서 설계)

@@ -40,8 +40,8 @@
 **검증 규칙** (저장 전, `CompanyMatchingOpenAICaller.validate()`에서 수행):
 - 7개 텍스트 필드 blank 아님
 - `interviewQuestions`/`cautions` non-empty
-- **크로스필드 일관성**: `monthlyAdvices.size()` == `AnalysisConstants.FORECAST_MONTH_COUNT`, 그리고 `monthlyAdvices`의 month 집합 == 사전 계산된 `expectedTargetMonths` (기존 로직, 변경 없음)
-- **신규 이관**: `monthlyAdvices` 각 항목의 month 값이 1~12 범위인지, 각 score 필드가 0~100 범위인지 (기존 `MonthlyForecast.month`/`score`, `TargetRoleAnalysis.matchScore`의 `@Min`/`@Max`를 대체)
+- **크로스필드 일관성**: `monthlyAdvices.size()` == `AnalysisConstants.FORECAST_MONTH_COUNT`, 그리고 `monthlyAdvices`의 month 집합 == 사전 계산된 `expectedTargetMonths` (기존 로직, 변경 없음 — 이 일치 검사가 범위를 벗어나거나 중복된 month 값도 함께 걸러내므로 별도 range 검사는 불필요)
+- **범위 검증 없음 (코드 리뷰로 정정)**: 최초 계획은 기존 `MonthlyForecast.score`/`TargetRoleAnalysis.matchScore` 엔티티의 `@Min`/`@Max`를 `validate()`로 이관하는 것이었으나, 이 두 값은 `CompatibilityNarrativeResponse` DTO에 필드로 존재하지 않는다 — OpenAI 응답이 아니라 `JobRoleAnalyzer`/`AnalysisResponseBuilder`가 오행 데이터로 내부 계산하는 값이며 공식 자체가 0~100으로 자체 유계다. 따라서 `validate()`에 추가할 코드가 없다 (research.md #4 참고).
 
 **변경 없는 것 (out of scope)**: `UserSatisfactionFeedback` — 사용자가 직접 제출하는 피드백이며 AI 생성 결과가 아니므로 JSON화 대상이 아니다. `CompanyCompatibility`와의 FK 관계만 유지.
 
