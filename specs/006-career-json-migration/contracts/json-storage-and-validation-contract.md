@@ -43,7 +43,8 @@
 
 **입력 계약**: `TenGodCalculator`/`HiddenStemCalculator`의 계산 결과가 그대로 직렬화 대상이다. 이 값은 외부 응답이 아닌 내부 결정론적 계산이므로 별도의 저장-전 검증 절차는 두지 않는다(계산 로직 자체의 정확성이 곧 데이터 정합성 — 기존과 동일). 다만 다음 최소 계약은 지킨다 (코드 리뷰로 시점 정정):
 - **null 체크**: 계산 결과가 `null`이면 저장 메서드(`repository.save(...)`)를 호출하기 전에 동기적으로 확인 가능하며, 이 경우 저장을 시도하지 않고 예외를 전파한다.
-- **직렬화 자체의 실패**(순환 참조, 지원하지 않는 타입 등): `AttributeConverter`는 JPA가 flush/commit 시점에 호출하므로, `save()` 호출 시점에는 아직 실패 여부를 알 수 없다 — "저장 메서드를 호출하지 않는다"는 보장은 여기에는 적용되지 않는다. 대신 flush/commit 중 컨버터가 예외를 던지면 `@Transactional` 기본 동작(런타임 예외 시 롤백)에 의해 트랜잭션 전체가 롤백되어 **부분 저장은 발생하지 않으며**, 예외는 호출부까지 그대로 전파된다 — "호출 이전에 막는다"가 아니라 "커밋되지 않는다"로 보장 지점이 다를 뿐, 최종적으로 지키는 계약(부분 저장 없음, 예외 전파)은 동일하다.
+- **직렬화 자체의 실패**(순환 참조, 지원하지 않는 타입 등): `AttributeConverter`는 JPA가 flush/commit 시점에 호출하므로, `save()` 호출 시점에는 아직 실패 여부를 알 수 없다. 컨버터가 flush/commit 중 예외를 던지면 `@Transactional` 기본 동작(런타임 예외 시 롤백)에 의해 **`tenGodHiddenStemAnalysis` 자식 저장 트랜잭션은 롤백되어 JSON이 부분 기록되는 일은 없으며**, 예외는 호출부까지 전파된다.
+- **범위 한정 (코드 리뷰로 정정)**: 위 롤백 보장은 `tenGodHiddenStemAnalysis`를 저장하는 `@Transactional` 단계에만 적용된다. `SajuResultProvider.java:37`의 `sajuResultJdbcRepository.insertOrIgnore(...)`는 raw JDBC 호출로 **AUTO COMMIT**되어 이 자식 저장 트랜잭션과 별개다(`SajuResultWriteService.java:20,39` 주석 참조) — 즉 JSON 직렬화가 실패해도 `saju_result` 루트 행 자체는 이미 커밋된 채로 남고 `tenGodHiddenStemAnalysis`만 비어있을 수 있다. 이는 이번 JSON 마이그레이션이 새로 만든 상황이 아니라 `insertOrIgnore` 기반 동시성 처리(동시 요청 레이스 방지)를 위해 기존부터 의도된 2단계 커밋 구조이며, 이 상태의 재시도/재생성은 `specs/004-redis-hardening-refactor`의 `lock:saju-result:{userProfileId}` 분산락이 "조회→생성 전체 구간"을 보호하도록 예정된 범위에서 다뤄진다 — 이번 스펙의 범위가 아니다.
 
 ## 위반 시 동작
 

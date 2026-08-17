@@ -69,6 +69,6 @@
 
 ## 6. 테스트 전략
 
-**Decision**: (a) 신규 컨버터의 직렬화/역직렬화 라운드트립을 H2 기반 단위 테스트로 검증, (b) MySQL `json` 컬럼 타입 특이 동작(예: 저장 시 JSON 유효성 오류)은 Testcontainers MySQL 통합 테스트로 검증, (c) 기존 `CompanyMatchingOpenAICallerTest`에 "범위를 벗어난/중복된 month를 담은 응답이 기존 대상월 일치 검사로 이미 거부됨"을 확인하는 회귀 테스트 케이스를 추가(신규 검증 코드 없음 — 결정 #4 참고).
+**Decision**: (a) 신규 컨버터의 직렬화/역직렬화 라운드트립을 H2 기반 단위 테스트로 검증, (b) MySQL `json` 컬럼 타입 특이 동작(예: 저장 시 JSON 유효성 오류)은 Testcontainers MySQL 통합 테스트로 검증, (c) 기존 `CompanyMatchingOpenAICallerTest`에 "범위를 벗어난/중복된 month를 담은 응답이 기존 대상월 일치 검사로 이미 거부됨"을 확인하는 회귀 테스트 케이스를 추가(신규 검증 코드 없음 — 결정 #4 참고), (d) `JobRoleAnalyzerTest`에 음수 `FiveElements` 카운트(또는 동등한 비정상 입력)를 넣었을 때 `calculateMatchScore()`가 0 미만으로 내려가지 않는지 확인하는 회귀 테스트를 추가(결정 #4의 하한 클램프에 대응, tasks.md T019a).
 
 **Rationale**: 기존 테스트 인프라(H2 단위 + Testcontainers MySQL 통합)를 그대로 재사용하며 신규 의존성을 추가하지 않는다.

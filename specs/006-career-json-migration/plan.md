@@ -14,7 +14,7 @@
 
 **Primary Dependencies**: Spring Boot 4.0.5, Spring Data JPA (Hibernate), Spring AI `2.0.0-M4` (`ChatClient`, OpenAI), Jackson 3.x (`tools.jackson`, 프로젝트 전역 `com.fasterxml.jackson` 아님)
 
-**Storage**: MySQL 8 (운영/로컬), H2(단위 테스트), Testcontainers MySQL(통합 테스트) — 신규 JSON 컬럼은 기존 `ObjectMapConverter`(`career/converter/ObjectMapConverter.java`) 패턴을 따르는 `AttributeConverter<T, String>`으로 구현, `columnDefinition = "json"` 여부는 Phase 0 research에서 결정
+**Storage**: MySQL 8 (운영/로컬), H2(단위 테스트), Testcontainers MySQL(통합 테스트) — 신규 JSON 컬럼은 기존 `ObjectMapConverter`(`career/converter/ObjectMapConverter.java`) 패턴을 따르는 도메인별 `AttributeConverter<T, String>`으로 구현하고, 컬럼은 MySQL `json` 타입(`columnDefinition = "json"`)으로 선언한다(research.md #2에서 확정)
 
 **Testing**: JUnit 5 + `spring-boot-starter-test`, Testcontainers(MySQL 특화 통합 테스트, 예: JSON 컬럼 round-trip), H2(순수 단위 테스트)
 
