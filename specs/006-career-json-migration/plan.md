@@ -6,7 +6,7 @@
 
 ## Summary
 
-관운분석(`SajuResult`에 딸린 `TenGodData`/`HiddenStemData`), 커리어 컨설팅(`CareerConsultation`), 기업 궁합 분석(`CompanyCompatibility`) — 세 루트 엔티티에 딸린 정규화 자식 엔티티(각각 2/14/8개 직계, 다수의 손자 엔티티 포함)를 제거하고, AI/내부 분석 결과를 루트 엔티티당 JSON 컬럼 하나로 직렬화해 저장한다. (`CareerFortune` 자체는 이미 스칼라 컬럼뿐이라 변경 대상이 아니다.) 식별/조회에 쓰이는 스칼라 컬럼(예: `compatibilityMonth`, `consultationMonth`, 유니크 제약 필드)은 그대로 유지한다. 정합성 검사는 기존과 동일하게 AI 응답 DTO가 JSON으로 직렬화되기 *전* 단계(`ConsultationOpenAICaller.validate()` / `CompanyMatchingOpenAICaller.validate()`)에서 수행한다. 월(month) 범위는 기존 대상월 일치 검사가 이미 포괄하고, 점수(`MonthlyForecast.score`/`TargetRoleAnalysis.matchScore`)는 AI 응답 필드가 아니라 내부 결정론적 계산값(공식 자체가 0~100으로 자체 유계)이라 별도 caller 검증 코드 추가는 필요하지 않다 — 자세한 근거는 research.md #4 참고. 기존 저장 데이터는 개발 단계이므로 마이그레이션 스크립트 없이, 자식 테이블은 DROP, 컬럼 구조가 바뀌는 루트 테이블은 스키마 변경 후 TRUNCATE로 제거한다.
+관운분석(`SajuResult`에 딸린 `TenGodData`/`HiddenStemData`), 커리어 컨설팅(`CareerConsultation`), 기업 궁합 분석(`CompanyCompatibility`) — 세 루트 엔티티에 딸린 정규화 자식 엔티티(각각 2/14/8개 직계, 다수의 손자 엔티티 포함)를 제거하고, AI/내부 분석 결과를 루트 엔티티당 JSON 컬럼 하나로 직렬화해 저장한다. (`CareerFortune` 자체는 이미 스칼라 컬럼뿐이라 변경 대상이 아니다.) 식별/조회에 쓰이는 스칼라 컬럼(예: `compatibilityMonth`, `consultationMonth`, 유니크 제약 필드)은 그대로 유지한다. 정합성 검사는 기존과 동일하게 AI 응답 DTO가 JSON으로 직렬화되기 *전* 단계(`ConsultationOpenAICaller.validate()` / `CompanyMatchingOpenAICaller.validate()`)에서 수행한다. 월(month) 범위는 기존 대상월 일치 검사가 이미 포괄하고, 점수(`MonthlyForecast.score`/`TargetRoleAnalysis.matchScore`)는 AI 응답 필드가 아니라 내부 결정론적 계산값이라 별도 caller 검증 코드 추가는 필요하지 않다 — 다만 그 계산(`JobRoleAnalyzer.calculateMatchScore()`)의 하한 클램프가 코드에 강제되어 있지 않음이 리뷰로 드러나 방어적 클램프를 추가한다(자세한 근거는 research.md #4 참고). 기존 저장 데이터는 개발 단계이므로 마이그레이션 스크립트 없이, 자식 테이블은 DROP, 컬럼 구조가 바뀌는 루트 테이블(`career_consultation`/`company_compatibility`/`saju_result`)은 스키마 변경 후 TRUNCATE로 제거한다. `saju_result`는 이를 FK로 참조하는 `saju_full_data`/`career_fortune`(구조 변경 없음)도 함께 TRUNCATE해 사주 결과 전체를 리셋하고, `user_satisfaction_feedback`은 행을 지우지 않고 `company_compatibility_id`/`career_consultation_id` FK만 NULL로 해제해 피드백 내용을 보존한다 — FK 그래프에 따른 절차는 research.md #5 참고.
 
 ## Technical Context
 
@@ -71,8 +71,8 @@ SSAju/src/main/java/ssafy/SSAju/
 │   │   ├── ObjectMapConverter.java         # 기존 패턴 참고
 │   │   └── (신규 JSON 컬럼용 AttributeConverter 추가 — Phase 0에서 설계)
 │   ├── caller/
-│   │   ├── ConsultationOpenAICaller.java   # 변경: validate()에 range 검사 이관
-│   │   └── CompanyMatchingOpenAICaller.java # 변경: validate()에 range 검사 이관
+│   │   ├── ConsultationOpenAICaller.java   # 변경 없음(회귀 확인만) — range 검사 이관 없음, research.md #4 참고
+│   │   └── CompanyMatchingOpenAICaller.java # 변경 없음(설계 근거 주석만 추가) — score/matchScore는 이 DTO에 없는 필드라 이관 불가, research.md #4 참고
 │   └── mapper/ConsultationMapper.java      # 변경: 엔티티 매핑 → JSON 직렬화로 교체
 ├── service/
 │   ├── CompatibilityChildSaveService.java  # 삭제 또는 단순 JSON 저장으로 교체
@@ -83,10 +83,10 @@ SSAju/src/main/java/ssafy/SSAju/
     ├── CareerFortuneRepository.java        # 영향 적음 (자식 리포지토리 없음)
     ├── CareerConsultationRepository.java    # 영향 적음
     ├── CompanyCompatibilityRepository.java  # 영향 적음
-    └── (22개 자식 엔티티 전용 Repository 인터페이스)  # 삭제 대상
+    └── (Repository가 있는 자식/손자 엔티티 15개 전용 인터페이스만 삭제 대상 — 20개는 Repository 자체가 없어 엔티티 클래스만 삭제, data-model.md 참조)
 
 SSAju/src/test/java/ssafy/SSAju/
-├── career/caller/  # 기존 validate() 테스트 + range 검사 이관 테스트 추가
+├── career/caller/  # 기존 validate() 테스트 + JobRoleAnalyzer 하한 클램프 회귀 테스트 추가(T019a)
 └── service/        # 저장/조회 서비스 재작성에 따른 테스트 갱신
 ```
 

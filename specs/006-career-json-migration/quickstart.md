@@ -18,13 +18,15 @@
 
 ## 2. 스키마 수동 적용 (마이그레이션 스크립트 없음 — FR-009)
 
-research.md #5에서 확정한 절차에 따라 적용한다 (운영자가 로컬/개발 DB에서 수동 적용 — 이 문서/코드에 스크립트를 포함하지 않는다):
+research.md #5에서 확정한 절차에 따라 적용한다 (운영자가 로컬/개발 DB에서 수동 적용 — 이 문서/코드에 스크립트를 포함하지 않는다). `user_satisfaction_feedback`이 `company_compatibility`/`career_consultation`을, `saju_full_data`/`career_fortune`이 `saju_result`를 FK로 참조하고 있어 순서를 지키지 않으면 TRUNCATE가 거부된다:
 
-1. **사전 확인**: 대상 테이블(자식 24개 + 손자 다수, 루트 3개)의 현재 행 수를 `SELECT COUNT(*)`로 기록해둔다. 별도 백업은 하지 않는다(운영 데이터 아님, 개발 단계 — FR-006 전제).
-2. **자식/손자 테이블 DROP**: `industry`, `interview_tip`, `monthly_forecast`, `target_role_analysis`, `ten_god_data`, `hidden_stem_data` 등(data-model.md 전체 목록) — 자식→손자 순, FK로 참조하는 테이블부터 먼저 DROP.
-3. **루트 테이블 ALTER + TRUNCATE**: `career_consultation`, `company_compatibility`, `saju_result`에 `result_json`/`ten_god_hidden_stem_analysis` JSON 컬럼을 추가하고 구 컬럼(`summary`, `day_master_description` 등)을 제거한 뒤, TRUNCATE로 구버전 형식의 기존 행을 비운다.
-4. **실패 시**: FK 제약으로 DROP이 거부되면 해당 테이블을 참조하는 다른 테이블을 먼저 처리하도록 순서를 재조정한다. `SET FOREIGN_KEY_CHECKS=0`으로 강제 우회하지 않는다.
-5. **검증**: DROP된 각 테이블에 대해 `SHOW TABLES LIKE '...'` 결과가 비어있는지, TRUNCATE된 각 루트 테이블은 `SELECT COUNT(*)`가 0인지 확인한다.
+1. **사전 확인**: 대상 테이블(자식 24개 + 손자 다수, 루트 3개, `saju_full_data`/`career_fortune`, `user_satisfaction_feedback`)의 현재 행 수를 `SELECT COUNT(*)`로 기록해둔다. 별도 백업은 하지 않는다(운영 데이터 아님, 개발 단계 — FR-006 전제).
+2. **피드백 FK 해제 (삭제 아님)**: `UPDATE user_satisfaction_feedback SET company_compatibility_id = NULL, career_consultation_id = NULL WHERE company_compatibility_id IS NOT NULL OR career_consultation_id IS NOT NULL;` — 피드백 내용(행)은 보존하고 링크만 끊는다.
+3. **자식/손자 테이블 DROP**: `industry`, `interview_tip`, `monthly_forecast`, `target_role_analysis`, `ten_god_data`, `hidden_stem_data` 등(data-model.md 전체 목록) — 자식→손자 순, FK로 참조하는 테이블부터 먼저 DROP.
+4. **`career_consultation`/`company_compatibility` ALTER + TRUNCATE**: `result_json` JSON 컬럼을 추가하고 구 컬럼(`summary`, `day_master_description` 등)을 제거한 뒤 TRUNCATE.
+5. **`saju_full_data`/`career_fortune` TRUNCATE → `saju_result` ALTER + TRUNCATE**: 자식(`saju_full_data`, `career_fortune`)을 먼저 비운 뒤 `saju_result`에 `ten_god_hidden_stem_analysis` 컬럼을 추가하고 TRUNCATE — 구조적 일관성을 위해 사주 결과 전체를 리셋한다.
+6. **실패 시**: FK 제약으로 DROP/TRUNCATE가 거부되면 해당 테이블을 참조하는 다른 테이블을 먼저 처리하도록 순서를 재조정한다. `SET FOREIGN_KEY_CHECKS=0`으로 강제 우회하지 않는다.
+7. **검증**: DROP된 각 테이블에 대해 `SHOW TABLES LIKE '...'` 결과가 비어있는지, TRUNCATE된 각 테이블(`career_consultation`/`company_compatibility`/`saju_full_data`/`career_fortune`/`saju_result`)은 `SELECT COUNT(*)`가 0인지, `user_satisfaction_feedback`은 1단계에서 기록한 행 수와 동일한지(삭제 없음, FK만 NULL) 확인한다.
 
 ## 3. 시나리오별 검증
 
@@ -67,8 +69,9 @@ research.md #5에서 확정한 절차에 따라 적용한다 (운영자가 로�
 ### 3.4 기존 데이터 제거 확인 (User Story 3)
 
 1. §2에서 DROP한 자식/손자 테이블(`industry`, `monthly_forecast`, `ten_god_data` 등)이 더 이상 존재하지 않는지 확인 (`SHOW TABLES`)
-2. §2에서 ALTER+TRUNCATE한 루트 테이블(`career_consultation`, `company_compatibility`, `saju_result`)의 행 수가 0건인지 확인
-3. 신규 요청이 정상적으로 새 구조로 저장되는지 확인
+2. §2에서 ALTER+TRUNCATE한 테이블(`career_consultation`, `company_compatibility`, `saju_full_data`, `career_fortune`, `saju_result`)의 행 수가 0건인지 확인
+3. `user_satisfaction_feedback`의 행 수가 §2 1단계 사전 확인 값과 동일하고(삭제되지 않음), `company_compatibility_id`/`career_consultation_id`가 모두 `NULL`인지 확인
+4. 신규 요청이 정상적으로 새 구조로 저장되는지 확인
 
 ## 4. 참고 문서
 
