@@ -276,22 +276,11 @@ class ConsultationServiceTest {
         given(cachedConsultation.getOpenaiModelVersion()).willReturn("gpt-4o-mini");
         given(cachedConsultation.getId()).willReturn(99L);
         // restoreAdvice()가 호출하는 getter 설정
-        given(cachedConsultation.getIndustries()).willReturn(List.of());
-        given(cachedConsultation.getInterviewTips()).willReturn(List.of());
-        given(cachedConsultation.getStrengths()).willReturn(List.of());
-        given(cachedConsultation.getCautions()).willReturn(List.of());
-        given(cachedConsultation.getKeyTenGods()).willReturn(List.of());
-        given(cachedConsultation.getWealthStyle()).willReturn(null);
-        given(cachedConsultation.getRoadmap()).willReturn(null);
-        given(cachedConsultation.getPersonalBranding()).willReturn(null);
-        given(cachedConsultation.getPowerKeywords()).willReturn(null);
-        given(cachedConsultation.getMentalCare()).willReturn(null);
-        given(cachedConsultation.getEnvironmentFit()).willReturn(null);
-        given(cachedConsultation.getWorkStyle()).willReturn(null);
-        given(cachedConsultation.getRelationshipStrategy()).willReturn(null);
-        given(cachedConsultation.getCareerTimeline()).willReturn(null);
-        given(cachedConsultation.getDayMasterDescription()).willReturn("");
-        given(cachedConsultation.getFiveElementsAnalysis()).willReturn("");
+        given(cachedConsultation.getResultJson()).willReturn(new CareerAdviceResponse(
+                List.of(), List.of(), List.of(), List.of(),
+                null, null, null, null, null, null, null, null, null,
+                List.of(), "", ""
+        ));
 
         service.getCareerConsultation(VALID_REQUEST, USER_ID);
 

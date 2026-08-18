@@ -57,39 +57,16 @@ class CompanyCompatibilityJdbcRepositoryTest {
     @Autowired private CompanyCompatibilityRepository compatibilityRepository;
     @Autowired private UserProfileRepository userProfileRepository;
     @Autowired private SajuResultRepository sajuResultRepository;
-    @Autowired private TenGodDataRepository tenGodDataRepository;
-    @Autowired private HiddenStemDataRepository hiddenStemDataRepository;
     @Autowired private CareerFortuneRepository careerFortuneRepository;
     @Autowired private SajuFullDataRepository sajuFullDataRepository;
     @Autowired private UserRepository userRepository;
-
-    // company_compatibility의 자식 테이블 레포지토리 (FK 안전 삭제용)
-    @Autowired private TargetRoleAnalysisRepository targetRoleAnalysisRepository;
-    @Autowired private FiveElementsAnalysisRepository fiveElementsAnalysisRepository;
-    @Autowired private AnalysisBreakdownRepository analysisBreakdownRepository;
-    @Autowired private ActionableStrategyRepository actionableStrategyRepository;
-    @Autowired private ExpectedInterviewQuestionRepository expectedInterviewQuestionRepository;
-    @Autowired private RoleCompatibilityRepository roleCompatibilityRepository;
-    @Autowired private MonthlyForecastRepository monthlyForecastRepository;
-    @Autowired private CautionRepository cautionRepository;
 
     private UserProfile savedProfile;
     private User testUser;
 
     @BeforeEach
     void setUp() {
-        // FK 의존성 역순 삭제: 자식 → 부모 순서로 삭제해야 제약 위반을 방지
-        targetRoleAnalysisRepository.deleteAllInBatch();
-        fiveElementsAnalysisRepository.deleteAllInBatch();
-        analysisBreakdownRepository.deleteAllInBatch();
-        actionableStrategyRepository.deleteAllInBatch();
-        expectedInterviewQuestionRepository.deleteAllInBatch();
-        roleCompatibilityRepository.deleteAllInBatch();
-        monthlyForecastRepository.deleteAllInBatch();
-        cautionRepository.deleteAllInBatch();
         compatibilityRepository.deleteAllInBatch();
-        tenGodDataRepository.deleteAllInBatch();
-        hiddenStemDataRepository.deleteAllInBatch();
         careerFortuneRepository.deleteAllInBatch();
         sajuFullDataRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
