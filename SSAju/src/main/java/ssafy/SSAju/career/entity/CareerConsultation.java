@@ -37,7 +37,7 @@ public class CareerConsultation {
     private Integer consultationMonth;
 
     @Convert(converter = ConsultationResultConverter.class)
-    @Column(name = "result_json", columnDefinition = "json")
+    @Column(name = "result_json", columnDefinition = "json", nullable = false)
     private CareerAdviceResponse resultJson;
 
     @CreatedDate

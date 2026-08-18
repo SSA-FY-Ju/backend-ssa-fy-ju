@@ -135,9 +135,9 @@ class ConsultationOpenAICallerTest {
     // ─────────────────────────────────────────
 
     private static CareerAdviceResponse advice(
-            java.util.List<CareerAdviceResponse.IndustryRecommendation> industries,
-            java.util.List<String> interviewTips,
-            java.util.List<String> strengths) {
+            List<CareerAdviceResponse.IndustryRecommendation> industries,
+            List<String> interviewTips,
+            List<String> strengths) {
         return new CareerAdviceResponse(
                 industries, interviewTips, strengths, List.of(),
                 null, null, null, null, null, null, null, null, null,
@@ -153,7 +153,8 @@ class ConsultationOpenAICallerTest {
                 .willReturn(response);
 
         assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
-                .isInstanceOf(OpenAIApiException.class);
+                .isInstanceOf(OpenAIApiException.class)
+                .hasMessageContaining("산업 추천 정보가 누락되었습니다");
     }
 
     @Test
@@ -166,7 +167,8 @@ class ConsultationOpenAICallerTest {
                 .willReturn(response);
 
         assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
-                .isInstanceOf(OpenAIApiException.class);
+                .isInstanceOf(OpenAIApiException.class)
+                .hasMessageContaining("산업 추천 항목에 빈 name 또는 reason이 포함되어 있습니다");
     }
 
     @Test
@@ -179,7 +181,8 @@ class ConsultationOpenAICallerTest {
                 .willReturn(response);
 
         assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
-                .isInstanceOf(OpenAIApiException.class);
+                .isInstanceOf(OpenAIApiException.class)
+                .hasMessageContaining("면접 팁 정보가 누락되었습니다");
     }
 
     @Test
@@ -192,7 +195,8 @@ class ConsultationOpenAICallerTest {
                 .willReturn(response);
 
         assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
-                .isInstanceOf(OpenAIApiException.class);
+                .isInstanceOf(OpenAIApiException.class)
+                .hasMessageContaining("강점 분석 정보가 누락되었습니다");
     }
 
     @Test

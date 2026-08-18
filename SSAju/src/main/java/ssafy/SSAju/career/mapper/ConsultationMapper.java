@@ -12,6 +12,7 @@ import ssafy.SSAju.career.enums.TenGodConstants;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.response.ConsultationResponse;
+import ssafy.SSAju.exception.DataAccessException;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -51,7 +52,11 @@ public class ConsultationMapper {
      * 저장된 CareerConsultation에서 CareerAdviceResponse 복원 (캐시 히트 시 사용).
      */
     public CareerAdviceResponse restoreAdvice(CareerConsultation cc) {
-        return cc.getResultJson();
+        CareerAdviceResponse advice = cc.getResultJson();
+        if (advice == null) {
+            throw new DataAccessException("CareerConsultation.resultJson이 없습니다: id=" + cc.getId());
+        }
+        return advice;
     }
 
     public ConsultationResponse toResponse(FastAPIResponse sajuData,

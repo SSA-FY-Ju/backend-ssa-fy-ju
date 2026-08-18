@@ -5,6 +5,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -12,6 +14,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.SajuResult;
@@ -32,6 +35,7 @@ import ssafy.SSAju.repository.UserSatisfactionFeedbackRepository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,6 +98,7 @@ class CareerResultLegacyDataCleanupIntegrationTest {
     @Autowired private CareerConsultationRepository careerConsultationRepository;
     @Autowired private CompanyCompatibilityRepository companyCompatibilityRepository;
     @Autowired private UserSatisfactionFeedbackRepository feedbackRepository;
+    @PersistenceContext private EntityManager entityManager;
 
     private User testUser;
     private UserProfile testProfile;
@@ -167,9 +172,20 @@ class CareerResultLegacyDataCleanupIntegrationTest {
     }
 
     @Test
-    @DisplayName("(b 유사) 새 스키마로 저장한 CompanyCompatibility에 자식 테이블 없이 resultJson만으로 완결된 응답 재구성이 가능하다")
+    @DisplayName("(b 유사) 새 스키마로 저장한 CompanyCompatibility는 자식 테이블 없이 resultJson만으로 재조회 시 완결된 데이터를 복원한다")
     void newSchemaWrites_doNotDependOnDroppedChildTables() {
-        CompanyCompatibility saved = companyCompatibilityRepository.save(CompanyCompatibility.builder()
+        CompatibilityAnalysisData analysisData = new CompatibilityAnalysisData(
+                new CompatibilityAnalysisData.RoleAnalysis(88, "시너지", "주의"),
+                new CompatibilityAnalysisData.FiveElementsInfo(Map.of("木", 2), Map.of("金", 3), "오행 시너지"),
+                new CompatibilityAnalysisData.ScoreBreakdown(75, 80, 70),
+                new CompatibilityAnalysisData.StrategyInfo(List.of("키워드1"), "약점 보완", List.of("월요일"), "오전"),
+                List.of(new CompatibilityAnalysisData.InterviewQuestion("질문1", "의도1")),
+                List.of(),
+                List.of(),
+                List.of("유의사항1")
+        );
+
+        CompanyCompatibility built = CompanyCompatibility.builder()
                 .userProfile(testProfile)
                 .user(testUser)
                 .companyName("현대오토에버")
@@ -178,10 +194,19 @@ class CareerResultLegacyDataCleanupIntegrationTest {
                 .compatibilityScore(80)
                 .summary("요약")
                 .compatibilityMonth(202605)
-                .build());
+                .build();
+        built.assignResultJsonAndMarkCompleted(analysisData);
 
-        assertThat(saved.getId()).isNotNull();
-        assertThat(saved.isCompleted()).isFalse();
+        Long id = companyCompatibilityRepository.save(built).getId();
+        entityManager.flush();
+        entityManager.clear(); // 영속성 컨텍스트 1차 캐시를 비워 실제 DB 재조회를 강제
+
+        CompanyCompatibility reloaded = companyCompatibilityRepository.findById(id).orElseThrow();
+        assertThat(reloaded.isCompleted()).isTrue();
+        assertThat(reloaded.getResultJson().roleAnalysis().matchScore()).isEqualTo(88);
+        assertThat(reloaded.getResultJson().fiveElements().userDistribution()).isEqualTo(Map.of("木", 2));
+        assertThat(reloaded.getResultJson().strategy().keywords()).containsExactly("키워드1");
+        assertThat(reloaded.getResultJson().cautions()).containsExactly("유의사항1");
         assertThat(companyCompatibilityRepository.count()).isEqualTo(1);
     }
 }

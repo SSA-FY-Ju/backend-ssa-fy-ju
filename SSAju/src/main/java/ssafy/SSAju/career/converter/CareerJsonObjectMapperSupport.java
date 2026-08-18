@@ -20,6 +20,8 @@ import java.time.format.DateTimeFormatter;
  */
 public final class CareerJsonObjectMapperSupport {
 
+    private static final String INSTANT_KST_MODULE_NAME = "CareerJsonInstantKstModule";
+
     private static final DateTimeFormatter KST_FORMATTER =
             DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneId.of("Asia/Seoul"));
 
@@ -35,7 +37,7 @@ public final class CareerJsonObjectMapperSupport {
     }
 
     private static SimpleModule instantKstSerializerModule() {
-        SimpleModule module = new SimpleModule("CareerJsonInstantKstModule");
+        SimpleModule module = new SimpleModule(INSTANT_KST_MODULE_NAME);
         module.addSerializer(Instant.class, new StdSerializer<>(Instant.class) {
             @Override
             public void serialize(Instant value, JsonGenerator gen, SerializationContext ctxt)
