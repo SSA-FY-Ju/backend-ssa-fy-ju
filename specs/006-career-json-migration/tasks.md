@@ -105,7 +105,7 @@ description: "Task list for 커리어 분석 결과 JSON 저장 마이그레이�
 
 - [ ] T022 [US3] 로컬/개발 DB에 신규 스키마를 수동 적용 (순서 중요, quickstart.md §2):
   1. `UPDATE user_satisfaction_feedback SET company_compatibility_id = NULL, career_consultation_id = NULL WHERE ...` — 피드백 행은 보존, 참조만 해제
-  2. 자식/손자 테이블(`industry`, `monthly_forecast`, `ten_god_data`, `hidden_stem_data` 등 data-model.md 전체 목록) **DROP TABLE**
+  2. 자식/손자 테이블(`industry`, `monthly_forecast`, `ten_god_data`, `hidden_stem_data` 등 data-model.md 전체 목록) **DROP TABLE** — 손자 → 자식 순(가장 깊이 참조하는 테이블부터, research.md #5 참고)
   3. `career_consultation`, `company_compatibility` **ALTER TABLE**(`result_json` 컬럼 추가) 후 **TRUNCATE**
   4. `saju_full_data`, `career_fortune` **TRUNCATE** → `saju_result` **ALTER TABLE**(`ten_god_hidden_stem_analysis` 컬럼 추가) 후 **TRUNCATE** — 구조적 일관성을 위해 사주 결과 전체를 리셋
   버전관리에 스크립트 커밋하지 않음(FR-009) (depends on T009, T010, T011)

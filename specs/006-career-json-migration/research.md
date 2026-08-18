@@ -57,7 +57,7 @@
 **수동 적용 절차** (버전관리 커밋 없음, 운영자가 로컬/개발 DB에서 직접 수행 — FR-009):
 1. 적용 전 각 대상 테이블의 행 수를 기록 (`SELECT COUNT(*)`) — 사전 확인용, 별도 백업 불필요(운영 데이터 아님, 개발 단계).
 2. `UPDATE user_satisfaction_feedback SET company_compatibility_id = NULL, career_consultation_id = NULL WHERE company_compatibility_id IS NOT NULL OR career_consultation_id IS NOT NULL;`
-3. FK 의존 순서를 지켜 자식 → 손자 순으로, 각 루트를 참조하는 자식부터 먼저 DROP (24개 자식/손자 테이블).
+3. FK 의존 순서를 지켜 **손자 → 자식 순으로**(가장 깊이 참조하는 테이블부터) DROP — 예: `ActionableKeyword`/`LuckyDay`(손자)가 `ActionableStrategy`(자식)를 FK로 참조하므로 `ActionableKeyword`/`LuckyDay`를 먼저 DROP해야 `ActionableStrategy`의 DROP이 FK 위반 없이 성공한다(24개 자식/손자 테이블 전체 — data-model.md 목록). 실제 참조 관계가 문서와 다를 수 있으므로, DROP 전 `SELECT * FROM information_schema.KEY_COLUMN_USAGE WHERE REFERENCED_TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IN (...)`로 대상 테이블을 참조하는 다른 테이블이 남아있지 않은지 사전 확인한다.
 4. `career_consultation`, `company_compatibility` ALTER TABLE 후 TRUNCATE.
 5. `saju_full_data`, `career_fortune` TRUNCATE → `saju_result` ALTER TABLE 후 TRUNCATE (자식이 부모보다 먼저 비워져야 함).
 6. 실패 시(예: FK 제약으로 DROP/TRUNCATE 거부) 대상 테이블의 FK를 먼저 확인해 순서를 재조정 — 강제로 FK를 비활성화(`SET FOREIGN_KEY_CHECKS=0`)하지 않는다(의도치 않은 다른 FK 무결성 손상 방지).
