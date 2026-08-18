@@ -4,15 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.career.entity.CareerFortune;
-import ssafy.SSAju.career.entity.HiddenStemData;
 import ssafy.SSAju.career.entity.SajuFullData;
 import ssafy.SSAju.career.entity.SajuResult;
-import ssafy.SSAju.career.entity.TenGodData;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.repository.SajuResultRepository;
-
-import java.util.List;
 
 /**
  * SajuResult 신규 저장 시 자식 엔티티를 단일 트랜잭션으로 보호.
@@ -60,24 +56,7 @@ public class SajuResultWriteService {
                     .build());
         }
 
-        List<TenGodData> tenGods = source.getTenGodDataList().stream()
-                .map(e -> TenGodData.builder()
-                        .sajuResult(saved)
-                        .tenGodName(e.getTenGodName())
-                        .score(e.getScore())
-                        .build())
-                .collect(java.util.stream.Collectors.toList());
-
-        List<HiddenStemData> hiddenStems = source.getHiddenStemDataList().stream()
-                .map(e -> HiddenStemData.builder()
-                        .sajuResult(saved)
-                        .earthlyBranch(e.getEarthlyBranch())
-                        .hiddenStem(e.getHiddenStem())
-                        .build())
-                .collect(java.util.stream.Collectors.toList());
-
-        saved.assignTenGodData(tenGods);
-        saved.assignHiddenStemData(hiddenStems);
+        saved.assignTenGodHiddenStemAnalysis(source.getTenGodHiddenStemAnalysis());
 
         CareerFortune cf = source.getCareerFortune();
         if (cf != null) {

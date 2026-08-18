@@ -4,13 +4,11 @@ import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.career.converter.TenGodHiddenStemConverter;
+import ssafy.SSAju.career.domain.TenGodHiddenStemAnalysis;
 import ssafy.SSAju.entity.User;
-import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 
 @Getter
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
@@ -40,11 +38,9 @@ public class SajuResult {
     @OneToOne(mappedBy = "sajuResult", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private SajuFullData sajuFullData;
 
-    @OneToMany(mappedBy = "sajuResult", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<TenGodData> tenGodDataList = new ArrayList<>();
-
-    @OneToMany(mappedBy = "sajuResult", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<HiddenStemData> hiddenStemDataList = new ArrayList<>();
+    @Convert(converter = TenGodHiddenStemConverter.class)
+    @Column(name = "ten_god_hidden_stem_analysis", columnDefinition = "json")
+    private TenGodHiddenStemAnalysis tenGodHiddenStemAnalysis;
 
     @OneToOne(mappedBy = "sajuResult", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private CareerFortune careerFortune;
@@ -66,14 +62,8 @@ public class SajuResult {
         }
     }
 
-    public void assignTenGodData(List<TenGodData> list) {
-        this.tenGodDataList.clear();
-        this.tenGodDataList.addAll(list);
-    }
-
-    public void assignHiddenStemData(List<HiddenStemData> list) {
-        this.hiddenStemDataList.clear();
-        this.hiddenStemDataList.addAll(list);
+    public void assignTenGodHiddenStemAnalysis(TenGodHiddenStemAnalysis analysis) {
+        this.tenGodHiddenStemAnalysis = analysis;
     }
 
     public void assignCareerFortune(CareerFortune fortune) {

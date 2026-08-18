@@ -2,13 +2,17 @@ package ssafy.SSAju.career.mapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import ssafy.SSAju.career.entity.*;
+import ssafy.SSAju.career.domain.TenGodHiddenStemAnalysis;
+import ssafy.SSAju.career.entity.CareerConsultation;
+import ssafy.SSAju.career.entity.CareerFortune;
+import ssafy.SSAju.career.entity.SajuFullData;
+import ssafy.SSAju.career.entity.SajuResult;
+import ssafy.SSAju.dto.external.CareerAdviceResponse;
+import ssafy.SSAju.dto.response.ConsultationResponse;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
-import ssafy.SSAju.dto.response.ConsultationResponse;
-
 import java.util.List;
 import java.util.Map;
 
@@ -24,6 +28,15 @@ class ConsultationMapperTest {
             Instant.parse("2026-05-27T12:00:00Z"), ZoneId.of("Asia/Seoul"));
     private final ConsultationMapper mapper = new ConsultationMapper(FIXED_CLOCK);
 
+    private static CareerAdviceResponse advice(String dayMasterDescription, String fiveElementsAnalysis) {
+        return new CareerAdviceResponse(
+                List.of(), List.of(), List.of(), List.of(),
+                null, null, null, null, null, null, null, null, null,
+                List.of("정관"),
+                dayMasterDescription, fiveElementsAnalysis
+        );
+    }
+
     @Test
     @DisplayName("CareerConsultation 엔티티 → ConsultationResponse 정상 복원")
     void shouldRestoreConsultationResponse_FromEntity() {
@@ -33,14 +46,10 @@ class ConsultationMapperTest {
         var cf = mock(CareerFortune.class);
         var cc = mock(CareerConsultation.class);
 
-        var tenGodData = TenGodData.builder()
-                .tenGodName("정관")
-                .score(2)
-                .build();
-
         given(sajuResult.getSajuFullData()).willReturn(sfd);
         given(sajuResult.getCareerFortune()).willReturn(cf);
-        given(sajuResult.getTenGodDataList()).willReturn(List.of(tenGodData));
+        given(sajuResult.getTenGodHiddenStemAnalysis())
+                .willReturn(new TenGodHiddenStemAnalysis(Map.of("정관", 2), Map.of()));
 
         given(sfd.getDayMaster()).willReturn("己");
         given(sfd.getFiveElements()).willReturn(Map.of("木", 1, "火", 2, "土", 2, "金", 2, "水", 1));
@@ -52,23 +61,7 @@ class ConsultationMapperTest {
         given(cc.getId()).willReturn(42L);
         given(cc.getSajuResult()).willReturn(sajuResult);
         given(cc.getOpenaiModelVersion()).willReturn("gpt-4o-mini");
-        given(cc.getDayMasterDescription()).willReturn("己土 - 수용적 성향");
-        given(cc.getFiveElementsAnalysis()).willReturn("金 강세");
-
-        given(cc.getIndustries()).willReturn(List.of());
-        given(cc.getInterviewTips()).willReturn(List.of());
-        given(cc.getStrengths()).willReturn(List.of());
-        given(cc.getCautions()).willReturn(List.of());
-        given(cc.getKeyTenGods()).willReturn(List.of());
-        given(cc.getWealthStyle()).willReturn(null);
-        given(cc.getRoadmap()).willReturn(null);
-        given(cc.getPersonalBranding()).willReturn(null);
-        given(cc.getPowerKeywords()).willReturn(null);
-        given(cc.getMentalCare()).willReturn(null);
-        given(cc.getEnvironmentFit()).willReturn(null);
-        given(cc.getWorkStyle()).willReturn(null);
-        given(cc.getRelationshipStrategy()).willReturn(null);
-        given(cc.getCareerTimeline()).willReturn(null);
+        given(cc.getResultJson()).willReturn(advice("己土 - 수용적 성향", "金 강세"));
 
         // When
         ConsultationResponse result = mapper.toResponseFromEntity(cc);
@@ -95,7 +88,8 @@ class ConsultationMapperTest {
 
         given(sajuResult.getSajuFullData()).willReturn(null);
         given(sajuResult.getCareerFortune()).willReturn(cf);
-        given(sajuResult.getTenGodDataList()).willReturn(List.of());
+        given(sajuResult.getTenGodHiddenStemAnalysis())
+                .willReturn(new TenGodHiddenStemAnalysis(Map.of(), Map.of()));
 
         given(cf.getFavoredPeriod()).willReturn("H2");
         given(cf.getConfidenceScore()).willReturn(60);
@@ -104,23 +98,7 @@ class ConsultationMapperTest {
         given(cc.getId()).willReturn(1L);
         given(cc.getSajuResult()).willReturn(sajuResult);
         given(cc.getOpenaiModelVersion()).willReturn("gpt-4o");
-        given(cc.getDayMasterDescription()).willReturn("");
-        given(cc.getFiveElementsAnalysis()).willReturn("");
-
-        given(cc.getIndustries()).willReturn(List.of());
-        given(cc.getInterviewTips()).willReturn(List.of());
-        given(cc.getStrengths()).willReturn(List.of());
-        given(cc.getCautions()).willReturn(List.of());
-        given(cc.getKeyTenGods()).willReturn(List.of());
-        given(cc.getWealthStyle()).willReturn(null);
-        given(cc.getRoadmap()).willReturn(null);
-        given(cc.getPersonalBranding()).willReturn(null);
-        given(cc.getPowerKeywords()).willReturn(null);
-        given(cc.getMentalCare()).willReturn(null);
-        given(cc.getEnvironmentFit()).willReturn(null);
-        given(cc.getWorkStyle()).willReturn(null);
-        given(cc.getRelationshipStrategy()).willReturn(null);
-        given(cc.getCareerTimeline()).willReturn(null);
+        given(cc.getResultJson()).willReturn(advice("", ""));
 
         ConsultationResponse result = mapper.toResponseFromEntity(cc);
 
@@ -138,7 +116,8 @@ class ConsultationMapperTest {
 
         given(sajuResult.getSajuFullData()).willReturn(sfd);
         given(sajuResult.getCareerFortune()).willReturn(null);
-        given(sajuResult.getTenGodDataList()).willReturn(List.of());
+        given(sajuResult.getTenGodHiddenStemAnalysis())
+                .willReturn(new TenGodHiddenStemAnalysis(Map.of(), Map.of()));
 
         given(sfd.getDayMaster()).willReturn("甲");
         given(sfd.getFiveElements()).willReturn(Map.of("木", 3));
@@ -146,23 +125,7 @@ class ConsultationMapperTest {
         given(cc.getId()).willReturn(2L);
         given(cc.getSajuResult()).willReturn(sajuResult);
         given(cc.getOpenaiModelVersion()).willReturn("gpt-4o-mini");
-        given(cc.getDayMasterDescription()).willReturn("甲木");
-        given(cc.getFiveElementsAnalysis()).willReturn("木 강세");
-
-        given(cc.getIndustries()).willReturn(List.of());
-        given(cc.getInterviewTips()).willReturn(List.of());
-        given(cc.getStrengths()).willReturn(List.of());
-        given(cc.getCautions()).willReturn(List.of());
-        given(cc.getKeyTenGods()).willReturn(List.of());
-        given(cc.getWealthStyle()).willReturn(null);
-        given(cc.getRoadmap()).willReturn(null);
-        given(cc.getPersonalBranding()).willReturn(null);
-        given(cc.getPowerKeywords()).willReturn(null);
-        given(cc.getMentalCare()).willReturn(null);
-        given(cc.getEnvironmentFit()).willReturn(null);
-        given(cc.getWorkStyle()).willReturn(null);
-        given(cc.getRelationshipStrategy()).willReturn(null);
-        given(cc.getCareerTimeline()).willReturn(null);
+        given(cc.getResultJson()).willReturn(advice("甲木", "木 강세"));
 
         ConsultationResponse result = mapper.toResponseFromEntity(cc);
 

@@ -21,6 +21,7 @@ import ssafy.SSAju.exception.OpenAIApiException;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -125,5 +126,91 @@ class ConsultationOpenAICallerTest {
         // @Retryable의 retryFor 목록에 포함되어 정상적으로 재시도 대상이 됨을 보장한다.
         assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
                 .isInstanceOf(TransientAiException.class);
+    }
+
+    // ─────────────────────────────────────────
+    // T019: validate()의 기존 null/blank/필수 컬렉션 검사 회귀 확인
+    // (JSON 마이그레이션으로 CareerAdviceResponse 필드 구조 자체는 변경되지 않았으므로
+    // 검증 로직도 변경 없이 그대로 동작해야 한다)
+    // ─────────────────────────────────────────
+
+    private static CareerAdviceResponse advice(
+            List<CareerAdviceResponse.IndustryRecommendation> industries,
+            List<String> interviewTips,
+            List<String> strengths) {
+        return new CareerAdviceResponse(
+                industries, interviewTips, strengths, List.of(),
+                null, null, null, null, null, null, null, null, null,
+                List.of(), "일간 설명", "오행 설명"
+        );
+    }
+
+    @Test
+    @DisplayName("industries가 비어있으면 OpenAIApiException")
+    void emptyIndustries_throwsOpenAIApiException() {
+        CareerAdviceResponse response = advice(List.of(), List.of("팁"), List.of("강점"));
+        given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
+                .willReturn(response);
+
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+                .isInstanceOf(OpenAIApiException.class)
+                .hasMessageContaining("산업 추천 정보가 누락되었습니다");
+    }
+
+    @Test
+    @DisplayName("industries 항목의 name/reason이 blank면 OpenAIApiException")
+    void blankIndustryItem_throwsOpenAIApiException() {
+        CareerAdviceResponse response = advice(
+                List.of(new CareerAdviceResponse.IndustryRecommendation("  ", "이유", List.of())),
+                List.of("팁"), List.of("강점"));
+        given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
+                .willReturn(response);
+
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+                .isInstanceOf(OpenAIApiException.class)
+                .hasMessageContaining("산업 추천 항목에 빈 name 또는 reason이 포함되어 있습니다");
+    }
+
+    @Test
+    @DisplayName("interviewTips가 비어있으면 OpenAIApiException")
+    void emptyInterviewTips_throwsOpenAIApiException() {
+        CareerAdviceResponse response = advice(
+                List.of(new CareerAdviceResponse.IndustryRecommendation("IT", "이유", List.of())),
+                List.of(), List.of("강점"));
+        given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
+                .willReturn(response);
+
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+                .isInstanceOf(OpenAIApiException.class)
+                .hasMessageContaining("면접 팁 정보가 누락되었습니다");
+    }
+
+    @Test
+    @DisplayName("strengths가 비어있으면 OpenAIApiException")
+    void emptyStrengths_throwsOpenAIApiException() {
+        CareerAdviceResponse response = advice(
+                List.of(new CareerAdviceResponse.IndustryRecommendation("IT", "이유", List.of())),
+                List.of("팁"), List.of());
+        given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
+                .willReturn(response);
+
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+                .isInstanceOf(OpenAIApiException.class)
+                .hasMessageContaining("강점 분석 정보가 누락되었습니다");
+    }
+
+    @Test
+    @DisplayName("모든 필드가 유효하면 정상적으로 응답을 반환한다")
+    void validResponse_returnsAsIs() {
+        CareerAdviceResponse response = advice(
+                List.of(new CareerAdviceResponse.IndustryRecommendation("IT", "이유", List.of("백엔드"))),
+                List.of("팁"), List.of("강점"));
+        given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
+                .willReturn(response);
+
+        CareerAdviceResponse result = caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己");
+
+        assertThat(result.industries()).hasSize(1);
+        assertThat(result.strengths()).containsExactly("강점");
     }
 }

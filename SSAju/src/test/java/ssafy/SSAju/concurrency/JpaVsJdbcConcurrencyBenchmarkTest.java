@@ -14,11 +14,9 @@ import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.repository.CareerFortuneRepository;
-import ssafy.SSAju.repository.HiddenStemDataRepository;
 import ssafy.SSAju.repository.SajuFullDataRepository;
 import ssafy.SSAju.repository.SajuResultJdbcRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
-import ssafy.SSAju.repository.TenGodDataRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 import ssafy.SSAju.repository.UserRepository;
 
@@ -54,8 +52,6 @@ class JpaVsJdbcConcurrencyBenchmarkTest {
     @Autowired private SajuResultRepository      sajuResultRepository;
     @Autowired private SajuResultJdbcRepository  sajuResultJdbcRepository;
     @Autowired private UserProfileRepository     userProfileRepository;
-    @Autowired private TenGodDataRepository      tenGodDataRepository;
-    @Autowired private HiddenStemDataRepository  hiddenStemDataRepository;
     @Autowired private CareerFortuneRepository   careerFortuneRepository;
     @Autowired private SajuFullDataRepository    sajuFullDataRepository;
     @Autowired private UserRepository            userRepository;
@@ -64,8 +60,6 @@ class JpaVsJdbcConcurrencyBenchmarkTest {
 
     @BeforeEach
     void cleanDb() {
-        tenGodDataRepository.deleteAllInBatch();
-        hiddenStemDataRepository.deleteAllInBatch();
         careerFortuneRepository.deleteAllInBatch();
         sajuFullDataRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();

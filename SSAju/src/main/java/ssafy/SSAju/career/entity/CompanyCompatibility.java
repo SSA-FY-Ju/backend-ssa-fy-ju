@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import ssafy.SSAju.career.converter.CompatibilityResultConverter;
+import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.util.JobCategoryEnum;
 import ssafy.SSAju.entity.User;
 
@@ -54,6 +56,19 @@ public class CompanyCompatibility {
     private String summary;
 
     /**
+     * 궁합 분석 결과 상세(직무 적합도 점수, 오행 분포, 세부 점수, 전략, 면접 질문, 직무 궁합, 월별 운세, 유의사항).
+     *
+     * <p>이전에는 8개 자식 엔티티로 나뉘어 저장되던 값을 하나의 JSON으로 저장한다.
+     * OpenAI가 생성한 서술형 텍스트(roleSynergy, weaknessDefense 등)와 내부에서 결정론적으로
+     * 계산되는 점수(matchScore, 오행 분포, breakdown 점수 등)가 함께 들어있다 — 점수는
+     * {@code CompatibilityNarrativeResponse}(OpenAI 응답 DTO)에 없는 필드이므로, 이 컬럼은
+     * 그 DTO가 아니라 두 종류를 이미 조합해 둔 내부 VO({@link CompatibilityAnalysisData})를 저장 대상으로 삼는다.
+     */
+    @Convert(converter = CompatibilityResultConverter.class)
+    @Column(name = "result_json", columnDefinition = "json")
+    private CompatibilityAnalysisData resultJson;
+
+    /**
      * 모든 자식 엔티티(TargetRoleAnalysis, FiveElementsAnalysis 등 8개)가
      * 정상적으로 저장 완료된 경우 true로 설정됩니다.
      *
@@ -71,24 +86,6 @@ public class CompanyCompatibility {
      */
     @Column(name = "compatibility_month", nullable = false)
     private Integer compatibilityMonth;
-
-    // ─────────────────────────────────────────
-    // 역방향 @OneToOne 매핑 (조회 전용 — FK 소유 안 함)
-    // CompatibilityChildReadService가 fetch join으로 한 번에 로드하기 위해 사용.
-    // 직접 접근 시 LAZY 프록시 초기화에 주의하세요.
-    // ─────────────────────────────────────────
-
-    @OneToOne(mappedBy = "companyCompatibility", fetch = FetchType.LAZY)
-    private TargetRoleAnalysis targetRoleAnalysis;
-
-    @OneToOne(mappedBy = "companyCompatibility", fetch = FetchType.LAZY)
-    private FiveElementsAnalysis fiveElementsAnalysis;
-
-    @OneToOne(mappedBy = "companyCompatibility", fetch = FetchType.LAZY)
-    private AnalysisBreakdown analysisBreakdown;
-
-    @OneToOne(mappedBy = "companyCompatibility", fetch = FetchType.LAZY)
-    private ActionableStrategy actionableStrategy;
 
     @Column(name = "analyzed_at", nullable = false, updatable = false)
     private Instant analyzedAt;
@@ -114,10 +111,10 @@ public class CompanyCompatibility {
     }
 
     /**
-     * 모든 자식 엔티티 저장이 완료된 후 호출합니다.
-     * completed 상태를 true로 전환하여 캐시 재사용을 허용합니다.
+     * 분석 결과 JSON을 저장하고 completed 상태를 true로 전환하여 캐시 재사용을 허용합니다.
      */
-    public void markCompleted() {
+    public void assignResultJsonAndMarkCompleted(CompatibilityAnalysisData resultJson) {
+        this.resultJson = resultJson;
         this.completed = true;
     }
 

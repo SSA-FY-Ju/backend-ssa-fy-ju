@@ -189,6 +189,25 @@ class CompanyMatchingOpenAICallerTest {
     }
 
     @Test
+    @DisplayName("monthlyAdvices에 중복된 월이 섞여 있으면 OpenAIApiException (T020 회귀)")
+    void monthlyAdvicesDuplicateMonth_throwsOpenAIApiException() {
+        // 개수는 5개지만 1월이 중복되고 5월이 누락된 경우 — 대상월 집합 일치 검사가 걸러내야 함
+        CompatibilityNarrativeResponse response = new CompatibilityNarrativeResponse(
+                "요약", "시너지", "경고", "오행 시너지", "약점 방어",
+                List.of(VALID_QUESTION), "전문가 사유", "리드 사유",
+                List.of(1, 1, 2, 3, 4).stream()
+                        .map(month -> new CompatibilityNarrativeResponse.MonthlyAdvice(month, month + "월 조언"))
+                        .toList(),
+                List.of("주의사항")
+        );
+        given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
+                .willReturn(response);
+
+        assertThatThrownBy(() -> caller.call(REQUEST))
+                .isInstanceOf(OpenAIApiException.class);
+    }
+
+    @Test
     @DisplayName("monthlyAdvices의 순서가 대상 월 순서와 달라도 월 집합만 같으면 통과한다")
     void monthlyAdvicesOutOfOrder_stillValid() {
         // 대상 월은 1~5지만, AI가 5,4,3,2,1 순서로 반환해도 유효해야 함(순서 비의존 검증)

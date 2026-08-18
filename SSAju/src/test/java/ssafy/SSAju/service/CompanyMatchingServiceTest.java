@@ -265,7 +265,7 @@ class CompanyMatchingServiceTest {
         // Given
         CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
         CompanyCompatibility completedEntity = buildCompatibility(MOCK_USER_PROFILE);
-        completedEntity.markCompleted();
+        completedEntity.assignResultJsonAndMarkCompleted(buildAnalysisData());
         CompatibilityResponse cachedResponse = new CompatibilityResponse(
                 completedEntity.getId(), null, 78, "캐시 요약",
                 null, null, null, null, null, null, null, null
@@ -341,7 +341,7 @@ class CompanyMatchingServiceTest {
                 Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
                         "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
         CompanyCompatibility completedEntity = buildCompatibility(MOCK_USER_PROFILE);
-        completedEntity.markCompleted();
+        completedEntity.assignResultJsonAndMarkCompleted(buildAnalysisData());
         CompatibilityResponse cachedResponse = new CompatibilityResponse(
                 completedEntity.getId(), null, 78, "캐시 요약",
                 null, null, null, null, null, null, null, null
@@ -526,5 +526,15 @@ class CompanyMatchingServiceTest {
                 .summary("테스트 요약")
                 .compatibilityMonth(TEST_COMPATIBILITY_MONTH)
                 .build();
+    }
+
+    private CompatibilityAnalysisData buildAnalysisData() {
+        return new CompatibilityAnalysisData(
+                new CompatibilityAnalysisData.RoleAnalysis(80, "시너지", "주의"),
+                new CompatibilityAnalysisData.FiveElementsInfo(Map.of(), Map.of(), "오행 시너지"),
+                new CompatibilityAnalysisData.ScoreBreakdown(70, 70, 70),
+                new CompatibilityAnalysisData.StrategyInfo(List.of(), "약점 보완", List.of(), "오전"),
+                List.of(), List.of(), List.of(), List.of()
+        );
     }
 }
