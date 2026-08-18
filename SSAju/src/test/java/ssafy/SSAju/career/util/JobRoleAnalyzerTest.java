@@ -68,4 +68,18 @@ class JobRoleAnalyzerTest {
         // Then
         assertThat(matchScore).isEqualTo(100);
     }
+
+    @Test
+    @DisplayName("비정상적으로 음수 오행 카운트가 들어와도 0 미만으로 내려가지 않는다 (하한 클램프)")
+    void shouldNotGoBelowZero_WhenElementCountIsNegative() {
+        // Given: 정상적으로는 발생하지 않는 음수 카운트를 직접 주입 (방어적 하한 클램프 검증용)
+        FiveElements userFiveElements = new FiveElements(
+                Map.of("木", 0, "火", 0, "土", 0, "金", -5, "水", -3));
+
+        // When
+        int matchScore = analyzer.analyze(userFiveElements, JobCategoryEnum.TECH_BACKEND);
+
+        // Then
+        assertThat(matchScore).isEqualTo(0);
+    }
 }

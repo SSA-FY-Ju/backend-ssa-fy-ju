@@ -84,6 +84,15 @@ public class CompanyMatchingOpenAICaller {
         throw ex;
     }
 
+    /**
+     * month 범위는 아래 monthlyAdvices 검증(대상월 집합 완전 일치)이 이미 포괄한다 — 범위를 벗어나거나
+     * 중복된 month는 이 일치 검사에서 자동으로 거부되므로 별도 range 검사를 추가하지 않는다.
+     *
+     * <p>{@code TargetRoleAnalysis.matchScore}/{@code MonthlyForecast.score}는 이 메서드가 검증하는
+     * {@link CompatibilityNarrativeResponse}에 필드로 존재하지 않는다 — OpenAI 응답이 아니라
+     * {@code JobRoleAnalyzer}/{@code AnalysisResponseBuilder}가 오행 데이터로 내부 계산하는 값이라
+     * 이 저장-전 검증의 대상이 아니다(계산 공식 자체가 0~100으로 자체 유계).
+     */
     private void validate(CompatibilityNarrativeResponse response, List<Integer> expectedTargetMonths) {
         OpenAIRetrySupport.requireNonNullResponse(
                 response, ErrorMessageConstants.COMPATIBILITY_NARRATIVE_EMPTY_RESPONSE);

@@ -24,6 +24,6 @@ public class JobRoleAnalyzer {
     private int calculateMatchScore(int primaryCount, int secondaryCount) {
         int score = primaryCount * AnalysisConstants.PRIMARY_MATCH_WEIGHT
                 + secondaryCount * AnalysisConstants.SECONDARY_MATCH_WEIGHT;
-        return Math.min(score, AnalysisConstants.MAX_SCORE);
+        return Math.max(0, Math.min(score, AnalysisConstants.MAX_SCORE));
     }
 }
