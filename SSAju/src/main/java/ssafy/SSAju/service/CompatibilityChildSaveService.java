@@ -6,25 +6,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
-import ssafy.SSAju.career.entity.*;
-import ssafy.SSAju.repository.*;
-
-import java.util.List;
-import java.util.Map;
-import java.util.stream.IntStream;
+import ssafy.SSAju.career.entity.CompanyCompatibility;
+import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 
 /**
- * 기업 궁합 자식 엔티티 저장 및 완료 상태 관리를 담당합니다.
- *
- * <p><strong>책임 분리 (SRP)</strong>:
- * {@link CompanyMatchingService}가 오케스트레이션에만 집중할 수 있도록
- * 자식 엔티티 저장 로직을 완전히 분리했습니다.
+ * 기업 궁합 분석 결과 저장 및 완료 상태 관리를 담당합니다.
  *
  * <p><strong>@Transactional(REQUIRES_NEW) 적용 이유</strong>:
  * <ul>
- *   <li>8개 자식 엔티티 저장을 단일 트랜잭션으로 묶어 원자성 보장</li>
- *   <li>중간 실패 시 전체 자식 저장이 롤백되어 부분 저장 방지</li>
- *   <li>CompanyMatchingService는 @Transactional 없음(외부 I/O 중 커넥션 점유 방지) →
+ *   <li>{@code CompanyMatchingService}는 @Transactional 없음(외부 I/O 중 커넥션 점유 방지) →
  *       호출자 트랜잭션이 없으므로 REQUIRES_NEW와 사실상 동일하게 동작하지만,
  *       명시적으로 선언하여 향후 @Transactional 추가 시에도 독립 트랜잭션을 보장합니다.</li>
  *   <li>같은 클래스 내 self-invocation에서는 Spring AOP 프록시가 작동하지 않으므로
@@ -32,9 +22,9 @@ import java.util.stream.IntStream;
  * </ul>
  *
  * <p><strong>completed 플래그 (Option A)</strong>:
- * 모든 자식 저장이 성공한 후 {@code markCompleted()}를 호출하여
+ * {@code resultJson} 저장과 {@code completed = true} 전환을 같은 트랜잭션에서 수행하여
  * {@link CompatibilityChildReadService#buildFromExisting}의 캐시 재사용을 허용합니다.
- * 저장 중 예외 발생 시 트랜잭션 롤백으로 자식 데이터 + completed 업데이트가 모두 취소됩니다.
+ * 저장 중 예외 발생 시 트랜잭션 롤백으로 JSON + completed 업데이트가 모두 취소됩니다.
  */
 @Slf4j
 @Service
@@ -42,157 +32,18 @@ import java.util.stream.IntStream;
 public class CompatibilityChildSaveService {
 
     private final CompanyCompatibilityRepository compatibilityRepository;
-    private final TargetRoleAnalysisRepository targetRoleAnalysisRepository;
-    private final FiveElementsAnalysisRepository fiveElementsAnalysisRepository;
-    private final AnalysisBreakdownRepository analysisBreakdownRepository;
-    private final ActionableStrategyRepository actionableStrategyRepository;
-    private final ActionableKeywordRepository actionableKeywordRepository;
-    private final LuckyDayRepository luckyDayRepository;
-    private final ExpectedInterviewQuestionRepository expectedInterviewQuestionRepository;
-    private final RoleCompatibilityRepository roleCompatibilityRepository;
-    private final MonthlyForecastRepository monthlyForecastRepository;
-    private final CautionRepository cautionRepository;
 
     /**
-     * 8개 자식 엔티티를 단일 트랜잭션으로 저장하고 완료 플래그를 업데이트합니다.
+     * 분석 결과를 JSON으로 저장하고 완료 플래그를 업데이트합니다.
      *
-     * <p>중간에 예외가 발생하면 전체 저장이 롤백되어 부분 저장을 방지합니다.
-     * 성공 시 {@code completed = true}로 업데이트하여 캐시 재사용을 허용합니다.
-     *
-     * @param saved        저장된 root 엔티티 (자식들의 FK 참조 대상)
+     * @param saved        저장된 root 엔티티
      * @param analysisData 분석 결과 내부 VO
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveAllAndMarkCompleted(CompanyCompatibility saved,
                                         CompatibilityAnalysisData analysisData) {
-
-        saveRoleAnalysis(saved, analysisData.roleAnalysis());
-        saveFiveElements(saved, analysisData.fiveElements());
-        saveBreakdown(saved, analysisData.breakdown());
-        saveStrategy(saved, analysisData.strategy());
-        saveInterviewQuestions(saved, analysisData.questions());
-        saveRoleCompatibilities(saved, analysisData.roles());
-        saveMonthlyForecasts(saved, analysisData.forecasts());
-        saveCautions(saved, analysisData.cautions());
-
-        // Option A: 모든 자식 저장 성공 후 completed = true
-        // 이 라인 이전에 예외가 발생하면 트랜잭션 롤백으로 자식들도 함께 취소됨
-        compatibilityRepository.markCompleted(saved.getId());
-        log.info("자식 엔티티 저장 완료 및 completed 플래그 업데이트 (compatibilityId={})", saved.getId());
-    }
-
-    private void saveRoleAnalysis(CompanyCompatibility saved, CompatibilityAnalysisData.RoleAnalysis r) {
-        targetRoleAnalysisRepository.save(TargetRoleAnalysis.builder()
-                .companyCompatibility(saved)
-                .matchScore(r.matchScore())
-                .synergy(r.synergy())
-                .warning(r.warning())
-                .build());
-    }
-
-    private void saveFiveElements(CompanyCompatibility saved, CompatibilityAnalysisData.FiveElementsInfo f) {
-        Map<String, Integer> u = f.userDistribution();
-        Map<String, Integer> c = f.companyDistribution();
-        fiveElementsAnalysisRepository.save(FiveElementsAnalysis.builder()
-                .companyCompatibility(saved)
-                .userWood(u.getOrDefault("木", 0))
-                .userFire(u.getOrDefault("火", 0))
-                .userEarth(u.getOrDefault("土", 0))
-                .userMetal(u.getOrDefault("金", 0))
-                .userWater(u.getOrDefault("水", 0))
-                .companyWood(c.getOrDefault("木", 0))
-                .companyFire(c.getOrDefault("火", 0))
-                .companyEarth(c.getOrDefault("土", 0))
-                .companyMetal(c.getOrDefault("金", 0))
-                .companyWater(c.getOrDefault("水", 0))
-                .synergyDescription(f.synergyDescription())
-                .build());
-    }
-
-    private void saveBreakdown(CompanyCompatibility saved, CompatibilityAnalysisData.ScoreBreakdown b) {
-        analysisBreakdownRepository.save(AnalysisBreakdown.builder()
-                .companyCompatibility(saved)
-                .characterMatch(b.characterMatch())
-                .potentialSynergy(b.potentialSynergy())
-                .longTermStability(b.longTermStability())
-                .build());
-    }
-
-    private void saveStrategy(CompanyCompatibility saved, CompatibilityAnalysisData.StrategyInfo s) {
-        ActionableStrategy strategy = actionableStrategyRepository.save(ActionableStrategy.builder()
-                .companyCompatibility(saved)
-                .weaknessDefense(s.weaknessDefense())
-                .preferredTime(s.preferredTime())
-                .build());
-
-        List<String> keywords = s.keywords();
-        actionableKeywordRepository.saveAll(
-                IntStream.range(0, keywords.size())
-                        .mapToObj(i -> ActionableKeyword.builder()
-                                .actionableStrategy(strategy)
-                                .keyword(keywords.get(i))
-                                .displayOrder(i)
-                                .build())
-                        .toList());
-
-        List<String> luckyDays = s.luckyDays();
-        luckyDayRepository.saveAll(
-                IntStream.range(0, luckyDays.size())
-                        .mapToObj(i -> LuckyDay.builder()
-                                .actionableStrategy(strategy)
-                                .luckyDay(luckyDays.get(i))
-                                .displayOrder(i)
-                                .build())
-                        .toList());
-    }
-
-    private void saveInterviewQuestions(CompanyCompatibility saved,
-                                        List<CompatibilityAnalysisData.InterviewQuestion> questions) {
-        expectedInterviewQuestionRepository.saveAll(
-                questions.stream()
-                        .map(q -> ExpectedInterviewQuestion.builder()
-                                .companyCompatibility(saved)
-                                .question(q.question())
-                                .intent(q.intent())
-                                .build())
-                        .toList());
-    }
-
-    private void saveRoleCompatibilities(CompanyCompatibility saved,
-                                          List<CompatibilityAnalysisData.RoleCompatibility> roles) {
-        roleCompatibilityRepository.saveAll(
-                roles.stream()
-                        .map(r -> RoleCompatibility.builder()
-                                .companyCompatibility(saved)
-                                .roleName(r.roleName())
-                                .score(r.score())
-                                .reason(r.reason())
-                                .tag(r.tag())
-                                .build())
-                        .toList());
-    }
-
-    private void saveMonthlyForecasts(CompanyCompatibility saved,
-                                       List<CompatibilityAnalysisData.MonthlyForecast> forecasts) {
-        monthlyForecastRepository.saveAll(
-                forecasts.stream()
-                        .map(f -> MonthlyForecast.builder()
-                                .companyCompatibility(saved)
-                                .month(f.month())
-                                .score(f.score())
-                                .status(f.status())
-                                .advice(f.advice())
-                                .build())
-                        .toList());
-    }
-
-    private void saveCautions(CompanyCompatibility saved, List<String> cautions) {
-        cautionRepository.saveAll(
-                cautions.stream()
-                        .map(c -> Caution.builder()
-                                .companyCompatibility(saved)
-                                .content(c)
-                                .build())
-                        .toList());
+        saved.assignResultJsonAndMarkCompleted(analysisData);
+        compatibilityRepository.save(saved);
+        log.info("궁합 분석 결과 JSON 저장 완료 및 completed 플래그 업데이트 (compatibilityId={})", saved.getId());
     }
 }
