@@ -5,8 +5,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -23,6 +21,7 @@ import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
 import ssafy.SSAju.career.enums.FeedbackType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.career.util.JobCategoryEnum;
+import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
@@ -98,13 +97,28 @@ class CareerResultLegacyDataCleanupIntegrationTest {
     @Autowired private CareerConsultationRepository careerConsultationRepository;
     @Autowired private CompanyCompatibilityRepository companyCompatibilityRepository;
     @Autowired private UserSatisfactionFeedbackRepository feedbackRepository;
-    @PersistenceContext private EntityManager entityManager;
 
     private User testUser;
     private UserProfile testProfile;
 
+    private static CareerAdviceResponse minimalAdvice() {
+        return new CareerAdviceResponse(
+                List.of(), List.of(), List.of(), List.of(),
+                null, null, null, null, null, null, null, null, null,
+                List.of("정관"), "일간 설명", "오행 분석");
+    }
+
     @BeforeEach
     void setUp() {
+        // 테스트 격리: 같은 컨테이너를 재사용하는 다른 테스트 메서드가 남긴 데이터와
+        // 충돌하지 않도록 FK 자식 → 부모 순서로 초기화 (CareerApiIntegrationTest와 동일 패턴)
+        feedbackRepository.deleteAll();
+        careerConsultationRepository.deleteAll();
+        companyCompatibilityRepository.deleteAll();
+        sajuResultRepository.deleteAll();
+        userProfileRepository.deleteAll();
+        userRepository.deleteAll();
+
         testUser = userRepository.save(User.builder()
                 .email("legacy-cleanup-test@test.com")
                 .passwordHash("hash")
@@ -151,6 +165,7 @@ class CareerResultLegacyDataCleanupIntegrationTest {
                                 SajuResult.builder().userProfile(testProfile).user(testUser).build()))
                         .openaiModelVersion("gpt-4o-mini")
                         .consultationMonth(202605)
+                        .resultJson(minimalAdvice())
                         .build());
 
         UserSatisfactionFeedback feedback = feedbackRepository.save(UserSatisfactionFeedback.builder()
@@ -197,9 +212,9 @@ class CareerResultLegacyDataCleanupIntegrationTest {
                 .build();
         built.assignResultJsonAndMarkCompleted(analysisData);
 
+        // save()/findById()는 각각 SimpleJpaRepository의 독립된 트랜잭션(영속성 컨텍스트)에서 실행되므로
+        // 별도 flush/clear 없이도 findById가 1차 캐시가 아닌 DB에서 새로 조회함
         Long id = companyCompatibilityRepository.save(built).getId();
-        entityManager.flush();
-        entityManager.clear(); // 영속성 컨텍스트 1차 캐시를 비워 실제 DB 재조회를 강제
 
         CompanyCompatibility reloaded = companyCompatibilityRepository.findById(id).orElseThrow();
         assertThat(reloaded.isCompleted()).isTrue();
