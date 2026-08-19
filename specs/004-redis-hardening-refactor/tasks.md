@@ -134,11 +134,11 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 ### Tests for User Story 4
 
-- [ ] T027 [P] [US4] MockMvc 테스트 `SSAju/src/test/java/ssafy/SSAju/config/SecurityConfigCorsTest.java` — 임의 헤더 preflight 거부, 화이트리스트 헤더는 허용 확인
+- [x] T027 [P] [US4] MockMvc 테스트 `SSAju/src/test/java/ssafy/SSAju/config/SecurityConfigCorsTest.java` — 임의 헤더 preflight 거부, 화이트리스트 헤더는 허용 확인
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] `config/SecurityConfig.java` `corsConfigurationSource()` 수정 — `allowedHeaders`를 `["*"]`에서 `List.of("Authorization", "Content-Type")`로 변경
+- [x] T028 [US4] `config/SecurityConfig.java` `corsConfigurationSource()` 수정 — `allowedHeaders`를 `["*"]`에서 `List.of("Authorization", "Content-Type")`로 변경 — *구현 중 화이트리스트를 `cors.allowed-headers`로 `application.yaml` 외부화(PR 리뷰 반영)*
 
 **Checkpoint**: `./gradlew test` 통과
 
@@ -152,20 +152,20 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 ### Tests for User Story 5
 
-- [ ] T029 [P] [US5] `SSAju/src/test/java/ssafy/SSAju/concurrency/SajuResultConcurrencyTest.java` — 동일 `userProfileId`에 대해 N개 동시 요청 시 `saju_result` 행이 정확히 1개인지 확인
-- [ ] T030 [P] [US5] `SSAju/src/test/java/ssafy/SSAju/concurrency/UserProfileConcurrencyTest.java` — 동일 생년월일시 조합 동시 생성 시 `user_profile` 행 1개 확인
-- [ ] T031 [P] [US5] `SSAju/src/test/java/ssafy/SSAju/concurrency/CompanyCompatibilityConcurrencyTest.java` — 동일 (프로필, 회사, 직군) 조합 동시 생성 시 `company_compatibility` 행 1개 확인
-- [ ] T032 [P] [US5] `SSAju/src/test/java/ssafy/SSAju/concurrency/ConsultationConcurrencyTest.java` — 동일 (정본, 월) 조합 동시 생성 시 `career_consultation` 행 1개 확인
+- [x] T029 [P] [US5] `SSAju/src/test/java/ssafy/SSAju/concurrency/SajuResultConcurrencyTest.java` — 동일 `userProfileId`에 대해 N개 동시 요청 시 `saju_result` 행이 정확히 1개인지 확인
+- [x] T030 [P] [US5] `SSAju/src/test/java/ssafy/SSAju/concurrency/UserProfileConcurrencyTest.java` — 동일 생년월일시 조합 동시 생성 시 `user_profile` 행 1개 확인
+- [x] T031 [P] [US5] `SSAju/src/test/java/ssafy/SSAju/concurrency/CompanyCompatibilityConcurrencyTest.java` — 동일 (프로필, 회사, 직군) 조합 동시 생성 시 `company_compatibility` 행 1개 확인
+- [x] T032 [P] [US5] `SSAju/src/test/java/ssafy/SSAju/concurrency/ConsultationConcurrencyTest.java` — 동일 (정본, 월) 조합 동시 생성 시 `career_consultation` 행 1개 확인
 
 ### Implementation for User Story 5
 
-- [ ] T033 [US5] `career/provider/SajuResultProvider.java` `findOrCreate`에 `@DistributedLock(key = "lock:saju-result:{userProfileId}")` 적용, `insertOrIgnore` 기반 흡수 로직 제거하고 락 보호 하에서 단순 조회-후-생성으로 변경; `repository/SajuResultJdbcRepository.java`의 `insertOrIgnore` 메서드 및 T049 TODO 주석 블록 제거(F 일부)
-- [ ] T034 [US5] `career/provider/UserProfileProvider.java` `findOrCreate`에 `@DistributedLock(key = "lock:user-profile:{birthDate}:{birthTime}")` 적용, `DataIntegrityViolationException` catch는 진짜 무결성 위반 전용으로 단순화
-- [ ] T035 [US5] `service/CompanyMatchingService.java` 궁합 생성 경로에 `@DistributedLock(key = "lock:company-compatibility:{userProfileId}:{companyName}:{targetRoleCategory}")` 적용; `repository/CompanyCompatibilityJdbcRepository.java`의 `DuplicateKeyException` 처리를 진짜 위반 전용으로 단순화
-- [ ] T036 [US5] `service/ConsultationSaveService.java` `insertOrRecoverOnConflict`에 `@DistributedLock(key = "lock:career-consultation:{sajuResultId}:{yearMonth}")` 적용, 제약조건 이름 문자열 분기 로직 제거
-- [ ] T037 [US5] `service/ConsultationInsertService.java`의 `REQUIRES_NEW` 트랜잭션 분리 우회 로직 제거(락이 충돌 자체를 막으므로 단순 트랜잭션으로 축소)
+- [x] T033 [US5] `career/provider/SajuResultProvider.java` `findOrCreate`에 `@DistributedLock(key = "lock:saju-result:{userProfileId}")` 적용, `insertOrIgnore` 기반 흡수 로직 제거하고 락 보호 하에서 단순 조회-후-생성으로 변경; `repository/SajuResultJdbcRepository.java`의 `insertOrIgnore` 메서드 및 T049 TODO 주석 블록 제거(F 일부) — *`SajuResultJdbcRepository`가 이 메서드 하나만 가진 클래스여서 파일째 삭제. `SajuResultWriteService.saveNewResultWithChildren`도 `saveNewResult`로 단순화*
+- [x] T034 [US5] `career/provider/UserProfileProvider.java` `findOrCreate`에 `@DistributedLock(key = "lock:user-profile:{birthDate}:{birthTime}")` 적용, `DataIntegrityViolationException` catch는 진짜 무결성 위반 전용으로 단순화
+- [x] T035 [US5] `service/CompanyMatchingService.java` 궁합 생성 경로에 `@DistributedLock(key = "lock:company-compatibility:{userProfileId}:{companyName}:{targetRoleCategory}")` 적용; `repository/CompanyCompatibilityJdbcRepository.java`의 `DuplicateKeyException` 처리를 진짜 위반 전용으로 단순화 — *계획 대비 범위 확장: 같은 클래스 내 self-invocation에서는 `@DistributedLock`을 가로채는 Spring AOP 프록시가 작동하지 않으므로(`ConsultationSaveService`/`ConsultationInsertService`와 동일한 이유), 락 없는 1차 캐시 조회(`CompanyMatchingService`)와 락+쿼터+사주계산/AI/저장 구간을 신규 `service/CompanyCompatibilityLockedAnalysisService.java`로 분리. 락 획득 후 캐시 재확인(더블체크락)까지 도입해 대기 중이던 요청의 쿼터 이중 차감을 방지(US2 T024 재조정 완료)*
+- [x] T036 [US5] `service/ConsultationSaveService.java` `insertOrRecoverOnConflict`에 `@DistributedLock(key = "lock:career-consultation:{sajuResultId}:{yearMonth}")` 적용, 제약조건 이름 문자열 분기 로직 제거
+- [x] T037 [US5] `service/ConsultationInsertService.java`의 `REQUIRES_NEW` 트랜잭션 분리 우회 로직 제거(락이 충돌 자체를 막으므로 단순 트랜잭션으로 축소) — *`DistributedLockAspect`가 `HIGHEST_PRECEDENCE`로 트랜잭션 어드바이저보다 바깥쪽에 위치해 `@DistributedLock`+`@Transactional`을 한 메서드에 함께 선언 가능함을 확인 → `ConsultationInsertService` 및 도달 불가능해진 `ConsultationRecoveryFailedException` 파일째 삭제*
 
-**Checkpoint**: `./gradlew test` 통과 — 분산락 동시성 테스트 포함 전체 통과 확인
+**Checkpoint**: `./gradlew test` 통과 — 분산락 동시성 테스트 포함 전체 통과 확인 (`feat/us5-distributed-lock-concurrency` 브랜치)
 
 ---
 
