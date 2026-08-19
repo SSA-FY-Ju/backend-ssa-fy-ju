@@ -38,6 +38,9 @@ public class SecurityConfig {
     @Value("${cors.allowed-origins}")
     private String corsAllowedOrigins;
 
+    @Value("${cors.allowed-headers}")
+    private String corsAllowedHeaders;
+
     @Bean
     public JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint(
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
@@ -93,11 +96,14 @@ public class SecurityConfig {
         List<String> allowedOrigins = Arrays.stream(corsAllowedOrigins.split(","))
                 .map(String::trim)
                 .toList();
+        List<String> allowedHeaders = Arrays.stream(corsAllowedHeaders.split(","))
+                .map(String::trim)
+                .toList();
 
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "x-vercel-proxy"));
+        configuration.setAllowedHeaders(allowedHeaders);
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);

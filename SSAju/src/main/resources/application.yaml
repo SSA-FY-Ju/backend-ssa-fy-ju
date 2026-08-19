@@ -75,6 +75,7 @@ jwt:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  allowed-headers: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type,x-vercel-proxy}
 
 server:
   shutdown: graceful
