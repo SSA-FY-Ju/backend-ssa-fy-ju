@@ -52,6 +52,7 @@ jwt:
 
 cors:
   allowed-origins: http://localhost:3000
+  allowed-headers: Authorization,Content-Type,x-vercel-proxy
 
 server:
   cookie:
