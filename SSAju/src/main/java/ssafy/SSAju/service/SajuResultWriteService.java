@@ -6,15 +6,10 @@ import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.career.entity.CareerFortune;
 import ssafy.SSAju.career.entity.SajuFullData;
 import ssafy.SSAju.career.entity.SajuResult;
-import ssafy.SSAju.career.enums.ErrorMessageConstants;
-import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.repository.SajuResultRepository;
 
 /**
- * SajuResult 신규 저장 시 자식 엔티티를 단일 트랜잭션으로 보호.
- *
- * insertOrIgnore(AUTO COMMIT) 성공 후 자식 저장이 단일 트랜잭션으로 보호되어,
- * 자식 저장 실패 시 롤백되어 root만 남는 불일치 상태를 방지.
+ * SajuResult 신규 저장 시 root와 자식 엔티티를 단일 트랜잭션으로 보호.
  *
  * SajuResult는 (user, userProfile) 기준으로 불변(immutable)입니다.
  * 동일 생년월일·시각으로 요청된 결과는 기존 row를 재사용하며,
@@ -30,16 +25,18 @@ public class SajuResultWriteService {
     private final SajuResultRepository sajuResultRepository;
 
     /**
-     * insertOrIgnore로 삽입된 새 SajuResult에 자식 엔티티를 붙여 저장.
+     * 새 SajuResult(root)와 자식 엔티티를 함께 저장한다.
      *
-     * insertOrIgnore(AUTO COMMIT) 성공 후 자식 저장이 단일 트랜잭션으로 보호되어,
-     * 자식 저장 실패 시 롤백되어 root만 남는 불일치 상태를 방지.
+     * <p>{@link ssafy.SSAju.career.provider.SajuResultProvider}가 userProfile 단위
+     * 분산락 안에서만 이 메서드를 호출하므로(US5, T033) 동시 생성 경합을 별도로
+     * 처리할 필요가 없다 — 단순히 root를 만들고 자식을 붙여 저장한다.
      */
     @Transactional
-    public SajuResult saveNewResultWithChildren(SajuResult detached, SajuResult source) {
-        // 트랜잭션 내에서 재조회 → managed 엔티티 확보 (detached 엔티티의 PersistentBag 조작 방지)
-        SajuResult saved = sajuResultRepository.findById(detached.getId())
-                .orElseThrow(() -> new DataAccessException(ErrorMessageConstants.SAJU_RESULT_ACCESS_FAILED.getMessage()));
+    public SajuResult saveNewResult(SajuResult source) {
+        SajuResult saved = SajuResult.builder()
+                .userProfile(source.getUserProfile())
+                .user(source.getUser())
+                .build();
 
         SajuFullData srcFullData = source.getSajuFullData();
         if (srcFullData != null) {
