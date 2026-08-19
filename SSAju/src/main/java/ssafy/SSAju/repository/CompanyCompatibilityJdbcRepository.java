@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.util.JobCategoryEnum;
 import ssafy.SSAju.entity.User;
+import ssafy.SSAju.exception.DataAccessException;
 
 import java.util.Optional;
 
@@ -15,13 +16,11 @@ import java.util.Optional;
 /**
  * CompanyCompatibility 월별 캐시 패턴을 위한 JDBC 저장소.
  *
- * <p>CareerConsultation과 동일한 월별 캐시 패턴 적용:
- * UNIQUE(user_id, user_profile_id, company_name, target_role_category, compatibility_month) 제약으로
- * 동일 사용자가 같은 달에 동일 기업/직무를 중복 분석하는 것을 방지합니다.
- *
- * <p>INSERT + {@link org.springframework.dao.DuplicateKeyException} 처리 방식으로
- * race condition을 안전하게 처리합니다. 반환값 0이 UNIQUE 제약 위반임을 명확히 보장합니다.
- * (SELECT FOR UPDATE + 버전 증가 방식을 제거하여 동시성 성능 개선)
+ * <p>동일 사용자가 같은 달에 동일 기업/직무를 중복 분석하는 것은
+ * UNIQUE(user_id, user_profile_id, company_name, target_role_category, compatibility_month) 제약과
+ * userProfile+company+role 단위 분산락({@code CompanyCompatibilityLockedAnalysisService}, US5)이
+ * 함께 막습니다. 락이 동시 삽입 자체를 막으므로, 이 클래스에서 {@link DuplicateKeyException}이
+ * 발생한다면 더 이상 "예상된 race condition"이 아니라 진짜 무결성 위반(버그)입니다.
  */
 @Slf4j
 @Repository
@@ -31,20 +30,17 @@ public class CompanyCompatibilityJdbcRepository {
     private final JdbcTemplate jdbcTemplate;
 
     /**
-     * UNIQUE(user_id, user_profile_id, company_name, target_role_category, compatibility_month) 제약으로
-     * 동일 월 중복 삽입을 방지합니다.
+     * CompanyCompatibility root 엔티티를 삽입합니다.
      *
-     * <p>INSERT IGNORE 대신 INSERT + {@link DataIntegrityViolationException} 처리 방식을 사용합니다.
-     * INSERT IGNORE는 UNIQUE 제약 위반뿐 아니라 다른 무시 가능한 오류도 0으로 반환할 수 있어
-     * 반환값 0의 의미가 "중복 확정"임을 보장하기 어렵습니다.
-     * 명시적 Exception 처리로 UNIQUE 제약 위반만 0으로 반환하고, 나머지 오류는 재던집니다.
+     * <p>userProfile+company+role 단위 분산락 안에서만 호출되므로 동일 월 중복 삽입은
+     * 발생하지 않아야 합니다. 그럼에도 {@link DuplicateKeyException}이 발생하면 락 밖 경로나
+     * 데이터 이관 등에서 비롯된 진짜 무결성 위반이므로 {@link DataAccessException}으로 전파합니다.
      *
      * @param entity 저장할 CompanyCompatibility (compatibilityMonth 필드 포함)
-     * @return 1 (신규 삽입 성공), 0 (이번 달 분석 결과가 이미 존재 — UNIQUE 제약 위반 확정)
      */
-    public int insertOrIgnore(CompanyCompatibility entity) {
+    public void insert(CompanyCompatibility entity) {
         try {
-            return jdbcTemplate.update(
+            jdbcTemplate.update(
                     "INSERT INTO company_compatibility " +
                             "(user_profile_id, user_id, company_name, target_role_category, target_role_detail_name, " +
                             "completed, compatibility_score, summary, compatibility_month, analyzed_at, created_at) " +
@@ -61,14 +57,9 @@ public class CompanyCompatibilityJdbcRepository {
                     entity.getAnalyzedAt()
             );
         } catch (DuplicateKeyException e) {
-            // JdbcTemplate이 UNIQUE/PK 제약 위반을 DuplicateKeyException으로 변환함.
-            // (Hibernate를 거치지 않는 JDBC 레이어이므로 ConstraintViolationException이 아닌
-            //  DuplicateKeyException을 직접 catch하는 것이 정확함)
-            // 이 INSERT에서 위반 가능한 UNIQUE 제약은 uk_user_company_role_month 하나뿐이므로
-            // constraint name 체크 없이 0 반환이 안전함.
-            log.debug("월별 캐시 UNIQUE 제약 위반 (정상 — race condition): compatibilityMonth={}",
-                    entity.getCompatibilityMonth());
-            return 0;
+            throw new DataAccessException(
+                    "분산락 보호 하에서 예기치 못한 CompanyCompatibility UNIQUE 제약 위반이 발생했습니다: "
+                            + "compatibilityMonth=" + entity.getCompatibilityMonth(), e);
         }
     }
 
