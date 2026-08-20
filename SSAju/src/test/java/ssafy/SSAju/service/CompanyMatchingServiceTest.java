@@ -155,7 +155,7 @@ class CompanyMatchingServiceTest {
     }
 
     @Test
-    @DisplayName("기업 설립 시간 null이어도 락 없는 1차 경로 자체는 영향 없음")
+    @DisplayName("사용자 출생시간 미입력 시 12:00 기본값으로 위임 전에 확정된다")
     void shouldResolveUserBirthTime_beforeDelegating() {
         CompatibilityRequest request = new CompatibilityRequest(
                 USER_BIRTH_DATE, null,

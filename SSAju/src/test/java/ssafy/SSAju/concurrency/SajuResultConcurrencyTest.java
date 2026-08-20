@@ -138,7 +138,8 @@ class SajuResultConcurrencyTest {
             });
         }
         startLatch.countDown();
-        doneLatch.await(30, TimeUnit.SECONDS);
+        boolean finishedInTime = doneLatch.await(30, TimeUnit.SECONDS);
+        assertThat(finishedInTime).as("30초 내에 모든 스레드가 완료되어야 한다").isTrue();
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 

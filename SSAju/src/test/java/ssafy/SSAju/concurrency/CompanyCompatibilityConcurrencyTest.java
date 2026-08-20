@@ -183,7 +183,8 @@ class CompanyCompatibilityConcurrencyTest {
             });
         }
         startLatch.countDown();
-        doneLatch.await(60, TimeUnit.SECONDS);
+        boolean finishedInTime = doneLatch.await(60, TimeUnit.SECONDS);
+        assertThat(finishedInTime).as("60초 내에 모든 스레드가 완료되어야 한다").isTrue();
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 

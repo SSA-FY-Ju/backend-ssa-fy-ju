@@ -29,6 +29,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -137,7 +139,8 @@ class ConsultationConcurrencyTest {
             });
         }
         startLatch.countDown();
-        doneLatch.await(30, TimeUnit.SECONDS);
+        boolean finishedInTime = doneLatch.await(30, TimeUnit.SECONDS);
+        assertThat(finishedInTime).as("30초 내에 모든 스레드가 완료되어야 한다").isTrue();
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 
@@ -151,10 +154,66 @@ class ConsultationConcurrencyTest {
                 .containsOnly(resultIds.get(0));
     }
 
+    /**
+     * 락 경합 중 결과 JSON이 여러 스레드의 내용과 뒤섞이지 않고(손상 없이) 정확히
+     * 그 중 하나의 응답과 완전히 일치하는지 검증한다(US5, 데이터 정합성).
+     *
+     * <p>모든 스레드가 같은 modelVersion을 쓰므로 {@code updateIfModelChanged}가 나중에
+     * 도착한 요청을 건너뛴다 — 즉 락 대기열에서 가장 먼저 insert에 성공한 스레드의 내용만
+     * 저장되어야 하며, 그 내용은 스레드별로 서로 다르게 구성한 advice 중 정확히 하나와
+     * 동일해야 한다(부분적으로 섞인 값이면 실패).
+     */
+    @Test
+    @DisplayName("동시 요청 중 저장된 결과 내용은 손상 없이 그 중 하나의 응답과 정확히 일치한다")
+    void concurrentSaveOrUpdate_persistsUncorruptedContentFromExactlyOneRequest() throws InterruptedException {
+        // Given
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(THREAD_COUNT);
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+        Map<Integer, CareerAdviceResponse> submittedByThread = new ConcurrentHashMap<>();
+        List<Throwable> failures = new CopyOnWriteArrayList<>();
+
+        // When
+        for (int i = 0; i < THREAD_COUNT; i++) {
+            final int threadIndex = i;
+            executor.submit(() -> {
+                try {
+                    startLatch.await();
+                    CareerAdviceResponse advice = fakeAdvice(threadIndex);
+                    submittedByThread.put(threadIndex, advice);
+                    consultationSaveService.saveOrUpdate(
+                            testSajuResult, advice, "gpt-4o-mini", CONSULTATION_MONTH);
+                } catch (Throwable e) {
+                    failures.add(e);
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+        startLatch.countDown();
+        boolean finishedInTime = doneLatch.await(30, TimeUnit.SECONDS);
+        assertThat(finishedInTime).as("30초 내에 모든 스레드가 완료되어야 한다").isTrue();
+        executor.shutdown();
+        executor.awaitTermination(5, TimeUnit.SECONDS);
+
+        // Then
+        assertThat(failures).as("동시 요청 중 예외가 발생하지 않아야 한다").isEmpty();
+        CareerConsultation persisted = careerConsultationRepository
+                .findBySajuResultAndConsultationMonth(testSajuResult, CONSULTATION_MONTH)
+                .orElseThrow();
+        assertThat(submittedByThread.values())
+                .as("저장된 결과는 손상 없이 N개의 서로 다른 요청 중 정확히 하나와 완전히 일치해야 한다")
+                .contains(persisted.getResultJson());
+    }
+
     private CareerAdviceResponse fakeAdvice() {
+        return fakeAdvice(0);
+    }
+
+    private CareerAdviceResponse fakeAdvice(int threadIndex) {
         return new CareerAdviceResponse(
                 List.of(new CareerAdviceResponse.IndustryRecommendation("IT", "적합", List.of("백엔드 개발자"))),
-                List.of("강점을 설명하세요"),
+                List.of("강점을 설명하세요 - thread" + threadIndex),
                 List.of("분석력", "책임감"),
                 List.of(), null, null, null, null, null, null, null, null, null,
                 List.of(), null, null

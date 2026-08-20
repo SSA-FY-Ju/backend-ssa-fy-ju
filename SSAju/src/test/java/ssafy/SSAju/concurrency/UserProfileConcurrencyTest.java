@@ -14,6 +14,11 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.provider.UserProfileProvider;
+import ssafy.SSAju.repository.CareerConsultationRepository;
+import ssafy.SSAju.repository.CareerFortuneRepository;
+import ssafy.SSAju.repository.CompanyCompatibilityRepository;
+import ssafy.SSAju.repository.SajuFullDataRepository;
+import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 
 import java.time.LocalDate;
@@ -54,10 +59,31 @@ class UserProfileConcurrencyTest {
     private UserProfileRepository userProfileRepository;
 
     @Autowired
+    private CareerConsultationRepository careerConsultationRepository;
+
+    @Autowired
+    private CareerFortuneRepository careerFortuneRepository;
+
+    @Autowired
+    private SajuFullDataRepository sajuFullDataRepository;
+
+    @Autowired
+    private SajuResultRepository sajuResultRepository;
+
+    @Autowired
+    private CompanyCompatibilityRepository companyCompatibilityRepository;
+
+    @Autowired
     private RedissonClient redissonClient;
 
     @BeforeEach
     void setUp() {
+        // FK 순서: userProfile을 참조하는 자식(및 손자) 테이블을 먼저 비운다.
+        careerConsultationRepository.deleteAllInBatch();
+        careerFortuneRepository.deleteAllInBatch();
+        sajuFullDataRepository.deleteAllInBatch();
+        sajuResultRepository.deleteAllInBatch();
+        companyCompatibilityRepository.deleteAllInBatch();
         userProfileRepository.deleteAllInBatch();
     }
 
@@ -94,7 +120,8 @@ class UserProfileConcurrencyTest {
             });
         }
         startLatch.countDown();
-        doneLatch.await(30, TimeUnit.SECONDS);
+        boolean finishedInTime = doneLatch.await(30, TimeUnit.SECONDS);
+        assertThat(finishedInTime).as("30초 내에 모든 스레드가 완료되어야 한다").isTrue();
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 
