@@ -34,6 +34,6 @@ public class SajuResultProvider {
         }
 
         return sajuResultRepository.findByUserAndUserProfile(user, userProfile)
-                .orElseGet(() -> sajuResultWriteService.saveNewResult(newResult));
+                .orElseGet(() -> sajuResultWriteService.saveNewResult(user, userProfile, newResult));
     }
 }

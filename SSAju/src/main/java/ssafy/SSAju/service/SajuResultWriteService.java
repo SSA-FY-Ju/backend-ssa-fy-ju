@@ -6,6 +6,8 @@ import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.career.entity.CareerFortune;
 import ssafy.SSAju.career.entity.SajuFullData;
 import ssafy.SSAju.career.entity.SajuResult;
+import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.entity.User;
 import ssafy.SSAju.repository.SajuResultRepository;
 
 /**
@@ -30,12 +32,17 @@ public class SajuResultWriteService {
      * <p>{@link ssafy.SSAju.career.provider.SajuResultProvider}가 userProfile 단위
      * 분산락 안에서만 이 메서드를 호출하므로(US5, T033) 동시 생성 경합을 별도로
      * 처리할 필요가 없다 — 단순히 root를 만들고 자식을 붙여 저장한다.
+     *
+     * <p>root의 user/userProfile은 {@code source}가 아니라 호출자가 조회·검증에 이미 사용한
+     * {@code user}/{@code userProfile}로 만든다 — source는 자식 엔티티(사주 계산 결과)만
+     * 제공하는 값으로 취급하고, 락 키·조회에 쓰인 식별자와 저장되는 식별자가 항상 같은
+     * 값이도록 보장한다(source.getUser()가 검증되지 않은 값일 수 있는 문제 방지).
      */
     @Transactional
-    public SajuResult saveNewResult(SajuResult source) {
+    public SajuResult saveNewResult(User user, UserProfile userProfile, SajuResult source) {
         SajuResult saved = SajuResult.builder()
-                .userProfile(source.getUserProfile())
-                .user(source.getUser())
+                .userProfile(userProfile)
+                .user(user)
                 .build();
 
         SajuFullData srcFullData = source.getSajuFullData();
