@@ -41,16 +41,17 @@ import java.util.Optional;
  * <p><strong>락 배치 원칙</strong>: 분산락은 "실제로 동시에 겹치면 안 되는 최소 구간"(DB 저장)에만
  * 건다. FastAPI/공공데이터/OpenAI 같은 외부 I/O는 걸리는 시간이 들쭉날쭉하고 통제할 수 없으므로
  * 락 밖에 둔다 — 락 안에 넣으면 락 임대시간(leaseTime)보다 외부 호출이 오래 걸릴 때 락이 중간에
- * 만료되어 동시성 보장이 깨진다. 이 원칙은 {@link SajuResultProvider}/{@link UserProfileProvider}/
- * {@link ConsultationSaveService}와 동일하다.
+ * 만료되어 동시성 보장이 깨진다. 이 원칙은 {@link ssafy.SSAju.career.provider.SajuResultProvider}/
+ * {@link UserProfileProvider}/{@link ConsultationSaveService}와 동일하다.
  *
  * <p>동일 (프로필, 회사, 직무, 월) 조합에 대한 동시 요청이 FastAPI/OpenAI를 중복 호출하는 것은
  * 허용한다(트레이드오프로 감수) — 최종 저장은 {@link CompanyCompatibilitySaveService}의 락이
  * 정확히 1건만 남도록 보장한다.
  *
  * <p>{@code @Transactional} 없음: FastAPI/OpenAI 외부 I/O 동안 DB 커넥션을 점유하지 않도록
- * 트랜잭션을 분리. DB 저장은 {@link CompanyCompatibilitySaveService}의 {@code @Transactional}에서
- * 처리된다.
+ * 트랜잭션을 분리. DB 저장은 {@link CompanyCompatibilitySaveService}에 위임되며, 그 클래스에도
+ * {@code @Transactional}이 없다 — 락이 메서드를 감싸고 그 안의 저장소 호출은 Spring Data JPA
+ * 기본 트랜잭션으로 개별 처리된다(중첩 트랜잭션 없음).
  */
 @Slf4j
 @Service
@@ -100,7 +101,7 @@ public class CompanyMatchingService {
         // 캐시 미스: 사주 계산·AI 호출과 DB 저장을 감싸 실패 시 쿼터를 복원한다.
         LocalDate usageDate = dailyApiUsageService.checkAndIncrementDailyUsage(userId);
         try {
-            return analyzeAndPersist(request, userId, user, userProfile, compatibilityMonth, userBirthTime);
+            return analyzeAndPersist(request, user, userProfile, compatibilityMonth, userBirthTime);
         } catch (RuntimeException e) {
             try {
                 dailyApiUsageService.restoreDailyUsage(userId, usageDate);
@@ -126,7 +127,7 @@ public class CompanyMatchingService {
      * {@link CompanyCompatibilitySaveService}에 위임해 (사용자, 프로필, 회사, 직무, 월) 단위
      * 분산락으로 보호한다.
      */
-    private CompatibilityResponse analyzeAndPersist(CompatibilityRequest request, Long userId,
+    private CompatibilityResponse analyzeAndPersist(CompatibilityRequest request,
                                                        User user, UserProfile userProfile,
                                                        Integer compatibilityMonth, LocalTime userBirthTime) {
         SajuCalculationResult sajuCalc = calculateSajuData(request, userBirthTime);
@@ -140,8 +141,7 @@ public class CompanyMatchingService {
         int compatibilityScore = compatibilityScoreCalculator.calculate(
                 userHiddenStems, sajuCalc.userDayMaster(), companyHiddenStems, sajuCalc.companyDayMaster());
         int matchScore = jobRoleAnalyzer.analyze(userFiveElements, category);
-        int primaryScore = matchScore;
-        int secondaryScore = roleCompatibilityCalculator.calculateSecondary(primaryScore);
+        int secondaryScore = roleCompatibilityCalculator.calculateSecondary(matchScore);
 
         CompatibilityNarrativeRequest narrativeRequest = new CompatibilityNarrativeRequest(
                 new CompatibilityNarrativeRequest.SajuInfo(
@@ -149,7 +149,7 @@ public class CompanyMatchingService {
                 new CompatibilityNarrativeRequest.SajuInfo(
                         companyFiveElements, companyHiddenStems, sajuCalc.companyDayMaster()),
                 new CompatibilityNarrativeRequest.ScoreSet(
-                        compatibilityScore, matchScore, primaryScore, secondaryScore),
+                        compatibilityScore, matchScore, matchScore, secondaryScore),
                 category, request.targetRole().detailName());
         CompatibilityNarrativeResponse narrative = companyMatchingOpenAICaller.call(narrativeRequest);
 
@@ -161,7 +161,7 @@ public class CompanyMatchingService {
                 responseBuilder.buildActionableStrategy(category, narrative.weaknessDefense()),
                 responseBuilder.buildInterviewQuestions(narrative.interviewQuestions()),
                 responseBuilder.buildRoleCompatibilities(
-                        category, primaryScore, secondaryScore,
+                        category, matchScore, secondaryScore,
                         narrative.primaryRoleReason(), narrative.secondaryRoleReason()),
                 responseBuilder.buildMonthlyForecasts(userFiveElements, narrative.monthlyAdvices()),
                 narrative.cautions()
