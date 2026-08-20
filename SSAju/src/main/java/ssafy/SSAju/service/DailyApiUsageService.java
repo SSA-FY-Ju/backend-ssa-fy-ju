@@ -12,7 +12,7 @@ import java.time.LocalDate;
 @Service
 public class DailyApiUsageService {
 
-    private static final int DAILY_REQUEST_LIMIT = 3;
+    public static final int DAILY_REQUEST_LIMIT = 3;
 
     private final DailyApiUsageRepository dailyApiUsageRepository;
     private final Clock clock;
