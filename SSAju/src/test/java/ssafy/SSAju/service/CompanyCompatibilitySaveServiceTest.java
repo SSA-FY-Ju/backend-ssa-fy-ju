@@ -47,9 +47,6 @@ class CompanyCompatibilitySaveServiceTest {
     @Mock
     private CompanyCompatibilityRepository companyCompatibilityRepository;
 
-    @Mock
-    private CompanyCompatibilityInsertService companyCompatibilityInsertService;
-
     private CompanyCompatibilitySaveService service;
 
     private static final User MOCK_USER = User.builder()
@@ -71,32 +68,31 @@ class CompanyCompatibilitySaveServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CompanyCompatibilitySaveService(companyCompatibilityRepository, companyCompatibilityInsertService);
+        service = new CompanyCompatibilitySaveService(companyCompatibilityRepository);
     }
 
     @Test
-    @DisplayName("완료된 기존 행이 없으면 InsertService로 저장을 위임한다")
-    void shouldDelegateToInsertService_WhenNoCompletedRowExists() {
+    @DisplayName("완료된 기존 행이 없으면 새로 저장한다")
+    void shouldSave_WhenNoCompletedRowExists() {
         // Given
         CompanyCompatibility entity = buildEntity();
         CompatibilityAnalysisData analysisData = buildAnalysisData();
-        entity.assignResultJsonAndMarkCompleted(analysisData);
         given(companyCompatibilityRepository
                 .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonthAndCompletedTrue(
                         any(), any(), anyString(), any(), anyInt()))
                 .willReturn(Optional.empty());
-        given(companyCompatibilityInsertService.insert(entity, analysisData)).willReturn(entity);
+        given(companyCompatibilityRepository.save(entity)).willReturn(entity);
 
         // When
         CompanyCompatibility saved = service.saveWithLock(entity, analysisData);
 
         // Then
         assertThat(saved).isSameAs(entity);
-        verify(companyCompatibilityInsertService).insert(entity, analysisData);
+        verify(companyCompatibilityRepository).save(entity);
     }
 
     @Test
-    @DisplayName("락 안에서 완료된 기존 행을 발견하면 재사용하고 InsertService를 호출하지 않는다")
+    @DisplayName("락 안에서 완료된 기존 행을 발견하면 재사용하고 저장하지 않는다")
     void shouldReuseExistingCompletedRow_WithoutInserting() {
         // Given
         CompanyCompatibility entity = buildEntity();
@@ -113,7 +109,7 @@ class CompanyCompatibilitySaveServiceTest {
         // Then: 동시에 완전히 동일한 요청이 먼저 완료해 둔 행을 그대로 재사용 —
         // 우리가 방금 계산한 entity/analysisData는 저장되지 않는다(중복 방지).
         assertThat(result).isSameAs(existing);
-        verify(companyCompatibilityInsertService, never()).insert(any(), any());
+        verify(companyCompatibilityRepository, never()).save(any());
     }
 
     @Test
@@ -128,7 +124,7 @@ class CompanyCompatibilitySaveServiceTest {
                         any(), any(), anyString(), any(), anyInt()))
                 .willReturn(Optional.empty())   // 더블체크: 미스
                 .willReturn(Optional.of(winner)); // 삽입 실패 후 재조회: 경쟁에서 이긴 스레드의 행
-        given(companyCompatibilityInsertService.insert(any(), any()))
+        given(companyCompatibilityRepository.save(any()))
                 .willThrow(new DataIntegrityViolationException("UNIQUE 제약 위반"));
 
         // When
@@ -147,7 +143,7 @@ class CompanyCompatibilitySaveServiceTest {
                 .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonthAndCompletedTrue(
                         any(), any(), anyString(), any(), anyInt()))
                 .willReturn(Optional.empty());
-        given(companyCompatibilityInsertService.insert(any(), any()))
+        given(companyCompatibilityRepository.save(any()))
                 .willThrow(new DataIntegrityViolationException("UNIQUE 제약 위반"));
 
         // When & Then

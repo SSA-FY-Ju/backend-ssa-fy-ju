@@ -28,6 +28,7 @@ import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.DailyApiUsageRepository;
 import ssafy.SSAju.repository.UserRepository;
 import ssafy.SSAju.service.CompanyMatchingService;
+import ssafy.SSAju.service.DailyApiUsageService;
 import ssafy.SSAju.service.SajuDataService;
 
 import java.time.Instant;
@@ -64,8 +65,8 @@ import static org.mockito.Mockito.verify;
 @DisplayName("CompanyCompatibility 동시 생성 방지 테스트 (US5)")
 class CompanyCompatibilityConcurrencyTest {
 
-    /** DailyApiUsageService.DAILY_REQUEST_LIMIT(3)를 넘지 않는 선에서 동시 요청을 재현한다. */
-    private static final int THREAD_COUNT = 3;
+    /** 일일 쿼터 한도를 넘지 않는 선에서 동시 요청을 재현한다. */
+    private static final int THREAD_COUNT = DailyApiUsageService.DAILY_REQUEST_LIMIT;
 
     @Container
     static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0");
@@ -195,6 +196,9 @@ class CompanyCompatibilityConcurrencyTest {
             executor.shutdown();
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
                 executor.shutdownNow();
+                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Executor did not terminate after shutdownNow()");
+                }
             }
         }
         assertThat(finishedInTime).as("60초 내에 모든 스레드가 완료되어야 한다").isTrue();

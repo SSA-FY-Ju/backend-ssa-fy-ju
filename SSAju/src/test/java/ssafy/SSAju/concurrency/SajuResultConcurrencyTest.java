@@ -148,6 +148,9 @@ class SajuResultConcurrencyTest {
             executor.shutdown();
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
                 executor.shutdownNow();
+                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Executor did not terminate after shutdownNow()");
+                }
             }
         }
         assertThat(finishedInTime).as("30초 내에 모든 스레드가 완료되어야 한다").isTrue();
