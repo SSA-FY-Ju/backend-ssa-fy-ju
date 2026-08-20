@@ -18,6 +18,7 @@ import ssafy.SSAju.career.provider.SajuResultProvider;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
+import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.CareerFortuneRepository;
 import ssafy.SSAju.repository.SajuFullDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
@@ -47,13 +48,11 @@ class SajuResultConcurrencyTest {
     private static final int THREAD_COUNT = 20;
 
     @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
-            .withExposedPorts(6379);
+    static GenericContainer<?> redis = RedisTestSupport.newRedisContainer();
 
     @DynamicPropertySource
     static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
+        RedisTestSupport.registerRedisProperties(registry, redis);
     }
 
     @Autowired
@@ -72,6 +71,9 @@ class SajuResultConcurrencyTest {
     private SajuFullDataRepository sajuFullDataRepository;
 
     @Autowired
+    private CareerConsultationRepository careerConsultationRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -82,6 +84,7 @@ class SajuResultConcurrencyTest {
 
     @BeforeEach
     void setUp() {
+        careerConsultationRepository.deleteAllInBatch();
         careerFortuneRepository.deleteAllInBatch();
         sajuFullDataRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
@@ -138,10 +141,16 @@ class SajuResultConcurrencyTest {
             });
         }
         startLatch.countDown();
-        boolean finishedInTime = doneLatch.await(30, TimeUnit.SECONDS);
+        boolean finishedInTime;
+        try {
+            finishedInTime = doneLatch.await(30, TimeUnit.SECONDS);
+        } finally {
+            executor.shutdown();
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        }
         assertThat(finishedInTime).as("30초 내에 모든 스레드가 완료되어야 한다").isTrue();
-        executor.shutdown();
-        executor.awaitTermination(5, TimeUnit.SECONDS);
 
         // Then
         assertThat(failures).as("동시 요청 중 예외가 발생하지 않아야 한다").isEmpty();
