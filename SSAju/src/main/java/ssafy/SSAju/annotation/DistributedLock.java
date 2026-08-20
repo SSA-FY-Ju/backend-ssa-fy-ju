@@ -26,8 +26,7 @@ import java.lang.annotation.Target;
  * 이 어노테이션이 조용히 무시됩니다(예외 없이 락 없는 채로 그냥 실행됨). 이 어노테이션을
  * 붙인 메서드를 호출하는 다른 코드가 같은 클래스 안에 있다면 반드시 별도 빈으로 분리하세요
  * ({@code CompanyMatchingService}가 락 없는 1차 캐시 조회와 락이 필요한 저장 단계를
- * {@code CompanyCompatibilitySaveService}로 분리한 것, {@code ConsultationSaveService}가
- * 신규 삽입을 {@code ConsultationInsertService}로 분리한 것 참고). 이 아스펙트 자체는
+ * {@code CompanyCompatibilitySaveService}로 분리한 것 참고). 이 아스펙트 자체는
  * self-invocation을 감지할 방법이 없습니다 — 애초에 아스펙트가 호출되지 않기 때문입니다.
  */
 @Target(ElementType.METHOD)
