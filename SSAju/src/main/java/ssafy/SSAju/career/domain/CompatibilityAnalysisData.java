@@ -8,14 +8,14 @@ import java.util.Map;
 /**
  * 기업 궁합 분석 결과를 담는 내부 VO (Value Object).
  *
- * <p>Persistence Layer({@link ssafy.SSAju.service.CompatibilityChildSaveService})가
+ * <p>Persistence Layer({@link ssafy.SSAju.service.CompanyCompatibilitySaveService})가
  * Presentation Layer({@code CompatibilityResponse.*}) 타입에 의존하지 않도록 분리합니다.
  *
  * <p>사용 흐름:
  * <ol>
- *   <li>{@code AnalysisResponseBuilder}가 이 VO를 생성</li>
- *   <li>{@code CompatibilityChildSaveService}가 이 VO를 받아 DB에 저장</li>
- *   <li>{@code CompanyMatchingService}가 이 VO를 {@code CompatibilityResponse}로 변환하여 반환</li>
+ *   <li>{@code CompanyMatchingService}가 {@code AnalysisResponseBuilder}로 이 VO를 생성</li>
+ *   <li>{@code CompanyCompatibilitySaveService}가 이 VO를 받아 DB에 저장</li>
+ *   <li>{@code CompatibilityChildReadService}가 이 VO를 {@code CompatibilityResponse}로 변환하여 반환</li>
  * </ol>
  */
 public record CompatibilityAnalysisData(

@@ -47,25 +47,31 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
- * 동일 (프로필, 회사, 직군) 조합에 대한 동시 요청이 정확히 1개의 CompanyCompatibility만 생성하고,
- * 쿼터도 정확히 1회만 차감되는지 검증 (US5, T031).
+ * 동일 (프로필, 회사, 직군) 조합에 대한 동시 요청이 DB에는 정확히 1개의 CompanyCompatibility만
+ * 남기는지 검증한다(US5, T031 후속 리팩토링).
+ *
+ * <p>락 배치를 저장 단계로 좁히면서(외부 I/O는 락 밖) 더블체크 캐시 확인을 제거했다 — 완전히
+ * 동일한 요청이 동시에 오면 FastAPI/OpenAI가 스레드 수만큼 중복 호출되고 쿼터도 그만큼
+ * 차감되는 것을 감수한다(단, 최종 저장은 락 덕분에 항상 1건으로 수렴한다). 그래서 스레드 수를
+ * 일일 쿼터 한도({@code DailyApiUsageService.DAILY_REQUEST_LIMIT=3}) 이내로 제한해, 한도
+ * 초과로 인한 {@code DailyLimitExceededException}이 "예외 없음" 검증을 방해하지 않게 한다.
  *
  * <p>{@code DailyApiUsageService}가 MySQL의 {@code ON DUPLICATE KEY UPDATE} 문법을 사용하므로
  * MySQL Testcontainers가 필요하다({@code DailyQuotaIntegrityIntegrationTest}와 동일한 이유).
  */
 @Testcontainers
 @SpringBootTest
-@DisplayName("CompanyCompatibility 동시 생성 방지 및 쿼터 단일 차감 테스트 (US5)")
+@DisplayName("CompanyCompatibility 동시 생성 방지 테스트 (US5)")
 class CompanyCompatibilityConcurrencyTest {
 
-    private static final int THREAD_COUNT = 10;
+    /** DailyApiUsageService.DAILY_REQUEST_LIMIT(3)를 넘지 않는 선에서 동시 요청을 재현한다. */
+    private static final int THREAD_COUNT = 3;
 
     @Container
     static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0");
 
     @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
-            .withExposedPorts(6379);
+    static GenericContainer<?> redis = RedisTestSupport.newRedisContainer();
 
     @DynamicPropertySource
     static void containerProperties(DynamicPropertyRegistry registry) {
@@ -75,8 +81,7 @@ class CompanyCompatibilityConcurrencyTest {
         registry.add("spring.datasource.password", mysql::getPassword);
         registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.MySQLDialect");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create");
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
+        RedisTestSupport.registerRedisProperties(registry, redis);
     }
 
     @Autowired
@@ -161,8 +166,8 @@ class CompanyCompatibilityConcurrencyTest {
     }
 
     @Test
-    @DisplayName("동일 (프로필, 회사, 직군) 조합에 대한 N개 동시 요청은 CompanyCompatibility 1건, 쿼터 1회 차감만 발생시킨다")
-    void concurrentAnalyze_createsExactlyOneRowAndDeductsQuotaOnce() throws InterruptedException {
+    @DisplayName("동일 (프로필, 회사, 직군) 조합에 대한 N개 동시 요청도 CompanyCompatibility는 정확히 1건만 남는다")
+    void concurrentAnalyze_createsExactlyOneRow() throws InterruptedException {
         // Given
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(THREAD_COUNT);
@@ -183,22 +188,31 @@ class CompanyCompatibilityConcurrencyTest {
             });
         }
         startLatch.countDown();
-        boolean finishedInTime = doneLatch.await(60, TimeUnit.SECONDS);
+        boolean finishedInTime;
+        try {
+            finishedInTime = doneLatch.await(60, TimeUnit.SECONDS);
+        } finally {
+            executor.shutdown();
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        }
         assertThat(finishedInTime).as("60초 내에 모든 스레드가 완료되어야 한다").isTrue();
-        executor.shutdown();
-        executor.awaitTermination(5, TimeUnit.SECONDS);
 
         // Then
         assertThat(failures).as("동시 요청 중 예외가 발생하지 않아야 한다").isEmpty();
         assertThat(companyCompatibilityRepository.count())
-                .as("DB에는 CompanyCompatibility가 정확히 1건만 존재해야 한다")
+                .as("동시에 완전히 동일한 요청이 와도 DB에는 CompanyCompatibility가 정확히 1건만 남아야 한다")
                 .isEqualTo(1);
+        // 더블체크락을 제거했으므로 각 스레드가 FastAPI/OpenAI를 각자 호출하고 쿼터도 각자
+        // 차감한다 — 최종 DB 행 수(위 assertion)만 락으로 보장되고, 호출/쿼터 차감 횟수는
+        // 스레드 수(THREAD_COUNT)만큼 발생하는 것이 이번 설계의 의도된 트레이드오프다.
         assertThat(dailyApiUsageRepository.findByUserIdAndUsageDate(testUser.getId(), LocalDate.now(ClockConfig.SERVICE_ZONE))
                 .map(usage -> usage.getRequestCount())
                 .orElse(0))
-                .as("더블체크락으로 쿼터는 정확히 1회만 차감되어야 한다(이중 차감 방지)")
-                .isEqualTo(1);
-        verify(sajuDataService, times(2)).fetchSajuFromFastAPI(any(), any()); // 사용자 1회 + 기업 1회, 승자 스레드만
-        verify(companyMatchingOpenAICaller, times(1)).call(any());
+                .as("더블체크락이 없으므로 쿼터는 동시 요청 수만큼 차감된다")
+                .isEqualTo(THREAD_COUNT);
+        verify(sajuDataService, times(THREAD_COUNT * 2)).fetchSajuFromFastAPI(any(), any()); // 스레드마다 사용자 1회 + 기업 1회
+        verify(companyMatchingOpenAICaller, times(THREAD_COUNT)).call(any());
     }
 }
