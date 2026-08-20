@@ -336,6 +336,9 @@ class CompanyCompatibilityLockedAnalysisServiceTest {
                 request, USER_ID, MOCK_USER, MOCK_USER_PROFILE, TEST_COMPATIBILITY_MONTH, USER_BIRTH_TIME))
                 .isSameAs(saveFailure);
         verify(dailyApiUsageService).restoreDailyUsage(USER_ID, usageDate);
+        // insert까지 성공한 completed=false 행을 남겨두면 재시도가 UNIQUE 위반으로 영구히 막히므로
+        // 보상 삭제로 정리되어야 한다(회귀 검증).
+        verify(companyCompatibilityRepository).delete(savedEntity);
     }
 
     private CompatibilityRequest buildRequest() {

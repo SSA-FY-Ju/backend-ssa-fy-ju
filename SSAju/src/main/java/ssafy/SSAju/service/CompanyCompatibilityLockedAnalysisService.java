@@ -35,7 +35,8 @@ import java.util.Optional;
 
 /**
  * 기업 궁합 분석의 "캐시 미스 이후" 구간(더블체크 캐시 확인 → 쿼터 차감 → 사주 계산/AI 호출/저장)을
- * userProfile+company+role 단위 분산락으로 보호합니다(US5, T035).
+ * user+userProfile+company+role+month 단위 분산락으로 보호합니다(US5, T035). UNIQUE 제약과
+ * 동일한 범위로 좁혀 서로 다른 사용자·다른 월의 요청까지 불필요하게 직렬화하지 않습니다.
  *
  * <p>{@link CompanyMatchingService}가 락 없이 빠르게 처리하는 1차 캐시 조회에서 미스가 난 요청만
  * 이 클래스로 넘어옵니다. {@code @DistributedLock}은 같은 클래스 내 self-invocation에서는 Spring AOP
@@ -69,8 +70,8 @@ public class CompanyCompatibilityLockedAnalysisService {
     private final CompatibilityChildReadService childReadService;
     private final DailyApiUsageService dailyApiUsageService;
 
-    @DistributedLock(key = "'lock:company-compatibility:' + #userProfile.id + ':' + #request.companyName() "
-            + "+ ':' + #request.targetRole().category()")
+    @DistributedLock(key = "'lock:company-compatibility:' + #userId + ':' + #userProfile.id + ':' "
+            + "+ #request.companyName() + ':' + #request.targetRole().category() + ':' + #compatibilityMonth")
     public CompatibilityResponse analyzeWithLock(CompatibilityRequest request, Long userId, User user,
                                                    UserProfile userProfile, Integer compatibilityMonth,
                                                    LocalTime userBirthTime) {
@@ -174,8 +175,21 @@ public class CompanyCompatibilityLockedAnalysisService {
                         request.companyName(), request.targetRole().category(), compatibilityMonth)
                 .orElseThrow(() -> new DataAccessException("CompanyCompatibility 조회 실패"));
 
-        // 자식 엔티티 전체 저장을 단일 트랜잭션(REQUIRES_NEW)으로 위임
-        childSaveService.saveAllAndMarkCompleted(saved, analysisData);
+        try {
+            // 자식 엔티티 전체 저장을 단일 트랜잭션(REQUIRES_NEW)으로 위임
+            childSaveService.saveAllAndMarkCompleted(saved, analysisData);
+        } catch (RuntimeException e) {
+            // 방금 insert한 completed=false 행을 그대로 남겨두면, 재시도가 findCompletedCache에서
+            // 계속 미스인 채로 insert를 다시 시도해 UNIQUE 제약 위반으로 영구히 막힌다.
+            // 보상 삭제로 행을 정리해 다음 시도가 정상적으로 재분석할 수 있게 한다.
+            try {
+                companyCompatibilityRepository.delete(saved);
+            } catch (RuntimeException deleteException) {
+                log.error("불완전한 CompanyCompatibility 행 정리 실패 (compatibilityId={})", saved.getId(), deleteException);
+                e.addSuppressed(deleteException);
+            }
+            throw e;
+        }
 
         log.info("기업 궁합 분석 완료: compatibilityScore={}", compatibilityScore);
         return buildNewResponse(saved, request, analysisData);
