@@ -148,6 +148,17 @@ class ConsultationServiceTest {
             "火와 金의 기운이 강해 전략성과 실행력이 뛰어남"
     );
 
+    /** MOCK_ADVICE와 strengths만 다르게 한 "경쟁에서 이긴 스레드가 실제로 저장한" advice. */
+    private static final CareerAdviceResponse WINNER_ADVICE = new CareerAdviceResponse(
+            MOCK_ADVICE.industries(), MOCK_ADVICE.interviewTips(),
+            List.of("승자의_강점_텍스트"),
+            MOCK_ADVICE.cautions(), MOCK_ADVICE.wealthStyle(), MOCK_ADVICE.longTermRoadmap(),
+            MOCK_ADVICE.personalBranding(), MOCK_ADVICE.powerKeywords(), MOCK_ADVICE.mentalCare(),
+            MOCK_ADVICE.environmentFit(), MOCK_ADVICE.workStyle(), MOCK_ADVICE.relationshipStrategy(),
+            MOCK_ADVICE.careerTimeline(), MOCK_ADVICE.keyTenGods(),
+            MOCK_ADVICE.dayMasterDescription(), MOCK_ADVICE.fiveElementsAnalysis()
+    );
+
     @BeforeEach
     void setUp() {
         service = new ConsultationService(
@@ -314,9 +325,13 @@ class ConsultationServiceTest {
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
-        // 이 스레드가 만든 advice는 버려지고, 락 안 재확인에서 이미 완료된 다른 스레드의 결과를 반환
+        // 이 스레드가 만든 advice(MOCK_ADVICE)는 버려지고, 락 안 재확인에서 이미 완료된 다른
+        // 스레드가 실제로 저장한 행(WINNER_ADVICE)으로 수렴한다.
         given(consultationSaveService.saveOrUpdate(any(), any(), any(), any()))
                 .willReturn(new ConsultationSaveService.SaveOutcome(77L, false));
+        var winnerConsultation = mock(CareerConsultation.class);
+        given(winnerConsultation.getResultJson()).willReturn(WINNER_ADVICE);
+        given(careerConsultationRepository.findById(77L)).willReturn(Optional.of(winnerConsultation));
 
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
@@ -324,6 +339,10 @@ class ConsultationServiceTest {
         assertThat(result).isNotNull();
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
         verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
+        // consultationId(77L)가 가리키는 실제 저장분(WINNER_ADVICE)의 내용이 응답에 실려야 한다 —
+        // 이 요청이 직접 만들었다가 버려진 MOCK_ADVICE의 내용이 아니다.
+        assertThat(result.strengths()).containsExactlyElementsOf(WINNER_ADVICE.strengths());
+        assertThat(result.strengths()).doesNotContainAnyElementsOf(MOCK_ADVICE.strengths());
     }
 
     @Test

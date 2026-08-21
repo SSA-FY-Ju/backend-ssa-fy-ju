@@ -21,6 +21,7 @@ import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.ConsultationRequest;
 import ssafy.SSAju.dto.response.ConsultationResponse;
 import ssafy.SSAju.entity.User;
+import ssafy.SSAju.exception.ConsultationRecoveryFailedException;
 import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
@@ -140,6 +141,7 @@ public class ConsultationService {
             }
             throw e;
         }
+        CareerAdviceResponse responseAdvice = advice;
         if (!outcome.persisted()) {
             // 따닥(동일 요청 동시 도착)으로 락 안 재확인에서 다른 요청이 이미 저장한 결과로
             // 수렴한 경우 — 이 요청이 방금 낸 OpenAI 호출은 어떤 값도 만들지 못했으므로
@@ -149,10 +151,17 @@ public class ConsultationService {
             } catch (RuntimeException restoreException) {
                 log.error("경합으로 인한 쿼터 복원 실패 (userId={}, usageDate={})", userId, usageDate, restoreException);
             }
+            // 이 요청이 만든 advice는 버려졌으므로, 그대로 반환하면 실제 DB에 저장된 내용과
+            // 달라질 수 있다(OpenAI 응답은 호출마다 조금씩 다름). outcome.consultationId()가
+            // 가리키는 실제 저장분을 다시 읽어와 응답에 실어야 consultationId와 내용이 일치한다.
+            CareerConsultation persisted = careerConsultationRepository.findById(outcome.consultationId())
+                    .orElseThrow(() -> new ConsultationRecoveryFailedException(
+                            "경합 후 저장된 CareerConsultation 재조회 실패: consultationId=" + outcome.consultationId()));
+            responseAdvice = consultationMapper.restoreAdvice(persisted);
         }
 
         log.info("커리어 컨설팅 완료: sajuResultId={}, favoredPeriod={}", sajuResult.getId(), favoredPeriod);
         return consultationMapper.toResponse(sajuData, tenGodDistribution, dayMaster,
-                favoredPeriod, confidenceScore, reasoning, sajuResult, outcome.consultationId(), advice, modelVersion);
+                favoredPeriod, confidenceScore, reasoning, sajuResult, outcome.consultationId(), responseAdvice, modelVersion);
     }
 }
