@@ -127,7 +127,7 @@ class ConsultationConcurrencyTest {
                 try {
                     startLatch.await();
                     Long id = consultationSaveService.saveOrUpdate(
-                            testSajuResult, fakeAdvice(), "gpt-4o-mini", CONSULTATION_MONTH);
+                            testSajuResult, fakeAdvice(), "gpt-4o-mini", CONSULTATION_MONTH).consultationId();
                     resultIds.add(id);
                 } catch (Throwable e) {
                     failures.add(e);

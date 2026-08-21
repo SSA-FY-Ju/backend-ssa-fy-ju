@@ -34,6 +34,14 @@ public class ConsultationSaveService {
     private final CareerConsultationRepository careerConsultationRepository;
 
     /**
+     * saveOrUpdate 호출 결과. {@code persisted}는 이 호출이 실제로 새 내용을 DB에 썼는지를
+     * 나타낸다 — 락 안 재확인/경합 복구로 인해 이미 있던(다른 요청이 만든) 데이터를 그대로
+     * 반환만 한 경우엔 false. 호출자는 이 값으로 "따닥"(동일 요청 동시 도착) 시 자신이 이미
+     * 차감한 일일 API 쿼터를 보상 복원할지 판단한다.
+     */
+    public record SaveOutcome(Long consultationId, boolean persisted) {}
+
+    /**
      * CareerConsultation을 저장하거나 기존 데이터를 업데이트.
      *
      * <ol>
@@ -49,7 +57,7 @@ public class ConsultationSaveService {
      * @param consultationMonth 대상 월 (YYYYMM 형식 정수, 예: 202605)
      */
     @DistributedLock(key = "'lock:career-consultation:' + #sajuResult.id + ':' + #consultationMonth")
-    public Long saveOrUpdate(SajuResult sajuResult, CareerAdviceResponse advice,
+    public SaveOutcome saveOrUpdate(SajuResult sajuResult, CareerAdviceResponse advice,
                              String modelVersion, Integer consultationMonth) {
         Optional<CareerConsultation> existingOpt = careerConsultationRepository
                 .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth);
@@ -65,7 +73,7 @@ public class ConsultationSaveService {
      * (UNIQUE 위반) 시 기존 데이터를 재조회합니다. 이 클래스에 @Transactional이 없으므로
      * save()는 그 자체로 독립된 트랜잭션이라, 실패해도 재조회를 오염시키지 않는다.
      */
-    private Long insertOrRecoverOnConflict(SajuResult sajuResult, CareerAdviceResponse advice,
+    private SaveOutcome insertOrRecoverOnConflict(SajuResult sajuResult, CareerAdviceResponse advice,
                                            String modelVersion, Integer consultationMonth) {
         try {
             CareerConsultation newConsultation = consultationMapper.buildConsultation(
@@ -73,7 +81,7 @@ public class ConsultationSaveService {
             CareerConsultation saved = careerConsultationRepository.save(newConsultation);
             log.info("새 CareerConsultation 저장 완료: sajuResultId={}, month={}",
                     sajuResult.getId(), consultationMonth);
-            return saved.getId();
+            return new SaveOutcome(saved.getId(), true);
         } catch (DataIntegrityViolationException e) {
             log.warn("CareerConsultation 삽입 중 UNIQUE 제약 위반(락 임대시간 만료 경합 추정) — 재조회: "
                             + "sajuResultId={}, month={}",
@@ -92,7 +100,7 @@ public class ConsultationSaveService {
      * 기존 엔티티는 이전 조회의 트랜잭션이 이미 끝나 detached 상태다 — 필드만 바꾸고 끝내면
      * DB에 반영되지 않으므로, 명시적으로 save()해 merge한다.
      */
-    private Long updateIfModelChanged(CareerConsultation existing, SajuResult sajuResult,
+    private SaveOutcome updateIfModelChanged(CareerConsultation existing, SajuResult sajuResult,
                                       CareerAdviceResponse advice, String modelVersion, Integer consultationMonth) {
         if (!existing.getOpenaiModelVersion().equals(modelVersion)) {
             log.info("모델 버전 변경 감지 — 기존 컨설팅 결과 업데이트: " +
@@ -100,10 +108,10 @@ public class ConsultationSaveService {
                     sajuResult.getId(), consultationMonth,
                     existing.getOpenaiModelVersion(), modelVersion);
             consultationMapper.updateConsultation(existing, advice, modelVersion);
-            return careerConsultationRepository.save(existing).getId();
+            return new SaveOutcome(careerConsultationRepository.save(existing).getId(), true);
         }
         log.info("같은 모델 버전 — 기존 컨설팅 결과 유지: sajuResultId={}, month={}",
                 sajuResult.getId(), consultationMonth);
-        return existing.getId();
+        return new SaveOutcome(existing.getId(), false);
     }
 }

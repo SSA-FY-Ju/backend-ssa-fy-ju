@@ -126,10 +126,33 @@ public class ConsultationService {
         }
 
         // ─── 5. 저장 (C-7: @Transactional 보장) ─────────────────────────────────
-        Long consultationId = consultationSaveService.saveOrUpdate(sajuResult, advice, modelVersion, consultationMonth);
+        ConsultationSaveService.SaveOutcome outcome;
+        try {
+            outcome = consultationSaveService.saveOrUpdate(sajuResult, advice, modelVersion, consultationMonth);
+        } catch (RuntimeException e) {
+            // 저장/경합 복구 자체가 실패한 경우(예: ConsultationRecoveryFailedException) — 이 요청은
+            // 어떤 값도 만들지 못했으므로 앞서 차감한 쿼터를 복원한 뒤 원본 예외를 그대로 전파한다.
+            try {
+                dailyApiUsageService.restoreDailyUsage(userId, usageDate);
+            } catch (RuntimeException restoreException) {
+                log.error("쿼터 복원 실패 (userId={}, usageDate={})", userId, usageDate, restoreException);
+                e.addSuppressed(restoreException);
+            }
+            throw e;
+        }
+        if (!outcome.persisted()) {
+            // 따닥(동일 요청 동시 도착)으로 락 안 재확인에서 다른 요청이 이미 저장한 결과로
+            // 수렴한 경우 — 이 요청이 방금 낸 OpenAI 호출은 어떤 값도 만들지 못했으므로
+            // 앞서 차감한 일일 쿼터를 보상 복원한다.
+            try {
+                dailyApiUsageService.restoreDailyUsage(userId, usageDate);
+            } catch (RuntimeException restoreException) {
+                log.error("경합으로 인한 쿼터 복원 실패 (userId={}, usageDate={})", userId, usageDate, restoreException);
+            }
+        }
 
         log.info("커리어 컨설팅 완료: sajuResultId={}, favoredPeriod={}", sajuResult.getId(), favoredPeriod);
         return consultationMapper.toResponse(sajuData, tenGodDistribution, dayMaster,
-                favoredPeriod, confidenceScore, reasoning, sajuResult, consultationId, advice, modelVersion);
+                favoredPeriod, confidenceScore, reasoning, sajuResult, outcome.consultationId(), advice, modelVersion);
     }
 }

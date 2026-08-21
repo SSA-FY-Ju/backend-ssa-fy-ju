@@ -27,6 +27,7 @@ import ssafy.SSAju.dto.response.ConsultationResponse;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
+import ssafy.SSAju.exception.ConsultationRecoveryFailedException;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
@@ -184,6 +185,8 @@ class ConsultationServiceTest {
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(consultationSaveService.saveOrUpdate(any(), any(), any(), any()))
+                .willReturn(new ConsultationSaveService.SaveOutcome(100L, true));
 
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
@@ -242,6 +245,8 @@ class ConsultationServiceTest {
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(consultationSaveService.saveOrUpdate(any(), any(), any(), any()))
+                .willReturn(new ConsultationSaveService.SaveOutcome(100L, true));
 
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
@@ -288,6 +293,63 @@ class ConsultationServiceTest {
         verify(openAICaller, never()).call(any(), any(), any(), any());
         verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(any());
         verify(dailyApiUsageService, never()).restoreDailyUsage(any(), any());
+    }
+
+    // ─────────────────────────────────────────
+    // 따닥(동일 요청 동시 도착) → 락 안 재확인에서 남의 결과 재사용 → 쿼터 보상
+    // ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("saveOrUpdate가 남의 결과를 재사용(persisted=false)했다면 예외 없이도 쿼터를 보상 복원한다")
+    void shouldRestoreQuota_WhenSaveServiceReusedExistingConsultation() {
+        var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        var sajuResult = mock(SajuResult.class);
+
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
+        given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
+        given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
+        given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
+                .willReturn(Optional.empty());
+        given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        // 이 스레드가 만든 advice는 버려지고, 락 안 재확인에서 이미 완료된 다른 스레드의 결과를 반환
+        given(consultationSaveService.saveOrUpdate(any(), any(), any(), any()))
+                .willReturn(new ConsultationSaveService.SaveOutcome(77L, false));
+
+        ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
+
+        // 예외는 없었지만(정상 반환), 이 요청은 새 값을 저장하지 못했으므로 쿼터를 보상 복원해야 한다
+        assertThat(result).isNotNull();
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
+    }
+
+    @Test
+    @DisplayName("saveOrUpdate가 경합 복구까지 실패해 예외를 던지면 쿼터를 복원한 뒤 원본 예외를 전파한다")
+    void shouldRestoreQuota_WhenSaveServiceFails() {
+        var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        var sajuResult = mock(SajuResult.class);
+        ConsultationRecoveryFailedException saveFailure =
+                new ConsultationRecoveryFailedException("CareerConsultation 경합 복구 실패");
+
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
+        given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
+        given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
+        given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
+                .willReturn(Optional.empty());
+        given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(consultationSaveService.saveOrUpdate(any(), any(), any(), any())).willThrow(saveFailure);
+
+        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
+                .isSameAs(saveFailure);
+
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
     }
 
     // ─────────────────────────────────────────
