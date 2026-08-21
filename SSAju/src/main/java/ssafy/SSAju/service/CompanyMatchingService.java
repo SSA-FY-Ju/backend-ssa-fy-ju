@@ -101,7 +101,18 @@ public class CompanyMatchingService {
         // 캐시 미스: 사주 계산·AI 호출과 DB 저장을 감싸 실패 시 쿼터를 복원한다.
         LocalDate usageDate = dailyApiUsageService.checkAndIncrementDailyUsage(userId);
         try {
-            return analyzeAndPersist(request, user, userProfile, compatibilityMonth, userBirthTime);
+            AnalysisOutcome outcome = analyzeAndPersist(request, user, userProfile, compatibilityMonth, userBirthTime);
+            if (!outcome.newlyCreated()) {
+                // 따닥(동일 요청 동시 도착)으로 락 안 재확인에서 다른 요청이 이미 저장한 행으로
+                // 수렴한 경우 — 이 요청이 방금 낸 FastAPI/OpenAI 호출은 어떤 값도 만들지
+                // 못했으므로 앞서 차감한 일일 쿼터를 보상 복원한다.
+                try {
+                    dailyApiUsageService.restoreDailyUsage(userId, usageDate);
+                } catch (RuntimeException restoreException) {
+                    log.error("경합으로 인한 쿼터 복원 실패 (userId={}, usageDate={})", userId, usageDate, restoreException);
+                }
+            }
+            return outcome.response();
         } catch (RuntimeException e) {
             try {
                 dailyApiUsageService.restoreDailyUsage(userId, usageDate);
@@ -112,6 +123,9 @@ public class CompanyMatchingService {
             throw e;
         }
     }
+
+    /** analyzeAndPersist 결과. newlyCreated는 이 호출이 실제로 새 행을 저장했는지를 나타낸다. */
+    private record AnalysisOutcome(CompatibilityResponse response, boolean newlyCreated) {}
 
     private Optional<CompanyCompatibility> findCompletedCache(Long userId, UserProfile userProfile,
                                                                  CompatibilityRequest request,
@@ -127,7 +141,7 @@ public class CompanyMatchingService {
      * {@link CompanyCompatibilitySaveService}에 위임해 (사용자, 프로필, 회사, 직무, 월) 단위
      * 분산락으로 보호한다.
      */
-    private CompatibilityResponse analyzeAndPersist(CompatibilityRequest request,
+    private AnalysisOutcome analyzeAndPersist(CompatibilityRequest request,
                                                        User user, UserProfile userProfile,
                                                        Integer compatibilityMonth, LocalTime userBirthTime) {
         SajuCalculationResult sajuCalc = calculateSajuData(request, userBirthTime);
@@ -181,10 +195,11 @@ public class CompanyMatchingService {
 
         // 락 안에서 "이미 완료된 행이 있으면 재사용, 없으면 저장"까지 처리 — 동시에 완전히
         // 동일한 요청이 왔다면 이 시점에 승자의 결과로 수렴한다(우리가 방금 계산한 값은 버려짐).
-        CompanyCompatibility saved = compatibilitySaveService.saveWithLock(root, analysisData);
+        CompanyCompatibilitySaveService.SaveOutcome outcome = compatibilitySaveService.saveWithLock(root, analysisData);
 
-        log.info("기업 궁합 분석 완료: compatibilityId={}", saved.getId());
-        return childReadService.buildFromExisting(saved, request);
+        log.info("기업 궁합 분석 완료: compatibilityId={}", outcome.entity().getId());
+        return new AnalysisOutcome(
+                childReadService.buildFromExisting(outcome.entity(), request), outcome.newlyCreated());
     }
 
     /** 사용자·기업 사주(FastAPI/공공데이터 호출 포함)를 계산한 결과. */

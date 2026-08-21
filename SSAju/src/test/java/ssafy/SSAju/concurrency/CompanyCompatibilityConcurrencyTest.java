@@ -52,10 +52,13 @@ import static org.mockito.Mockito.verify;
  * 남기는지 검증한다(US5, T031 후속 리팩토링).
  *
  * <p>락 배치를 저장 단계로 좁히면서(외부 I/O는 락 밖) 더블체크 캐시 확인을 제거했다 — 완전히
- * 동일한 요청이 동시에 오면 FastAPI/OpenAI가 스레드 수만큼 중복 호출되고 쿼터도 그만큼
- * 차감되는 것을 감수한다(단, 최종 저장은 락 덕분에 항상 1건으로 수렴한다). 그래서 스레드 수를
- * 일일 쿼터 한도({@code DailyApiUsageService.DAILY_REQUEST_LIMIT=3}) 이내로 제한해, 한도
- * 초과로 인한 {@code DailyLimitExceededException}이 "예외 없음" 검증을 방해하지 않게 한다.
+ * 동일한 요청이 동시에 오면 FastAPI/OpenAI가 스레드 수만큼 중복 호출되는 것은 감수한다(단,
+ * 최종 저장은 락 덕분에 항상 1건으로 수렴한다). 다만 쿼터는 saveWithLock의 결과(newlyCreated)를
+ * 보고 경합에서 진 요청만 보상 복원하므로, 동시 요청 수와 무관하게 실제로 새 행을 만든 1건만
+ * 최종 차감으로 남는다. 그래도 각 스레드의 최초 차감(checkAndIncrementDailyUsage)은 보상 이전에
+ * 동시에 일어나므로, 스레드 수를 일일 쿼터 한도({@code DailyApiUsageService.DAILY_REQUEST_LIMIT=3})
+ * 이내로 제한해 한도 초과로 인한 {@code DailyLimitExceededException}이 "예외 없음" 검증을
+ * 방해하지 않게 한다.
  *
  * <p>{@code DailyApiUsageService}가 MySQL의 {@code ON DUPLICATE KEY UPDATE} 문법을 사용하므로
  * MySQL Testcontainers가 필요하다({@code DailyQuotaIntegrityIntegrationTest}와 동일한 이유).
@@ -208,14 +211,15 @@ class CompanyCompatibilityConcurrencyTest {
         assertThat(companyCompatibilityRepository.count())
                 .as("동시에 완전히 동일한 요청이 와도 DB에는 CompanyCompatibility가 정확히 1건만 남아야 한다")
                 .isEqualTo(1);
-        // 더블체크락을 제거했으므로 각 스레드가 FastAPI/OpenAI를 각자 호출하고 쿼터도 각자
-        // 차감한다 — 최종 DB 행 수(위 assertion)만 락으로 보장되고, 호출/쿼터 차감 횟수는
-        // 스레드 수(THREAD_COUNT)만큼 발생하는 것이 이번 설계의 의도된 트레이드오프다.
+        // 더블체크락을 제거했으므로 각 스레드가 FastAPI/OpenAI를 각자 호출한다 — 그건 감수한
+        // 트레이드오프다. 다만 쿼터는 다르다: saveWithLock이 남의 행을 재사용(newlyCreated=false)
+        // 하면 CompanyMatchingService가 해당 스레드의 쿼터를 보상 복원하므로, 동시에 완전히
+        // 동일한 요청이 THREAD_COUNT개 와도 최종적으로 남는 차감은 실제로 새 행을 만든 1건뿐이다.
         assertThat(dailyApiUsageRepository.findByUserIdAndUsageDate(testUser.getId(), LocalDate.now(ClockConfig.SERVICE_ZONE))
                 .map(usage -> usage.getRequestCount())
                 .orElse(0))
-                .as("더블체크락이 없으므로 쿼터는 동시 요청 수만큼 차감된다")
-                .isEqualTo(THREAD_COUNT);
+                .as("경합에서 진 요청은 쿼터가 보상 복원되므로, 실제로 새 행을 만든 요청 1건만 남는다")
+                .isEqualTo(1);
         verify(sajuDataService, times(THREAD_COUNT * 2)).fetchSajuFromFastAPI(any(), any()); // 스레드마다 사용자 1회 + 기업 1회
         verify(companyMatchingOpenAICaller, times(THREAD_COUNT)).call(any());
     }

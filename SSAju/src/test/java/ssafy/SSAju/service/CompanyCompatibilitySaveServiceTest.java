@@ -84,10 +84,11 @@ class CompanyCompatibilitySaveServiceTest {
         given(companyCompatibilityRepository.save(entity)).willReturn(entity);
 
         // When
-        CompanyCompatibility saved = service.saveWithLock(entity, analysisData);
+        CompanyCompatibilitySaveService.SaveOutcome outcome = service.saveWithLock(entity, analysisData);
 
         // Then
-        assertThat(saved).isSameAs(entity);
+        assertThat(outcome.entity()).isSameAs(entity);
+        assertThat(outcome.newlyCreated()).isTrue();
         verify(companyCompatibilityRepository).save(entity);
     }
 
@@ -104,11 +105,12 @@ class CompanyCompatibilitySaveServiceTest {
                 .willReturn(Optional.of(existing));
 
         // When
-        CompanyCompatibility result = service.saveWithLock(entity, buildAnalysisData());
+        CompanyCompatibilitySaveService.SaveOutcome outcome = service.saveWithLock(entity, buildAnalysisData());
 
         // Then: 동시에 완전히 동일한 요청이 먼저 완료해 둔 행을 그대로 재사용 —
         // 우리가 방금 계산한 entity/analysisData는 저장되지 않는다(중복 방지).
-        assertThat(result).isSameAs(existing);
+        assertThat(outcome.entity()).isSameAs(existing);
+        assertThat(outcome.newlyCreated()).isFalse();
         verify(companyCompatibilityRepository, never()).save(any());
     }
 
@@ -128,10 +130,11 @@ class CompanyCompatibilitySaveServiceTest {
                 .willThrow(new DataIntegrityViolationException("UNIQUE 제약 위반"));
 
         // When
-        CompanyCompatibility result = service.saveWithLock(entity, buildAnalysisData());
+        CompanyCompatibilitySaveService.SaveOutcome outcome = service.saveWithLock(entity, buildAnalysisData());
 
         // Then
-        assertThat(result).isSameAs(winner);
+        assertThat(outcome.entity()).isSameAs(winner);
+        assertThat(outcome.newlyCreated()).isFalse();
     }
 
     @Test

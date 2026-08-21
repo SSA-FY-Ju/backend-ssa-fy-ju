@@ -188,7 +188,8 @@ class CompanyMatchingServiceTest {
                 .willReturn(78);
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(85);
-        given(compatibilitySaveService.saveWithLock(any(), any())).willReturn(savedEntity);
+        given(compatibilitySaveService.saveWithLock(any(), any()))
+                .willReturn(new CompanyCompatibilitySaveService.SaveOutcome(savedEntity, true));
         given(childReadService.buildFromExisting(savedEntity, request)).willReturn(expectedResponse);
 
         // When
@@ -217,7 +218,8 @@ class CompanyMatchingServiceTest {
                 .willReturn(78);
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(85);
-        given(compatibilitySaveService.saveWithLock(any(), any())).willReturn(savedEntity);
+        given(compatibilitySaveService.saveWithLock(any(), any()))
+                .willReturn(new CompanyCompatibilitySaveService.SaveOutcome(savedEntity, true));
 
         // When
         service.analyzeCompatibility(request, USER_ID);
@@ -289,7 +291,8 @@ class CompanyMatchingServiceTest {
                 .willReturn(60);
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(60);
-        given(compatibilitySaveService.saveWithLock(any(), any())).willReturn(savedEntity);
+        given(compatibilitySaveService.saveWithLock(any(), any()))
+                .willReturn(new CompanyCompatibilitySaveService.SaveOutcome(savedEntity, true));
 
         // When
         service.analyzeCompatibility(request, USER_ID);
@@ -374,6 +377,45 @@ class CompanyMatchingServiceTest {
         // When & Then
         assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
                 .isSameAs(saveFailure);
+        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, usageDate);
+    }
+
+    // ─────────────────────────────────────────
+    // 따닥(동일 요청 동시 도착) → 락 안 재확인에서 남의 행 재사용 → 쿼터 보상
+    // ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("saveWithLock이 남의 행을 재사용(newlyCreated=false)했다면 예외 없이도 쿼터를 보상 복원한다")
+    void shouldRestoreQuota_WhenSaveServiceReusedExistingRow() {
+        // Given
+        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
+        HiddenStems mockHiddenStems = new HiddenStems(
+                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
+                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
+        LocalDate usageDate = LocalDate.of(2026, 5, 27);
+        CompanyCompatibility winnerEntity = buildCompatibility(MOCK_USER_PROFILE);
+        CompatibilityResponse winnerResponse = new CompatibilityResponse(
+                winnerEntity.getId(), null, 78, "경쟁에서 이긴 스레드의 요약",
+                null, null, null, null, null, null, null, null
+        );
+
+        given(dailyApiUsageService.checkAndIncrementDailyUsage(USER_ID)).willReturn(usageDate);
+        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
+        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
+        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
+                .willReturn(78);
+        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
+                .willReturn(85);
+        // 이 스레드가 계산한 결과는 버려지고, 락 안 재확인에서 이미 완료된 다른 스레드의 행을 반환
+        given(compatibilitySaveService.saveWithLock(any(), any()))
+                .willReturn(new CompanyCompatibilitySaveService.SaveOutcome(winnerEntity, false));
+        given(childReadService.buildFromExisting(winnerEntity, request)).willReturn(winnerResponse);
+
+        // When
+        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
+
+        // Then: 예외는 없었지만(정상 반환), 이 요청은 새 값을 만들지 못했으므로 쿼터를 보상 복원해야 한다
+        assertThat(response).isEqualTo(winnerResponse);
         verify(dailyApiUsageService).restoreDailyUsage(USER_ID, usageDate);
     }
 

@@ -42,6 +42,14 @@ public class CompanyCompatibilitySaveService {
 
     private final CompanyCompatibilityRepository companyCompatibilityRepository;
 
+    /**
+     * saveWithLock 호출 결과. {@code newlyCreated}는 이 호출이 실제로 새 행을 저장했는지를
+     * 나타낸다 — 락 안 재확인/경합 복구로 인해 이미 있던(다른 요청이 만든) 행을 그대로
+     * 재사용만 한 경우엔 false. 호출자는 이 값으로 "따닥"(동일 요청 동시 도착) 시 자신이 이미
+     * 차감한 일일 API 쿼터를 보상 복원할지 판단한다.
+     */
+    public record SaveOutcome(CompanyCompatibility entity, boolean newlyCreated) {}
+
     // 락 키에 자유 입력 텍스트(companyName)를 ':'로 이어붙이면, 회사명 안에 ':'가 포함될 경우
     // 키 경계가 밀려 이론상 다른 (회사, 직무) 조합과 충돌할 수 있다. 회사명 앞에 길이를 붙여
     // 경계를 고정하면(예: "4_현대"), 같은 최종 문자열을 만들려면 길이 필드까지 조작해야 하므로
@@ -49,22 +57,23 @@ public class CompanyCompatibilitySaveService {
     @DistributedLock(key = "'lock:company-compatibility:' + #entity.user.id + ':' + #entity.userProfile.id + ':' "
             + "+ #entity.companyName.length() + '_' + #entity.companyName + ':' "
             + "+ #entity.targetRoleCategory + ':' + #entity.compatibilityMonth")
-    public CompanyCompatibility saveWithLock(CompanyCompatibility entity, CompatibilityAnalysisData analysisData) {
+    public SaveOutcome saveWithLock(CompanyCompatibility entity, CompatibilityAnalysisData analysisData) {
         Optional<CompanyCompatibility> existing = findCompleted(entity);
         if (existing.isPresent()) {
             log.info("락 안에서 완료된 기존 행 재사용 (compatibilityId={})", existing.get().getId());
-            return existing.get();
+            return new SaveOutcome(existing.get(), false);
         }
 
         try {
             entity.assignResultJsonAndMarkCompleted(analysisData);
             CompanyCompatibility saved = companyCompatibilityRepository.save(entity);
             log.info("CompanyCompatibility 신규 저장 완료 (compatibilityId={})", saved.getId());
-            return saved;
+            return new SaveOutcome(saved, true);
         } catch (DataIntegrityViolationException e) {
             log.warn("CompanyCompatibility 삽입 중 UNIQUE 제약 위반(락 임대시간 만료 경합 추정) — 재조회: "
                     + "userProfileId={}, month={}", entity.getUserProfile().getId(), entity.getCompatibilityMonth(), e);
             return findCompleted(entity)
+                    .map(found -> new SaveOutcome(found, false))
                     .orElseThrow(() -> new DataAccessException(
                             "CompanyCompatibility 경합 복구 실패: userProfileId="
                                     + entity.getUserProfile().getId()
