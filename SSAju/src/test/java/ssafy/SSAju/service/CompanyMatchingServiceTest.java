@@ -199,7 +199,8 @@ class CompanyMatchingServiceTest {
         assertThat(response).isEqualTo(expectedResponse);
         verify(compatibilitySaveService).saveWithLock(any(), any());
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService, never()).restoreDailyUsage(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
     }
 
     @Test
@@ -319,7 +320,7 @@ class CompanyMatchingServiceTest {
         assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
                 .isInstanceOf(FastAPITimeoutException.class);
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService).restoreDailyUsage(eq(USER_ID), any());
+        verify(dailyApiUsageService).restoreQuietly(eq(USER_ID), any(), any());
         verify(compatibilitySaveService, never()).saveWithLock(any(), any());
     }
 
@@ -350,7 +351,7 @@ class CompanyMatchingServiceTest {
         // When & Then
         assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
                 .isSameAs(aiFailure);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, usageDate);
+        verify(dailyApiUsageService).restoreQuietly(USER_ID, usageDate, aiFailure);
         verify(compatibilitySaveService, never()).saveWithLock(any(), any());
     }
 
@@ -377,7 +378,7 @@ class CompanyMatchingServiceTest {
         // When & Then
         assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
                 .isSameAs(saveFailure);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, usageDate);
+        verify(dailyApiUsageService).restoreQuietly(USER_ID, usageDate, saveFailure);
     }
 
     // ─────────────────────────────────────────
@@ -416,7 +417,39 @@ class CompanyMatchingServiceTest {
 
         // Then: 예외는 없었지만(정상 반환), 이 요청은 새 값을 만들지 못했으므로 쿼터를 보상 복원해야 한다
         assertThat(response).isEqualTo(winnerResponse);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, usageDate);
+        verify(dailyApiUsageService).restoreQuietly(USER_ID, usageDate);
+    }
+
+    @Test
+    @DisplayName("저장은 성공했는데 응답 조립이 실패해도 쿼터를 복원하지 않는다(이중 지급 방지)")
+    void shouldNotRestoreQuota_WhenSaveSucceedsButResponseBuildingFails() {
+        // Given: saveWithLock까지는 성공(DB에 행이 남음)하지만, 그 이후 응답 조립 단계에서 실패
+        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
+        HiddenStems mockHiddenStems = new HiddenStems(
+                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
+                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
+        LocalDate usageDate = LocalDate.of(2026, 5, 27);
+        CompanyCompatibility savedEntity = buildCompatibility(MOCK_USER_PROFILE);
+        DataAccessException buildFailure = new DataAccessException("completed=true인데 resultJson이 없음");
+
+        given(dailyApiUsageService.checkAndIncrementDailyUsage(USER_ID)).willReturn(usageDate);
+        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
+        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
+        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
+                .willReturn(78);
+        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
+                .willReturn(85);
+        given(compatibilitySaveService.saveWithLock(any(), any()))
+                .willReturn(new CompanyCompatibilitySaveService.SaveOutcome(savedEntity, true));
+        given(childReadService.buildFromExisting(savedEntity, request)).willThrow(buildFailure);
+
+        // When & Then
+        assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
+                .isSameAs(buildFailure);
+        // 저장은 이미 성공했으므로(newlyCreated=true) 쿼터를 되돌려주면 안 된다 — 그러면
+        // DB엔 값이 남아있는데 쿼터만 공짜로 생기는 이중 지급이 된다.
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
     }
 
     // ─────────────────────────────────────────

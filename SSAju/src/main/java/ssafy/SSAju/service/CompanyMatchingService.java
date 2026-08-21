@@ -100,32 +100,26 @@ public class CompanyMatchingService {
 
         // 캐시 미스: 사주 계산·AI 호출과 DB 저장을 감싸 실패 시 쿼터를 복원한다.
         LocalDate usageDate = dailyApiUsageService.checkAndIncrementDailyUsage(userId);
+        CompanyCompatibilitySaveService.SaveOutcome outcome;
         try {
-            AnalysisOutcome outcome = analyzeAndPersist(request, user, userProfile, compatibilityMonth, userBirthTime);
-            if (!outcome.newlyCreated()) {
-                // 따닥(동일 요청 동시 도착)으로 락 안 재확인에서 다른 요청이 이미 저장한 행으로
-                // 수렴한 경우 — 이 요청이 방금 낸 FastAPI/OpenAI 호출은 어떤 값도 만들지
-                // 못했으므로 앞서 차감한 일일 쿼터를 보상 복원한다.
-                try {
-                    dailyApiUsageService.restoreDailyUsage(userId, usageDate);
-                } catch (RuntimeException restoreException) {
-                    log.error("경합으로 인한 쿼터 복원 실패 (userId={}, usageDate={})", userId, usageDate, restoreException);
-                }
-            }
-            return outcome.response();
+            outcome = analyzeAndPersist(request, user, userProfile, compatibilityMonth, userBirthTime);
         } catch (RuntimeException e) {
-            try {
-                dailyApiUsageService.restoreDailyUsage(userId, usageDate);
-            } catch (RuntimeException restoreException) {
-                log.error("쿼터 복원 실패 (userId={}, usageDate={})", userId, usageDate, restoreException);
-                e.addSuppressed(restoreException);
-            }
+            dailyApiUsageService.restoreQuietly(userId, usageDate, e);
             throw e;
         }
-    }
+        if (!outcome.newlyCreated()) {
+            // 따닥(동일 요청 동시 도착)으로 락 안 재확인에서 다른 요청이 이미 저장한 행으로
+            // 수렴한 경우 — 이 요청이 방금 낸 FastAPI/OpenAI 호출은 어떤 값도 만들지
+            // 못했으므로 앞서 차감한 일일 쿼터를 보상 복원한다.
+            dailyApiUsageService.restoreQuietly(userId, usageDate);
+        }
 
-    /** analyzeAndPersist 결과. newlyCreated는 이 호출이 실제로 새 행을 저장했는지를 나타낸다. */
-    private record AnalysisOutcome(CompatibilityResponse response, boolean newlyCreated) {}
+        // 저장은 이미 끝났으므로(newlyCreated 여부와 무관하게 DB에 유효한 행이 존재), 이 아래
+        // 응답 조립 단계의 실패는 쿼터 복원 대상이 아니다 — 저장 자체는 성공했기 때문에, 여기서
+        // 예외가 나도 쿼터를 되돌려주면 안 된다(그러면 실제로 값이 남았는데 공짜 쿼터가 생긴다).
+        log.info("기업 궁합 분석 완료: compatibilityId={}", outcome.entity().getId());
+        return childReadService.buildFromExisting(outcome.entity(), request);
+    }
 
     private Optional<CompanyCompatibility> findCompletedCache(Long userId, UserProfile userProfile,
                                                                  CompatibilityRequest request,
@@ -139,9 +133,11 @@ public class CompanyMatchingService {
     /**
      * 사주 계산부터 AI 해설 생성까지의 신규 분석 흐름(외부 I/O, 락 없음). 마지막 저장 단계만
      * {@link CompanyCompatibilitySaveService}에 위임해 (사용자, 프로필, 회사, 직무, 월) 단위
-     * 분산락으로 보호한다.
+     * 분산락으로 보호한다. 응답 조립은 호출자(analyzeCompatibility)가 저장이 끝난 뒤에 별도로
+     * 수행한다 — 저장 성공 이후의 실패는 쿼터 복원 대상이 아니어야 하기 때문에 이 메서드는
+     * 저장 결과(SaveOutcome)까지만 반환한다.
      */
-    private AnalysisOutcome analyzeAndPersist(CompatibilityRequest request,
+    private CompanyCompatibilitySaveService.SaveOutcome analyzeAndPersist(CompatibilityRequest request,
                                                        User user, UserProfile userProfile,
                                                        Integer compatibilityMonth, LocalTime userBirthTime) {
         SajuCalculationResult sajuCalc = calculateSajuData(request, userBirthTime);
@@ -195,11 +191,7 @@ public class CompanyMatchingService {
 
         // 락 안에서 "이미 완료된 행이 있으면 재사용, 없으면 저장"까지 처리 — 동시에 완전히
         // 동일한 요청이 왔다면 이 시점에 승자의 결과로 수렴한다(우리가 방금 계산한 값은 버려짐).
-        CompanyCompatibilitySaveService.SaveOutcome outcome = compatibilitySaveService.saveWithLock(root, analysisData);
-
-        log.info("기업 궁합 분석 완료: compatibilityId={}", outcome.entity().getId());
-        return new AnalysisOutcome(
-                childReadService.buildFromExisting(outcome.entity(), request), outcome.newlyCreated());
+        return compatibilitySaveService.saveWithLock(root, analysisData);
     }
 
     /** 사용자·기업 사주(FastAPI/공공데이터 호출 포함)를 계산한 결과. */
