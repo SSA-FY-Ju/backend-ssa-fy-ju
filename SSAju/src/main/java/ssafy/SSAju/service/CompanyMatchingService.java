@@ -8,10 +8,16 @@ import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.CompatibilityNarrativeRequest;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
-import ssafy.SSAju.career.entity.*;
+import ssafy.SSAju.career.entity.CompanyCompatibility;
+import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.enums.SajuPillarIndex;
 import ssafy.SSAju.career.provider.UserProfileProvider;
-import ssafy.SSAju.career.util.*;
+import ssafy.SSAju.career.util.AnalysisResponseBuilder;
+import ssafy.SSAju.career.util.CompatibilityScoreCalculator;
+import ssafy.SSAju.career.util.HiddenStemCalculator;
+import ssafy.SSAju.career.util.JobCategoryEnum;
+import ssafy.SSAju.career.util.JobRoleAnalyzer;
+import ssafy.SSAju.career.util.RoleCompatibilityCalculator;
 import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
@@ -20,35 +26,32 @@ import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.exception.PublicDataApiException;
 import ssafy.SSAju.exception.UserNotFoundException;
-import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.UserRepository;
-import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.YearMonth;
-import java.util.List;
 import java.util.Optional;
 
 /**
  * 기업/직무 궁합 분석 오케스트레이션 서비스.
  *
- * <p><strong>이 클래스의 단일 책임</strong>: 분석 흐름 제어
- * <ol>
- *   <li>사주 계산 (FastAPI 호출 → validate → 오행/십신 계산)</li>
- *   <li>INSERT IGNORE 기반 Race Condition 안전 처리</li>
- *   <li>신규/기존 분기 후 응답 반환</li>
- * </ol>
+ * <p><strong>락 배치 원칙</strong>: 분산락은 "실제로 동시에 겹치면 안 되는 최소 구간"(DB 저장)에만
+ * 건다. FastAPI/공공데이터/OpenAI 같은 외부 I/O는 걸리는 시간이 들쭉날쭉하고 통제할 수 없으므로
+ * 락 밖에 둔다 — 락 안에 넣으면 락 임대시간(leaseTime)보다 외부 호출이 오래 걸릴 때 락이 중간에
+ * 만료되어 동시성 보장이 깨진다. 이 원칙은 {@link ssafy.SSAju.career.provider.SajuResultProvider}/
+ * {@link UserProfileProvider}/{@link ConsultationSaveService}와 동일하다.
  *
- * <p>자식 엔티티 저장은 {@link CompatibilityChildSaveService}에 위임합니다.
- * DTO 포매팅은 {@link AnalysisResponseBuilder},
- * 비즈니스 계산은 각 Calculator 클래스에 위임합니다.
+ * <p>동일 (프로필, 회사, 직무, 월) 조합에 대한 동시 요청이 FastAPI/OpenAI를 중복 호출하는 것은
+ * 허용한다(트레이드오프로 감수) — 최종 저장은 {@link CompanyCompatibilitySaveService}의 락이
+ * 정확히 1건만 남도록 보장한다.
  *
- * <p>{@code @Transactional} 없음: FastAPI 외부 I/O 동안 DB 커넥션을 점유하지 않도록
- * 트랜잭션을 분리. 각 DB 작업은 Repository 또는 {@link CompatibilityChildSaveService}의
- * {@code @Transactional}에 의해 실행됩니다.
+ * <p>{@code @Transactional} 없음: FastAPI/OpenAI 외부 I/O 동안 DB 커넥션을 점유하지 않도록
+ * 트랜잭션을 분리. DB 저장은 {@link CompanyCompatibilitySaveService}에 위임되며, 그 클래스에도
+ * {@code @Transactional}이 없다 — 락이 메서드를 감싸고 그 안의 저장소 호출은 Spring Data JPA
+ * 기본 트랜잭션으로 개별 처리된다(중첩 트랜잭션 없음).
  */
 @Slf4j
 @Service
@@ -58,28 +61,19 @@ public class CompanyMatchingService {
     private static final LocalTime DEFAULT_BIRTH_TIME = LocalTime.of(12, 0);
     private static final LocalDate MIN_SUPPORTED_DATE = LocalDate.of(1900, 1, 1);
 
-    // ─────────────────────────────────────────
-    // 외부 서비스 / 유틸리티
-    // ─────────────────────────────────────────
     private final SajuDataService sajuDataService;
     private final CompanyInfoService companyInfoService;
     private final UserProfileProvider userProfileProvider;
     private final SajuValidator sajuValidator;
-    private final TenGodCalculator tenGodCalculator;
     private final HiddenStemCalculator hiddenStemCalculator;
     private final CompatibilityScoreCalculator compatibilityScoreCalculator;
     private final JobRoleAnalyzer jobRoleAnalyzer;
     private final RoleCompatibilityCalculator roleCompatibilityCalculator;
     private final AnalysisResponseBuilder responseBuilder;
     private final CompanyMatchingOpenAICaller companyMatchingOpenAICaller;
-
-    // ─────────────────────────────────────────
-    // 레포지토리 / 자식 서비스
-    // ─────────────────────────────────────────
     private final CompanyCompatibilityRepository companyCompatibilityRepository;
-    private final CompanyCompatibilityJdbcRepository companyCompatibilityJdbcRepository;
-    private final CompatibilityChildSaveService childSaveService;
     private final CompatibilityChildReadService childReadService;
+    private final CompanyCompatibilitySaveService compatibilitySaveService;
     private final UserRepository userRepository;
     /** KST 기준 현재 월 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
     private final Clock clock;
@@ -91,7 +85,6 @@ public class CompanyMatchingService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
-        // ─── 이번 달 캐시 조회 (FastAPI 호출 이전에 확인) ──────────────
         LocalTime userBirthTime = resolveUserBirthTime(request);
         UserProfile userProfile = userProfileProvider.findOrCreate(
                 request.userBirthDate(), userBirthTime);
@@ -99,74 +92,54 @@ public class CompanyMatchingService {
         YearMonth now = YearMonth.now(clock);
         Integer compatibilityMonth = now.getYear() * 100 + now.getMonthValue();
 
-        Optional<CompanyCompatibility> cachedOpt = companyCompatibilityRepository
-                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
-                        userId, userProfile.getId(),
-                        request.companyName(), request.targetRole().category(), compatibilityMonth);
-
-        if (cachedOpt.isPresent() && cachedOpt.get().isCompleted()) {
+        Optional<CompanyCompatibility> cachedOpt = findCompletedCache(userId, userProfile, request, compatibilityMonth);
+        if (cachedOpt.isPresent()) {
             log.info("이번 달 궁합 분석 캐시 히트 (compatibilityId={})", cachedOpt.get().getId());
             return childReadService.buildFromExisting(cachedOpt.get(), request);
         }
 
-        // ─── 사주 계산 → AI 해설 생성 → 저장 (외부 I/O 포함, 신규 분석) ──────
-        // 이른 캐시 히트(completed=true) 경로는 위에서 반환됨 → 여기서부터는 FastAPI/공공데이터/
-        // OpenAI 호출과 DB 저장이 발생하는 신규 분석. 이 구간 어디서 실패하든 쿼터가 소진된 채
-        // 남지 않도록 차감 이후 구간(사주 계산·AI 호출·DB 저장)을 보상 트랜잭션으로 감싼다.
-        // 단, 이 요청이 직접 저장까지 성공시킨 뒤의 최종 응답 조립(순수 객체 조립, 외부 I/O 없음)은
-        // 보상 범위 밖에 둔다 — 저장이 끝난 뒤에 실패한다면 그건 쿼터 낭비가 아니라 코드 결함이므로
-        // 쿼터를 복원하면 오히려 이미 저장된 분석 + 복원된 쿼터라는 이중 지급이 된다.
+        // 캐시 미스: 사주 계산·AI 호출과 DB 저장을 감싸 실패 시 쿼터를 복원한다.
         LocalDate usageDate = dailyApiUsageService.checkAndIncrementDailyUsage(userId);
-        SavedAnalysis persisted;
+        CompanyCompatibilitySaveService.SaveOutcome outcome;
         try {
-            persisted = analyzeAndPersist(
-                    request, userId, user, userProfile, compatibilityMonth, userBirthTime);
+            outcome = analyzeAndPersist(request, user, userProfile, compatibilityMonth, userBirthTime);
         } catch (RuntimeException e) {
-            // 보상(쿼터 복원) 자체가 실패해도 원본 예외가 유실되면 안 되므로 별도로 잡아 로그만 남기고
-            // 원인으로 덧붙인 뒤, 항상 원본 예외를 그대로 던진다.
-            try {
-                dailyApiUsageService.restoreDailyUsage(userId, usageDate);
-            } catch (RuntimeException restoreException) {
-                log.error("쿼터 복원 실패 (userId={}, usageDate={})", userId, usageDate, restoreException);
-                e.addSuppressed(restoreException);
-            }
+            dailyApiUsageService.restoreQuietly(userId, usageDate, e);
             throw e;
         }
-        return persisted.rendered() != null
-                ? persisted.rendered()
-                : buildNewResponse(persisted.saved(), request, persisted.data());
+        if (!outcome.newlyCreated()) {
+            // 따닥(동일 요청 동시 도착)으로 락 안 재확인에서 다른 요청이 이미 저장한 행으로
+            // 수렴한 경우 — 이 요청이 방금 낸 FastAPI/OpenAI 호출은 어떤 값도 만들지
+            // 못했으므로 앞서 차감한 일일 쿼터를 보상 복원한다.
+            dailyApiUsageService.restoreQuietly(userId, usageDate);
+        }
+
+        // 저장은 이미 끝났으므로(newlyCreated 여부와 무관하게 DB에 유효한 행이 존재), 이 아래
+        // 응답 조립 단계의 실패는 쿼터 복원 대상이 아니다 — 저장 자체는 성공했기 때문에, 여기서
+        // 예외가 나도 쿼터를 되돌려주면 안 된다(그러면 실제로 값이 남았는데 공짜 쿼터가 생긴다).
+        log.info("기업 궁합 분석 완료: compatibilityId={}", outcome.entity().getId());
+        return childReadService.buildFromExisting(outcome.entity(), request);
+    }
+
+    private Optional<CompanyCompatibility> findCompletedCache(Long userId, UserProfile userProfile,
+                                                                 CompatibilityRequest request,
+                                                                 Integer compatibilityMonth) {
+        return companyCompatibilityRepository
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonthAndCompletedTrue(
+                        userId, userProfile.getId(),
+                        request.companyName(), request.targetRole().category(), compatibilityMonth);
     }
 
     /**
-     * 저장까지는 끝났지만 아직 최종 응답으로 조립되지 않은 상태를 나타내는 내부 VO.
-     *
-     * <p>{@code rendered}가 채워져 있으면 이미 완성된 응답(캐시 재사용/race-condition 분기),
-     * {@code saved}/{@code data}만 채워져 있으면 이 요청이 직접 저장에 성공했으니
-     * {@link #analyzeCompatibility}가 쿼터 보상 범위 밖에서 응답을 조립해야 함을 의미한다.
+     * 사주 계산부터 AI 해설 생성까지의 신규 분석 흐름(외부 I/O, 락 없음). 마지막 저장 단계만
+     * {@link CompanyCompatibilitySaveService}에 위임해 (사용자, 프로필, 회사, 직무, 월) 단위
+     * 분산락으로 보호한다. 응답 조립은 호출자(analyzeCompatibility)가 저장이 끝난 뒤에 별도로
+     * 수행한다 — 저장 성공 이후의 실패는 쿼터 복원 대상이 아니어야 하기 때문에 이 메서드는
+     * 저장 결과(SaveOutcome)까지만 반환한다.
      */
-    private record SavedAnalysis(CompatibilityResponse rendered,
-                                  CompanyCompatibility saved,
-                                  CompatibilityAnalysisData data) {
-        static SavedAnalysis rendered(CompatibilityResponse response) {
-            return new SavedAnalysis(response, null, null);
-        }
-
-        static SavedAnalysis pendingRender(CompanyCompatibility saved, CompatibilityAnalysisData data) {
-            return new SavedAnalysis(null, saved, data);
-        }
-    }
-
-    /**
-     * 사주 계산부터 AI 해설 생성, DB 저장까지의 신규 분석 흐름.
-     *
-     * <p>{@link #analyzeCompatibility}가 이 메서드 전체를 쿼터 보상 범위로 감싼다(US3, T016) —
-     * 사주 계산·AI 호출·DB 저장 중 어디서 실패하든 동일하게 보상되어야 하기 때문이다. 이 요청이
-     * 직접 저장에 성공한 이후의 최종 응답 조립은 이 메서드가 아니라 {@link #analyzeCompatibility}가
-     * 보상 범위 밖에서 수행한다({@link SavedAnalysis#pendingRender}).
-     */
-    private SavedAnalysis analyzeAndPersist(CompatibilityRequest request, Long userId,
-                                              User user, UserProfile userProfile,
-                                              Integer compatibilityMonth, LocalTime userBirthTime) {
+    private CompanyCompatibilitySaveService.SaveOutcome analyzeAndPersist(CompatibilityRequest request,
+                                                       User user, UserProfile userProfile,
+                                                       Integer compatibilityMonth, LocalTime userBirthTime) {
         SajuCalculationResult sajuCalc = calculateSajuData(request, userBirthTime);
         HiddenStems userHiddenStems = sajuCalc.userHiddenStems();
         FiveElements userFiveElements = sajuCalc.userFiveElements();
@@ -178,8 +151,7 @@ public class CompanyMatchingService {
         int compatibilityScore = compatibilityScoreCalculator.calculate(
                 userHiddenStems, sajuCalc.userDayMaster(), companyHiddenStems, sajuCalc.companyDayMaster());
         int matchScore = jobRoleAnalyzer.analyze(userFiveElements, category);
-        int primaryScore = matchScore;
-        int secondaryScore = roleCompatibilityCalculator.calculateSecondary(primaryScore);
+        int secondaryScore = roleCompatibilityCalculator.calculateSecondary(matchScore);
 
         CompatibilityNarrativeRequest narrativeRequest = new CompatibilityNarrativeRequest(
                 new CompatibilityNarrativeRequest.SajuInfo(
@@ -187,7 +159,7 @@ public class CompanyMatchingService {
                 new CompatibilityNarrativeRequest.SajuInfo(
                         companyFiveElements, companyHiddenStems, sajuCalc.companyDayMaster()),
                 new CompatibilityNarrativeRequest.ScoreSet(
-                        compatibilityScore, matchScore, primaryScore, secondaryScore),
+                        compatibilityScore, matchScore, matchScore, secondaryScore),
                 category, request.targetRole().detailName());
         CompatibilityNarrativeResponse narrative = companyMatchingOpenAICaller.call(narrativeRequest);
 
@@ -199,63 +171,28 @@ public class CompanyMatchingService {
                 responseBuilder.buildActionableStrategy(category, narrative.weaknessDefense()),
                 responseBuilder.buildInterviewQuestions(narrative.interviewQuestions()),
                 responseBuilder.buildRoleCompatibilities(
-                        category, primaryScore, secondaryScore,
+                        category, matchScore, secondaryScore,
                         narrative.primaryRoleReason(), narrative.secondaryRoleReason()),
                 responseBuilder.buildMonthlyForecasts(userFiveElements, narrative.monthlyAdvices()),
                 narrative.cautions()
         );
         String summary = narrative.summary();
 
-        // ───────────────────────────────────────────────────────────────────
-        // 캐시 미스: INSERT IGNORE로 root 엔티티 삽입
-        //
-        // - inserted=1: 신규 → 자식 엔티티들 저장
-        // - inserted=0: 동시 요청이 먼저 삽입함 → 재조회 후 분기
-        //   - completed=true: 자식 저장 완료된 캐시 재사용
-        //   - completed=false: 자식 저장 진행 중 → 현재 계산 결과로 응답
-        // ───────────────────────────────────────────────────────────────────
         CompanyCompatibility root = CompanyCompatibility.builder()
                 .userProfile(userProfile)
                 .user(user)
                 .companyName(request.companyName())
-                .targetRoleCategory(request.targetRole().category())
+                .targetRoleCategory(category)
                 .targetRoleDetailName(request.targetRole().detailName())
                 .compatibilityScore(compatibilityScore)
                 .summary(summary)
                 .compatibilityMonth(compatibilityMonth)
                 .build();
 
-        int inserted = companyCompatibilityJdbcRepository.insertOrIgnore(root);
-
-        CompanyCompatibility saved = companyCompatibilityRepository
-                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
-                        userId, userProfile.getId(),
-                        request.companyName(), request.targetRole().category(), compatibilityMonth)
-                .orElseThrow(() -> new ssafy.SSAju.exception.DataAccessException(
-                        "CompanyCompatibility 조회 실패"));
-
-        if (inserted == 0) {
-            if (saved.isCompleted()) {
-                // completed=true → 자식 데이터가 완전히 저장된 캐시만 재사용
-                log.info("완료된 궁합 분석 캐시 재사용 (compatibilityId={})", saved.getId());
-                return SavedAnalysis.rendered(childReadService.buildFromExisting(saved, request));
-            }
-            // completed=false: 다른 요청이 자식 저장 진행 중 → 현재 계산 결과로 응답
-            log.info("자식 저장 진행 중인 기존 레코드 감지 (compatibilityId={}), 현재 계산 결과로 응답",
-                    saved.getId());
-            return SavedAnalysis.rendered(buildNewResponse(saved, request, analysisData));
-        }
-
-        // 자식 엔티티 전체 저장을 단일 트랜잭션(REQUIRES_NEW)으로 위임
-        childSaveService.saveAllAndMarkCompleted(saved, analysisData);
-
-        log.info("기업 궁합 분석 완료: compatibilityScore={}", compatibilityScore);
-        return SavedAnalysis.pendingRender(saved, analysisData);
+        // 락 안에서 "이미 완료된 행이 있으면 재사용, 없으면 저장"까지 처리 — 동시에 완전히
+        // 동일한 요청이 왔다면 이 시점에 승자의 결과로 수렴한다(우리가 방금 계산한 값은 버려짐).
+        return compatibilitySaveService.saveWithLock(root, analysisData);
     }
-
-    // ─────────────────────────────────────────
-    // private: 사주 계산
-    // ─────────────────────────────────────────
 
     /** 사용자·기업 사주(FastAPI/공공데이터 호출 포함)를 계산한 결과. */
     private record SajuCalculationResult(
@@ -286,10 +223,6 @@ public class CompanyMatchingService {
         return new SajuCalculationResult(userHiddenStems, userDayMaster, userFiveElements,
                 companyHiddenStems, companyDayMaster, companyFiveElements);
     }
-
-    // ─────────────────────────────────────────
-    // private: 결정 로직
-    // ─────────────────────────────────────────
 
     private LocalTime resolveUserBirthTime(CompatibilityRequest request) {
         return request.userBirthTime() != null ? request.userBirthTime() : DEFAULT_BIRTH_TIME;
@@ -322,55 +255,4 @@ public class CompanyMatchingService {
         }
         return date;
     }
-
-    // ─────────────────────────────────────────
-    // private: 응답 빌드
-    // ─────────────────────────────────────────
-
-    private CompatibilityResponse buildNewResponse(CompanyCompatibility saved,
-                                                     CompatibilityRequest request,
-                                                     CompatibilityAnalysisData data) {
-        CompatibilityAnalysisData.StrategyInfo s = data.strategy();
-        return new CompatibilityResponse(
-                saved.getId(),
-                buildRequestContext(saved, request),
-                saved.getCompatibilityScore(),
-                saved.getSummary(),
-                new CompatibilityResponse.TargetRoleAnalysis(
-                        data.roleAnalysis().matchScore(),
-                        data.roleAnalysis().synergy(),
-                        data.roleAnalysis().warning()),
-                new CompatibilityResponse.FiveElements(
-                        data.fiveElements().userDistribution(),
-                        data.fiveElements().companyDistribution(),
-                        data.fiveElements().synergyDescription()),
-                new CompatibilityResponse.AnalysisBreakdown(
-                        data.breakdown().characterMatch(),
-                        data.breakdown().potentialSynergy(),
-                        data.breakdown().longTermStability()),
-                new CompatibilityResponse.ActionableStrategy(
-                        s.keywords(), s.weaknessDefense(),
-                        new CompatibilityResponse.ActionableStrategy.BestTiming(
-                                s.luckyDays(), s.preferredTime())),
-                data.questions().stream().map(q -> new CompatibilityResponse.InterviewQuestion(
-                        q.question(), q.intent())).toList(),
-                data.roles().stream().map(r -> new CompatibilityResponse.RoleCompatibility(
-                        r.roleName(), r.score(), r.reason(), r.tag())).toList(),
-                data.forecasts().stream().map(f -> new CompatibilityResponse.MonthlyForecast(
-                        f.month(), f.score(), f.status(), f.advice())).toList(),
-                data.cautions()
-        );
-    }
-
-    private CompatibilityResponse.RequestContext buildRequestContext(CompanyCompatibility saved,
-                                                                      CompatibilityRequest request) {
-        return new CompatibilityResponse.RequestContext(
-                saved.getCompanyName(),
-                new CompatibilityResponse.TargetRoleInfo(
-                        saved.getTargetRoleCategory(),
-                        request.targetRole().detailName()
-                )
-        );
-    }
-
 }

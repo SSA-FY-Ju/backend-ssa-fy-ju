@@ -40,7 +40,7 @@ public class CareerFortuneService {
      * 각 DB 작업은 하위 컴포넌트의 @Transactional에 의해 개별 트랜잭션으로 실행됨.
      *
      * <p>사주(SajuResult)는 같은 (user, userProfile)에 대해 불변이므로 findOrCreate로 재사용.
-     * 동시성 경쟁(INSERT race)은 SajuResultProvider 내부의 insertOrIgnore + @Retryable/@Recover가 처리.
+     * 동시성 경쟁은 SajuResultProvider의 userProfile 단위 분산락(@DistributedLock)이 처리.
      */
     public CareerTimingResponse analyzeCareerTiming(LocalDate birthDate, LocalTime birthTime, Long userId) {
         if (userId == null) {

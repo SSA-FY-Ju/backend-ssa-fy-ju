@@ -2,11 +2,9 @@ package ssafy.SSAju.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.exception.ConstraintViolationException;
-import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import ssafy.SSAju.annotation.DistributedLock;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.mapper.ConsultationMapper;
@@ -17,21 +15,31 @@ import ssafy.SSAju.repository.CareerConsultationRepository;
 import java.util.Optional;
 
 /**
- * C-7: CareerConsultation 저장을 별도 서비스로 분리하여 @Transactional 보장.
+ * C-7: CareerConsultation 저장을 별도 서비스로 분리(ConsultationService의 외부 I/O와 DB
+ * 저장을 분리).
  *
- * ConsultationService(외부 I/O 포함)와 달리 이 서비스는 순수하게 DB 저장만 담당.
- * 외부 API 호출이 없으므로 트랜잭션을 안전하게 적용할 수 있음.
+ * <p>이 클래스 자체엔 {@code @Transactional}이 없다 — (정본, 월) 단위 분산락
+ * ({@code @DistributedLock}, US5, T036)이 메서드 전체를 감싸고, 그 안의 개별 저장소 호출은
+ * Spring Data JPA의 기본 트랜잭션으로 각자 실행된다. 이렇게 하면 "바깥 트랜잭션 안에 안쪽
+ * 트랜잭션을 분리해 넣는" 중첩 구조 자체가 없어진다 — REQUIRES_NEW로 격리할 대상이 애초에
+ * 없으므로, 삽입 중 UNIQUE 제약 위반이 발생해도 재조회가 오염될 트랜잭션이 없어 항상 안전하다
+ * ({@code UserProfileProvider}/{@code SajuResultProvider}와 동일한 패턴).
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ConsultationSaveService {
 
-    private static final String CONSULTATION_MONTH_UNIQUE_CONSTRAINT = "uq_career_consultation_result_month";
-
     private final ConsultationMapper consultationMapper;
     private final CareerConsultationRepository careerConsultationRepository;
-    private final ConsultationInsertService consultationInsertService;
+
+    /**
+     * saveOrUpdate 호출 결과. {@code persisted}는 이 호출이 실제로 새 내용을 DB에 썼는지를
+     * 나타낸다 — 락 안 재확인/경합 복구로 인해 이미 있던(다른 요청이 만든) 데이터를 그대로
+     * 반환만 한 경우엔 false. 호출자는 이 값으로 "따닥"(동일 요청 동시 도착) 시 자신이 이미
+     * 차감한 일일 API 쿼터를 보상 복원할지 판단한다.
+     */
+    public record SaveOutcome(Long consultationId, boolean persisted) {}
 
     /**
      * CareerConsultation을 저장하거나 기존 데이터를 업데이트.
@@ -39,7 +47,8 @@ public class ConsultationSaveService {
      * <ol>
      *   <li>해당 달의 데이터를 먼저 조회</li>
      *   <li>존재하면: 모델 버전이 다를 때만 업데이트, 같으면 건너뜀</li>
-     *   <li>없으면: 새로 저장. 동시 경합(UNIQUE 위반) 시 재조회 후 버전 비교하여 처리</li>
+     *   <li>없으면: 새로 저장. 락 임대시간 만료 등으로 인한 극히 드문 경합(UNIQUE 위반) 시
+     *       재조회 후 버전 비교하여 처리</li>
      * </ol>
      *
      * @param sajuResult        저장 대상 SajuResult
@@ -47,20 +56,51 @@ public class ConsultationSaveService {
      * @param modelVersion      사용 모델 버전
      * @param consultationMonth 대상 월 (YYYYMM 형식 정수, 예: 202605)
      */
-    @Transactional
-    public Long saveOrUpdate(SajuResult sajuResult, CareerAdviceResponse advice,
+    @DistributedLock(key = "'lock:career-consultation:' + #sajuResult.id + ':' + #consultationMonth")
+    public SaveOutcome saveOrUpdate(SajuResult sajuResult, CareerAdviceResponse advice,
                              String modelVersion, Integer consultationMonth) {
         Optional<CareerConsultation> existingOpt = careerConsultationRepository
                 .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth);
 
         if (existingOpt.isPresent()) {
             return updateIfModelChanged(existingOpt.get(), sajuResult, advice, modelVersion, consultationMonth);
-        } else {
-            return insertOrRecoverOnConflict(sajuResult, advice, modelVersion, consultationMonth);
+        }
+        return insertOrRecoverOnConflict(sajuResult, advice, modelVersion, consultationMonth);
+    }
+
+    /**
+     * CareerConsultation 신규 삽입을 시도하고, 락 임대시간 만료 등으로 인한 극히 드문 경합
+     * (UNIQUE 위반) 시 기존 데이터를 재조회합니다. 이 클래스에 @Transactional이 없으므로
+     * save()는 그 자체로 독립된 트랜잭션이라, 실패해도 재조회를 오염시키지 않는다.
+     */
+    private SaveOutcome insertOrRecoverOnConflict(SajuResult sajuResult, CareerAdviceResponse advice,
+                                           String modelVersion, Integer consultationMonth) {
+        try {
+            CareerConsultation newConsultation = consultationMapper.buildConsultation(
+                    sajuResult, advice, modelVersion, consultationMonth);
+            CareerConsultation saved = careerConsultationRepository.save(newConsultation);
+            log.info("새 CareerConsultation 저장 완료: sajuResultId={}, month={}",
+                    sajuResult.getId(), consultationMonth);
+            return new SaveOutcome(saved.getId(), true);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("CareerConsultation 삽입 중 UNIQUE 제약 위반(락 임대시간 만료 경합 추정) — 재조회: "
+                            + "sajuResultId={}, month={}",
+                    sajuResult.getId(), consultationMonth, e);
+            return careerConsultationRepository
+                    .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth)
+                    .map(existing -> updateIfModelChanged(
+                            existing, sajuResult, advice, modelVersion, consultationMonth))
+                    .orElseThrow(() -> new ConsultationRecoveryFailedException(
+                            "CareerConsultation 경합 복구 실패: sajuResultId=" +
+                            sajuResult.getId() + ", month=" + consultationMonth, e));
         }
     }
 
-    private Long updateIfModelChanged(CareerConsultation existing, SajuResult sajuResult,
+    /**
+     * 기존 엔티티는 이전 조회의 트랜잭션이 이미 끝나 detached 상태다 — 필드만 바꾸고 끝내면
+     * DB에 반영되지 않으므로, 명시적으로 save()해 merge한다.
+     */
+    private SaveOutcome updateIfModelChanged(CareerConsultation existing, SajuResult sajuResult,
                                       CareerAdviceResponse advice, String modelVersion, Integer consultationMonth) {
         if (!existing.getOpenaiModelVersion().equals(modelVersion)) {
             log.info("모델 버전 변경 감지 — 기존 컨설팅 결과 업데이트: " +
@@ -68,46 +108,10 @@ public class ConsultationSaveService {
                     sajuResult.getId(), consultationMonth,
                     existing.getOpenaiModelVersion(), modelVersion);
             consultationMapper.updateConsultation(existing, advice, modelVersion);
-        } else {
-            log.info("같은 모델 버전 — 기존 컨설팅 결과 유지: sajuResultId={}, month={}",
-                    sajuResult.getId(), consultationMonth);
+            return new SaveOutcome(careerConsultationRepository.save(existing).getId(), true);
         }
-        return existing.getId();
-    }
-
-    /**
-     * CareerConsultation 신규 삽입을 시도하고, 동시 요청 경합 시 기존 데이터를 재조회합니다.
-     *
-     * <p>삽입은 {@link ConsultationInsertService#insert(CareerConsultation)}에 위임하여
-     * REQUIRES_NEW 독립 트랜잭션에서 실행합니다. UNIQUE 제약 위반이 발생해도
-     * 현재 트랜잭션(@Transactional)은 rollback-only로 마킹되지 않으므로,
-     * catch block에서 재조회 후 정상 커밋이 가능합니다.
-     */
-    private Long insertOrRecoverOnConflict(SajuResult sajuResult, CareerAdviceResponse advice,
-                                           String modelVersion, Integer consultationMonth) {
-        try {
-            CareerConsultation newConsultation = consultationMapper.buildConsultation(
-                    sajuResult, advice, modelVersion, consultationMonth);
-            Long savedId = consultationInsertService.insert(newConsultation);
-            log.info("새 CareerConsultation 저장 완료: sajuResultId={}, month={}",
-                    sajuResult.getId(), consultationMonth);
-            return savedId;
-        } catch (DataIntegrityViolationException e) {
-            // NestedExceptionUtils로 루트 원인을 추출하여 월별 UNIQUE 제약 위반인지 확인
-            Throwable rootCause = NestedExceptionUtils.getRootCause(e);
-            if (!(rootCause instanceof ConstraintViolationException cve)
-                    || !CONSULTATION_MONTH_UNIQUE_CONSTRAINT.equals(cve.getConstraintName())) {
-                throw e;
-            }
-            log.warn("CareerConsultation 동시 insert 경합 — 기존 결과 재조회: sajuResultId={}, month={}",
-                    sajuResult.getId(), consultationMonth);
-            return careerConsultationRepository
-                    .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth)
-                    .map(existing -> updateIfModelChanged(
-                            existing, sajuResult, advice, modelVersion, consultationMonth))
-                    .orElseThrow(() -> new ConsultationRecoveryFailedException(
-                            "CareerConsultation 동시 경합 복구 실패: sajuResultId=" +
-                            sajuResult.getId() + ", month=" + consultationMonth));
-        }
+        log.info("같은 모델 버전 — 기존 컨설팅 결과 유지: sajuResultId={}, month={}",
+                sajuResult.getId(), consultationMonth);
+        return new SaveOutcome(existing.getId(), false);
     }
 }

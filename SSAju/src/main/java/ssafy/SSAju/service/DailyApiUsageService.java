@@ -12,7 +12,7 @@ import java.time.LocalDate;
 @Service
 public class DailyApiUsageService {
 
-    private static final int DAILY_REQUEST_LIMIT = 3;
+    public static final int DAILY_REQUEST_LIMIT = 3;
 
     private final DailyApiUsageRepository dailyApiUsageRepository;
     private final Clock clock;
@@ -49,5 +49,29 @@ public class DailyApiUsageService {
         if (affectedRows == 0) {
             log.warn("쿼터 복원 대상 없음: userId={}, date={}", userId, usageDate);
         }
+    }
+
+    /**
+     * {@link #restoreDailyUsage}를 호출하되, 복원 자체가 실패해도(예: 일시적 DB 오류) 예외를
+     * 밖으로 던지지 않고 로그만 남긴다 — 보상 트랜잭션은 "최선을 다해 되돌려주는" 성격이라,
+     * 복원 실패로 원래 처리 흐름(호출자가 던지려던 예외 등)을 가로막으면 안 되기 때문이다.
+     *
+     * @param suppressInto 복원 실패를 알리는 예외를 붙여 넣을 대상(호출자가 곧 다시 던질 원본
+     *                      예외). 복원할 활성 예외가 없는 호출(예: 락 경합으로 인한 정상 반환
+     *                      경로)이면 null을 넘긴다.
+     */
+    public void restoreQuietly(Long userId, LocalDate usageDate, RuntimeException suppressInto) {
+        try {
+            restoreDailyUsage(userId, usageDate);
+        } catch (RuntimeException restoreException) {
+            log.error("쿼터 복원 실패 (userId={}, usageDate={})", userId, usageDate, restoreException);
+            if (suppressInto != null) {
+                suppressInto.addSuppressed(restoreException);
+            }
+        }
+    }
+
+    public void restoreQuietly(Long userId, LocalDate usageDate) {
+        restoreQuietly(userId, usageDate, null);
     }
 }

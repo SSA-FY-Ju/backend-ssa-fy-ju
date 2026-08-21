@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -21,7 +22,6 @@ import ssafy.SSAju.career.util.HiddenStemCalculator;
 import ssafy.SSAju.career.util.JobCategoryEnum;
 import ssafy.SSAju.career.util.JobRoleAnalyzer;
 import ssafy.SSAju.career.util.RoleCompatibilityCalculator;
-import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.career.validator.SajuValidator;
 import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 import ssafy.SSAju.dto.external.FastAPIResponse;
@@ -33,16 +33,13 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.exception.OpenAIApiException;
-import ssafy.SSAju.repository.CompanyCompatibilityJdbcRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.UserRepository;
-import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
@@ -52,12 +49,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+/**
+ * CompanyMatchingService 단위 테스트.
+ *
+ * <p>락 배치를 저장 단계로 좁히면서(더블체크락 제거, US5 후속 리팩토링) 사주 계산/AI 호출을
+ * 다시 이 클래스로 합쳤다 — self-invocation 문제가 있는 건 저장 단계뿐이므로, 그 부분만
+ * {@link CompanyCompatibilitySaveService}로 분리되어 있다. 그래서 이 테스트는 원래(US5 이전)
+ * 구조와 비슷하게 전체 흐름을 검증하되, DB 저장 세부사항(재시도/재사용 판단)은
+ * {@code CompanyCompatibilitySaveServiceTest}에서 검증한다.
+ */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("CompanyMatchingService 단위 테스트")
@@ -67,7 +74,6 @@ class CompanyMatchingServiceTest {
     @Mock private CompanyInfoService companyInfoService;
     @Mock private UserProfileProvider userProfileProvider;
     @Mock private SajuValidator sajuValidator;
-    @Mock private TenGodCalculator tenGodCalculator;
     @Mock private HiddenStemCalculator hiddenStemCalculator;
     @Mock private CompatibilityScoreCalculator compatibilityScoreCalculator;
     @Mock private JobRoleAnalyzer jobRoleAnalyzer;
@@ -75,9 +81,8 @@ class CompanyMatchingServiceTest {
     @Mock private AnalysisResponseBuilder analysisResponseBuilder;
     @Mock private CompanyMatchingOpenAICaller companyMatchingOpenAICaller;
     @Mock private CompanyCompatibilityRepository companyCompatibilityRepository;
-    @Mock private CompanyCompatibilityJdbcRepository companyCompatibilityJdbcRepository;
-    @Mock private CompatibilityChildSaveService childSaveService;
     @Mock private CompatibilityChildReadService childReadService;
+    @Mock private CompanyCompatibilitySaveService compatibilitySaveService;
     @Mock private UserRepository userRepository;
     @Mock private DailyApiUsageService dailyApiUsageService;
 
@@ -132,19 +137,15 @@ class CompanyMatchingServiceTest {
     void setUp() {
         service = new CompanyMatchingService(
                 sajuDataService, companyInfoService, userProfileProvider, sajuValidator,
-                tenGodCalculator, hiddenStemCalculator,
-                compatibilityScoreCalculator, jobRoleAnalyzer, roleCompatibilityCalculator,
+                hiddenStemCalculator, compatibilityScoreCalculator, jobRoleAnalyzer, roleCompatibilityCalculator,
                 analysisResponseBuilder, companyMatchingOpenAICaller,
-                companyCompatibilityRepository, companyCompatibilityJdbcRepository,
-                childSaveService, childReadService, userRepository,
-                FIXED_CLOCK, dailyApiUsageService
+                companyCompatibilityRepository, childReadService, compatibilitySaveService,
+                userRepository, FIXED_CLOCK, dailyApiUsageService
         );
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
+        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
 
-        // AI 응답 기본 mock 설정 (lenient)
         given(companyMatchingOpenAICaller.call(any())).willReturn(DEFAULT_NARRATIVE);
-
-        // AnalysisResponseBuilder 기본 mock 설정 (lenient)
         given(analysisResponseBuilder.buildFiveElementsData(any(), any(), any()))
                 .willReturn(new CompatibilityAnalysisData.FiveElementsInfo(Map.of(), Map.of(), "테스트 시너지"));
         given(analysisResponseBuilder.buildAnalysisBreakdown(anyInt()))
@@ -158,18 +159,53 @@ class CompanyMatchingServiceTest {
 
         // 이번 달 캐시 기본값: 캐시 미스 (lenient)
         given(companyCompatibilityRepository
-                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonthAndCompletedTrue(
                         nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
                 .willReturn(Optional.empty());
     }
 
     // ─────────────────────────────────────────
-    // 정상 플로우: 신규 삽입
+    // 정상 플로우: 신규 분석 → 저장 → 응답
     // ─────────────────────────────────────────
 
     @Test
-    @DisplayName("신규 요청 → INSERT IGNORE 성공, 자식 엔티티 저장, 응답 반환")
-    void shouldSaveAllChildren_WhenNewCompatibilityInserted() {
+    @DisplayName("신규 요청 → 저장 서비스 호출, childReadService로 응답 조립, 쿼터 1회 차감")
+    void shouldSaveAndBuildResponse_WhenNewRequest() {
+        // Given
+        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
+        HiddenStems mockHiddenStems = new HiddenStems(
+                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
+                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
+        CompanyCompatibility savedEntity = buildCompatibility(MOCK_USER_PROFILE);
+        CompatibilityResponse expectedResponse = new CompatibilityResponse(
+                savedEntity.getId(), null, 78, "테스트 요약",
+                null, null, null, null, null, null, null, null
+        );
+
+        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
+        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
+        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
+                .willReturn(78);
+        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
+                .willReturn(85);
+        given(compatibilitySaveService.saveWithLock(any(), any()))
+                .willReturn(new CompanyCompatibilitySaveService.SaveOutcome(savedEntity, true));
+        given(childReadService.buildFromExisting(savedEntity, request)).willReturn(expectedResponse);
+
+        // When
+        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
+
+        // Then
+        assertThat(response).isEqualTo(expectedResponse);
+        verify(compatibilitySaveService).saveWithLock(any(), any());
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("AI 응답의 텍스트 필드가 저장 서비스에 전달되는 CompatibilityAnalysisData에 반영된다")
+    void shouldPassAiNarrativeFields_ToSaveService() {
         // Given
         CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
         HiddenStems mockHiddenStems = new HiddenStems(
@@ -177,81 +213,27 @@ class CompanyMatchingServiceTest {
                         "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
         CompanyCompatibility savedEntity = buildCompatibility(MOCK_USER_PROFILE);
 
-        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
         given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
         given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
         given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
                 .willReturn(78);
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(85);
-        given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
-
-        // INSERT 후 재조회 mock (이번 달로 조회)
-        given(companyCompatibilityRepository
-                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
-                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
-                .willReturn(Optional.empty())       // 1차 캐시 조회: 미스
-                .willReturn(Optional.of(savedEntity)); // 2차 INSERT 후 재조회: 성공
+        given(compatibilitySaveService.saveWithLock(any(), any()))
+                .willReturn(new CompanyCompatibilitySaveService.SaveOutcome(savedEntity, true));
 
         // When
-        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
+        service.analyzeCompatibility(request, USER_ID);
 
         // Then
-        assertThat(response).isNotNull();
-        assertThat(response.compatibilityScore()).isEqualTo(78);
-        assertThat(response.requestContext().companyName()).isEqualTo("현대오토에버");
-        verify(childSaveService).saveAllAndMarkCompleted(any(), any());
-        // 캐시 미스 → FastAPI 호출 직전 차감: 1회 필수
-        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        // 저장까지 성공한 정상 흐름 → 쿼터 복원은 절대 호출되면 안 됨(이중 지급 방지 회귀 검증)
-        verify(dailyApiUsageService, never()).restoreDailyUsage(any(), any());
-    }
+        ArgumentCaptor<CompatibilityAnalysisData> dataCaptor = ArgumentCaptor.forClass(CompatibilityAnalysisData.class);
+        ArgumentCaptor<CompanyCompatibility> rootCaptor = ArgumentCaptor.forClass(CompanyCompatibility.class);
+        verify(compatibilitySaveService).saveWithLock(rootCaptor.capture(), dataCaptor.capture());
 
-    // ─────────────────────────────────────────
-    // AI 해설 응답이 최종 응답에 그대로 반영되는지 (US1, T003)
-    // ─────────────────────────────────────────
-
-    @Test
-    @DisplayName("AI 응답의 텍스트 필드가 최종 응답에 그대로 반영된다")
-    void shouldReflectAiNarrativeFields_InFinalResponse() {
-        // Given
-        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
-        HiddenStems mockHiddenStems = new HiddenStems(
-                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
-                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
-        CompanyCompatibility savedEntity = CompanyCompatibility.builder()
-                .userProfile(MOCK_USER_PROFILE)
-                .user(MOCK_USER)
-                .companyName("현대오토에버")
-                .targetRoleCategory(JobCategoryEnum.TECH_BACKEND)
-                .targetRoleDetailName("개발자")
-                .compatibilityScore(78)
-                .summary(DEFAULT_NARRATIVE.summary())
-                .compatibilityMonth(TEST_COMPATIBILITY_MONTH)
-                .build();
-
-        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
-        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
-        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
-        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
-                .willReturn(78);
-        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
-                .willReturn(85);
-        given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
-        given(companyCompatibilityRepository
-                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
-                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
-                .willReturn(Optional.empty())
-                .willReturn(Optional.of(savedEntity));
-
-        // When
-        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
-
-        // Then: summary는 root 엔티티를 거쳐 저장/반환, synergy/warning/matchScore는 Service가 직접 조립
-        assertThat(response.summary()).isEqualTo(DEFAULT_NARRATIVE.summary());
-        assertThat(response.targetRoleAnalysis().matchScore()).isEqualTo(85);
-        assertThat(response.targetRoleAnalysis().synergy()).isEqualTo(DEFAULT_NARRATIVE.roleSynergy());
-        assertThat(response.targetRoleAnalysis().warning()).isEqualTo(DEFAULT_NARRATIVE.roleWarning());
+        assertThat(rootCaptor.getValue().getSummary()).isEqualTo(DEFAULT_NARRATIVE.summary());
+        assertThat(dataCaptor.getValue().roleAnalysis().matchScore()).isEqualTo(85);
+        assertThat(dataCaptor.getValue().roleAnalysis().synergy()).isEqualTo(DEFAULT_NARRATIVE.roleSynergy());
+        assertThat(dataCaptor.getValue().roleAnalysis().warning()).isEqualTo(DEFAULT_NARRATIVE.roleWarning());
         verify(companyMatchingOpenAICaller).call(any());
     }
 
@@ -271,9 +253,8 @@ class CompanyMatchingServiceTest {
                 null, null, null, null, null, null, null, null
         );
 
-        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
         given(companyCompatibilityRepository
-                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
+                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonthAndCompletedTrue(
                         nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
                 .willReturn(Optional.of(completedEntity));
         given(childReadService.buildFromExisting(completedEntity, request)).willReturn(cachedResponse);
@@ -284,92 +265,9 @@ class CompanyMatchingServiceTest {
         // Then: 외부 API 호출 없음, 캐시 반환
         assertThat(response).isEqualTo(cachedResponse);
         verify(sajuDataService, never()).fetchSajuFromFastAPI(any(), any());
-        verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
-        // completed=true 캐시 히트 → 외부 API 미호출 경로: 차감 없음
+        verify(compatibilitySaveService, never()).saveWithLock(any(), any());
         verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(USER_ID);
-        // 캐시 히트 → AI 해설 호출 없음
         verify(companyMatchingOpenAICaller, never()).call(any());
-    }
-
-    // ─────────────────────────────────────────
-    // Race Condition: INSERT 후 동시 요청이 먼저 삽입한 경우
-    // ─────────────────────────────────────────
-
-    @Test
-    @DisplayName("INSERT IGNORE 0 + completed=false → 현재 계산 결과로 응답")
-    void shouldReturnCalculatedResult_WhenInsertIgnoredAndNotCompleted() {
-        // Given
-        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
-        HiddenStems mockHiddenStems = new HiddenStems(
-                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
-                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
-        CompanyCompatibility existingEntity = buildCompatibility(MOCK_USER_PROFILE); // completed=false
-
-        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
-        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
-        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
-        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
-                .willReturn(78);
-        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
-                .willReturn(85);
-        given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(0);
-        given(companyCompatibilityRepository
-                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
-                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
-                .willReturn(Optional.empty())        // 1차 캐시 조회: 미스
-                .willReturn(Optional.of(existingEntity)); // 2차 INSERT IGNORE 후 재조회
-
-        // When
-        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
-
-        // Then: 현재 계산 결과로 응답, childSaveService 호출 없음
-        assertThat(response).isNotNull();
-        verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
-        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-    }
-
-    // ─────────────────────────────────────────
-    // Race Condition: INSERT IGNORE 0 + completed=true
-    // ─────────────────────────────────────────
-
-    @Test
-    @DisplayName("INSERT IGNORE 0 + completed=true → childReadService.buildFromExisting 호출")
-    void shouldUseCachedResult_WhenInsertedZeroAndCompleted() {
-        // Given
-        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
-        HiddenStems mockHiddenStems = new HiddenStems(
-                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
-                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
-        CompanyCompatibility completedEntity = buildCompatibility(MOCK_USER_PROFILE);
-        completedEntity.assignResultJsonAndMarkCompleted(buildAnalysisData());
-        CompatibilityResponse cachedResponse = new CompatibilityResponse(
-                completedEntity.getId(), null, 78, "캐시 요약",
-                null, null, null, null, null, null, null, null
-        );
-
-        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
-        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
-        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
-        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
-                .willReturn(78);
-        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
-                .willReturn(85);
-        given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(0);
-        given(companyCompatibilityRepository
-                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
-                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
-                .willReturn(Optional.empty())           // 1차 캐시 조회: 미스
-                .willReturn(Optional.of(completedEntity)); // 2차 INSERT IGNORE 후 재조회
-        given(childReadService.buildFromExisting(completedEntity, request)).willReturn(cachedResponse);
-
-        // When
-        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
-
-        // Then
-        assertThat(response).isEqualTo(cachedResponse);
-        verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
-        verify(childReadService).buildFromExisting(completedEntity, request);
-        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
     }
 
     // ─────────────────────────────────────────
@@ -388,25 +286,19 @@ class CompanyMatchingServiceTest {
         HiddenStems mockHiddenStems = new HiddenStems(Map.of());
         CompanyCompatibility savedEntity = buildCompatibility(MOCK_USER_PROFILE);
 
-        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
         given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
         given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
         given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
                 .willReturn(60);
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(60);
-        given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
-        given(companyCompatibilityRepository
-                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
-                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
-                .willReturn(Optional.empty())
-                .willReturn(Optional.of(savedEntity));
+        given(compatibilitySaveService.saveWithLock(any(), any()))
+                .willReturn(new CompanyCompatibilitySaveService.SaveOutcome(savedEntity, true));
 
         // When
-        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
+        service.analyzeCompatibility(request, USER_ID);
 
         // Then: 기본 시간(12:00)으로 FastAPI 호출
-        assertThat(response).isNotNull();
         verify(sajuDataService).fetchSajuFromFastAPI(USER_BIRTH_DATE, USER_BIRTH_TIME);
         verify(sajuDataService).fetchSajuFromFastAPI(COMPANY_FOUNDING_DATE, LocalTime.of(12, 0));
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
@@ -417,23 +309,23 @@ class CompanyMatchingServiceTest {
     // ─────────────────────────────────────────
 
     @Test
-    @DisplayName("FastAPI 타임아웃 → FastAPITimeoutException 전파")
+    @DisplayName("FastAPI 타임아웃 → FastAPITimeoutException 전파, 저장 서비스는 호출되지 않음")
     void shouldPropagateException_WhenFastAPIFails() {
         // Given
         CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
-        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
         given(sajuDataService.fetchSajuFromFastAPI(any(), any()))
                 .willThrow(new FastAPITimeoutException("FastAPI 응답 타임아웃"));
 
         // When & Then
         assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
                 .isInstanceOf(FastAPITimeoutException.class);
-        // 캐시 미스 → charge 후 FastAPI 실패: 차감은 이미 발생
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService).restoreQuietly(eq(USER_ID), any(), any());
+        verify(compatibilitySaveService, never()).saveWithLock(any(), any());
     }
 
     // ─────────────────────────────────────────
-    // AI 실패/최종 저장 실패 시 쿼터 보상 (US3, T015)
+    // AI 실패/최종 저장 실패 시 쿼터 보상
     // ─────────────────────────────────────────
 
     @Test
@@ -447,7 +339,6 @@ class CompanyMatchingServiceTest {
         LocalDate usageDate = LocalDate.of(2026, 5, 27);
         OpenAIApiException aiFailure = new OpenAIApiException("AI 호출 실패");
 
-        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
         given(dailyApiUsageService.checkAndIncrementDailyUsage(USER_ID)).willReturn(usageDate);
         given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
         given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
@@ -460,23 +351,21 @@ class CompanyMatchingServiceTest {
         // When & Then
         assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
                 .isSameAs(aiFailure);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, usageDate);
-        verify(childSaveService, never()).saveAllAndMarkCompleted(any(), any());
+        verify(dailyApiUsageService).restoreQuietly(USER_ID, usageDate, aiFailure);
+        verify(compatibilitySaveService, never()).saveWithLock(any(), any());
     }
 
     @Test
-    @DisplayName("AI 해설 생성은 성공했지만 최종 저장 실패 → 쿼터 복원 후 원본 예외 전파")
-    void shouldRestoreQuota_WhenFinalSaveFails() {
+    @DisplayName("AI 해설 생성은 성공했지만 저장 서비스 실패 → 쿼터 복원 후 원본 예외 전파")
+    void shouldRestoreQuota_WhenSaveServiceFails() {
         // Given
         CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
         HiddenStems mockHiddenStems = new HiddenStems(
                 Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
                         "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
-        CompanyCompatibility savedEntity = buildCompatibility(MOCK_USER_PROFILE);
         LocalDate usageDate = LocalDate.of(2026, 5, 27);
         DataAccessException saveFailure = new DataAccessException("DB 저장 실패");
 
-        given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
         given(dailyApiUsageService.checkAndIncrementDailyUsage(USER_ID)).willReturn(usageDate);
         given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
         given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
@@ -484,19 +373,83 @@ class CompanyMatchingServiceTest {
                 .willReturn(78);
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(85);
-        given(companyCompatibilityJdbcRepository.insertOrIgnore(any())).willReturn(1);
-        given(companyCompatibilityRepository
-                .findByUser_IdAndUserProfile_IdAndCompanyNameAndTargetRoleCategoryAndCompatibilityMonth(
-                        nullable(Long.class), nullable(Long.class), anyString(), any(), anyInt()))
-                .willReturn(Optional.empty())
-                .willReturn(Optional.of(savedEntity));
-        org.mockito.BDDMockito.willThrow(saveFailure)
-                .given(childSaveService).saveAllAndMarkCompleted(any(), any());
+        given(compatibilitySaveService.saveWithLock(any(), any())).willThrow(saveFailure);
 
         // When & Then
         assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
                 .isSameAs(saveFailure);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, usageDate);
+        verify(dailyApiUsageService).restoreQuietly(USER_ID, usageDate, saveFailure);
+    }
+
+    // ─────────────────────────────────────────
+    // 따닥(동일 요청 동시 도착) → 락 안 재확인에서 남의 행 재사용 → 쿼터 보상
+    // ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("saveWithLock이 남의 행을 재사용(newlyCreated=false)했다면 예외 없이도 쿼터를 보상 복원한다")
+    void shouldRestoreQuota_WhenSaveServiceReusedExistingRow() {
+        // Given
+        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
+        HiddenStems mockHiddenStems = new HiddenStems(
+                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
+                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
+        LocalDate usageDate = LocalDate.of(2026, 5, 27);
+        CompanyCompatibility winnerEntity = buildCompatibility(MOCK_USER_PROFILE);
+        CompatibilityResponse winnerResponse = new CompatibilityResponse(
+                winnerEntity.getId(), null, 78, "경쟁에서 이긴 스레드의 요약",
+                null, null, null, null, null, null, null, null
+        );
+
+        given(dailyApiUsageService.checkAndIncrementDailyUsage(USER_ID)).willReturn(usageDate);
+        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
+        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
+        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
+                .willReturn(78);
+        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
+                .willReturn(85);
+        // 이 스레드가 계산한 결과는 버려지고, 락 안 재확인에서 이미 완료된 다른 스레드의 행을 반환
+        given(compatibilitySaveService.saveWithLock(any(), any()))
+                .willReturn(new CompanyCompatibilitySaveService.SaveOutcome(winnerEntity, false));
+        given(childReadService.buildFromExisting(winnerEntity, request)).willReturn(winnerResponse);
+
+        // When
+        CompatibilityResponse response = service.analyzeCompatibility(request, USER_ID);
+
+        // Then: 예외는 없었지만(정상 반환), 이 요청은 새 값을 만들지 못했으므로 쿼터를 보상 복원해야 한다
+        assertThat(response).isEqualTo(winnerResponse);
+        verify(dailyApiUsageService).restoreQuietly(USER_ID, usageDate);
+    }
+
+    @Test
+    @DisplayName("저장은 성공했는데 응답 조립이 실패해도 쿼터를 복원하지 않는다(이중 지급 방지)")
+    void shouldNotRestoreQuota_WhenSaveSucceedsButResponseBuildingFails() {
+        // Given: saveWithLock까지는 성공(DB에 행이 남음)하지만, 그 이후 응답 조립 단계에서 실패
+        CompatibilityRequest request = buildRequest(JobCategoryEnum.TECH_BACKEND);
+        HiddenStems mockHiddenStems = new HiddenStems(
+                Map.of("午", List.of("丁", "己"), "戌", List.of("丁", "辛", "戊"),
+                        "未", List.of("乙", "丁", "己"), "寅", List.of("甲", "丙", "戊")));
+        LocalDate usageDate = LocalDate.of(2026, 5, 27);
+        CompanyCompatibility savedEntity = buildCompatibility(MOCK_USER_PROFILE);
+        DataAccessException buildFailure = new DataAccessException("completed=true인데 resultJson이 없음");
+
+        given(dailyApiUsageService.checkAndIncrementDailyUsage(USER_ID)).willReturn(usageDate);
+        given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(MOCK_SAJU);
+        given(hiddenStemCalculator.calculate(any())).willReturn(mockHiddenStems);
+        given(compatibilityScoreCalculator.calculate(any(), anyString(), any(), anyString()))
+                .willReturn(78);
+        given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
+                .willReturn(85);
+        given(compatibilitySaveService.saveWithLock(any(), any()))
+                .willReturn(new CompanyCompatibilitySaveService.SaveOutcome(savedEntity, true));
+        given(childReadService.buildFromExisting(savedEntity, request)).willThrow(buildFailure);
+
+        // When & Then
+        assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))
+                .isSameAs(buildFailure);
+        // 저장은 이미 성공했으므로(newlyCreated=true) 쿼터를 되돌려주면 안 된다 — 그러면
+        // DB엔 값이 남아있는데 쿼터만 공짜로 생기는 이중 지급이 된다.
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
     }
 
     // ─────────────────────────────────────────

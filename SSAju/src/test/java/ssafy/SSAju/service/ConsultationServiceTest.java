@@ -27,6 +27,7 @@ import ssafy.SSAju.dto.response.ConsultationResponse;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
+import ssafy.SSAju.exception.ConsultationRecoveryFailedException;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.UserRepository;
@@ -45,6 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -147,6 +149,17 @@ class ConsultationServiceTest {
             "火와 金의 기운이 강해 전략성과 실행력이 뛰어남"
     );
 
+    /** MOCK_ADVICE와 strengths만 다르게 한 "경쟁에서 이긴 스레드가 실제로 저장한" advice. */
+    private static final CareerAdviceResponse WINNER_ADVICE = new CareerAdviceResponse(
+            MOCK_ADVICE.industries(), MOCK_ADVICE.interviewTips(),
+            List.of("승자의_강점_텍스트"),
+            MOCK_ADVICE.cautions(), MOCK_ADVICE.wealthStyle(), MOCK_ADVICE.longTermRoadmap(),
+            MOCK_ADVICE.personalBranding(), MOCK_ADVICE.powerKeywords(), MOCK_ADVICE.mentalCare(),
+            MOCK_ADVICE.environmentFit(), MOCK_ADVICE.workStyle(), MOCK_ADVICE.relationshipStrategy(),
+            MOCK_ADVICE.careerTimeline(), MOCK_ADVICE.keyTenGods(),
+            MOCK_ADVICE.dayMasterDescription(), MOCK_ADVICE.fiveElementsAnalysis()
+    );
+
     @BeforeEach
     void setUp() {
         service = new ConsultationService(
@@ -184,6 +197,8 @@ class ConsultationServiceTest {
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(consultationSaveService.saveOrUpdate(any(), any(), any(), any()))
+                .willReturn(new ConsultationSaveService.SaveOutcome(100L, true));
 
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
@@ -220,7 +235,8 @@ class ConsultationServiceTest {
         verify(sajuResultProvider).findOrCreate(MOCK_USER, userProfile, sajuResult);
         // 캐시 미스 → 신규 OpenAI 호출 발생 → 일일 한도 1회 차감 필수, 성공했으므로 복원은 없어야 함
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService, never()).restoreDailyUsage(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
     }
 
     // ─────────────────────────────────────────
@@ -242,6 +258,8 @@ class ConsultationServiceTest {
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
         given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(consultationSaveService.saveOrUpdate(any(), any(), any(), any()))
+                .willReturn(new ConsultationSaveService.SaveOutcome(100L, true));
 
         ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
@@ -250,7 +268,8 @@ class ConsultationServiceTest {
         verify(sajuResultProvider).findOrCreate(MOCK_USER, userProfile, newSajuResult);
         verify(consultationSaveService).saveOrUpdate(any(), any(), any(), any());
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService, never()).restoreDailyUsage(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
     }
 
     // ─────────────────────────────────────────
@@ -287,7 +306,73 @@ class ConsultationServiceTest {
         // 캐시 히트 → OpenAI 미호출, 일일 한도 차감/복원 모두 없음
         verify(openAICaller, never()).call(any(), any(), any(), any());
         verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(any());
-        verify(dailyApiUsageService, never()).restoreDailyUsage(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
+    }
+
+    // ─────────────────────────────────────────
+    // 따닥(동일 요청 동시 도착) → 락 안 재확인에서 남의 결과 재사용 → 쿼터 보상
+    // ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("saveOrUpdate가 남의 결과를 재사용(persisted=false)했다면 예외 없이도 쿼터를 보상 복원한다")
+    void shouldRestoreQuota_WhenSaveServiceReusedExistingConsultation() {
+        var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        var sajuResult = mock(SajuResult.class);
+
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
+        given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
+        given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
+        given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
+                .willReturn(Optional.empty());
+        given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        // 이 스레드가 만든 advice(MOCK_ADVICE)는 버려지고, 락 안 재확인에서 이미 완료된 다른
+        // 스레드가 실제로 저장한 행(WINNER_ADVICE)으로 수렴한다.
+        given(consultationSaveService.saveOrUpdate(any(), any(), any(), any()))
+                .willReturn(new ConsultationSaveService.SaveOutcome(77L, false));
+        var winnerConsultation = mock(CareerConsultation.class);
+        given(winnerConsultation.getResultJson()).willReturn(WINNER_ADVICE);
+        given(careerConsultationRepository.findById(77L)).willReturn(Optional.of(winnerConsultation));
+
+        ConsultationResponse result = service.getCareerConsultation(VALID_REQUEST, USER_ID);
+
+        // 예외는 없었지만(정상 반환), 이 요청은 새 값을 저장하지 못했으므로 쿼터를 보상 복원해야 한다
+        assertThat(result).isNotNull();
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService).restoreQuietly(USER_ID, TEST_USAGE_DATE);
+        // consultationId(77L)가 가리키는 실제 저장분(WINNER_ADVICE)의 내용이 응답에 실려야 한다 —
+        // 이 요청이 직접 만들었다가 버려진 MOCK_ADVICE의 내용이 아니다.
+        assertThat(result.strengths()).containsExactlyElementsOf(WINNER_ADVICE.strengths());
+        assertThat(result.strengths()).doesNotContainAnyElementsOf(MOCK_ADVICE.strengths());
+    }
+
+    @Test
+    @DisplayName("saveOrUpdate가 경합 복구까지 실패해 예외를 던지면 쿼터를 복원한 뒤 원본 예외를 전파한다")
+    void shouldRestoreQuota_WhenSaveServiceFails() {
+        var userProfile = UserProfile.builder().birthDate(BIRTH_DATE).birthTime(BIRTH_TIME).build();
+        var sajuResult = mock(SajuResult.class);
+        ConsultationRecoveryFailedException saveFailure =
+                new ConsultationRecoveryFailedException("CareerConsultation 경합 복구 실패");
+
+        given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
+        given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
+        given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+                .willReturn(sajuResult);
+        given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
+        given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
+                .willReturn(Optional.empty());
+        given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(consultationSaveService.saveOrUpdate(any(), any(), any(), any())).willThrow(saveFailure);
+
+        assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
+                .isSameAs(saveFailure);
+
+        verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
+        verify(dailyApiUsageService).restoreQuietly(USER_ID, TEST_USAGE_DATE, saveFailure);
     }
 
     // ─────────────────────────────────────────
@@ -314,7 +399,7 @@ class ConsultationServiceTest {
                 .hasMessageContaining("OpenAI API 호출 실패");
         // 캐시 미스 → charge 후 OpenAI 실패: 차감 후 보상(복원)까지 발생해야 함 (US2)
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
+        verify(dailyApiUsageService).restoreQuietly(eq(USER_ID), eq(TEST_USAGE_DATE), any());
     }
 
     @Test
@@ -336,7 +421,7 @@ class ConsultationServiceTest {
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("비어있습니다");
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
+        verify(dailyApiUsageService).restoreQuietly(eq(USER_ID), eq(TEST_USAGE_DATE), any());
     }
 
     @Test
@@ -358,6 +443,6 @@ class ConsultationServiceTest {
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("산업 추천 정보가 누락");
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
+        verify(dailyApiUsageService).restoreQuietly(eq(USER_ID), eq(TEST_USAGE_DATE), any());
     }
 }

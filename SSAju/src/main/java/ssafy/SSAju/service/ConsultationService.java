@@ -21,6 +21,7 @@ import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.dto.request.ConsultationRequest;
 import ssafy.SSAju.dto.response.ConsultationResponse;
 import ssafy.SSAju.entity.User;
+import ssafy.SSAju.exception.ConsultationRecoveryFailedException;
 import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.CareerConsultationRepository;
@@ -121,15 +122,37 @@ public class ConsultationService {
         try {
             advice = openAICaller.call(sajuData, tenGodDistribution, hiddenStems, dayMaster);
         } catch (RuntimeException e) {
-            dailyApiUsageService.restoreDailyUsage(userId, usageDate);
+            dailyApiUsageService.restoreQuietly(userId, usageDate, e);
             throw e;
         }
 
         // ─── 5. 저장 (C-7: @Transactional 보장) ─────────────────────────────────
-        Long consultationId = consultationSaveService.saveOrUpdate(sajuResult, advice, modelVersion, consultationMonth);
+        ConsultationSaveService.SaveOutcome outcome;
+        try {
+            outcome = consultationSaveService.saveOrUpdate(sajuResult, advice, modelVersion, consultationMonth);
+        } catch (RuntimeException e) {
+            // 저장/경합 복구 자체가 실패한 경우(예: ConsultationRecoveryFailedException) — 이 요청은
+            // 어떤 값도 만들지 못했으므로 앞서 차감한 쿼터를 복원한 뒤 원본 예외를 그대로 전파한다.
+            dailyApiUsageService.restoreQuietly(userId, usageDate, e);
+            throw e;
+        }
+        CareerAdviceResponse responseAdvice = advice;
+        if (!outcome.persisted()) {
+            // 따닥(동일 요청 동시 도착)으로 락 안 재확인에서 다른 요청이 이미 저장한 결과로
+            // 수렴한 경우 — 이 요청이 방금 낸 OpenAI 호출은 어떤 값도 만들지 못했으므로
+            // 앞서 차감한 일일 쿼터를 보상 복원한다.
+            dailyApiUsageService.restoreQuietly(userId, usageDate);
+            // 이 요청이 만든 advice는 버려졌으므로, 그대로 반환하면 실제 DB에 저장된 내용과
+            // 달라질 수 있다(OpenAI 응답은 호출마다 조금씩 다름). outcome.consultationId()가
+            // 가리키는 실제 저장분을 다시 읽어와 응답에 실어야 consultationId와 내용이 일치한다.
+            CareerConsultation persisted = careerConsultationRepository.findById(outcome.consultationId())
+                    .orElseThrow(() -> new ConsultationRecoveryFailedException(
+                            "경합 후 저장된 CareerConsultation 재조회 실패: consultationId=" + outcome.consultationId()));
+            responseAdvice = consultationMapper.restoreAdvice(persisted);
+        }
 
         log.info("커리어 컨설팅 완료: sajuResultId={}, favoredPeriod={}", sajuResult.getId(), favoredPeriod);
         return consultationMapper.toResponse(sajuData, tenGodDistribution, dayMaster,
-                favoredPeriod, confidenceScore, reasoning, sajuResult, consultationId, advice, modelVersion);
+                favoredPeriod, confidenceScore, reasoning, sajuResult, outcome.consultationId(), responseAdvice, modelVersion);
     }
 }
