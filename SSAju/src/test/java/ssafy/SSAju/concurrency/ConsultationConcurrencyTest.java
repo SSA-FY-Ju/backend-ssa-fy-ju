@@ -118,7 +118,7 @@ class ConsultationConcurrencyTest {
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(THREAD_COUNT);
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
-        List<Long> resultIds = new CopyOnWriteArrayList<>();
+        List<ConsultationSaveService.SaveOutcome> outcomes = new CopyOnWriteArrayList<>();
         List<Throwable> failures = new CopyOnWriteArrayList<>();
 
         // When
@@ -126,9 +126,9 @@ class ConsultationConcurrencyTest {
             executor.submit(() -> {
                 try {
                     startLatch.await();
-                    Long id = consultationSaveService.saveOrUpdate(
-                            testSajuResult, fakeAdvice(), "gpt-4o-mini", CONSULTATION_MONTH).consultationId();
-                    resultIds.add(id);
+                    ConsultationSaveService.SaveOutcome outcome = consultationSaveService.saveOrUpdate(
+                            testSajuResult, fakeAdvice(), "gpt-4o-mini", CONSULTATION_MONTH);
+                    outcomes.add(outcome);
                 } catch (Throwable e) {
                     failures.add(e);
                 } finally {
@@ -156,9 +156,13 @@ class ConsultationConcurrencyTest {
         assertThat(careerConsultationRepository.count())
                 .as("DB에는 CareerConsultation이 정확히 1건만 존재해야 한다")
                 .isEqualTo(1);
+        List<Long> resultIds = outcomes.stream().map(ConsultationSaveService.SaveOutcome::consultationId).toList();
         assertThat(resultIds).as("모든 스레드가 동일한 CareerConsultation.id를 반환해야 한다")
                 .hasSize(THREAD_COUNT)
                 .containsOnly(resultIds.get(0));
+        assertThat(outcomes.stream().filter(ConsultationSaveService.SaveOutcome::persisted).count())
+                .as("N개의 동시 요청 중 실제로 새 값을 저장한 것은 정확히 1건이어야 한다(락 안 재확인으로 나머지는 재사용)")
+                .isEqualTo(1);
     }
 
     /**
