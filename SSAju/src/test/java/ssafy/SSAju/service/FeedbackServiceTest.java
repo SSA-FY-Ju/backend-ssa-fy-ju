@@ -116,7 +116,7 @@ class FeedbackServiceTest {
 
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
         // C-4: DB 레벨 소유권 검증 메서드 사용
-        given(consultationRepository.findByIdAndSajuResult_User_Id(1L, USER_ID))
+        given(consultationRepository.findByIdAndAccessibleByUser(1L, USER_ID))
                 .willReturn(Optional.of(consultation));
         given(feedbackRepository.save(any(UserSatisfactionFeedback.class))).willReturn(savedFeedback);
 
@@ -135,7 +135,7 @@ class FeedbackServiceTest {
 
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
         // DB 레벨 소유권 검증: userId=1L로 조회 시 empty 반환 (다른 유저 소유)
-        given(consultationRepository.findByIdAndSajuResult_User_Id(1L, USER_ID))
+        given(consultationRepository.findByIdAndAccessibleByUser(1L, USER_ID))
                 .willReturn(Optional.empty());
 
         // When & Then

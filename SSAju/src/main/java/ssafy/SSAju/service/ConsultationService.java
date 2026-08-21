@@ -90,7 +90,7 @@ public class ConsultationService {
         UserProfile userProfile = userProfileProvider.findOrCreate(
                 request.birthDate(), request.birthTime());
         SajuResult newResult = sajuResultMapper.buildSajuResult(
-                userProfile, user, sajuData, tenGodDistribution, hiddenStems,
+                userProfile, sajuData, tenGodDistribution, hiddenStems,
                 favoredPeriod, confidenceScore, reasoning);
         SajuResult sajuResult = sajuResultProvider.findOrCreate(user, userProfile, newResult);
 

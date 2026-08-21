@@ -52,11 +52,11 @@ public class FeedbackService {
                         .build();
             }
             case CONSULTATION -> {
-                // C-4: DB 레벨 소유권 검증 — lazy loading chain(getSajuResult().getUser()) 제거.
-                // findByIdAndSajuResult_User_Id가 SQL JOIN으로 소유권을 확인하므로
+                // C-4/B1: DB 레벨 소유권 검증 — lazy loading chain(getSajuResult().getUser()) 제거.
+                // findByIdAndAccessibleByUser가 UserSajuAccess EXISTS 서브쿼리로 소유권을 확인하므로
                 // 트랜잭션 여부와 무관하게 안전하게 IDOR를 차단합니다.
                 CareerConsultation consultation = consultationRepository
-                        .findByIdAndSajuResult_User_Id(request.analysisId(), userId)
+                        .findByIdAndAccessibleByUser(request.analysisId(), userId)
                         .orElseThrow(() -> new SajuResultNotFoundException(
                                 ErrorMessageConstants.SAJU_RESULT_NOT_FOUND.getMessage()
                                         + " id=" + request.analysisId()));

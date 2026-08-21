@@ -162,7 +162,7 @@ class CareerResultLegacyDataCleanupIntegrationTest {
         CareerConsultation consultation = careerConsultationRepository.save(
                 CareerConsultation.builder()
                         .sajuResult(sajuResultRepository.save(
-                                SajuResult.builder().userProfile(testProfile).user(testUser).build()))
+                                SajuResult.builder().userProfile(testProfile).build()))
                         .openaiModelVersion("gpt-4o-mini")
                         .consultationMonth(202605)
                         .resultJson(minimalAdvice())
