@@ -11,4 +11,8 @@ public class ConsultationRecoveryFailedException extends DataAccessException {
     public ConsultationRecoveryFailedException(String message) {
         super(message);
     }
+
+    public ConsultationRecoveryFailedException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

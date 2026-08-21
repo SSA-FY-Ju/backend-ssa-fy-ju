@@ -46,6 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -234,7 +235,8 @@ class ConsultationServiceTest {
         verify(sajuResultProvider).findOrCreate(MOCK_USER, userProfile, sajuResult);
         // 캐시 미스 → 신규 OpenAI 호출 발생 → 일일 한도 1회 차감 필수, 성공했으므로 복원은 없어야 함
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService, never()).restoreDailyUsage(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
     }
 
     // ─────────────────────────────────────────
@@ -266,7 +268,8 @@ class ConsultationServiceTest {
         verify(sajuResultProvider).findOrCreate(MOCK_USER, userProfile, newSajuResult);
         verify(consultationSaveService).saveOrUpdate(any(), any(), any(), any());
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService, never()).restoreDailyUsage(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
     }
 
     // ─────────────────────────────────────────
@@ -303,7 +306,8 @@ class ConsultationServiceTest {
         // 캐시 히트 → OpenAI 미호출, 일일 한도 차감/복원 모두 없음
         verify(openAICaller, never()).call(any(), any(), any(), any());
         verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(any());
-        verify(dailyApiUsageService, never()).restoreDailyUsage(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
     }
 
     // ─────────────────────────────────────────
@@ -338,7 +342,7 @@ class ConsultationServiceTest {
         // 예외는 없었지만(정상 반환), 이 요청은 새 값을 저장하지 못했으므로 쿼터를 보상 복원해야 한다
         assertThat(result).isNotNull();
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
+        verify(dailyApiUsageService).restoreQuietly(USER_ID, TEST_USAGE_DATE);
         // consultationId(77L)가 가리키는 실제 저장분(WINNER_ADVICE)의 내용이 응답에 실려야 한다 —
         // 이 요청이 직접 만들었다가 버려진 MOCK_ADVICE의 내용이 아니다.
         assertThat(result.strengths()).containsExactlyElementsOf(WINNER_ADVICE.strengths());
@@ -368,7 +372,7 @@ class ConsultationServiceTest {
                 .isSameAs(saveFailure);
 
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
+        verify(dailyApiUsageService).restoreQuietly(USER_ID, TEST_USAGE_DATE, saveFailure);
     }
 
     // ─────────────────────────────────────────
@@ -395,7 +399,7 @@ class ConsultationServiceTest {
                 .hasMessageContaining("OpenAI API 호출 실패");
         // 캐시 미스 → charge 후 OpenAI 실패: 차감 후 보상(복원)까지 발생해야 함 (US2)
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
+        verify(dailyApiUsageService).restoreQuietly(eq(USER_ID), eq(TEST_USAGE_DATE), any());
     }
 
     @Test
@@ -417,7 +421,7 @@ class ConsultationServiceTest {
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("비어있습니다");
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
+        verify(dailyApiUsageService).restoreQuietly(eq(USER_ID), eq(TEST_USAGE_DATE), any());
     }
 
     @Test
@@ -439,6 +443,6 @@ class ConsultationServiceTest {
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("산업 추천 정보가 누락");
         verify(dailyApiUsageService).checkAndIncrementDailyUsage(USER_ID);
-        verify(dailyApiUsageService).restoreDailyUsage(USER_ID, TEST_USAGE_DATE);
+        verify(dailyApiUsageService).restoreQuietly(eq(USER_ID), eq(TEST_USAGE_DATE), any());
     }
 }

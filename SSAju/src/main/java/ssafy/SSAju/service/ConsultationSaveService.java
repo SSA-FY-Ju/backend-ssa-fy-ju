@@ -85,14 +85,14 @@ public class ConsultationSaveService {
         } catch (DataIntegrityViolationException e) {
             log.warn("CareerConsultation 삽입 중 UNIQUE 제약 위반(락 임대시간 만료 경합 추정) — 재조회: "
                             + "sajuResultId={}, month={}",
-                    sajuResult.getId(), consultationMonth);
+                    sajuResult.getId(), consultationMonth, e);
             return careerConsultationRepository
                     .findBySajuResultAndConsultationMonth(sajuResult, consultationMonth)
                     .map(existing -> updateIfModelChanged(
                             existing, sajuResult, advice, modelVersion, consultationMonth))
                     .orElseThrow(() -> new ConsultationRecoveryFailedException(
                             "CareerConsultation 경합 복구 실패: sajuResultId=" +
-                            sajuResult.getId() + ", month=" + consultationMonth));
+                            sajuResult.getId() + ", month=" + consultationMonth, e));
         }
     }
 
