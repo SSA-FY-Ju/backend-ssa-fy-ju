@@ -61,7 +61,7 @@ class FeedbackControllerTest {
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "SAJU",
+                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "좋았습니다"
                                 }
@@ -153,7 +153,7 @@ class FeedbackControllerTest {
                         .content("""
                                 {
                                   "analysisId": 999,
-                                  "feedbackType": "SAJU",
+                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))

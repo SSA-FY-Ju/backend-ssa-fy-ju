@@ -64,8 +64,9 @@ public class SajuResultProvider {
 
     /**
      * userProfile 단위 분산락 안에서 호출되므로(위 findOrCreate) 동일 사용자의 중복 삽입 경합은
-     * 사실상 발생하지 않는다. 그럼에도 유니크 제약 위반은 "이미 매핑이 존재한다"는 뜻이므로
-     * 예외를 전파하지 않고 조용히 무시한다 — 접근 매핑은 존재 여부만 중요하다.
+     * 사실상 발생하지 않는다. 그럼에도 유니크 제약 위반은 "이미 매핑이 존재한다"는 뜻일 수 있으므로,
+     * 예외를 무시하기 전에 반드시 재조회로 실제로 매핑이 존재하는지 확인한다 — 그렇지 않다면
+     * (예: user/sajuResult FK 위반 등 무관한 원인) 원본 예외를 그대로 전파한다.
      */
     private void ensureAccess(User user, SajuResult sajuResult) {
         if (userSajuAccessRepository.existsByUserIdAndSajuResultId(user.getId(), sajuResult.getId())) {
@@ -77,6 +78,9 @@ public class SajuResultProvider {
                     .sajuResult(sajuResult)
                     .build());
         } catch (DataIntegrityViolationException ex) {
+            if (!userSajuAccessRepository.existsByUserIdAndSajuResultId(user.getId(), sajuResult.getId())) {
+                throw ex;
+            }
             // 이미 다른 요청이 매핑을 생성함 — 무시
         }
     }
