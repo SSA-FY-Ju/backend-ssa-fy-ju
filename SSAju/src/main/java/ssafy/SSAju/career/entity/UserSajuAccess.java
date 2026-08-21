@@ -26,7 +26,10 @@ import java.time.Instant;
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_user_saju_access_user_saju_result",
                 columnNames = {"user_id", "saju_result_id"}
-        )
+        ),
+        // 유니크 제약은 (user_id, saju_result_id) 순서라 saju_result_id 단독 조인(예:
+        // AnalysisHistoryRepository의 마이페이지 이력 조회)에는 인덱스를 못 탄다.
+        indexes = @Index(name = "idx_user_saju_access_saju_result", columnList = "saju_result_id")
 )
 public class UserSajuAccess {
 

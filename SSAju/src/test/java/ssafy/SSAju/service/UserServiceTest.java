@@ -29,7 +29,6 @@ import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserRepository;
-import ssafy.SSAju.repository.UserSajuAccessRepository;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -49,7 +48,6 @@ class UserServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private AnalysisHistoryRepository analysisHistoryRepository;
     @Mock private SajuResultRepository sajuResultRepository;
-    @Mock private UserSajuAccessRepository userSajuAccessRepository;
     @Mock private CareerConsultationRepository careerConsultationRepository;
     @Mock private CompanyCompatibilityRepository companyCompatibilityRepository;
     @Mock private ConsultationMapper consultationMapper;
@@ -83,7 +81,7 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         service = new UserService(
-                userRepository, analysisHistoryRepository, sajuResultRepository, userSajuAccessRepository,
+                userRepository, analysisHistoryRepository, sajuResultRepository,
                 careerConsultationRepository, companyCompatibilityRepository,
                 consultationMapper, compatibilityChildReadService);
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
@@ -109,9 +107,8 @@ class UserServiceTest {
         given(sajuResult.getUserProfile()).willReturn(userProfile);
         given(sajuResult.getCareerFortune()).willReturn(careerFortune);
         given(sajuResult.getFetchedAt()).willReturn(Instant.now());
-        // USER_ID를 정확히 지정 — 다른 userId가 넘어오면 stub 불일치로 false/empty 반환
-        given(userSajuAccessRepository.existsByUserIdAndSajuResultId(USER_ID, ANALYSIS_ID)).willReturn(true);
-        given(sajuResultRepository.findByIdWithProfileAndFortune(ANALYSIS_ID))
+        // USER_ID를 정확히 지정 — 다른 userId가 넘어오면 stub 불일치로 empty 반환
+        given(sajuResultRepository.findByIdAndUserIdWithProfileAndFortune(ANALYSIS_ID, USER_ID))
                 .willReturn(Optional.of(sajuResult));
 
         // When
@@ -130,23 +127,13 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("SAJU 상세 조회 — SajuResult 없음 → SajuResultNotFoundException")
+    @DisplayName("SAJU 상세 조회 — SajuResult가 없거나 접근 매핑이 없으면 SajuResultNotFoundException")
     void shouldThrow_WhenSajuResultNotFound() {
-        // Given
-        given(userSajuAccessRepository.existsByUserIdAndSajuResultId(USER_ID, ANALYSIS_ID)).willReturn(true);
-        given(sajuResultRepository.findByIdWithProfileAndFortune(ANALYSIS_ID))
+        // Given — findByIdAndUserIdWithProfileAndFortune은 EXISTS 서브쿼리로 소유권까지 함께
+        // 확인하므로, 정본 자체가 없는 경우와 접근 매핑(UserSajuAccess)이 없는 경우를
+        // DB 레벨에서 구분하지 않고 동일하게 empty를 반환한다.
+        given(sajuResultRepository.findByIdAndUserIdWithProfileAndFortune(ANALYSIS_ID, USER_ID))
                 .willReturn(Optional.empty());
-
-        // When & Then
-        assertThatThrownBy(() -> service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.SAJU))
-                .isInstanceOf(SajuResultNotFoundException.class);
-    }
-
-    @Test
-    @DisplayName("SAJU 상세 조회 — 다른 유저(id=999L)의 정본에 접근 매핑 없음 → SajuResultNotFoundException")
-    void shouldThrow_WhenNoAccessMappingForSajuResult() {
-        // Given — MOCK_USER(id=1L)는 이 SajuResult에 대한 UserSajuAccess가 없음
-        given(userSajuAccessRepository.existsByUserIdAndSajuResultId(USER_ID, ANALYSIS_ID)).willReturn(false);
 
         // When & Then
         assertThatThrownBy(() -> service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.SAJU))

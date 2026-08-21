@@ -13,13 +13,14 @@ public interface SajuResultRepository extends JpaRepository<SajuResult, Long> {
     Optional<SajuResult> findByUserProfile(UserProfile userProfile);
 
     /**
-     * 마이페이지 상세 조회 전용: UserProfile과 CareerFortune을 한 번의 쿼리로 fetch join.
-     * UserService.buildSajuDetail()의 레이지 로딩 체인(3개 SELECT)을 1개 쿼리로 개선.
-     * 소유권(UserSajuAccess) 확인은 호출자가 별도로 수행한다(B1).
+     * 마이페이지 상세 조회 전용: UserProfile과 CareerFortune을 fetch join하면서
+     * 소유권(UserSajuAccess EXISTS 서브쿼리)까지 한 번에 확인한다.
+     * CareerConsultationRepository.findByIdAndUserIdWithSajuResultAndProfile과 동일한 패턴(B1).
      */
     @Query("SELECT s FROM SajuResult s " +
            "LEFT JOIN FETCH s.userProfile " +
            "LEFT JOIN FETCH s.careerFortune " +
-           "WHERE s.id = :id")
-    Optional<SajuResult> findByIdWithProfileAndFortune(@Param("id") Long id);
+           "WHERE s.id = :id AND EXISTS (" +
+           "  SELECT 1 FROM UserSajuAccess usa WHERE usa.sajuResult = s AND usa.user.id = :userId)")
+    Optional<SajuResult> findByIdAndUserIdWithProfileAndFortune(@Param("id") Long id, @Param("userId") Long userId);
 }

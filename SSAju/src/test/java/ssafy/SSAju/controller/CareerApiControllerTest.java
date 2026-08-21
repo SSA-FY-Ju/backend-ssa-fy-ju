@@ -189,7 +189,7 @@ class CareerApiControllerTest {
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "CONSULTATION",
+                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "좋은 상담이었습니다"
                                 }
@@ -209,7 +209,7 @@ class CareerApiControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "feedbackType": "CONSULTATION",
+                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))

@@ -24,7 +24,6 @@ import ssafy.SSAju.repository.CareerConsultationRepository;
 import ssafy.SSAju.repository.CompanyCompatibilityRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserRepository;
-import ssafy.SSAju.repository.UserSajuAccessRepository;
 
 import java.util.List;
 
@@ -36,7 +35,6 @@ public class UserService {
     private final UserRepository userRepository;
     private final AnalysisHistoryRepository analysisHistoryRepository;
     private final SajuResultRepository sajuResultRepository;
-    private final UserSajuAccessRepository userSajuAccessRepository;
     private final CareerConsultationRepository careerConsultationRepository;
     private final CompanyCompatibilityRepository companyCompatibilityRepository;
     private final ConsultationMapper consultationMapper;
@@ -82,11 +80,8 @@ public class UserService {
     // ─────────────────────────────────────────
 
     private AnalysisDetailResponse buildSajuDetail(User user, Long analysisId) {
-        if (!userSajuAccessRepository.existsByUserIdAndSajuResultId(user.getId(), analysisId)) {
-            throw new SajuResultNotFoundException("사주 분석 결과를 찾을 수 없습니다.");
-        }
         SajuResult sajuResult = sajuResultRepository
-                .findByIdWithProfileAndFortune(analysisId)
+                .findByIdAndUserIdWithProfileAndFortune(analysisId, user.getId())
                 .orElseThrow(() -> new SajuResultNotFoundException("사주 분석 결과를 찾을 수 없습니다."));
 
         UserProfile profile = sajuResult.getUserProfile();
