@@ -4,12 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ssafy.SSAju.career.dto.request.SatisfactionFeedbackRequest;
+import ssafy.SSAju.career.dto.response.SatisfactionFeedbackResponse;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
-import ssafy.SSAju.dto.request.SatisfactionFeedbackRequest;
-import ssafy.SSAju.dto.response.SatisfactionFeedbackResponse;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.exception.FeedbackNotAllowedException;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
@@ -37,7 +37,7 @@ public class FeedbackService {
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
         UserSatisfactionFeedback feedback = switch (request.feedbackType()) {
-            case COMPATIBILITY -> {
+            case COMPANY_COMPATIBILITY -> {
                 CompanyCompatibility compatibility = compatibilityRepository
                         .findByIdAndUser(request.analysisId(), user)
                         .orElseThrow(() -> new SajuResultNotFoundException(
@@ -51,7 +51,7 @@ public class FeedbackService {
                         .feedbackContent(request.feedbackContent())
                         .build();
             }
-            case CONSULTATION -> {
+            case CAREER_CONSULTATION -> {
                 // C-4/B1: DB 레벨 소유권 검증 — lazy loading chain(getSajuResult().getUser()) 제거.
                 // findByIdAndAccessibleByUser가 UserSajuAccess EXISTS 서브쿼리로 소유권을 확인하므로
                 // 트랜잭션 여부와 무관하게 안전하게 IDOR를 차단합니다.
@@ -68,7 +68,7 @@ public class FeedbackService {
                         .feedbackContent(request.feedbackContent())
                         .build();
             }
-            case CAREER_TIMING ->
+            case SAJU ->
                 throw new FeedbackNotAllowedException("관운 분석은 피드백 대상이 아닙니다.");
         };
 

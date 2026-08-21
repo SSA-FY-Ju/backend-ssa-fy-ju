@@ -16,7 +16,7 @@ import ssafy.SSAju.admin.dto.FeedbackDetailDTO;
 import ssafy.SSAju.admin.dto.FeedbackListDTO;
 import ssafy.SSAju.admin.dto.FeedbackStatDTO;
 import ssafy.SSAju.admin.service.AdminFeedbackService;
-import ssafy.SSAju.career.enums.FeedbackType;
+import ssafy.SSAju.career.enums.AnalysisType;
 
 import java.util.List;
 
@@ -33,7 +33,7 @@ public class AdminFeedbackController {
 
     @GetMapping("/feedback")
     public String getFeedbackPage(
-            @RequestParam(required = false) FeedbackType type,
+            @RequestParam(required = false) AnalysisType type,
             @RequestParam(defaultValue = "0") int page,
             Model model) {
 
@@ -57,7 +57,7 @@ public class AdminFeedbackController {
     @GetMapping("/api/feedback")
     @ResponseBody
     public ResponseEntity<List<FeedbackListDTO>> getFeedbackApi(
-            @RequestParam(required = false) FeedbackType type,
+            @RequestParam(required = false) AnalysisType type,
             @RequestParam(defaultValue = "0") int page) {
 
         Page<FeedbackListDTO> result = feedbackService.getFeedbackList(type, Math.max(page, 0), PAGE_SIZE);

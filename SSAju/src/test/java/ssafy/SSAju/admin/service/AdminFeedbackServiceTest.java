@@ -17,7 +17,7 @@ import ssafy.SSAju.admin.repository.AdminFeedbackQueryRepository;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
-import ssafy.SSAju.career.enums.FeedbackType;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.exception.FeedbackNotFoundException;
 
@@ -53,8 +53,8 @@ class AdminFeedbackServiceTest {
     @DisplayName("getFeedbackStats - Repository 결과를 그대로 반환")
     void getFeedbackStats_returnsRepositoryResult() {
         FeedbackStatDTO stub = new FeedbackStatDTO(
-                Map.of("CONSULTATION", 10L),
-                Map.of("CONSULTATION", 3L),
+                Map.of("CAREER_CONSULTATION", 10L),
+                Map.of("CAREER_CONSULTATION", 3L),
                 13L
         );
         given(feedbackRepository.findFeedbackStats()).willReturn(stub);
@@ -62,7 +62,7 @@ class AdminFeedbackServiceTest {
         FeedbackStatDTO result = adminFeedbackService.getFeedbackStats();
 
         assertThat(result.totalFeedbackCount()).isEqualTo(13L);
-        assertThat(result.satisfiedCountByFeedbackType()).containsEntry("CONSULTATION", 10L);
+        assertThat(result.satisfiedCountByFeedbackType()).containsEntry("CAREER_CONSULTATION", 10L);
         verify(feedbackRepository).findFeedbackStats();
     }
 
@@ -81,27 +81,27 @@ class AdminFeedbackServiceTest {
     }
 
     @Test
-    @DisplayName("getFeedbackList - type=CONSULTATION → FeedbackType.CONSULTATION으로 변환")
+    @DisplayName("getFeedbackList - type=CAREER_CONSULTATION → AnalysisType.CAREER_CONSULTATION으로 변환")
     void getFeedbackList_withType_convertsEnum() {
         Pageable pageable = PageRequest.of(0, 20);
         FeedbackListDTO item = new FeedbackListDTO(
-                1L, 10L, "좋아요", SatisfactionStatus.SATISFIED, FeedbackType.CONSULTATION, Instant.now());
+                1L, 10L, "좋아요", SatisfactionStatus.SATISFIED, AnalysisType.CAREER_CONSULTATION, Instant.now());
         given(paginationUtil.of(anyInt(), anyInt())).willReturn(pageable);
-        given(feedbackRepository.findFeedbackByType(eq(FeedbackType.CONSULTATION), eq(pageable)))
+        given(feedbackRepository.findFeedbackByType(eq(AnalysisType.CAREER_CONSULTATION), eq(pageable)))
                 .willReturn(new PageImpl<>(List.of(item)));
 
-        Page<FeedbackListDTO> result = adminFeedbackService.getFeedbackList(FeedbackType.CONSULTATION, 0, 20);
+        Page<FeedbackListDTO> result = adminFeedbackService.getFeedbackList(AnalysisType.CAREER_CONSULTATION, 0, 20);
 
         assertThat(result.getContent()).hasSize(1);
-        assertThat(result.getContent().get(0).feedbackType()).isEqualTo(FeedbackType.CONSULTATION);
+        assertThat(result.getContent().get(0).feedbackType()).isEqualTo(AnalysisType.CAREER_CONSULTATION);
     }
 
     @Test
-    @DisplayName("getFeedbackList - type=CAREER_TIMING → IllegalArgumentException (피드백 불가 정책)")
+    @DisplayName("getFeedbackList - type=SAJU → IllegalArgumentException (피드백 불가 정책)")
     void getFeedbackList_careerTimingType_throwsException() {
-        assertThatThrownBy(() -> adminFeedbackService.getFeedbackList(FeedbackType.CAREER_TIMING, 0, 20))
+        assertThatThrownBy(() -> adminFeedbackService.getFeedbackList(AnalysisType.SAJU, 0, 20))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("CAREER_TIMING");
+                .hasMessageContaining("SAJU");
 
         verifyNoInteractions(paginationUtil);
         verifyNoInteractions(feedbackRepository);
@@ -114,7 +114,7 @@ class AdminFeedbackServiceTest {
         CareerConsultation consultation = mock(CareerConsultation.class);
         given(feedback.getId()).willReturn(1L);
         given(feedback.getUser()).willReturn(null);
-        given(feedback.getFeedbackType()).willReturn(FeedbackType.CONSULTATION);
+        given(feedback.getFeedbackType()).willReturn(AnalysisType.CAREER_CONSULTATION);
         given(feedback.getSatisfactionStatus()).willReturn(SatisfactionStatus.SATISFIED);
         given(feedback.getFeedbackContent()).willReturn("좋았습니다");
         given(feedback.getCreatedAt()).willReturn(Instant.now());
@@ -127,7 +127,7 @@ class AdminFeedbackServiceTest {
         FeedbackDetailDTO result = adminFeedbackService.getFeedbackWithAnalysis(1L);
 
         assertThat(result.feedbackId()).isEqualTo(1L);
-        assertThat(result.analysisType()).isEqualTo("CONSULTATION");
+        assertThat(result.analysisType()).isEqualTo("CAREER_CONSULTATION");
         assertThat(result.analysisId()).isEqualTo(100L);
     }
 
@@ -138,7 +138,7 @@ class AdminFeedbackServiceTest {
         CompanyCompatibility compatibility = mock(CompanyCompatibility.class);
         given(feedback.getId()).willReturn(2L);
         given(feedback.getUser()).willReturn(null);
-        given(feedback.getFeedbackType()).willReturn(FeedbackType.COMPATIBILITY);
+        given(feedback.getFeedbackType()).willReturn(AnalysisType.COMPANY_COMPATIBILITY);
         given(feedback.getSatisfactionStatus()).willReturn(SatisfactionStatus.DISSATISFIED);
         given(feedback.getFeedbackContent()).willReturn("별로였어요");
         given(feedback.getCreatedAt()).willReturn(Instant.now());
@@ -150,7 +150,7 @@ class AdminFeedbackServiceTest {
 
         FeedbackDetailDTO result = adminFeedbackService.getFeedbackWithAnalysis(2L);
 
-        assertThat(result.analysisType()).isEqualTo("COMPATIBILITY");
+        assertThat(result.analysisType()).isEqualTo("COMPANY_COMPATIBILITY");
         assertThat(result.analysisId()).isEqualTo(200L);
         assertThat(result.satisfactionStatus()).isEqualTo("DISSATISFIED");
     }

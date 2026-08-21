@@ -17,7 +17,7 @@ import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.dto.response.ConsultationResponse;
-import ssafy.SSAju.dto.response.SatisfactionFeedbackResponse;
+import ssafy.SSAju.career.dto.response.SatisfactionFeedbackResponse;
 import ssafy.SSAju.service.CareerFortuneService;
 import ssafy.SSAju.service.CompanyMatchingService;
 import ssafy.SSAju.service.ConsultationService;

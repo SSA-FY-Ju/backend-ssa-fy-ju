@@ -5,9 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ssafy.SSAju.career.enums.FeedbackType;
+import ssafy.SSAju.career.dto.request.SatisfactionFeedbackRequest;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
-import ssafy.SSAju.dto.request.SatisfactionFeedbackRequest;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
@@ -65,7 +65,7 @@ class FeedbackServiceOwnershipTest {
     void consultationFeedback_deniedWithoutAccessMapping() {
         // Given — 다른 사용자의 정본이므로 findByIdAndAccessibleByUser가 EXISTS 서브쿼리에서 empty를 반환
         var request = new SatisfactionFeedbackRequest(
-                ANALYSIS_ID, FeedbackType.CONSULTATION, SatisfactionStatus.SATISFIED, null);
+                ANALYSIS_ID, AnalysisType.CAREER_CONSULTATION, SatisfactionStatus.SATISFIED, null);
         given(consultationRepository.findByIdAndAccessibleByUser(ANALYSIS_ID, USER_ID))
                 .willReturn(Optional.empty());
 
@@ -79,7 +79,7 @@ class FeedbackServiceOwnershipTest {
     void compatibilityFeedback_deniedWithoutOwnership() {
         // Given — CompanyCompatibility는 자체 user FK를 가지므로 findByIdAndUser가 소유권을 직접 확인
         var request = new SatisfactionFeedbackRequest(
-                ANALYSIS_ID, FeedbackType.COMPATIBILITY, SatisfactionStatus.SATISFIED, null);
+                ANALYSIS_ID, AnalysisType.COMPANY_COMPATIBILITY, SatisfactionStatus.SATISFIED, null);
         given(compatibilityRepository.findByIdAndUser(ANALYSIS_ID, MOCK_USER)).willReturn(Optional.empty());
 
         // When & Then
