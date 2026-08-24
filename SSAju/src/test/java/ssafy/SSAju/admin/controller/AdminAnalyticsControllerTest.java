@@ -94,14 +94,15 @@ class AdminAnalyticsControllerTest {
     }
 
     @Test
-    @DisplayName("GET /admin/analytics/{id}?type=SAJU → 200 + 상세 정보 반환")
+    @DisplayName("GET /admin/analytics/{id}?type=SAJU&userId=10 → 200 + 상세 정보 반환")
     void getAnalyticsDetail_existingId_returns200() throws Exception {
         AnalyticsDetailDTO detail = new AnalyticsDetailDTO(
                 1L, 10L, "SAJU", "{\"key\":\"값\"}", Instant.now());
-        given(adminAnalyticsService.getAnalyticsDetail(1L, AnalysisType.SAJU)).willReturn(detail);
+        given(adminAnalyticsService.getAnalyticsDetail(1L, AnalysisType.SAJU, 10L)).willReturn(detail);
 
         mockMvc.perform(get("/admin/analytics/1")
                         .param("type", "SAJU")
+                        .param("userId", "10")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
@@ -110,15 +111,26 @@ class AdminAnalyticsControllerTest {
     }
 
     @Test
-    @DisplayName("GET /admin/analytics/{id}?type=SAJU → 존재하지 않는 id → 400")
+    @DisplayName("GET /admin/analytics/{id}?type=SAJU&userId=10 → 존재하지 않는 id → 400")
     void getAnalyticsDetail_notFound_returns400() throws Exception {
-        given(adminAnalyticsService.getAnalyticsDetail(999L, AnalysisType.SAJU))
+        given(adminAnalyticsService.getAnalyticsDetail(999L, AnalysisType.SAJU, 10L))
                 .willThrow(new IllegalArgumentException("분석 기록을 찾을 수 없습니다: id=999"));
 
         mockMvc.perform(get("/admin/analytics/999")
                         .param("type", "SAJU")
+                        .param("userId", "10")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /admin/analytics/{id}?type=SAJU (userId 누락) → 400 (500 아님)")
+    void getAnalyticsDetail_missingUserId_returns400() throws Exception {
+        mockMvc.perform(get("/admin/analytics/1")
+                        .param("type", "SAJU")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test

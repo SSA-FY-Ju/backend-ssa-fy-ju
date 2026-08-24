@@ -39,8 +39,7 @@ public class AdminAnalyticsQueryRepository {
 
             SELECT 'CAREER_CONSULTATION' AS analysis_type, cc.id, usa.user_id, cc.generated_at AS created_at
             FROM career_consultation cc
-            JOIN saju_result sr ON cc.saju_result_id = sr.id
-            JOIN user_saju_access usa ON usa.saju_result_id = sr.id
+            JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id
             WHERE (:type IS NULL OR :type = 'CAREER_CONSULTATION')
               AND cc.generated_at >= :dateFrom AND cc.generated_at < :dateTo
 
@@ -72,12 +71,18 @@ public class AdminAnalyticsQueryRepository {
         ));
     }
 
-    public Optional<AnalyticsDetailDTO> findAnalyticsById(Long id, String analysisType) {
-        if (analysisType == null) return Optional.empty();
+    /**
+     * B1: SajuResult는 여러 사용자가 공유하는 정본이라 sr.id 하나에 user_saju_access가
+     * 여럿 붙을 수 있다. 목록에서 관리자가 클릭한 행이 어떤 사용자의 접근 매핑인지를
+     * userId로 명시적으로 전달받아 그 매핑 하나만 정확히 조회한다(목록 행과 상세 모달의
+     * 표시 값이 항상 일치하도록 보장).
+     */
+    public Optional<AnalyticsDetailDTO> findAnalyticsById(Long id, String analysisType, Long userId) {
+        if (analysisType == null || userId == null) return Optional.empty();
         return switch (analysisType) {
-            case SAJU -> findSajuDetail(id);
-            case CAREER_CONSULTATION -> findConsultationDetail(id);
-            case COMPANY_COMPATIBILITY -> findCompatibilityDetail(id);
+            case SAJU -> findSajuDetail(id, userId);
+            case CAREER_CONSULTATION -> findConsultationDetail(id, userId);
+            case COMPANY_COMPATIBILITY -> findCompatibilityDetail(id, userId);
             default -> Optional.empty();
         };
     }
@@ -103,8 +108,7 @@ public class AdminAnalyticsQueryRepository {
                         UNION ALL
                         SELECT 'CAREER_CONSULTATION', cc.id, usa.user_id, cc.generated_at
                         FROM career_consultation cc
-                        JOIN saju_result sr ON cc.saju_result_id = sr.id
-                        JOIN user_saju_access usa ON usa.saju_result_id = sr.id
+                        JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id
                         UNION ALL
                         SELECT 'COMPANY_COMPATIBILITY', compat.id, compat.user_id, compat.created_at
                         FROM company_compatibility compat
@@ -115,7 +119,7 @@ public class AdminAnalyticsQueryRepository {
         }
         return switch (analysisType) {
             case SAJU -> "SELECT 'SAJU' AS analysis_type, sr.id, usa.user_id, sr.fetched_at AS created_at FROM saju_result sr JOIN user_saju_access usa ON usa.saju_result_id = sr.id WHERE sr.fetched_at >= ? AND sr.fetched_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
-            case CAREER_CONSULTATION -> "SELECT 'CAREER_CONSULTATION' AS analysis_type, cc.id, usa.user_id, cc.generated_at AS created_at FROM career_consultation cc JOIN saju_result sr ON cc.saju_result_id = sr.id JOIN user_saju_access usa ON usa.saju_result_id = sr.id WHERE cc.generated_at >= ? AND cc.generated_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
+            case CAREER_CONSULTATION -> "SELECT 'CAREER_CONSULTATION' AS analysis_type, cc.id, usa.user_id, cc.generated_at AS created_at FROM career_consultation cc JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id WHERE cc.generated_at >= ? AND cc.generated_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
             case COMPANY_COMPATIBILITY -> "SELECT 'COMPANY_COMPATIBILITY' AS analysis_type, id, user_id, created_at FROM company_compatibility WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
             default -> throw new IllegalArgumentException("Unknown analysisType: " + analysisType);
         };
@@ -132,11 +136,10 @@ public class AdminAnalyticsQueryRepository {
 
     /**
      * B1: SajuResult는 여러 사용자가 공유하는 정본이라 sr.id 하나에 user_saju_access가
-     * 여럿 붙을 수 있다. 이 화면의 user_id는 상세 모달에 표시되는 정보성 텍스트일 뿐
-     * "제한 조정" 등 실제 액션에는 쓰이지 않으므로(그 액션은 목록 행의 user_id를 그대로
-     * 사용한다), 최초 접근자(usa.created_at ASC LIMIT 1)를 대표값으로 보여준다.
+     * 여럿 붙을 수 있다. 목록에서 클릭한 행의 userId를 그대로 받아 그 사용자의 접근
+     * 매핑 하나만 정확히 조회한다 — 임의로 대표값을 고르지 않는다.
      */
-    private Optional<AnalyticsDetailDTO> findSajuDetail(Long id) {
+    private Optional<AnalyticsDetailDTO> findSajuDetail(Long id, Long userId) {
         String sql = """
                 SELECT sr.id, usa.user_id,
                        CONCAT(sfd.year_pillar, sfd.month_pillar, sfd.day_pillar, sfd.hour_pillar) AS json_data,
@@ -144,9 +147,7 @@ public class AdminAnalyticsQueryRepository {
                 FROM saju_result sr
                 LEFT JOIN saju_full_data sfd ON sfd.saju_result_id = sr.id
                 JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-                WHERE sr.id = ?
-                ORDER BY usa.created_at ASC
-                LIMIT 1
+                WHERE sr.id = ? AND usa.user_id = ?
                 """;
         return jdbcTemplate.query(sql, (rs, rowNum) -> new AnalyticsDetailDTO(
                 rs.getLong("id"),
@@ -154,19 +155,16 @@ public class AdminAnalyticsQueryRepository {
                 SAJU,
                 rs.getString("json_data"),
                 rs.getTimestamp("created_at").toInstant()
-        ), id).stream().findFirst();
+        ), id, userId).stream().findFirst();
     }
 
-    /** B1: SajuResult 공유로 인한 대표 user_id 선정 기준은 {@link #findSajuDetail}과 동일. */
-    private Optional<AnalyticsDetailDTO> findConsultationDetail(Long id) {
+    /** B1: 조회 기준은 {@link #findSajuDetail}과 동일 — 클릭한 행의 userId로 정확히 필터링. */
+    private Optional<AnalyticsDetailDTO> findConsultationDetail(Long id, Long userId) {
         String sql = """
                 SELECT cc.id, usa.user_id, cc.day_master_description AS json_data, cc.generated_at AS created_at
                 FROM career_consultation cc
-                JOIN saju_result sr ON cc.saju_result_id = sr.id
-                JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-                WHERE cc.id = ?
-                ORDER BY usa.created_at ASC
-                LIMIT 1
+                JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id
+                WHERE cc.id = ? AND usa.user_id = ?
                 """;
         return jdbcTemplate.query(sql, (rs, rowNum) -> new AnalyticsDetailDTO(
                 rs.getLong("id"),
@@ -174,14 +172,14 @@ public class AdminAnalyticsQueryRepository {
                 CAREER_CONSULTATION,
                 rs.getString("json_data"),
                 rs.getTimestamp("created_at").toInstant()
-        ), id).stream().findFirst();
+        ), id, userId).stream().findFirst();
     }
 
-    private Optional<AnalyticsDetailDTO> findCompatibilityDetail(Long id) {
+    private Optional<AnalyticsDetailDTO> findCompatibilityDetail(Long id, Long userId) {
         String sql = """
                 SELECT id, user_id, summary AS json_data, created_at
                 FROM company_compatibility
-                WHERE id = ?
+                WHERE id = ? AND user_id = ?
                 """;
         return jdbcTemplate.query(sql, (rs, rowNum) -> new AnalyticsDetailDTO(
                 rs.getLong("id"),
@@ -189,7 +187,7 @@ public class AdminAnalyticsQueryRepository {
                 COMPANY_COMPATIBILITY,
                 rs.getString("json_data"),
                 rs.getTimestamp("created_at").toInstant()
-        ), id).stream().findFirst();
+        ), id, userId).stream().findFirst();
     }
 
     private long countSaju(Object from, Object to) {

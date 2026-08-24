@@ -148,9 +148,9 @@ class AdminAnalyticsServiceTest {
     @DisplayName("getAnalyticsDetail - 존재하는 id → AnalyticsDetailDTO 반환")
     void getAnalyticsDetail_existingId_returnsDto() {
         AnalyticsDetailDTO stub = new AnalyticsDetailDTO(1L, 10L, "SAJU", "{\"test\":\"data\"}", Instant.now());
-        given(analyticsRepository.findAnalyticsById(1L, "SAJU")).willReturn(Optional.of(stub));
+        given(analyticsRepository.findAnalyticsById(1L, "SAJU", 10L)).willReturn(Optional.of(stub));
 
-        AnalyticsDetailDTO result = adminAnalyticsService.getAnalyticsDetail(1L, AnalysisType.SAJU);
+        AnalyticsDetailDTO result = adminAnalyticsService.getAnalyticsDetail(1L, AnalysisType.SAJU, 10L);
 
         assertThat(result.id()).isEqualTo(1L);
         assertThat(result.jsonData()).isEqualTo("{\"test\":\"data\"}");
@@ -159,9 +159,9 @@ class AdminAnalyticsServiceTest {
     @Test
     @DisplayName("getAnalyticsDetail - 존재하지 않는 id → AnalyticsNotFoundException 발생")
     void getAnalyticsDetail_notFound_throwsException() {
-        given(analyticsRepository.findAnalyticsById(999L, "SAJU")).willReturn(Optional.empty());
+        given(analyticsRepository.findAnalyticsById(999L, "SAJU", 10L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> adminAnalyticsService.getAnalyticsDetail(999L, AnalysisType.SAJU))
+        assertThatThrownBy(() -> adminAnalyticsService.getAnalyticsDetail(999L, AnalysisType.SAJU, 10L))
                 .isInstanceOf(AnalyticsNotFoundException.class)
                 .hasMessageContaining("999");
     }
