@@ -13,6 +13,7 @@ import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.service.AdminAnalyticsService;
 import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.exception.AnalyticsNotFoundException;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
 
 import java.time.Instant;
@@ -111,16 +112,16 @@ class AdminAnalyticsControllerTest {
     }
 
     @Test
-    @DisplayName("GET /admin/analytics/{id}?type=SAJU&userId=10 → 존재하지 않는 id → 400")
-    void getAnalyticsDetail_notFound_returns400() throws Exception {
+    @DisplayName("GET /admin/analytics/{id}?type=SAJU&userId=10 → 존재하지 않는 id → 404")
+    void getAnalyticsDetail_notFound_returns404() throws Exception {
         given(adminAnalyticsService.getAnalyticsDetail(999L, AnalysisType.SAJU, 10L))
-                .willThrow(new IllegalArgumentException("분석 기록을 찾을 수 없습니다: id=999"));
+                .willThrow(new AnalyticsNotFoundException("분석 기록을 찾을 수 없습니다: id=999"));
 
         mockMvc.perform(get("/admin/analytics/999")
                         .param("type", "SAJU")
                         .param("userId", "10")
                         .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound());
     }
 
     @Test

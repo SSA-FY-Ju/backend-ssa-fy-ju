@@ -75,10 +75,10 @@ public class AdminAnalyticsQueryRepository {
      * B1: SajuResult는 여러 사용자가 공유하는 정본이라 sr.id 하나에 user_saju_access가
      * 여럿 붙을 수 있다. 목록에서 관리자가 클릭한 행이 어떤 사용자의 접근 매핑인지를
      * userId로 명시적으로 전달받아 그 매핑 하나만 정확히 조회한다(목록 행과 상세 모달의
-     * 표시 값이 항상 일치하도록 보장).
+     * 표시 값이 항상 일치하도록 보장). analysisType/userId의 null 검증은 호출자인
+     * AdminAnalyticsService의 책임이다(Repository는 순수 데이터 접근만 담당).
      */
     public Optional<AnalyticsDetailDTO> findAnalyticsById(Long id, String analysisType, Long userId) {
-        if (analysisType == null || userId == null) return Optional.empty();
         return switch (analysisType) {
             case SAJU -> findSajuDetail(id, userId);
             case CAREER_CONSULTATION -> findConsultationDetail(id, userId);
