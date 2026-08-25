@@ -5,7 +5,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.util.ReflectionTestUtils;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
+import ssafy.SSAju.admin.service.AdminBaseService;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
@@ -24,8 +26,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -88,7 +90,7 @@ class AdminAnalyticsQueryRepositoryTest {
         userSajuAccessRepository.save(UserSajuAccess.builder().user(userA).sajuResult(sajuResult).build());
         userSajuAccessRepository.save(UserSajuAccess.builder().user(userB).sajuResult(sajuResult).build());
 
-        LocalDate today = LocalDate.now(ssafy.SSAju.admin.service.AdminBaseService.SEOUL_ZONE);
+        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
         long summaryCount = analyticsQueryRepository.findDailyAnalysisSummary(today).get("SAJU");
         List<AnalyticsListDTO> listRows = analyticsQueryRepository.findAnalyticsByDateAndType(
                 "SAJU", today, today, 0, 20);
@@ -119,7 +121,7 @@ class AdminAnalyticsQueryRepositoryTest {
                 .resultJson(minimalAdvice())
                 .build());
 
-        LocalDate today = LocalDate.now(ssafy.SSAju.admin.service.AdminBaseService.SEOUL_ZONE);
+        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
         long summaryCount = analyticsQueryRepository.findDailyAnalysisSummary(today).get("CAREER_CONSULTATION");
         List<AnalyticsListDTO> listRows = analyticsQueryRepository.findAnalyticsByDateAndType(
                 "CAREER_CONSULTATION", today, today, 0, 20);
@@ -139,12 +141,40 @@ class AdminAnalyticsQueryRepositoryTest {
         sajuResultRepository.save(SajuResult.builder().userProfile(profile).build());
         // 의도적으로 UserSajuAccess를 생성하지 않음 (접근 불가능한 정본)
 
-        LocalDate today = LocalDate.now(ssafy.SSAju.admin.service.AdminBaseService.SEOUL_ZONE);
+        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
         long summaryCount = analyticsQueryRepository.findDailyAnalysisSummary(today).get("SAJU");
         List<AnalyticsListDTO> listRows = analyticsQueryRepository.findAnalyticsByDateAndType(
                 "SAJU", today, today, 0, 20);
 
         assertThat(summaryCount).isZero();
         assertThat(listRows).isEmpty();
+    }
+
+    @Test
+    @DisplayName("SAJU: 13개월 전 만들어진 정본에 오늘 처음 접근해도 오늘 집계/목록에 잡힌다")
+    void countSaju_oldCanonicalResult_newAccessToday_stillCountedToday() {
+        // Given — 정본은 13개월 전에 생성됐지만(1년 창을 벗어남), UserSajuAccess는 오늘 생성됨
+        User user = newUser("late-access@test.com");
+        UserProfile profile = userProfileRepository.save(UserProfile.builder()
+                .birthDate(LocalDate.of(1988, 4, 4))
+                .birthTime(LocalTime.of(6, 0))
+                .build());
+        SajuResult sajuResult = sajuResultRepository.save(SajuResult.builder()
+                .userProfile(profile)
+                .build());
+        ReflectionTestUtils.setField(sajuResult, "fetchedAt", Instant.now().minus(400, ChronoUnit.DAYS));
+        sajuResultRepository.save(sajuResult);
+        userSajuAccessRepository.save(UserSajuAccess.builder().user(user).sajuResult(sajuResult).build());
+
+        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
+
+        // When
+        long summaryCount = analyticsQueryRepository.findDailyAnalysisSummary(today).get("SAJU");
+        List<AnalyticsListDTO> listRows = analyticsQueryRepository.findAnalyticsByDateAndType(
+                "SAJU", today, today, 0, 20);
+
+        // Then — 정본 자체는 1년도 더 전에 생성됐지만, 이 사용자의 접근은 오늘이므로 잡혀야 한다
+        assertThat(summaryCount).isEqualTo(1);
+        assertThat(listRows).hasSize(1);
     }
 }

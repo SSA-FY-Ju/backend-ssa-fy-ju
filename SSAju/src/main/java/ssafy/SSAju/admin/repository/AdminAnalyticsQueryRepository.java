@@ -29,11 +29,11 @@ public class AdminAnalyticsQueryRepository {
     // (참고: 이 상수는 현재 어떤 메서드에서도 참조되지 않는 죽은 코드다 — 실제 쿼리는
     // buildListSql()이 만든다. 향후 참조될 경우를 대비해 스키마와 일치시켜 둔다.)
     private static final String UNION_LIST_QUERY = """
-            SELECT 'SAJU' AS analysis_type, sr.id, usa.user_id, sr.fetched_at AS created_at
+            SELECT 'SAJU' AS analysis_type, sr.id, usa.user_id, usa.created_at AS created_at
             FROM saju_result sr
             JOIN user_saju_access usa ON usa.saju_result_id = sr.id
             WHERE (:type IS NULL OR :type = 'SAJU')
-              AND sr.fetched_at >= :dateFrom AND sr.fetched_at < :dateTo
+              AND usa.created_at >= :dateFrom AND usa.created_at < :dateTo
 
             UNION ALL
 
@@ -102,7 +102,7 @@ public class AdminAnalyticsQueryRepository {
         if (analysisType == null) {
             return """
                     SELECT * FROM (
-                        SELECT 'SAJU' AS analysis_type, sr.id, usa.user_id, sr.fetched_at AS created_at
+                        SELECT 'SAJU' AS analysis_type, sr.id, usa.user_id, usa.created_at AS created_at
                         FROM saju_result sr
                         JOIN user_saju_access usa ON usa.saju_result_id = sr.id
                         UNION ALL
@@ -118,7 +118,7 @@ public class AdminAnalyticsQueryRepository {
                     """;
         }
         return switch (analysisType) {
-            case SAJU -> "SELECT 'SAJU' AS analysis_type, sr.id, usa.user_id, sr.fetched_at AS created_at FROM saju_result sr JOIN user_saju_access usa ON usa.saju_result_id = sr.id WHERE sr.fetched_at >= ? AND sr.fetched_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
+            case SAJU -> "SELECT 'SAJU' AS analysis_type, sr.id, usa.user_id, usa.created_at AS created_at FROM saju_result sr JOIN user_saju_access usa ON usa.saju_result_id = sr.id WHERE usa.created_at >= ? AND usa.created_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
             case CAREER_CONSULTATION -> "SELECT 'CAREER_CONSULTATION' AS analysis_type, cc.id, usa.user_id, cc.generated_at AS created_at FROM career_consultation cc JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id WHERE cc.generated_at >= ? AND cc.generated_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
             case COMPANY_COMPATIBILITY -> "SELECT 'COMPANY_COMPATIBILITY' AS analysis_type, id, user_id, created_at FROM company_compatibility WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
             default -> throw new IllegalArgumentException("Unknown analysisType: " + analysisType);
@@ -143,7 +143,7 @@ public class AdminAnalyticsQueryRepository {
         String sql = """
                 SELECT sr.id, usa.user_id,
                        CONCAT(sfd.year_pillar, sfd.month_pillar, sfd.day_pillar, sfd.hour_pillar) AS json_data,
-                       sr.fetched_at AS created_at
+                       usa.created_at AS created_at
                 FROM saju_result sr
                 LEFT JOIN saju_full_data sfd ON sfd.saju_result_id = sr.id
                 JOIN user_saju_access usa ON usa.saju_result_id = sr.id
@@ -195,12 +195,16 @@ public class AdminAnalyticsQueryRepository {
      * 다르다. 이 요약은 목록(buildListSql)과 동일하게 "오늘 관운 분석을 받은 사용자 수"를
      * 세는 게 관리자에게 더 유용하므로(내부 FastAPI 호출 수가 아니라), user_saju_access를
      * 조인해 접근자 수 기준으로 카운트한다 — 목록 행 수와 항상 일치한다.
+     *
+     * <p>날짜 필터도 정본 자체의 생성 시점(sr.fetched_at)이 아니라 이 사용자가 실제로 접근한
+     * 시점(usa.created_at)을 기준으로 한다 — 정본은 한 번 생성되면 다시 만들어지지 않으므로,
+     * 몇 달 전 만들어진 정본에 오늘 처음 접근한 사용자도 "오늘" 집계에 잡혀야 한다.
      */
     private long countSaju(Object from, Object to) {
         Long count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM saju_result sr " +
                         "JOIN user_saju_access usa ON usa.saju_result_id = sr.id " +
-                        "WHERE sr.fetched_at >= ? AND sr.fetched_at < ?", Long.class, from, to);
+                        "WHERE usa.created_at >= ? AND usa.created_at < ?", Long.class, from, to);
         return count != null ? count : 0L;
     }
 

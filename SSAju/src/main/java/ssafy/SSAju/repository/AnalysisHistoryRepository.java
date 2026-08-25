@@ -25,13 +25,13 @@ public class AnalysisHistoryRepository {
 
     private static final String UNION_QUERY = """
             SELECT 'SAJU' AS type, sr.id AS analysis_id, u.name AS target_name,
-                   up.birth_date, sr.fetched_at AS created_at
+                   up.birth_date, usa.created_at AS created_at
             FROM saju_result sr
             JOIN user_saju_access usa ON usa.saju_result_id = sr.id
             JOIN user_profile up ON sr.user_profile_id = up.id
             JOIN users u ON usa.user_id = u.id
             WHERE usa.user_id = ?
-              AND sr.fetched_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+              AND usa.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
 
             UNION ALL
 
@@ -60,7 +60,7 @@ public class AnalysisHistoryRepository {
                 SELECT sr.id FROM saju_result sr
                 JOIN user_saju_access usa ON usa.saju_result_id = sr.id
                 WHERE usa.user_id = ?
-                  AND sr.fetched_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+                  AND usa.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
 
                 UNION ALL
 
@@ -83,7 +83,7 @@ public class AnalysisHistoryRepository {
                 SELECT sr.id, 'SAJU' AS type FROM saju_result sr
                 JOIN user_saju_access usa ON usa.saju_result_id = sr.id
                 WHERE usa.user_id = ?
-                  AND sr.fetched_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
+                  AND usa.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
 
                 UNION ALL
 
