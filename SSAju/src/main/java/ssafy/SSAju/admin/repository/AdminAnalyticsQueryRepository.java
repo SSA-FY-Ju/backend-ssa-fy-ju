@@ -190,15 +190,26 @@ public class AdminAnalyticsQueryRepository {
         ), id, userId).stream().findFirst();
     }
 
+    /**
+     * B1: SajuResult는 여러 사용자가 공유하는 정본이라 "정본 수"와 "정본을 받은 사용자 수"가
+     * 다르다. 이 요약은 목록(buildListSql)과 동일하게 "오늘 관운 분석을 받은 사용자 수"를
+     * 세는 게 관리자에게 더 유용하므로(내부 FastAPI 호출 수가 아니라), user_saju_access를
+     * 조인해 접근자 수 기준으로 카운트한다 — 목록 행 수와 항상 일치한다.
+     */
     private long countSaju(Object from, Object to) {
         Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM saju_result WHERE fetched_at >= ? AND fetched_at < ?", Long.class, from, to);
+                "SELECT COUNT(*) FROM saju_result sr " +
+                        "JOIN user_saju_access usa ON usa.saju_result_id = sr.id " +
+                        "WHERE sr.fetched_at >= ? AND sr.fetched_at < ?", Long.class, from, to);
         return count != null ? count : 0L;
     }
 
+    /** 기준은 {@link #countSaju}와 동일 — 목록 행 수와 일치하도록 접근자 수 기준으로 카운트. */
     private long countConsultation(Object from, Object to) {
         Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM career_consultation WHERE generated_at >= ? AND generated_at < ?", Long.class, from, to);
+                "SELECT COUNT(*) FROM career_consultation cc " +
+                        "JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id " +
+                        "WHERE cc.generated_at >= ? AND cc.generated_at < ?", Long.class, from, to);
         return count != null ? count : 0L;
     }
 
