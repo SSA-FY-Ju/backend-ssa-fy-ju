@@ -15,7 +15,7 @@ import ssafy.SSAju.admin.dto.FeedbackDetailDTO;
 import ssafy.SSAju.admin.dto.FeedbackListDTO;
 import ssafy.SSAju.admin.dto.FeedbackStatDTO;
 import ssafy.SSAju.admin.service.AdminFeedbackService;
-import ssafy.SSAju.career.enums.FeedbackType;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.exception.FeedbackNotFoundException;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
@@ -53,13 +53,13 @@ class AdminFeedbackControllerTest {
 
     private FeedbackListDTO stubFeedbackItem(long id) {
         return new FeedbackListDTO(id, 10L, "좋아요", SatisfactionStatus.SATISFIED,
-                FeedbackType.CONSULTATION, Instant.now());
+                AnalysisType.CAREER_CONSULTATION, Instant.now());
     }
 
     private FeedbackStatDTO stubStats() {
         return new FeedbackStatDTO(
-                Map.of("CONSULTATION", 5L),
-                Map.of("CONSULTATION", 2L),
+                Map.of("CAREER_CONSULTATION", 5L),
+                Map.of("CAREER_CONSULTATION", 2L),
                 7L
         );
     }
@@ -79,13 +79,13 @@ class AdminFeedbackControllerTest {
     }
 
     @Test
-    @DisplayName("GET /admin/api/feedback?type=CONSULTATION → type 파라미터 서비스에 전달")
+    @DisplayName("GET /admin/api/feedback?type=CAREER_CONSULTATION → type 파라미터 서비스에 전달")
     void getFeedbackApi_withTypeFilter_passesToService() throws Exception {
         Page<FeedbackListDTO> page = new PageImpl<>(List.of(stubFeedbackItem(1L)));
-        given(feedbackService.getFeedbackList(eq(FeedbackType.CONSULTATION), anyInt(), anyInt())).willReturn(page);
+        given(feedbackService.getFeedbackList(eq(AnalysisType.CAREER_CONSULTATION), anyInt(), anyInt())).willReturn(page);
 
         mockMvc.perform(get("/admin/api/feedback")
-                        .param("type", "CONSULTATION")
+                        .param("type", "CAREER_CONSULTATION")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1));
@@ -113,22 +113,22 @@ class AdminFeedbackControllerTest {
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalFeedbackCount").value(7))
-                .andExpect(jsonPath("$.satisfiedCountByFeedbackType.CONSULTATION").value(5));
+                .andExpect(jsonPath("$.satisfiedCountByFeedbackType.CAREER_CONSULTATION").value(5));
     }
 
     @Test
     @DisplayName("GET /admin/api/feedback/{id} → 200 + 상세 정보 반환")
     void getFeedbackDetail_existingId_returns200() throws Exception {
         FeedbackDetailDTO detail = new FeedbackDetailDTO(
-                1L, 10L, "CONSULTATION", "SATISFIED", "좋았습니다",
-                Instant.now(), "CONSULTATION", 100L, Instant.now());
+                1L, 10L, "CAREER_CONSULTATION", "SATISFIED", "좋았습니다",
+                Instant.now(), "CAREER_CONSULTATION", 100L, Instant.now());
         given(feedbackService.getFeedbackWithAnalysis(1L)).willReturn(detail);
 
         mockMvc.perform(get("/admin/api/feedback/1")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.feedbackId").value(1))
-                .andExpect(jsonPath("$.analysisType").value("CONSULTATION"))
+                .andExpect(jsonPath("$.analysisType").value("CAREER_CONSULTATION"))
                 .andExpect(jsonPath("$.analysisId").value(100));
     }
 
@@ -165,13 +165,13 @@ class AdminFeedbackControllerTest {
     }
 
     @Test
-    @DisplayName("GET /admin/api/feedback?type=CAREER_TIMING → 서비스 정책 위반 → 400")
+    @DisplayName("GET /admin/api/feedback?type=SAJU → 서비스 정책 위반 → 400")
     void getFeedbackApi_careerTimingType_returns400() throws Exception {
-        given(feedbackService.getFeedbackList(eq(FeedbackType.CAREER_TIMING), anyInt(), anyInt()))
-                .willThrow(new IllegalArgumentException("CAREER_TIMING은 피드백 조회 대상이 아닙니다."));
+        given(feedbackService.getFeedbackList(eq(AnalysisType.SAJU), anyInt(), anyInt()))
+                .willThrow(new IllegalArgumentException("SAJU는 피드백 조회 대상이 아닙니다."));
 
         mockMvc.perform(get("/admin/api/feedback")
-                        .param("type", "CAREER_TIMING")
+                        .param("type", "SAJU")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
     }

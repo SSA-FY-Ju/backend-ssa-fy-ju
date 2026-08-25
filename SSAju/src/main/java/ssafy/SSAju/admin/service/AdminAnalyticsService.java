@@ -45,11 +45,14 @@ public class AdminAnalyticsService extends AdminBaseService {
         return result;
     }
 
-    public AnalyticsDetailDTO getAnalyticsDetail(Long id, AnalysisType analysisType) {
-        String analysisTypeName = analysisType != null ? analysisType.name() : null;
-        return analyticsRepository.findAnalyticsById(id, analysisTypeName)
+    public AnalyticsDetailDTO getAnalyticsDetail(Long id, AnalysisType analysisType, Long userId) {
+        if (analysisType == null || userId == null) {
+            throw new AnalyticsNotFoundException(
+                    "분석 기록을 찾을 수 없습니다: id=" + id + ", type=" + analysisType + ", userId=" + userId);
+        }
+        return analyticsRepository.findAnalyticsById(id, analysisType.name(), userId)
                 .orElseThrow(() -> new AnalyticsNotFoundException(
-                        "분석 기록을 찾을 수 없습니다: id=" + id + ", type=" + analysisTypeName));
+                        "분석 기록을 찾을 수 없습니다: id=" + id + ", type=" + analysisType.name() + ", userId=" + userId));
     }
 
     // 30일 범위 제한: dateFrom이 최대 범위를 벗어나면 자동으로 범위 내로 조정

@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.response.ApiResponse;
@@ -422,6 +423,17 @@ public class SajuGlobalExceptionHandler {
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.VALIDATION_FAILED.getCode(),
                         "요청 파라미터 값이 올바르지 않습니다.", requestId)));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParameter(
+            MissingServletRequestParameterException e, HttpServletRequest request) {
+        String requestId = generateRequestId();
+        log.warn("필수 요청 파라미터 누락: requestId={}", requestId);
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.VALIDATION_FAILED.getCode(),
+                        "필수 요청 파라미터가 누락되었습니다: " + e.getParameterName(), requestId)));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 import ssafy.SSAju.admin.dto.FeedbackListDTO;
 import ssafy.SSAju.admin.dto.FeedbackStatDTO;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
-import ssafy.SSAju.career.enums.FeedbackType;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 
 import jakarta.persistence.EntityManager;
@@ -25,7 +25,7 @@ public class AdminFeedbackQueryRepository {
 
     private final EntityManager em;
 
-    public Page<FeedbackListDTO> findFeedbackByType(FeedbackType feedbackType, Pageable pageable) {
+    public Page<FeedbackListDTO> findFeedbackByType(AnalysisType feedbackType, Pageable pageable) {
         String whereClause = feedbackType != null ? "WHERE f.feedbackType = :type " : "";
 
         String jpql = "SELECT f FROM UserSatisfactionFeedback f " + whereClause + "ORDER BY f.createdAt DESC";
@@ -71,7 +71,7 @@ public class AdminFeedbackQueryRepository {
         long total = 0L;
 
         for (Object[] row : rows) {
-            FeedbackType type = (FeedbackType) row[0];
+            AnalysisType type = (AnalysisType) row[0];
             SatisfactionStatus status = (SatisfactionStatus) row[1];
             long count = (Long) row[2];
             total += count;

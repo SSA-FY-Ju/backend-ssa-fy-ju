@@ -18,7 +18,6 @@ import ssafy.SSAju.dto.response.MyPageResponse;
 import ssafy.SSAju.dto.response.UserAnalysisDto;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
-import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.AnalysisHistoryRepository;
 import ssafy.SSAju.repository.CareerConsultationRepository;
@@ -82,7 +81,7 @@ public class UserService {
 
     private AnalysisDetailResponse buildSajuDetail(User user, Long analysisId) {
         SajuResult sajuResult = sajuResultRepository
-                .findByIdAndUser_IdWithProfileAndFortune(analysisId, user.getId())
+                .findByIdAndUserIdWithProfileAndFortune(analysisId, user.getId())
                 .orElseThrow(() -> new SajuResultNotFoundException("사주 분석 결과를 찾을 수 없습니다."));
 
         UserProfile profile = sajuResult.getUserProfile();
@@ -98,12 +97,8 @@ public class UserService {
 
     private AnalysisDetailResponse buildCareerConsultationDetail(User user, Long analysisId) {
         CareerConsultation cc = careerConsultationRepository
-                .findByIdWithSajuResultAndProfile(analysisId)
+                .findByIdAndUserIdWithSajuResultAndProfile(analysisId, user.getId())
                 .orElseThrow(() -> new SajuResultNotFoundException("커리어 컨설팅 결과를 찾을 수 없습니다."));
-
-        if (!user.equals(cc.getSajuResult().getUser())) {
-            throw new UnauthorizedException("접근 권한이 없습니다.");
-        }
 
         UserProfile profile = cc.getSajuResult().getUserProfile();
         ConsultationResponse consultationDetail = consultationMapper.toResponseFromEntity(cc);

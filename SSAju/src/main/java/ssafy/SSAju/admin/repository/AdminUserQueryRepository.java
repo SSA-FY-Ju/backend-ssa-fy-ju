@@ -63,10 +63,10 @@ public class AdminUserQueryRepository {
                 LEFT JOIN (
                     SELECT user_id, COUNT(*) AS total
                     FROM (
-                        SELECT user_id FROM saju_result
+                        SELECT user_id FROM user_saju_access
                         UNION ALL
-                        SELECT sr.user_id FROM career_consultation cc
-                            JOIN saju_result sr ON cc.saju_result_id = sr.id
+                        SELECT usa.user_id FROM career_consultation cc
+                            JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id
                         UNION ALL
                         SELECT user_id FROM company_compatibility
                     ) all_analyses
@@ -112,10 +112,10 @@ public class AdminUserQueryRepository {
     private long countAnalysisByUser(Long userId) {
         String countSql = """
                 SELECT COUNT(*) FROM (
-                    SELECT id FROM saju_result WHERE user_id = ?
+                    SELECT saju_result_id AS id FROM user_saju_access WHERE user_id = ?
                     UNION ALL
                     SELECT cc.id FROM career_consultation cc
-                    JOIN saju_result sr ON cc.saju_result_id = sr.id WHERE sr.user_id = ?
+                    JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id WHERE usa.user_id = ?
                     UNION ALL
                     SELECT id FROM company_compatibility WHERE user_id = ?
                 ) t

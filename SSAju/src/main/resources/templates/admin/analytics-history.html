@@ -176,6 +176,7 @@
                             <button class="detail-btn"
                                     th:data-id="${item.id}"
                                     th:data-type="${item.analysisType}"
+                                    th:data-user-id="${item.userId}"
                                     onclick="openDetailModal(this)">
                                 원문 보기
                             </button>
@@ -252,13 +253,14 @@
     function openDetailModal(btn) {
         const id = btn.getAttribute('data-id');
         const type = btn.getAttribute('data-type');
+        const userId = btn.getAttribute('data-user-id');
         const modal = document.getElementById('detailModal');
         const body = document.getElementById('detailModalBody');
 
         modal.classList.add('active');
         body.innerHTML = '<p class="modal-loading">불러오는 중...</p>';
 
-        fetch(`/admin/analytics/${id}?type=${encodeURIComponent(type)}`, {
+        fetch(`/admin/analytics/${id}?type=${encodeURIComponent(type)}&userId=${encodeURIComponent(userId)}`, {
             headers: { 'Accept': 'application/json' }
         })
             .then(res => {
