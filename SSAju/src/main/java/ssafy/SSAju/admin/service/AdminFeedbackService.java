@@ -49,7 +49,7 @@ public class AdminFeedbackService extends AdminBaseService {
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> new FeedbackNotFoundException(
-                        "피드백을 찾을 수 없습니다: id=" + feedbackId));
+                        ErrorMessageConstants.FEEDBACK_NOT_FOUND.getMessage() + " (id=" + feedbackId + ")"));
 
         return toDetailDTO(feedback);
     }

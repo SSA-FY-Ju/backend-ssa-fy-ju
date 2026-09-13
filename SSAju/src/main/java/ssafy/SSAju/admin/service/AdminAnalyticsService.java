@@ -9,6 +9,7 @@ import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.repository.AdminAnalyticsQueryRepository;
 import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.exception.AnalyticsNotFoundException;
 import ssafy.SSAju.exception.InvalidDateRangeException;
 
@@ -48,11 +49,13 @@ public class AdminAnalyticsService extends AdminBaseService {
     public AnalyticsDetailDTO getAnalyticsDetail(Long id, AnalysisType analysisType, Long userId) {
         if (analysisType == null || userId == null) {
             throw new AnalyticsNotFoundException(
-                    "분석 기록을 찾을 수 없습니다: id=" + id + ", type=" + analysisType + ", userId=" + userId);
+                    ErrorMessageConstants.ANALYTICS_NOT_FOUND.getMessage()
+                            + " (id=" + id + ", type=" + analysisType + ", userId=" + userId + ")");
         }
         return analyticsRepository.findAnalyticsById(id, analysisType.name(), userId)
                 .orElseThrow(() -> new AnalyticsNotFoundException(
-                        "분석 기록을 찾을 수 없습니다: id=" + id + ", type=" + analysisType.name() + ", userId=" + userId));
+                        ErrorMessageConstants.ANALYTICS_NOT_FOUND.getMessage()
+                                + " (id=" + id + ", type=" + analysisType.name() + ", userId=" + userId + ")"));
     }
 
     // 30일 범위 제한: dateFrom이 최대 범위를 벗어나면 자동으로 범위 내로 조정
@@ -69,7 +72,7 @@ public class AdminAnalyticsService extends AdminBaseService {
 
     private void validateDateRange(LocalDate from, LocalDate to) {
         if (from.isAfter(to)) {
-            throw new InvalidDateRangeException("시작일이 종료일보다 늦을 수 없습니다.");
+            throw new InvalidDateRangeException(ErrorMessageConstants.INVALID_DATE_RANGE.getMessage());
         }
     }
 }

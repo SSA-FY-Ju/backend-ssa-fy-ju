@@ -69,7 +69,7 @@ public class FeedbackService {
                         .build();
             }
             case SAJU ->
-                throw new FeedbackNotAllowedException("관운 분석은 피드백 대상이 아닙니다.");
+                throw new FeedbackNotAllowedException(ErrorMessageConstants.FEEDBACK_NOT_ALLOWED.getMessage());
         };
 
         UserSatisfactionFeedback saved = feedbackRepository.save(feedback);

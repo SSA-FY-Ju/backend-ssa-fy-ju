@@ -249,7 +249,8 @@ public class SajuGlobalExceptionHandler {
         log.warn("피드백 불가 요청: {}", e.getMessage());
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure(new ErrorInfo(
-                        "FEEDBACK_NOT_ALLOWED", e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.FEEDBACK_NOT_ALLOWED.getCode(),
+                        ErrorMessageConstants.FEEDBACK_NOT_ALLOWED.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(SajuResultNotFoundException.class)
@@ -259,7 +260,7 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.SAJU_RESULT_NOT_FOUND.getCode(),
-                        e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.SAJU_RESULT_NOT_FOUND.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(InvalidDateRangeException.class)
@@ -269,7 +270,7 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.INVALID_DATE_RANGE.getCode(),
-                        e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.INVALID_DATE_RANGE.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(AnalyticsNotFoundException.class)
@@ -299,7 +300,7 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.FEEDBACK_NOT_FOUND.getCode(),
-                        e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.FEEDBACK_NOT_FOUND.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(InvalidSajuDataException.class)
