@@ -7,7 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import ssafy.SSAju.career.enums.FeedbackType;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.entity.User;
 
@@ -42,7 +42,7 @@ public class UserSatisfactionFeedback {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "feedback_type", nullable = false)
-    private FeedbackType feedbackType;
+    private AnalysisType feedbackType;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "satisfaction_status", nullable = false)
@@ -59,7 +59,7 @@ public class UserSatisfactionFeedback {
     public UserSatisfactionFeedback(User user,
                                     CompanyCompatibility companyCompatibility,
                                     CareerConsultation careerConsultation,
-                                    FeedbackType feedbackType,
+                                    AnalysisType feedbackType,
                                     SatisfactionStatus satisfactionStatus,
                                     String feedbackContent) {
         if ((companyCompatibility == null) == (careerConsultation == null)) {

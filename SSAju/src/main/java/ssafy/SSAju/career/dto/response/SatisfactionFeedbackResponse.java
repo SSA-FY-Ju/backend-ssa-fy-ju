@@ -1,4 +1,4 @@
-package ssafy.SSAju.dto.response;
+package ssafy.SSAju.career.dto.response;
 
 import java.time.Instant;
 

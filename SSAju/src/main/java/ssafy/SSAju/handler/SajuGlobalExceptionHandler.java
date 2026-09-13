@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.dto.response.ApiResponse;
@@ -32,6 +33,7 @@ import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.exception.PublicDataApiException;
 import ssafy.SSAju.exception.AnalyticsNotFoundException;
 import ssafy.SSAju.exception.FeedbackNotFoundException;
+import ssafy.SSAju.exception.InvalidFeedbackTypeException;
 import ssafy.SSAju.exception.InvalidDateRangeException;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.exception.UserNotFoundException;
@@ -247,7 +249,8 @@ public class SajuGlobalExceptionHandler {
         log.warn("피드백 불가 요청: {}", e.getMessage());
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure(new ErrorInfo(
-                        "FEEDBACK_NOT_ALLOWED", e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.FEEDBACK_NOT_ALLOWED.getCode(),
+                        ErrorMessageConstants.FEEDBACK_NOT_ALLOWED.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(SajuResultNotFoundException.class)
@@ -257,7 +260,7 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.SAJU_RESULT_NOT_FOUND.getCode(),
-                        e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.SAJU_RESULT_NOT_FOUND.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(InvalidDateRangeException.class)
@@ -267,7 +270,7 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.INVALID_DATE_RANGE.getCode(),
-                        e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.INVALID_DATE_RANGE.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(AnalyticsNotFoundException.class)
@@ -277,7 +280,17 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.ANALYTICS_NOT_FOUND.getCode(),
-                        e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.ANALYTICS_NOT_FOUND.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(InvalidFeedbackTypeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidFeedbackType(
+            InvalidFeedbackTypeException e, HttpServletRequest request) {
+        log.warn("잘못된 피드백 조회 타입: {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.INVALID_FEEDBACK_TYPE.getCode(),
+                        ErrorMessageConstants.INVALID_FEEDBACK_TYPE.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(FeedbackNotFoundException.class)
@@ -287,7 +300,7 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.FEEDBACK_NOT_FOUND.getCode(),
-                        e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.FEEDBACK_NOT_FOUND.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(InvalidSajuDataException.class)
@@ -422,6 +435,17 @@ public class SajuGlobalExceptionHandler {
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.VALIDATION_FAILED.getCode(),
                         "요청 파라미터 값이 올바르지 않습니다.", requestId)));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParameter(
+            MissingServletRequestParameterException e, HttpServletRequest request) {
+        String requestId = generateRequestId();
+        log.warn("필수 요청 파라미터 누락: requestId={}", requestId);
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.VALIDATION_FAILED.getCode(),
+                        "필수 요청 파라미터가 누락되었습니다: " + e.getParameterName(), requestId)));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

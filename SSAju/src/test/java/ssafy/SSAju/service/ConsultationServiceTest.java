@@ -191,7 +191,7 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
@@ -252,7 +252,7 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H2);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(newSajuResult);
         given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, newSajuResult)).willReturn(newSajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
@@ -286,7 +286,7 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
@@ -323,7 +323,7 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
@@ -360,7 +360,7 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
@@ -388,7 +388,7 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
@@ -411,7 +411,7 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))
@@ -433,7 +433,7 @@ class ConsultationServiceTest {
         given(sajuDataService.fetchSajuFromFastAPI(BIRTH_DATE, BIRTH_TIME)).willReturn(MOCK_SAJU);
         given(sajuAnalysisFacade.analyze(MOCK_SAJU)).willReturn(MOCK_CTX_H1);
         given(userProfileProvider.findOrCreate(BIRTH_DATE, BIRTH_TIME)).willReturn(userProfile);
-        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), any(), anyInt(), any()))
+        given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any(), any())).willReturn(sajuResult);
         given(openAICaller.call(any(), any(), any(), any()))

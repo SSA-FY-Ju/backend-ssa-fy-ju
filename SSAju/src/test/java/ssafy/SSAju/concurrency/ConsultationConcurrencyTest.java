@@ -102,7 +102,6 @@ class ConsultationConcurrencyTest {
 
         testSajuResult = sajuResultRepository.save(SajuResult.builder()
                 .userProfile(userProfile)
-                .user(testUser)
                 .build());
     }
 

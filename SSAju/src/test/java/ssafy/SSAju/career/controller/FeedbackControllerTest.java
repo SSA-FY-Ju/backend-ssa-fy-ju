@@ -1,4 +1,4 @@
-package ssafy.SSAju.controller;
+package ssafy.SSAju.career.controller;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,7 +11,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import ssafy.SSAju.dto.response.SatisfactionFeedbackResponse;
+import ssafy.SSAju.career.dto.response.SatisfactionFeedbackResponse;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.service.FeedbackService;
 
@@ -61,7 +61,7 @@ class FeedbackControllerTest {
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "CAREER_TIMING",
+                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "좋았습니다"
                                 }
@@ -84,7 +84,7 @@ class FeedbackControllerTest {
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "CONSULTATION",
+                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "DISSATISFIED"
                                 }
                                 """))
@@ -101,7 +101,7 @@ class FeedbackControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "feedbackType": "CAREER_TIMING",
+                                  "feedbackType": "SAJU",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))
@@ -134,7 +134,7 @@ class FeedbackControllerTest {
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "CAREER_TIMING"
+                                  "feedbackType": "SAJU"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -153,7 +153,7 @@ class FeedbackControllerTest {
                         .content("""
                                 {
                                   "analysisId": 999,
-                                  "feedbackType": "CAREER_TIMING",
+                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))

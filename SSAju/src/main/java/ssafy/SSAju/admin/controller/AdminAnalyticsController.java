@@ -73,8 +73,9 @@ public class AdminAnalyticsController {
     @ResponseBody
     public ResponseEntity<AnalyticsDetailDTO> getAnalyticsDetail(
             @PathVariable Long id,
-            @RequestParam AnalysisType type) {
-        AnalyticsDetailDTO detail = adminAnalyticsService.getAnalyticsDetail(id, type);
+            @RequestParam AnalysisType type,
+            @RequestParam Long userId) {
+        AnalyticsDetailDTO detail = adminAnalyticsService.getAnalyticsDetail(id, type, userId);
         return ResponseEntity.ok(detail);
     }
 }

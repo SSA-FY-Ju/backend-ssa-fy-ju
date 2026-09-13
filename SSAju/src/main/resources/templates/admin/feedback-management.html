@@ -146,8 +146,8 @@
                     <label>피드백 유형</label>
                     <select name="type">
                         <option value="">전체</option>
-                        <option value="CONSULTATION" th:selected="${type?.name() == 'CONSULTATION'}">관운 상담</option>
-                        <option value="COMPATIBILITY" th:selected="${type?.name() == 'COMPATIBILITY'}">기업 궁합</option>
+                        <option value="CAREER_CONSULTATION" th:selected="${type?.name() == 'CAREER_CONSULTATION'}">관운 상담</option>
+                        <option value="COMPANY_COMPATIBILITY" th:selected="${type?.name() == 'COMPANY_COMPATIBILITY'}">기업 궁합</option>
                     </select>
                 </div>
                 <button class="search-btn" type="submit">검색</button>
@@ -182,9 +182,9 @@
                         <td th:text="${item.id()}">1</td>
                         <td th:text="${item.userId() ?: '-'}">1</td>
                         <td>
-                            <span th:if="${item.feedbackType().name() == 'CAREER_TIMING'}" class="badge badge-timing">커리어 타이밍</span>
-                            <span th:if="${item.feedbackType().name() == 'CONSULTATION'}" class="badge badge-consultation">관운 상담</span>
-                            <span th:if="${item.feedbackType().name() == 'COMPATIBILITY'}" class="badge badge-compatibility">기업 궁합</span>
+                            <span th:if="${item.feedbackType().name() == 'SAJU'}" class="badge badge-timing">커리어 타이밍</span>
+                            <span th:if="${item.feedbackType().name() == 'CAREER_CONSULTATION'}" class="badge badge-consultation">관운 상담</span>
+                            <span th:if="${item.feedbackType().name() == 'COMPANY_COMPATIBILITY'}" class="badge badge-compatibility">기업 궁합</span>
                         </td>
                         <td>
                             <span th:if="${item.satisfactionStatus().name() == 'SATISFIED'}" class="badge badge-satisfied">만족</span>
@@ -243,7 +243,7 @@
     };
 
     const labels = ['관운 상담', '기업 궁합'];
-    const keys = ['CONSULTATION', 'COMPATIBILITY'];
+    const keys = ['CAREER_CONSULTATION', 'COMPANY_COMPATIBILITY'];
 
     const satisfiedData = keys.map(k => statsData.satisfied[k] || 0);
     const unsatisfiedData = keys.map(k => statsData.unsatisfied[k] || 0);
@@ -301,17 +301,17 @@
             })
             .then(data => {
                 const typeMap = {
-                    CAREER_TIMING: '커리어 타이밍',
-                    CONSULTATION: '관운 상담',
-                    COMPATIBILITY: '기업 궁합'
+                    SAJU: '커리어 타이밍',
+                    CAREER_CONSULTATION: '관운 상담',
+                    COMPANY_COMPATIBILITY: '기업 궁합'
                 };
                 const statusMap = {
                     SATISFIED: '만족',
                     DISSATISFIED: '불만족'
                 };
                 const analysisTypeMap = {
-                    CONSULTATION: '관운 상담',
-                    COMPATIBILITY: '기업 궁합'
+                    CAREER_CONSULTATION: '관운 상담',
+                    COMPANY_COMPATIBILITY: '기업 궁합'
                 };
 
                 const dl = document.createElement('dl');

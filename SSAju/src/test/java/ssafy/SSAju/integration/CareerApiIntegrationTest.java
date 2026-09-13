@@ -162,7 +162,7 @@ class CareerApiIntegrationTest {
     // ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("T090-3: CAREER_TIMING 피드백 시도 → 400 FeedbackNotAllowedException")
+    @DisplayName("T090-3: SAJU 피드백 시도 → 400 FeedbackNotAllowedException")
     void saveFeedback_withCareerTimingType_returns400() throws Exception {
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .header("Authorization", authHeader)
@@ -170,7 +170,7 @@ class CareerApiIntegrationTest {
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "CAREER_TIMING",
+                                  "feedbackType": "SAJU",
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "테스트"
                                 }
@@ -191,7 +191,7 @@ class CareerApiIntegrationTest {
                         .content("""
                                 {
                                   "analysisId": 999999,
-                                  "feedbackType": "COMPATIBILITY",
+                                  "feedbackType": "COMPANY_COMPATIBILITY",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))

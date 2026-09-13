@@ -129,7 +129,6 @@ class SajuResultConcurrencyTest {
                     startLatch.await();
                     SajuResult newResult = SajuResult.builder()
                             .userProfile(testUserProfile)
-                            .user(testUser)
                             .build();
                     SajuResult result = sajuResultProvider.findOrCreate(testUser, testUserProfile, newResult);
                     resultIds.add(result.getId());
