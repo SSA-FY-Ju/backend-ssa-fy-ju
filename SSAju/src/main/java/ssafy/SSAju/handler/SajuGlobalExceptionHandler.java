@@ -33,6 +33,7 @@ import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.exception.PublicDataApiException;
 import ssafy.SSAju.exception.AnalyticsNotFoundException;
 import ssafy.SSAju.exception.FeedbackNotFoundException;
+import ssafy.SSAju.exception.InvalidFeedbackTypeException;
 import ssafy.SSAju.exception.InvalidDateRangeException;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.exception.UserNotFoundException;
@@ -278,7 +279,17 @@ public class SajuGlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.ANALYTICS_NOT_FOUND.getCode(),
-                        e.getMessage(), generateRequestId())));
+                        ErrorMessageConstants.ANALYTICS_NOT_FOUND.getMessage(), generateRequestId())));
+    }
+
+    @ExceptionHandler(InvalidFeedbackTypeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidFeedbackType(
+            InvalidFeedbackTypeException e, HttpServletRequest request) {
+        log.warn("잘못된 피드백 조회 타입: {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.INVALID_FEEDBACK_TYPE.getCode(),
+                        ErrorMessageConstants.INVALID_FEEDBACK_TYPE.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(FeedbackNotFoundException.class)

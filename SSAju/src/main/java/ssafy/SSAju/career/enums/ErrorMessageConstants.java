@@ -105,7 +105,7 @@ public enum ErrorMessageConstants {
     ANALYTICS_NOT_FOUND("ANALYTICS_NOT_FOUND", "해당 분석 기록을 찾을 수 없습니다."),
     FEEDBACK_NOT_FOUND("FEEDBACK_NOT_FOUND", "해당 피드백을 찾을 수 없습니다."),
     INVALID_DATE_RANGE("INVALID_DATE_RANGE", "시작일이 종료일보다 늦을 수 없습니다."),
-    INVALID_FEEDBACK_TYPE("INVALID_FEEDBACK_TYPE", "feedbackType은 CAREER_TIMING, CONSULTATION, COMPATIBILITY 중 하나여야 합니다."),
+    INVALID_FEEDBACK_TYPE("INVALID_FEEDBACK_TYPE", "SAJU는 피드백 조회 대상이 아닙니다."),
 
     // === 인증 예외 메시지 ===
     DUPLICATE_EMAIL("DUPLICATE_EMAIL", "이미 사용 중인 이메일입니다."),

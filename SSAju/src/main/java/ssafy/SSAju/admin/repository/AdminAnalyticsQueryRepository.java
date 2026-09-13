@@ -24,36 +24,6 @@ public class AdminAnalyticsQueryRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
-    // B1: SajuResult는 더 이상 user_id 컬럼을 갖지 않으므로(여러 사용자가 공유하는 정본),
-    // SAJU/CAREER_CONSULTATION 행의 user_id는 user_saju_access 매핑을 통해 얻는다.
-    // (참고: 이 상수는 현재 어떤 메서드에서도 참조되지 않는 죽은 코드다 — 실제 쿼리는
-    // buildListSql()이 만든다. 향후 참조될 경우를 대비해 스키마와 일치시켜 둔다.)
-    private static final String UNION_LIST_QUERY = """
-            SELECT 'SAJU' AS analysis_type, sr.id, usa.user_id, usa.created_at AS created_at
-            FROM saju_result sr
-            JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-            WHERE (:type IS NULL OR :type = 'SAJU')
-              AND usa.created_at >= :dateFrom AND usa.created_at < :dateTo
-
-            UNION ALL
-
-            SELECT 'CAREER_CONSULTATION' AS analysis_type, cc.id, usa.user_id, cc.generated_at AS created_at
-            FROM career_consultation cc
-            JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id
-            WHERE (:type IS NULL OR :type = 'CAREER_CONSULTATION')
-              AND cc.generated_at >= :dateFrom AND cc.generated_at < :dateTo
-
-            UNION ALL
-
-            SELECT 'COMPANY_COMPATIBILITY' AS analysis_type, compat.id, compat.user_id, compat.created_at
-            FROM company_compatibility compat
-            WHERE (:type IS NULL OR :type = 'COMPANY_COMPATIBILITY')
-              AND compat.created_at >= :dateFrom AND compat.created_at < :dateTo
-
-            ORDER BY created_at DESC
-            LIMIT ? OFFSET ?
-            """;
-
     public List<AnalyticsListDTO> findAnalyticsByDateAndType(
             String analysisType, LocalDate dateFrom, LocalDate dateTo, int page, int size) {
         var fromInstant = dateFrom.atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();

@@ -20,6 +20,7 @@ import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
 import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.exception.FeedbackNotFoundException;
+import ssafy.SSAju.exception.InvalidFeedbackTypeException;
 
 import java.time.Instant;
 import java.util.List;
@@ -97,10 +98,10 @@ class AdminFeedbackServiceTest {
     }
 
     @Test
-    @DisplayName("getFeedbackList - type=SAJU → IllegalArgumentException (피드백 불가 정책)")
+    @DisplayName("getFeedbackList - type=SAJU → InvalidFeedbackTypeException (피드백 불가 정책)")
     void getFeedbackList_careerTimingType_throwsException() {
         assertThatThrownBy(() -> adminFeedbackService.getFeedbackList(AnalysisType.SAJU, 0, 20))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidFeedbackTypeException.class)
                 .hasMessageContaining("SAJU");
 
         verifyNoInteractions(paginationUtil);

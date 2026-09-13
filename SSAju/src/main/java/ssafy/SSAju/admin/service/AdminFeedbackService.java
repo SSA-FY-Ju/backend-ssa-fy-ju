@@ -14,7 +14,9 @@ import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
 import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.exception.FeedbackNotFoundException;
+import ssafy.SSAju.exception.InvalidFeedbackTypeException;
 
 @Slf4j
 @Service
@@ -33,7 +35,7 @@ public class AdminFeedbackService extends AdminBaseService {
 
     public Page<FeedbackListDTO> getFeedbackList(AnalysisType feedbackType, int page, int size) {
         if (feedbackType == AnalysisType.SAJU) {
-            throw new IllegalArgumentException("SAJU는 피드백 조회 대상이 아닙니다.");
+            throw new InvalidFeedbackTypeException(ErrorMessageConstants.INVALID_FEEDBACK_TYPE.getMessage());
         }
         Pageable pageable = paginationUtil.of(page, size);
         Page<FeedbackListDTO> result = feedbackRepository.findFeedbackByType(feedbackType, pageable);

@@ -18,6 +18,7 @@ import ssafy.SSAju.admin.service.AdminFeedbackService;
 import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.exception.FeedbackNotFoundException;
+import ssafy.SSAju.exception.InvalidFeedbackTypeException;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
 
 import java.time.Instant;
@@ -168,7 +169,7 @@ class AdminFeedbackControllerTest {
     @DisplayName("GET /admin/api/feedback?type=SAJU → 서비스 정책 위반 → 400")
     void getFeedbackApi_careerTimingType_returns400() throws Exception {
         given(feedbackService.getFeedbackList(eq(AnalysisType.SAJU), anyInt(), anyInt()))
-                .willThrow(new IllegalArgumentException("SAJU는 피드백 조회 대상이 아닙니다."));
+                .willThrow(new InvalidFeedbackTypeException("SAJU는 피드백 조회 대상이 아닙니다."));
 
         mockMvc.perform(get("/admin/api/feedback")
                         .param("type", "SAJU")
