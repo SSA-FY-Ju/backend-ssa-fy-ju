@@ -48,14 +48,10 @@ public class AdminAnalyticsService extends AdminBaseService {
 
     public AnalyticsDetailDTO getAnalyticsDetail(Long id, AnalysisType analysisType, Long userId) {
         if (analysisType == null || userId == null) {
-            throw new AnalyticsNotFoundException(
-                    ErrorMessageConstants.ANALYTICS_NOT_FOUND.getMessage()
-                            + " (id=" + id + ", type=" + analysisType + ", userId=" + userId + ")");
+            throw new AnalyticsNotFoundException(ErrorMessageConstants.ANALYTICS_NOT_FOUND.getMessage());
         }
         return analyticsRepository.findAnalyticsById(id, analysisType.name(), userId)
-                .orElseThrow(() -> new AnalyticsNotFoundException(
-                        ErrorMessageConstants.ANALYTICS_NOT_FOUND.getMessage()
-                                + " (id=" + id + ", type=" + analysisType.name() + ", userId=" + userId + ")"));
+                .orElseThrow(() -> new AnalyticsNotFoundException(ErrorMessageConstants.ANALYTICS_NOT_FOUND.getMessage()));
     }
 
     // 30일 범위 제한: dateFrom이 최대 범위를 벗어나면 자동으로 범위 내로 조정

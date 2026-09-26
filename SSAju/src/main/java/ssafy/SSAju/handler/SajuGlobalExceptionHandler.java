@@ -276,7 +276,7 @@ public class SajuGlobalExceptionHandler {
     @ExceptionHandler(AnalyticsNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleAnalyticsNotFound(
             AnalyticsNotFoundException e, HttpServletRequest request) {
-        log.warn("Analytics not found: {}", e.getMessage());
+        log.warn("Analytics not found");
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.ANALYTICS_NOT_FOUND.getCode(),

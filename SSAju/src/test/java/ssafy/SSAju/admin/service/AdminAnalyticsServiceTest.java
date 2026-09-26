@@ -12,6 +12,7 @@ import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.repository.AdminAnalyticsQueryRepository;
 import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -163,6 +164,6 @@ class AdminAnalyticsServiceTest {
 
         assertThatThrownBy(() -> adminAnalyticsService.getAnalyticsDetail(999L, AnalysisType.SAJU, 10L))
                 .isInstanceOf(AnalyticsNotFoundException.class)
-                .hasMessageContaining("999");
+                .hasMessage(ErrorMessageConstants.ANALYTICS_NOT_FOUND.getMessage());
     }
 }
