@@ -18,6 +18,7 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.repository.UserSajuAccessRepository;
 import ssafy.SSAju.repository.UserSatisfactionFeedbackRepository;
 import ssafy.SSAju.service.DailyApiUsageService;
 import ssafy.SSAju.service.SajuDataService;
@@ -66,6 +67,9 @@ class CareerApiIntegrationTest {
     private SajuResultRepository sajuResultRepository;
 
     @Autowired
+    private UserSajuAccessRepository userSajuAccessRepository;
+
+    @Autowired
     private UserSatisfactionFeedbackRepository feedbackRepository;
 
     @Autowired
@@ -84,6 +88,7 @@ class CareerApiIntegrationTest {
 
         // 테스트 격리: 각 테스트 전 DB 초기화
         feedbackRepository.deleteAll();
+        userSajuAccessRepository.deleteAll();
         sajuResultRepository.deleteAll();
         userProfileRepository.deleteAll();
         userRepository.deleteAll();
