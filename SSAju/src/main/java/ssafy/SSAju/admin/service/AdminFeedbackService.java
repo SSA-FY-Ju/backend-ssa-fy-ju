@@ -13,8 +13,10 @@ import ssafy.SSAju.admin.repository.AdminFeedbackQueryRepository;
 import ssafy.SSAju.career.entity.CareerConsultation;
 import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
-import ssafy.SSAju.career.enums.FeedbackType;
+import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.exception.FeedbackNotFoundException;
+import ssafy.SSAju.exception.InvalidFeedbackTypeException;
 
 @Slf4j
 @Service
@@ -31,9 +33,9 @@ public class AdminFeedbackService extends AdminBaseService {
         return stats;
     }
 
-    public Page<FeedbackListDTO> getFeedbackList(FeedbackType feedbackType, int page, int size) {
-        if (feedbackType == FeedbackType.CAREER_TIMING) {
-            throw new IllegalArgumentException("CAREER_TIMING은 피드백 조회 대상이 아닙니다.");
+    public Page<FeedbackListDTO> getFeedbackList(AnalysisType feedbackType, int page, int size) {
+        if (feedbackType == AnalysisType.SAJU) {
+            throw new InvalidFeedbackTypeException(ErrorMessageConstants.INVALID_FEEDBACK_TYPE.getMessage());
         }
         Pageable pageable = paginationUtil.of(page, size);
         Page<FeedbackListDTO> result = feedbackRepository.findFeedbackByType(feedbackType, pageable);
@@ -47,7 +49,7 @@ public class AdminFeedbackService extends AdminBaseService {
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> new FeedbackNotFoundException(
-                        "피드백을 찾을 수 없습니다: id=" + feedbackId));
+                        ErrorMessageConstants.FEEDBACK_NOT_FOUND.getMessage() + " (id=" + feedbackId + ")"));
 
         return toDetailDTO(feedback);
     }
@@ -61,11 +63,11 @@ public class AdminFeedbackService extends AdminBaseService {
         java.time.Instant analysisCreatedAt = null;
 
         if (consultation != null) {
-            analysisType = "CONSULTATION";
+            analysisType = AnalysisType.CAREER_CONSULTATION.name();
             analysisId = consultation.getId();
             analysisCreatedAt = consultation.getGeneratedAt();
         } else if (compatibility != null) {
-            analysisType = "COMPATIBILITY";
+            analysisType = AnalysisType.COMPANY_COMPATIBILITY.name();
             analysisId = compatibility.getId();
             analysisCreatedAt = compatibility.getCreatedAt();
         }

@@ -23,7 +23,6 @@ import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
-import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.AnalysisHistoryRepository;
 import ssafy.SSAju.repository.CareerConsultationRepository;
@@ -109,7 +108,7 @@ class UserServiceTest {
         given(sajuResult.getCareerFortune()).willReturn(careerFortune);
         given(sajuResult.getFetchedAt()).willReturn(Instant.now());
         // USER_ID를 정확히 지정 — 다른 userId가 넘어오면 stub 불일치로 empty 반환
-        given(sajuResultRepository.findByIdAndUser_IdWithProfileAndFortune(eq(ANALYSIS_ID), eq(USER_ID)))
+        given(sajuResultRepository.findByIdAndUserIdWithProfileAndFortune(ANALYSIS_ID, USER_ID))
                 .willReturn(Optional.of(sajuResult));
 
         // When
@@ -128,10 +127,12 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("SAJU 상세 조회 — SajuResult 없음 → SajuResultNotFoundException")
+    @DisplayName("SAJU 상세 조회 — SajuResult가 없거나 접근 매핑이 없으면 SajuResultNotFoundException")
     void shouldThrow_WhenSajuResultNotFound() {
-        // Given
-        given(sajuResultRepository.findByIdAndUser_IdWithProfileAndFortune(eq(ANALYSIS_ID), eq(USER_ID)))
+        // Given — findByIdAndUserIdWithProfileAndFortune은 EXISTS 서브쿼리로 소유권까지 함께
+        // 확인하므로, 정본 자체가 없는 경우와 접근 매핑(UserSajuAccess)이 없는 경우를
+        // DB 레벨에서 구분하지 않고 동일하게 empty를 반환한다.
+        given(sajuResultRepository.findByIdAndUserIdWithProfileAndFortune(ANALYSIS_ID, USER_ID))
                 .willReturn(Optional.empty());
 
         // When & Then
@@ -153,13 +154,13 @@ class UserServiceTest {
         var mockResponse = mock(ConsultationResponse.class);
 
         given(userProfile.getBirthDate()).willReturn(BIRTH_DATE);
-        // MOCK_USER(id=1L)가 소유자임을 명확히 지정
-        given(sajuResult.getUser()).willReturn(MOCK_USER);
         given(sajuResult.getUserProfile()).willReturn(userProfile);
         given(cc.getId()).willReturn(ANALYSIS_ID);
         given(cc.getSajuResult()).willReturn(sajuResult);
         given(cc.getGeneratedAt()).willReturn(Instant.now());
-        given(careerConsultationRepository.findByIdWithSajuResultAndProfile(ANALYSIS_ID)).willReturn(Optional.of(cc));
+        // MOCK_USER(id=1L)가 소유자임을 명확히 지정 — UserSajuAccess EXISTS 서브쿼리로 확인
+        given(careerConsultationRepository.findByIdAndUserIdWithSajuResultAndProfile(ANALYSIS_ID, USER_ID))
+                .willReturn(Optional.of(cc));
         given(consultationMapper.toResponseFromEntity(cc)).willReturn(mockResponse);
 
         // When
@@ -174,19 +175,17 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("CAREER_CONSULTATION — 다른 유저(id=999L)의 데이터 접근 시도 → UnauthorizedException")
+    @DisplayName("CAREER_CONSULTATION — 다른 유저(id=999L)의 데이터 접근 시도 → SajuResultNotFoundException")
     void shouldThrow_WhenCareerConsultationBelongsToOtherUser() {
-        // Given — OTHER_USER(id=999L)가 소유자이고, MOCK_USER(id=1L)가 접근 시도
-        var sajuResult = mock(SajuResult.class);
-        var cc = mock(CareerConsultation.class);
+        // Given — OTHER_USER(id=999L)만 이 SajuResult에 대한 UserSajuAccess를 가짐.
+        // findByIdAndUserIdWithSajuResultAndProfile은 EXISTS 서브쿼리로 소유권까지 함께 확인하므로
+        // MOCK_USER(id=1L)로 조회하면 DB 레벨에서 애초에 empty가 반환된다.
+        given(careerConsultationRepository.findByIdAndUserIdWithSajuResultAndProfile(ANALYSIS_ID, USER_ID))
+                .willReturn(Optional.empty());
 
-        given(sajuResult.getUser()).willReturn(OTHER_USER);  // id=999L 소유자
-        given(cc.getSajuResult()).willReturn(sajuResult);
-        given(careerConsultationRepository.findByIdWithSajuResultAndProfile(ANALYSIS_ID)).willReturn(Optional.of(cc));
-
-        // When & Then — MOCK_USER(id=1L)로 조회하면 권한 없음
+        // When & Then — MOCK_USER(id=1L)로 조회하면 찾을 수 없음
         assertThatThrownBy(() -> service.getAnalysisDetail(USER_ID, ANALYSIS_ID, AnalysisType.CAREER_CONSULTATION))
-                .isInstanceOf(UnauthorizedException.class);
+                .isInstanceOf(SajuResultNotFoundException.class);
     }
 
     // ─────────────────────────────────────────

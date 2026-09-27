@@ -1,8 +1,8 @@
-package ssafy.SSAju.dto.request;
+package ssafy.SSAju.career.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import ssafy.SSAju.career.enums.FeedbackType;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 
 public record SatisfactionFeedbackRequest(
@@ -10,7 +10,7 @@ public record SatisfactionFeedbackRequest(
         Long analysisId,
 
         @NotNull(message = "feedbackType은 필수입니다")
-        FeedbackType feedbackType,
+        AnalysisType feedbackType,
 
         @NotNull(message = "satisfactionStatus는 필수입니다")
         SatisfactionStatus satisfactionStatus,

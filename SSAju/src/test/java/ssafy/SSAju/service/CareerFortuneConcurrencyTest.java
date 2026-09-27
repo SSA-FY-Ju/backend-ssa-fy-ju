@@ -20,6 +20,7 @@ import ssafy.SSAju.repository.SajuFullDataRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.repository.UserSajuAccessRepository;
 import ssafy.SSAju.service.DailyApiUsageService;
 
 import java.time.Instant;
@@ -69,6 +70,7 @@ class CareerFortuneConcurrencyTest {
     @Autowired private SajuResultRepository sajuResultRepository;
     @Autowired private CareerFortuneRepository careerFortuneRepository;
     @Autowired private SajuFullDataRepository sajuFullDataRepository;
+    @Autowired private UserSajuAccessRepository userSajuAccessRepository;
     @Autowired private UserRepository userRepository;
 
     private Long testUserId;
@@ -89,6 +91,7 @@ class CareerFortuneConcurrencyTest {
         // FK 순서에 따라 자식 엔티티부터 삭제
         careerFortuneRepository.deleteAllInBatch();
         sajuFullDataRepository.deleteAllInBatch();
+        userSajuAccessRepository.deleteAllInBatch();
         sajuResultRepository.deleteAllInBatch();
         userProfileRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();

@@ -18,7 +18,7 @@ import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
-import ssafy.SSAju.career.enums.FeedbackType;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
 import ssafy.SSAju.career.util.JobCategoryEnum;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
@@ -162,7 +162,7 @@ class CareerResultLegacyDataCleanupIntegrationTest {
         CareerConsultation consultation = careerConsultationRepository.save(
                 CareerConsultation.builder()
                         .sajuResult(sajuResultRepository.save(
-                                SajuResult.builder().userProfile(testProfile).user(testUser).build()))
+                                SajuResult.builder().userProfile(testProfile).build()))
                         .openaiModelVersion("gpt-4o-mini")
                         .consultationMonth(202605)
                         .resultJson(minimalAdvice())
@@ -171,7 +171,7 @@ class CareerResultLegacyDataCleanupIntegrationTest {
         UserSatisfactionFeedback feedback = feedbackRepository.save(UserSatisfactionFeedback.builder()
                 .user(testUser)
                 .careerConsultation(consultation)
-                .feedbackType(FeedbackType.CONSULTATION)
+                .feedbackType(AnalysisType.CAREER_CONSULTATION)
                 .satisfactionStatus(SatisfactionStatus.SATISFIED)
                 .feedbackContent("도움이 됐어요")
                 .build());

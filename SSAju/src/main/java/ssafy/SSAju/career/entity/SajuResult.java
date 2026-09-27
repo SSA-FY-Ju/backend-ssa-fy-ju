@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import ssafy.SSAju.career.converter.TenGodHiddenStemConverter;
 import ssafy.SSAju.career.domain.TenGodHiddenStemAnalysis;
-import ssafy.SSAju.entity.User;
 
 import java.time.Instant;
 
@@ -16,7 +15,7 @@ import java.time.Instant;
 @Table(name = "saju_result",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_saju_result_user_profile",
-                columnNames = {"user_id", "user_profile_id"}
+                columnNames = {"user_profile_id"}
         ))
 public class SajuResult {
 
@@ -27,10 +26,6 @@ public class SajuResult {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_profile_id", nullable = false)
     private UserProfile userProfile;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
 
     @Column(name = "fetched_at", nullable = false)
     private Instant fetchedAt;
@@ -46,9 +41,8 @@ public class SajuResult {
     private CareerFortune careerFortune;
 
     @Builder
-    public SajuResult(UserProfile userProfile, User user) {
+    public SajuResult(UserProfile userProfile) {
         this.userProfile = userProfile;
-        this.user = user;
         this.fetchedAt = Instant.now();
     }
 
@@ -68,10 +62,6 @@ public class SajuResult {
 
     public void assignCareerFortune(CareerFortune fortune) {
         this.careerFortune = fortune;
-    }
-
-    public void assignUser(User user) {
-        this.user = user;
     }
 
     @Override

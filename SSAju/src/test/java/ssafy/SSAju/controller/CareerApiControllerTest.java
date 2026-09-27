@@ -17,7 +17,7 @@ import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.dto.response.ConsultationResponse;
-import ssafy.SSAju.dto.response.SatisfactionFeedbackResponse;
+import ssafy.SSAju.career.dto.response.SatisfactionFeedbackResponse;
 import ssafy.SSAju.service.CareerFortuneService;
 import ssafy.SSAju.service.CompanyMatchingService;
 import ssafy.SSAju.service.ConsultationService;
@@ -189,7 +189,7 @@ class CareerApiControllerTest {
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "CONSULTATION",
+                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "좋은 상담이었습니다"
                                 }
@@ -209,7 +209,7 @@ class CareerApiControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "feedbackType": "CONSULTATION",
+                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))

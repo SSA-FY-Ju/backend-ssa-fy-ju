@@ -21,22 +21,30 @@ public interface CareerConsultationRepository extends JpaRepository<CareerConsul
                                                                        Integer consultationMonth);
 
     /**
-     * C-4: 피드백 저장 시 소유권 DB 레벨 검증 — IDOR 방지.
-     * FeedbackService의 lazy loading chain(filter + getSajuResult().getUser().getId())을
-     * DB JOIN으로 대체하여 트랜잭션 의존 없이 안전한 소유권 확인을 보장합니다.
+     * C-4/B1: 피드백 저장 시 소유권 DB 레벨 검증 — IDOR 방지.
+     * SajuResult가 여러 사용자가 공유하는 정본으로 바뀌었으므로(B1), 소유권은
+     * SajuResult.user가 아니라 UserSajuAccess 매핑 존재 여부로 EXISTS 서브쿼리를 통해
+     * 트랜잭션 의존 없이 DB 레벨에서 확인합니다.
      */
-    Optional<CareerConsultation> findByIdAndSajuResult_User_Id(Long id, Long userId);
+    @Query("SELECT cc FROM CareerConsultation cc " +
+           "WHERE cc.id = :id AND EXISTS (" +
+           "  SELECT 1 FROM UserSajuAccess usa " +
+           "  WHERE usa.sajuResult = cc.sajuResult AND usa.user.id = :userId)")
+    Optional<CareerConsultation> findByIdAndAccessibleByUser(@Param("id") Long id, @Param("userId") Long userId);
 
     /**
-     * 마이페이지 상세 조회 전용: SajuResult 및 UserProfile을 한 번의 쿼리로 fetch join.
+     * 마이페이지 상세 조회 전용: SajuResult 및 UserProfile을 한 번의 쿼리로 fetch join,
+     * 소유권(UserSajuAccess)까지 EXISTS 서브쿼리로 함께 확인.
      * UserService.buildCareerConsultationDetail()의 레이지 로딩 체인(3개 SELECT)을 1개 쿼리로 개선.
-     * 소유자 확인(user.equals)과 UserProfile 접근이 추가 쿼리 없이 가능.
      */
     @Query("SELECT cc FROM CareerConsultation cc " +
            "LEFT JOIN FETCH cc.sajuResult sr " +
            "LEFT JOIN FETCH sr.userProfile " +
-           "WHERE cc.id = :id")
-    Optional<CareerConsultation> findByIdWithSajuResultAndProfile(@Param("id") Long id);
+           "WHERE cc.id = :id AND EXISTS (" +
+           "  SELECT 1 FROM UserSajuAccess usa " +
+           "  WHERE usa.sajuResult = sr AND usa.user.id = :userId)")
+    Optional<CareerConsultation> findByIdAndUserIdWithSajuResultAndProfile(@Param("id") Long id,
+                                                                            @Param("userId") Long userId);
 
     /**
      * M-5: SajuResult 교체 시 연관된 CareerConsultation 전체 삭제 (FK 제약 위반 방지).

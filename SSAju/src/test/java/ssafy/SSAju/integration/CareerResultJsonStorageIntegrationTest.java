@@ -94,7 +94,6 @@ class CareerResultJsonStorageIntegrationTest {
     void shouldPersistAndReload_TenGodHiddenStemAnalysis() {
         SajuResult result = SajuResult.builder()
                 .userProfile(testProfile)
-                .user(testUser)
                 .build();
         result.assignTenGodHiddenStemAnalysis(new TenGodHiddenStemAnalysis(
                 Map.of("비견", 2, "겁재", 1),
@@ -113,7 +112,7 @@ class CareerResultJsonStorageIntegrationTest {
     @DisplayName("CareerConsultation.resultJson JSON 컬럼 저장/재조회")
     void shouldPersistAndReload_ConsultationResultJson() {
         SajuResult sajuResult = sajuResultRepository.save(
-                SajuResult.builder().userProfile(testProfile).user(testUser).build());
+                SajuResult.builder().userProfile(testProfile).build());
 
         CareerAdviceResponse advice = new CareerAdviceResponse(
                 List.of(new CareerAdviceResponse.IndustryRecommendation("IT", "적성 부합", List.of("백엔드"))),

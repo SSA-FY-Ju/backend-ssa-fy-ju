@@ -18,6 +18,7 @@ import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.repository.UserSajuAccessRepository;
 import ssafy.SSAju.repository.UserSatisfactionFeedbackRepository;
 import ssafy.SSAju.service.DailyApiUsageService;
 import ssafy.SSAju.service.SajuDataService;
@@ -66,6 +67,9 @@ class CareerApiIntegrationTest {
     private SajuResultRepository sajuResultRepository;
 
     @Autowired
+    private UserSajuAccessRepository userSajuAccessRepository;
+
+    @Autowired
     private UserSatisfactionFeedbackRepository feedbackRepository;
 
     @Autowired
@@ -84,6 +88,7 @@ class CareerApiIntegrationTest {
 
         // 테스트 격리: 각 테스트 전 DB 초기화
         feedbackRepository.deleteAll();
+        userSajuAccessRepository.deleteAll();
         sajuResultRepository.deleteAll();
         userProfileRepository.deleteAll();
         userRepository.deleteAll();
@@ -162,7 +167,7 @@ class CareerApiIntegrationTest {
     // ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("T090-3: CAREER_TIMING 피드백 시도 → 400 FeedbackNotAllowedException")
+    @DisplayName("T090-3: SAJU 피드백 시도 → 400 FeedbackNotAllowedException")
     void saveFeedback_withCareerTimingType_returns400() throws Exception {
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .header("Authorization", authHeader)
@@ -170,7 +175,7 @@ class CareerApiIntegrationTest {
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "CAREER_TIMING",
+                                  "feedbackType": "SAJU",
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "테스트"
                                 }
@@ -191,7 +196,7 @@ class CareerApiIntegrationTest {
                         .content("""
                                 {
                                   "analysisId": 999999,
-                                  "feedbackType": "COMPATIBILITY",
+                                  "feedbackType": "COMPANY_COMPATIBILITY",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))

@@ -7,13 +7,12 @@ import ssafy.SSAju.career.entity.CareerFortune;
 import ssafy.SSAju.career.entity.SajuFullData;
 import ssafy.SSAju.career.entity.SajuResult;
 import ssafy.SSAju.career.entity.UserProfile;
-import ssafy.SSAju.entity.User;
 import ssafy.SSAju.repository.SajuResultRepository;
 
 /**
  * SajuResult 신규 저장 시 root와 자식 엔티티를 단일 트랜잭션으로 보호.
  *
- * SajuResult는 (user, userProfile) 기준으로 불변(immutable)입니다.
+ * SajuResult는 userProfile 기준으로 불변(immutable)이며, 여러 사용자가 공유하는 정본입니다.
  * 동일 생년월일·시각으로 요청된 결과는 기존 row를 재사용하며,
  * 삭제 후 재생성하는 패턴은 사용하지 않습니다.
  *
@@ -33,16 +32,15 @@ public class SajuResultWriteService {
      * 분산락 안에서만 이 메서드를 호출하므로(US5, T033) 동시 생성 경합을 별도로
      * 처리할 필요가 없다 — 단순히 root를 만들고 자식을 붙여 저장한다.
      *
-     * <p>root의 user/userProfile은 {@code source}가 아니라 호출자가 조회·검증에 이미 사용한
-     * {@code user}/{@code userProfile}로 만든다 — source는 자식 엔티티(사주 계산 결과)만
+     * <p>root의 userProfile은 {@code source}가 아니라 호출자가 조회·검증에 이미 사용한
+     * {@code userProfile}로 만든다 — source는 자식 엔티티(사주 계산 결과)만
      * 제공하는 값으로 취급하고, 락 키·조회에 쓰인 식별자와 저장되는 식별자가 항상 같은
-     * 값이도록 보장한다(source.getUser()가 검증되지 않은 값일 수 있는 문제 방지).
+     * 값이도록 보장한다.
      */
     @Transactional
-    public SajuResult saveNewResult(User user, UserProfile userProfile, SajuResult source) {
+    public SajuResult saveNewResult(UserProfile userProfile, SajuResult source) {
         SajuResult saved = SajuResult.builder()
                 .userProfile(userProfile)
-                .user(user)
                 .build();
 
         SajuFullData srcFullData = source.getSajuFullData();
