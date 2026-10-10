@@ -227,12 +227,16 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 ### Tests for User Story 8
 
-- [ ] T055 [P] [US8] `SSAju/src/test/java/ssafy/SSAju/admin/service/AdminAuthenticationServiceAuditTest.java` — 성공/실패 각각 감사로그 이벤트가 기록되는지 확인
+- [x] T055 [P] [US8] `SSAju/src/test/java/ssafy/SSAju/admin/service/AdminAuthenticationServiceAuditTest.java` — 성공/실패 각각 감사로그 이벤트가 기록되는지 확인
 
 ### Implementation for User Story 8
 
-- [ ] T056 [US8] `admin/service/AdminAuthenticationService.java` 수정 — 최상위 `repository/UserRepository` 대신 admin 전용 리포지토리 사용(필요 시 `admin/repository/AdminUserAuthQueryRepository.java` 신규 생성)(C4)
-- [ ] T057 [US8] `admin/service/AdminAuthenticationService.java` `validateAdminCredentials()` 수정 — 성공/실패 경로 각각에서 감사로그 이벤트 기록(기존 `annotation/@AuditLog` + `aspect/AuditLoggingAspect.java` 패턴 재사용, 실패 시에도 기록되도록 트랜잭션 경계 고려)
+- [x] T056 [US8] `admin/service/AdminAuthenticationService.java` 수정 — 최상위 `repository/UserRepository` 대신 admin 전용 리포지토리 사용(필요 시 `admin/repository/AdminUserAuthQueryRepository.java` 신규 생성)(C4)
+- [x] T057 [US8] `admin/service/AdminAuthenticationService.java` `validateAdminCredentials()` 수정 — 성공/실패 경로 각각에서 감사로그 이벤트 기록(기존 `annotation/@AuditLog` + `aspect/AuditLoggingAspect.java` 패턴 재사용, 실패 시에도 기록되도록 트랜잭션 경계 고려)
+
+**검증 결과 (2026-10-10)**: `cd SSAju && ./gradlew test` → `BUILD SUCCESSFUL`, 380개 테스트 통과(실패/오류/스킵 0). US8 감사/트랜잭션 테스트 9개 포함. 브라우저를 통한 수동 로그인 검증은 실행하지 않았다.
+
+**구현 메모 (2026-10-10)**: US7은 프론트엔드 협의 대기로 보류하고 독립적인 US8을 먼저 진행. T068의 공통 유틸을 선행 구현해 두 관리자 서비스에 적용했다. `AdminUserAuthQueryRepository`는 Spring Data 파생 조회로 기존 `User.@SQLRestriction`의 탈퇴 사용자 제외를 유지한다. T057은 공통 `@AuditLog`의 인자 추출만으로 admin ID/실패 사유/이메일 해시를 담을 수 없어 `AdminAuditLogUtil`의 명시적 기록을 사용하며, 성공은 transaction synchronization의 `afterCommit`, 실패는 즉시 구조화 로그로 남긴다. 감사 기록 시각은 주입된 `Clock`을 사용한다. US7 및 US9의 나머지 작업은 미완료 상태를 유지한다.
 
 **Checkpoint**: `./gradlew test` 통과
 
@@ -256,7 +260,7 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 - [ ] T065 [US9] `exception/FeedbackNotAllowedException.java`, `exception/TokenHashException.java`를 `exception/SajuException` 계층 하위로 편입, `handler/SajuGlobalExceptionHandler.java`에 `TokenHashException` 전용 `@ExceptionHandler` 추가(D1)
 - [ ] T066 [P] [US9] 죽은 코드 삭제 — `exception/InvalidPasswordException.java` 및 `handler/SajuGlobalExceptionHandler.java` 내 대응 핸들러, 그 외 사용되지 않는 상수/리포지토리 메서드/DTO 전수 검색 후 삭제(F)
 - [ ] T067 [US9] `entity/RefreshToken.java`, `repository/RefreshTokenRepository.java` 삭제(US1에서 Redis로 대체 완료 확인 후), `refresh_token` 테이블 DROP용 DDL을 별도 스키마 마이그레이션 파일로 준비(스키마 변경 스크립트는 데이터 마이그레이션과 달리 커밋 가능하나 실행은 배포 절차에 따름)
-- [ ] T068 [US9] `admin/service/AdminUsageAdjustmentService.java`의 "커밋 이후 완료 로그 기록" 패턴을 공통 유틸(`admin/service/AdminAuditLogUtil.java` 등)로 추출하고, `AdminUsageAdjustmentService` 및 T057에서 작성한 `AdminAuthenticationService` 감사로그 기록 코드가 이 유틸을 사용하도록 리팩토링(G2)
+- [x] T068 [US9] `admin/service/AdminUsageAdjustmentService.java`의 "커밋 이후 완료 로그 기록" 패턴을 공통 유틸(`admin/service/AdminAuditLogUtil.java` 등)로 추출하고, `AdminUsageAdjustmentService` 및 T057에서 작성한 `AdminAuthenticationService` 감사로그 기록 코드가 이 유틸을 사용하도록 리팩토링(G2)
 - [ ] T069 [P] [US9] 서로 다른 4가지 페이지네이션 방식을 사용하는 컨트롤러(`admin/controller/*`, `controller/*` 전수 검색으로 식별)에 각 방식의 채택 이유를 주석으로 문서화(H1)
 - [ ] T070 [US9] `admin/repository/AdminUserQueryRepository.java`의 `findUserById` 내 N+1 위험 쿼리를 조인/배치 조회로 분리·호이스팅(H2)
 
