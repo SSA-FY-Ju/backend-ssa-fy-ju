@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.exception.AuthException;
-import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.admin.repository.AdminUserAuthQueryRepository;
 
 @Slf4j
 @Service
@@ -18,7 +18,7 @@ public class AdminAuthenticationService {
     private static final String INVALID_CREDENTIALS_MSG = "이메일 또는 비밀번호가 일치하지 않습니다.";
     private static final String ACCESS_DENIED_MSG = "접근 권한이 없습니다.";
 
-    private final UserRepository userRepository;
+    private final AdminUserAuthQueryRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     /**
