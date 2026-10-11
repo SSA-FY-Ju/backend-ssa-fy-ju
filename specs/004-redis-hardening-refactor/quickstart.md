@@ -64,7 +64,7 @@ cd SSAju
 
 1. 올바른/틀린 관리자 자격증명으로 각각 `POST /admin/login` 호출.
 2. 애플리케이션 로그에서 `[AUDIT] action=validateAdminCredentials`를 확인 — 성공은 `userId`, 실패는 `emailHash`와 `reason`(`INVALID_EMAIL`/`WRONG_PASSWORD`/`NOT_ADMIN`), 공통으로 `status`와 `timestamp`를 기록한다. 이메일 원문/비밀번호가 노출되지 않아야 한다.
-3. 자동 검증: `cd SSAju && ./gradlew test --tests 'ssafy.SSAju.admin.service.AdminAuthenticationServiceAuditTest'`. 성공은 커밋 이후에만 기록되고, 롤백/커밋 실패 시에는 남지 않으며, 인증 실패 기록은 롤백 후에도 남는지 확인한다.
+3. 자동 검증: `cd SSAju && ./gradlew test --tests 'ssafy.SSAju.admin.service.AdminAuthenticationServiceAuditTest' --tests 'ssafy.SSAju.admin.service.AdminAuditLogUtilTest'`. 성공은 커밋 이후에만 기록되고, 롤백/커밋 실패 시에는 남지 않으며, 인증 실패 기록은 롤백 후에도 남는지 확인한다. AOP 로그가 중복되지 않고, 기록 예외가 커밋 결과나 원래 인증 예외를 바꾸지 않는지도 검증한다.
 4. 이 스토리의 기록 대상은 관리자 자격 검증이다. 별도의 로그 테이블/조회 API는 없고, 토큰 발급 결과와 DTO 검증 오류는 포함하지 않는다.
 
 ### US9 — 구조 일관성 (정적 검증)

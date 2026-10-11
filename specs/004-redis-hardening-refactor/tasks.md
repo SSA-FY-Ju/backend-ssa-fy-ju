@@ -236,7 +236,9 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 **검증 결과 (2026-10-10)**: `cd SSAju && ./gradlew test` → `BUILD SUCCESSFUL`, 380개 테스트 통과(실패/오류/스킵 0). US8 감사/트랜잭션 테스트 9개 포함. 브라우저를 통한 수동 로그인 검증은 실행하지 않았다.
 
-**구현 메모 (2026-10-10)**: US7은 프론트엔드 협의 대기로 보류하고 독립적인 US8을 먼저 진행. T068의 공통 유틸을 선행 구현해 두 관리자 서비스에 적용했다. `AdminUserAuthQueryRepository`는 Spring Data 파생 조회로 기존 `User.@SQLRestriction`의 탈퇴 사용자 제외를 유지한다. T057은 공통 `@AuditLog`의 인자 추출만으로 admin ID/실패 사유/이메일 해시를 담을 수 없어 `AdminAuditLogUtil`의 명시적 기록을 사용하며, 성공은 transaction synchronization의 `afterCommit`, 실패는 즉시 구조화 로그로 남긴다. 감사 기록 시각은 주입된 `Clock`을 사용한다. US7 및 US9의 나머지 작업은 미완료 상태를 유지한다.
+**리뷰 반영 검증 (2026-10-11)**: `cd SSAju && ./gradlew test` → `BUILD SUCCESSFUL`, 387개 테스트 통과(실패/오류/스킵 0). 감사 기록 예외 격리 테스트 4개와 AOP 감사 테스트 12개 포함.
+
+**구현 메모 (2026-10-11)**: US7은 프론트엔드 협의 대기로 보류하고 독립적인 US8을 먼저 진행. T068의 공통 유틸을 선행 구현해 두 관리자 서비스에 적용했다. `AdminUserAuthQueryRepository`는 Spring Data 파생 조회로 기존 `User.@SQLRestriction`의 탈퇴 사용자 제외를 유지한다. T057은 기존 `@AuditLog`를 사용한다. 관리자 인증 전용 `AdminAuthenticationAuditAspect`가 서비스의 반환 admin ID와 `AdminAuthenticationException`의 실패 사유를 받아 `AdminAuditLogUtil`로 기록한다. 공통 `AuditLoggingAspect`는 이 메서드를 제외해 중복 로그를 방지한다. 성공은 transaction synchronization의 `afterCommit`, 실패는 즉시 구조화 로그로 남긴다. 감사 기록 시각은 주입된 `Clock`을 사용한다. US7 및 US9의 나머지 작업은 미완료 상태를 유지한다.
 
 **Checkpoint**: `./gradlew test` 통과
 

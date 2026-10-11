@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 /**
  * 감사 로그 수집 대상 메서드를 지정하는 커스텀 어노테이션.
  *
- * <p>이 어노테이션이 부착된 메서드는 {@code AuditLoggingAspect}에 의해
+ * <p>이 어노테이션이 부착된 메서드는 {@code AuditLoggingAspect} 또는 관리자 인증 전용 Aspect에 의해
  * 자동으로 감사 로그가 기록됩니다.</p>
  *
  * <pre>
