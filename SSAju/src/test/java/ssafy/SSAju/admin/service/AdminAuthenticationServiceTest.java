@@ -11,7 +11,7 @@ import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 import ssafy.SSAju.exception.AuthException;
-import ssafy.SSAju.repository.UserRepository;
+import ssafy.SSAju.admin.repository.AdminUserAuthQueryRepository;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -25,7 +25,7 @@ import static org.mockito.BDDMockito.given;
 class AdminAuthenticationServiceTest {
 
     @Mock
-    private UserRepository userRepository;
+    private AdminUserAuthQueryRepository userRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;

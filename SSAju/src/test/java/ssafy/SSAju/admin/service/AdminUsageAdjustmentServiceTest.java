@@ -6,7 +6,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import ssafy.SSAju.admin.dto.AdjustmentAction;
 import ssafy.SSAju.admin.dto.UsageAdjustmentRequestDTO;
 import ssafy.SSAju.admin.dto.UsageAdjustmentResponseDTO;
@@ -43,7 +42,7 @@ class AdminUsageAdjustmentServiceTest {
     private AdminUserQueryRepository adminUserQueryRepository;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private AdminAuditLogUtil auditLog;
 
     @InjectMocks
     private AdminUsageAdjustmentService usageAdjustmentService;
@@ -78,6 +77,7 @@ class AdminUsageAdjustmentServiceTest {
         assertThat(result.usageCountBefore()).isEqualTo(3);
         assertThat(result.usageCountAfter()).isEqualTo(0);
         assertThat(result.action()).isEqualTo("RESET");
+        verify(auditLog).usageAdjusted(1L, AdjustmentAction.RESET, 3, 0);
     }
 
     @Test

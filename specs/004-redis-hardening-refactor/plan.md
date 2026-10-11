@@ -117,7 +117,9 @@ SSAju/src/main/java/ssafy/SSAju/
 │   ├── FeedbackNotAllowedException.java  # [수정] SajuException 계층 편입 (D1)
 │   └── TokenHashException.java           # [수정] SajuException 계층 편입 + 전용 핸들러 (D1)
 ├── admin/
-│   └── service/AdminAuthenticationService.java  # [수정] admin 전용 리포지토리 사용 + 감사로그 (C4, G1)
+│   ├── repository/AdminUserAuthQueryRepository.java # [신규] 관리자 인증 전용 이메일 조회 (C4)
+│   ├── service/AdminAuditLogUtil.java          # [신규] Clock 기반 기록 + 커밋 이후 성공 로그 (G1, G2)
+│   └── service/AdminAuthenticationService.java # [수정] admin 전용 리포지토리 사용 + 감사로그 (C4, G1)
 └── dto/request/
     ├── SignupRequest.java             # [수정] birthDate(필수)/birthTime(선택) 추가 (#5)
     ├── UsageAdjustmentRequestDTO.java # [수정] @NotNull 추가 (E1)
@@ -146,3 +148,10 @@ Phase 1: [data-model.md](./data-model.md), [contracts/](./contracts/), [quicksta
 ## Post-Design Constitution Re-check
 
 Phase 1 설계(데이터 모델, 컨트랙트) 반영 후 재평가 — 신규 엔티티(`UserSajuAccess`)와 Redis 저장 스키마 모두 위 게이트를 그대로 통과하며, 신규 위반 없음. `career/controller`, `career/dto` 이동(C1)은 기존 `career/` 패키지 명명 규칙과 충돌하지 않음(엔티티/enum/provider 등 기존 하위 패키지 네이밍 패턴과 동일한 방식으로 추가).
+
+
+## US8 구현 기록 (2026-10-11 리뷰 반영)
+
+US7과 US8은 서로 독립적이다(tasks.md의 User Story Dependencies 참고). US7은 프론트엔드 협의를 기다리고 US8(T055~T057)을 먼저 진행한다. 감사 계약이 요구하는 G2 공통 유틸(T068)은 함께 선행 구현해 `AdminUsageAdjustmentService`의 완료 로그도 동일한 커밋 이후 처리로 통합한다.
+
+`AdminAuthenticationService.validateAdminCredentials()`의 자격 검증 결과를 감사 대상으로 삼는다. 성공은 admin ID와 `Clock` 시각을 커밋 이후 기록하고, 인증 실패는 이메일 SHA-256 해시와 사유 코드만 즉시 기록해 롤백 후에도 남긴다. 관리자 인증에는 기존 `@AuditLog`를 적용한다. 전용 `AdminAuthenticationAuditAspect`가 반환 admin ID와 실패 사유를 담은 `AdminAuthenticationException`을 사용해 기록한다. 서비스에서 로그 유틸 호출을 제거하고 공통 Aspect에서는 관리자 인증을 제외해 중복을 방지한다. `AdminLoginFailureReason`은 `admin/enums`의 별도 파일로 분리한다. 감사 기록의 RuntimeException은 격리하고 실패 횟수와 예외 종류를 별도 보고해, 커밋 결과나 원래 인증 예외를 바꾸지 않는다. 토큰 발급 결과나 요청 DTO 검증 오류로 감사 대상을 확장하지 않는다. 신규 DB 테이블과 응답 계약 변경은 없다.

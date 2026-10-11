@@ -2,13 +2,9 @@ package ssafy.SSAju.admin.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 import ssafy.SSAju.admin.dto.AdjustmentAction;
-import ssafy.SSAju.admin.dto.UsageAdjustedEvent;
 import ssafy.SSAju.admin.dto.UsageAdjustmentRequestDTO;
 import ssafy.SSAju.admin.dto.UsageAdjustmentResponseDTO;
 import ssafy.SSAju.admin.repository.AdminDailyUsageQueryRepository;
@@ -28,7 +24,7 @@ public class AdminUsageAdjustmentService extends AdminBaseService {
 
     private final AdminDailyUsageQueryRepository dailyUsageRepository;
     private final AdminUserQueryRepository adminUserQueryRepository;
-    private final ApplicationEventPublisher eventPublisher;
+    private final AdminAuditLogUtil auditLog;
 
     // 관리자가 유저의 일일 제한을 직접 변경하는 민감 작업 → 구조화 로깅(INFO) + @AuditLog 감사 로그 적용
     @Transactional
@@ -57,15 +53,8 @@ public class AdminUsageAdjustmentService extends AdminBaseService {
             after = Math.max(0, before - request.amount());
         }
 
-        eventPublisher.publishEvent(new UsageAdjustedEvent(userId, request.action(), before, after));
+        auditLog.usageAdjusted(userId, request.action(), before, after);
         return new UsageAdjustmentResponseDTO(userId, today.toString(), before, after, request.action().name());
-    }
-
-    // 실제 커밋 이후에만 로그를 남겨, 커밋 실패 시 "완료"로 오기록되는 것을 방지
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onUsageAdjusted(UsageAdjustedEvent event) {
-        log.info("일일 사용량 조정 완료: userId={}, action={}, before={}, after={}",
-                event.userId(), event.action(), event.before(), event.after());
     }
 
     private void validateRequest(UsageAdjustmentRequestDTO request) {

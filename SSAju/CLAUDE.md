@@ -38,6 +38,7 @@ When adding code, decide first which of these three areas it belongs to — they
 ### Cross-cutting infrastructure worth knowing about
 
 - **`annotation/` + `aspect/AuditLoggingAspect.java`** — AOP-based audit logging (`@AuditLog`, `@AuditableRequest`), runs outside the transaction advisor (see recent commit history — ordering was deliberately fixed to run after tx commit).
+- **`admin/service/AdminAuditLogUtil`** — 관리자 자격 검증 감사로그와 사용량 조정 완료 로그를 공유한다. 관리자 인증은 `@AuditLog` + `aspect/AdminAuthenticationAuditAspect`가 기록하고 공통 Aspect는 해당 메서드를 제외한다. 기록 예외는 업무 결과로 전파하지 않고 실패 횟수/예외 종류로 보고한다. 성공/완료는 커밋 이후, 인증 실패는 즉시 기록하며 시각은 주입된 `Clock`을 사용한다. 관리자 인증 조회는 `admin/repository/AdminUserAuthQueryRepository`를 사용한다.
 - **`event/`** — Spring application events (e.g. `LoginAttemptEvent` + listener) for decoupling side effects (like login-failure tracking) from the main auth flow.
 - **`security/`** — JWT plumbing separate from `config/SecurityConfig.java`: `JwtAuthenticationEntryPoint`, `JwtAccessDeniedHandler`, `JwtExceptionFilter`.
 - **`config/`** also includes `AsyncConfig`, `ClockConfig` (inject `Clock` instead of `new Date()`/`LocalDateTime.now()` for testability), `JacksonConfig`, `WebMvcConfig`, `JpaAuditingConfig`, besides the security/REST-client configs below.
