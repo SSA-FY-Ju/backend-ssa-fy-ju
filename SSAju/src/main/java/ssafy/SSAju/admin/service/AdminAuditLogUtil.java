@@ -9,6 +9,7 @@ import ssafy.SSAju.admin.dto.AdjustmentAction;
 import ssafy.SSAju.util.TokenHashUtil;
 
 import java.time.Clock;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Component
@@ -18,6 +19,7 @@ public class AdminAuditLogUtil {
     public enum LoginFailureReason { INVALID_EMAIL, WRONG_PASSWORD, NOT_ADMIN }
 
     private final Clock clock;
+    private final AtomicLong recordingFailures = new AtomicLong();
 
     public void loginSucceeded(Long adminId) {
         afterCommit(() -> log.info("[AUDIT] action=validateAdminCredentials, userId={}, status=SUCCESS, timestamp={}",
@@ -25,8 +27,8 @@ public class AdminAuditLogUtil {
     }
 
     public void loginFailed(String email, LoginFailureReason reason) {
-        log.warn("[AUDIT] action=validateAdminCredentials, emailHash={}, status=FAILURE, reason={}, timestamp={}",
-                TokenHashUtil.sha256(email), reason, clock.instant());
+        safelyRecord(() -> log.warn("[AUDIT] action=validateAdminCredentials, emailHash={}, status=FAILURE, reason={}, timestamp={}",
+                TokenHashUtil.sha256(email), reason, clock.instant()));
     }
 
     public void usageAdjusted(Long userId, AdjustmentAction action, int before, int after) {
@@ -41,11 +43,28 @@ public class AdminAuditLogUtil {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    record.run();
+                    safelyRecord(record);
                 }
             });
         } else {
+            safelyRecord(record);
+        }
+    }
+
+    public long recordingFailureCount() {
+        return recordingFailures.get();
+    }
+
+    private void safelyRecord(Runnable record) {
+        try {
             record.run();
+        } catch (RuntimeException e) {
+            long failures = recordingFailures.incrementAndGet();
+            try {
+                log.error("[AUDIT] recordingFailureCount={}, exceptionType={}", failures, e.getClass().getSimpleName());
+            } catch (RuntimeException reportingFailure) {
+                // 로그 출력 자체가 실패해도 카운터는 남기고 이미 확정된 업무 결과를 유지한다.
+            }
         }
     }
 }
