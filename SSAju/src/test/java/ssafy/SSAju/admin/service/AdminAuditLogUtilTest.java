@@ -14,6 +14,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 import ssafy.SSAju.admin.dto.AdjustmentAction;
+import ssafy.SSAju.admin.enums.AdminLoginFailureReason;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
@@ -69,13 +70,14 @@ class AdminAuditLogUtilTest {
 
     @Test
     void failureLogExceptionDoesNotEscape() {
-        assertThatCode(() -> auditLog.loginFailed("admin@example.com", AdminAuditLogUtil.LoginFailureReason.WRONG_PASSWORD))
+        assertThatCode(() -> auditLog.loginFailed("admin@example.com", AdminLoginFailureReason.WRONG_PASSWORD))
                 .doesNotThrowAnyException();
         assertRecordingFailure();
     }
 
     @Test
     void reportingFailureDoesNotEscapeAndRemainsDetectable() {
+        @SuppressWarnings("unchecked")
         Appender<ILoggingEvent> failingAppender = mock(Appender.class);
         doThrow(new IllegalStateException("logger failure")).when(failingAppender).doAppend(any());
         logger.addAppender(failingAppender);

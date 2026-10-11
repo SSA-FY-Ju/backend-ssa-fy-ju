@@ -13,8 +13,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.view.InternalResourceView;
 import org.springframework.web.servlet.view.RedirectView;
 import ssafy.SSAju.admin.service.AdminAuthenticationService;
+import ssafy.SSAju.admin.enums.AdminLoginFailureReason;
 import ssafy.SSAju.dto.response.AuthTokenPair;
-import ssafy.SSAju.exception.AuthException;
+import ssafy.SSAju.exception.AdminAuthenticationException;
 import ssafy.SSAju.service.AuthService;
 import ssafy.SSAju.util.JwtUtil;
 
@@ -79,7 +80,7 @@ class AdminLoginControllerTest {
     @DisplayName("POST /admin/login - ADMIN 자격증명 → admin_access_token 쿠키 설정 후 dashboard 리다이렉트")
     void login_validAdminCredentials_setCookieAndRedirectToDashboard() throws Exception {
         // Given
-        willDoNothing().given(adminAuthenticationService).validateAdminCredentials(anyString(), anyString());
+        given(adminAuthenticationService.validateAdminCredentials(anyString(), anyString())).willReturn(1L);
         given(authService.login(any(), anyString()))
                 .willReturn(new AuthTokenPair("access-token", "refresh-token", 3600L));
         given(jwtUtil.getAccessTokenExpirationSeconds()).willReturn(3600L);
@@ -107,7 +108,7 @@ class AdminLoginControllerTest {
     @DisplayName("POST /admin/login - USER 권한 → 에러 메시지와 함께 login 뷰 반환")
     void login_userRoleCredentials_returnsLoginWithError() throws Exception {
         // Given
-        willThrow(new AuthException("접근 권한이 없습니다."))
+        willThrow(new AdminAuthenticationException("접근 권한이 없습니다.", AdminLoginFailureReason.NOT_ADMIN))
                 .given(adminAuthenticationService).validateAdminCredentials(anyString(), anyString());
 
         // When & Then
@@ -123,7 +124,7 @@ class AdminLoginControllerTest {
     @DisplayName("POST /admin/login - 잘못된 자격증명 → 에러 메시지와 함께 login 뷰 반환")
     void login_invalidCredentials_returnsLoginWithError() throws Exception {
         // Given
-        willThrow(new AuthException("이메일 또는 비밀번호가 일치하지 않습니다."))
+        willThrow(new AdminAuthenticationException("이메일 또는 비밀번호가 일치하지 않습니다.", AdminLoginFailureReason.WRONG_PASSWORD))
                 .given(adminAuthenticationService).validateAdminCredentials(anyString(), anyString());
 
         // When & Then

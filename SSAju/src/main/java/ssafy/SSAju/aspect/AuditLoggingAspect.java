@@ -38,7 +38,9 @@ import java.time.Instant;
 @Order(Ordered.LOWEST_PRECEDENCE - 1)
 public class AuditLoggingAspect {
 
-    @Around("@annotation(ssafy.SSAju.annotation.AuditLog)")
+    // 관리자 인증은 반환 ID와 실패 사유를 사용하는 전용 Aspect가 기록한다.
+    @Around("@annotation(ssafy.SSAju.annotation.AuditLog)"
+            + " && !execution(* ssafy.SSAju.admin.service.AdminAuthenticationService.validateAdminCredentials(..))")
     public Object logAuthEvent(ProceedingJoinPoint jp) throws Throwable {
         String action = jp.getSignature().getName();
         Instant start = Instant.now();

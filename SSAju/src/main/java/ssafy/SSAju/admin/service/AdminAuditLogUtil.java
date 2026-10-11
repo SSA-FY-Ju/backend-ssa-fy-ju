@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import ssafy.SSAju.admin.dto.AdjustmentAction;
+import ssafy.SSAju.admin.enums.AdminLoginFailureReason;
 import ssafy.SSAju.util.TokenHashUtil;
 
 import java.time.Clock;
@@ -16,8 +17,6 @@ import java.util.concurrent.atomic.AtomicLong;
 @RequiredArgsConstructor
 public class AdminAuditLogUtil {
 
-    public enum LoginFailureReason { INVALID_EMAIL, WRONG_PASSWORD, NOT_ADMIN }
-
     private final Clock clock;
     private final AtomicLong recordingFailures = new AtomicLong();
 
@@ -26,7 +25,7 @@ public class AdminAuditLogUtil {
                 adminId, clock.instant()));
     }
 
-    public void loginFailed(String email, LoginFailureReason reason) {
+    public void loginFailed(String email, AdminLoginFailureReason reason) {
         safelyRecord(() -> log.warn("[AUDIT] action=validateAdminCredentials, emailHash={}, status=FAILURE, reason={}, timestamp={}",
                 TokenHashUtil.sha256(email), reason, clock.instant()));
     }

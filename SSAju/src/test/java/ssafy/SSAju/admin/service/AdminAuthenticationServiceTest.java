@@ -30,9 +30,6 @@ class AdminAuthenticationServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
-    @Mock
-    private AdminAuditLogUtil auditLog;
-
     @InjectMocks
     private AdminAuthenticationService adminAuthenticationService;
 
