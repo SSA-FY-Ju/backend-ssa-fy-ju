@@ -40,35 +40,17 @@
 - 저장 직전 별도 "JSON 저장용 Validator" 컴포넌트 신설 — 애초에 검증 대상 필드가 `validate()`에 존재하지 않는 문제를 해결하지 못하므로 기각.
 - `JobRoleAnalyzer`/`AnalysisResponseBuilder` 계산 직후에 방어적 assert 추가 — 공식이 이미 자체 유계라 실익이 낮고, "저장 전 응답 검증"이 아닌 "내부 계산 유닛의 방어적 프로그래밍"으로 스펙 성격이 달라져 채택하지 않음(YAGNI).
 
-## 5. 기존 데이터 제거 방식 (코드 리뷰로 TRUNCATE/DROP 절차 명확화 + FK 그래프 반영)
+## 5. 기존 데이터 제거 방식 (2026-10-12 정합성 정정)
 
-**최초 결정의 모호함**: "TRUNCATE(또는 DROP 후 재생성)"처럼 두 방식을 병기해, quickstart.md/tasks.md의 검증 절차가 "행 수 0건"을 확인해야 하는지 "테이블 존재 여부"를 확인해야 하는지 문서마다 불일치했다.
+최초 문서의 "피드백 FK 값을 NULL로 변경한 뒤 부모 TRUNCATE"는 성립하지 않는다. MySQL은 참조 값이 아니라 FK 제약 존재 여부로 TRUNCATE를 제한한다. 현재 `004` US6에서 추가된 `user_saju_access`도 `saju_result`를 참조한다.
 
-**1차 정정 이후 추가로 발견된 문제 (코드 리뷰)**: 1차 정정에서 "루트 테이블은 ALTER+TRUNCATE"로 확정했으나, 실제 FK 그래프를 확인하지 않아 다음 두 문제를 놓쳤다 — MySQL(InnoDB)은 **다른 테이블이 FK로 참조 중인 테이블에 대해 TRUNCATE를 거부**한다.
-- `UserSatisfactionFeedback.java:35-40`이 `company_compatibility_id`, `career_consultation_id`(둘 다 nullable) FK를 갖고 있어 `company_compatibility`/`career_consultation` TRUNCATE가 막힌다.
-- `SajuResult`의 `sajuFullData`/`careerFortune`은 `mappedBy` 관계라 FK 컬럼이 반대편(`saju_full_data.saju_result_id`, `career_fortune.saju_result_id`)에 있다 — 이 두 테이블은 이번 마이그레이션과 무관하게 컬럼 구조는 그대로지만, `saju_result` TRUNCATE를 막는 참조이므로 데이터 정리 절차에는 포함해야 한다.
+**Decision**: 폐기되는 정규화 테이블은 손자 → 자식 순서로 DROP하고, 유지되는 루트·관련 테이블은 FK를 보존한 DELETE로 비운다. 피드백 내용과 사용자/프로필은 유지하며 피드백의 두 분석 FK만 NULL로 해제한다. JSON 컬럼은 실제 엔티티 타입에 맞춰 적용하고 `CompanyCompatibility.summary`는 유지한다.
 
-**정정된 Decision**: 대상을 세 그룹으로 나눠 서로 다른 방식을 적용한다.
-- **자식/손자 테이블** (`industry`, `interview_tip`, `monthly_forecast`, `target_role_analysis`, `ten_god_data`, `hidden_stem_data` 등 24개 직계 + 다수 손자 — data-model.md 목록 전체): 대응하는 JPA 엔티티 클래스 자체가 삭제되어 더 이상 어떤 코드도 매핑하지 않으므로 **DROP TABLE**.
-- **`user_satisfaction_feedback`**: 사용자가 남긴 피드백 내용은 삭제 대상이 아니므로 행을 지우지 않는다. 대신 `company_compatibility_id`/`career_consultation_id` 컬럼만 **`UPDATE ... SET ... = NULL`**로 링크를 끊어 FK 참조를 해제한다(두 컬럼 모두 `nullable`이라 스키마 변경 불필요).
-- **`career_consultation`, `company_compatibility`**: `user_satisfaction_feedback`의 FK를 위 단계로 해제한 뒤 **ALTER TABLE**(`result_json` 컬럼 추가, `summary`/`day_master_description` 등 구 컬럼 제거) 후 **TRUNCATE**.
-- **`saju_full_data`, `career_fortune`, `saju_result`**: 구조적 일관성을 위해 사주 결과 전체를 리셋한다(사용자 결정) — 자식(`saju_full_data`, `career_fortune`)을 먼저 **TRUNCATE**한 뒤 `saju_result`에 `ten_god_hidden_stem_analysis` 컬럼을 **ALTER**로 추가하고 **TRUNCATE**. `saju_full_data`/`career_fortune`은 컬럼 구조 자체는 바뀌지 않지만(엔티티/스키마 변경 없음), 데이터는 `saju_result`와 함께 정리된다.
+수동 적용의 단일 기준은 [quickstart §2](quickstart.md#2-스키마-수동-적용-마이그레이션-스크립트-없음--fr-009)다. 마이그레이션 스크립트는 커밋하지 않으며 실제 DB 적용 완료 여부는 T022/T024에서 별도로 기록한다.
 
-**수동 적용 절차** (버전관리 커밋 없음, 운영자가 로컬/개발 DB에서 직접 수행 — FR-009):
-1. 적용 전 각 대상 테이블의 행 수를 기록 (`SELECT COUNT(*)`) — 사전 확인용, 별도 백업 불필요(운영 데이터 아님, 개발 단계).
-2. `UPDATE user_satisfaction_feedback SET company_compatibility_id = NULL, career_consultation_id = NULL WHERE company_compatibility_id IS NOT NULL OR career_consultation_id IS NOT NULL;`
-3. FK 의존 순서를 지켜 **손자 → 자식 순으로**(가장 깊이 참조하는 테이블부터) DROP — 예: `ActionableKeyword`/`LuckyDay`(손자)가 `ActionableStrategy`(자식)를 FK로 참조하므로 `ActionableKeyword`/`LuckyDay`를 먼저 DROP해야 `ActionableStrategy`의 DROP이 FK 위반 없이 성공한다(24개 자식/손자 테이블 전체 — data-model.md 목록). 실제 참조 관계가 문서와 다를 수 있으므로, DROP 전 `SELECT * FROM information_schema.KEY_COLUMN_USAGE WHERE REFERENCED_TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IN (...)`로 대상 테이블을 참조하는 다른 테이블이 남아있지 않은지 사전 확인한다.
-4. `career_consultation`, `company_compatibility` ALTER TABLE 후 TRUNCATE.
-5. `saju_full_data`, `career_fortune` TRUNCATE → `saju_result` ALTER TABLE 후 TRUNCATE (자식이 부모보다 먼저 비워져야 함).
-6. 실패 시(예: FK 제약으로 DROP/TRUNCATE 거부) 대상 테이블의 FK를 먼저 확인해 순서를 재조정 — 강제로 FK를 비활성화(`SET FOREIGN_KEY_CHECKS=0`)하지 않는다(의도치 않은 다른 FK 무결성 손상 방지).
-7. **검증**: `user_satisfaction_feedback`은 1단계 이전 행 수와 동일해야 하고(삭제 없음), 나머지 대상 테이블은 DROP된 것은 `SHOW TABLES`에서, TRUNCATE된 것은 행 수 0건으로 확인.
+## 6. 최종 구현 및 후속 리팩터링 반영
 
-**Rationale**: 자식 테이블은 애초에 이번 변경으로 "존재 자체가 사라지는" 대상이라 TRUNCATE로 비워두고 남겨둘 이유가 없다. 루트 테이블은 컬럼 구조가 바뀌어야 하므로 ALTER가 어차피 필요하고, 그 김에 구버전 데이터를 TRUNCATE로 정리한다. 피드백은 FK만 끊어 원본 데이터를 보존한다(사용자 결정 — 피드백 자체는 특정 분석 결과와 무관하게 별도로 의미 있는 데이터이므로). `saju_result`는 그 자식인 `saju_full_data`/`career_fortune`이 데이터 정리를 막고 있어, 부분적으로만 리셋하면 구조가 일관되지 않으므로(예: 새 사주 결과는 새 스키마인데 원시 데이터는 예전 것) 함께 리셋한다(사용자 결정).
-
-**Alternatives considered**: 루트 테이블도 DROP 후 Hibernate `ddl-auto`로 재생성 — 더 단순하지만 auto-increment 시퀀스 리셋 등 부수효과가 있고 운영자가 매번 전체 스키마를 재생성해야 해 번거로움 → 기각. `user_satisfaction_feedback` 행 자체를 DELETE — 검토했으나 피드백 내용 보존을 원해 기각, FK만 NULL 처리하는 방식 채택.
-
-## 6. 테스트 전략
-
-**Decision**: (a) 신규 컨버터의 직렬화/역직렬화 라운드트립을 H2 기반 단위 테스트로 검증, (b) MySQL `json` 컬럼 타입 특이 동작(예: 저장 시 JSON 유효성 오류)은 Testcontainers MySQL 통합 테스트로 검증, (c) 기존 `CompanyMatchingOpenAICallerTest`에 "범위를 벗어난/중복된 month를 담은 응답이 기존 대상월 일치 검사로 이미 거부됨"을 확인하는 회귀 테스트 케이스를 추가(신규 검증 코드 없음 — 결정 #4 참고), (d) `JobRoleAnalyzerTest`에 음수 `FiveElements` 카운트(또는 동등한 비정상 입력)를 넣었을 때 `calculateMatchScore()`가 0 미만으로 내려가지 않는지 확인하는 회귀 테스트를 추가(결정 #4의 하한 클램프에 대응, tasks.md T019a).
-
-**Rationale**: 기존 테스트 인프라(H2 단위 + Testcontainers MySQL 통합)를 그대로 재사용하며 신규 의존성을 추가하지 않는다.
+- 컨버터는 `AbstractJsonConverter<T>`와 `CareerJsonObjectMapperSupport`를 공유한다.
+- 궁합 JSON 타입은 `CompatibilityAnalysisData`이며 summary는 별도 컬럼이다. AI DTO만 저장하면 내부 계산 결과가 빠지므로 AI 해설과 계산 결과를 합친 VO를 사용한다.
+- matchScore 하한 클램프 및 회귀 테스트(T019a)는 구현 완료됐다.
+- 이후 `004`의 분산락 도입으로 `SajuResultWriteService.saveNewResult`는 루트·JSON·관련 엔티티를 단일 트랜잭션으로 저장한다. INSERT IGNORE 자동 커밋 경로는 더 이상 현재 계약이 아니다.

@@ -52,7 +52,7 @@ When adding code, decide first which of these three areas it belongs to — they
 Three external systems, each behind `RestClient` + `@Retryable` (config beans in `config/FastApiRestClientConfig.java`, `config/PublicDataRestClientConfig.java`, `config/ChatClientConfig.java`, `config/RetryConfig.java`):
 
 1. **FastAPI** (`http://fastapi:8000/api/saju/calculate`) — computes only raw pillars/stems/branches/five-elements from birth date+time. Ten-gods and hidden-stems are deliberately *not* computed there — Spring owns that domain logic (`TenGodCalculator`, `HiddenStemCalculator` in `career/`), so FastAPI can change without touching domain correctness.
-2. **OpenAI** (via Spring AI `ChatClient`, JSON-mode) — career consultation, returns a large nested-record response (`CareerAdviceResponse` + 14+ nested records). Prompt building is externalized to `PromptProvider`, never inlined in a Service.
+2. **OpenAI** (via Spring AI `ChatClient`, JSON-mode) — career consultation (`career/caller/ConsultationOpenAICaller`, `CareerAdviceResponse`) and company compatibility narratives (`career/caller/CompanyMatchingOpenAICaller`, `CompatibilityNarrativeResponse`). Compatibility scores remain deterministic; AI generates the explanatory text. Prompt building is externalized to `PromptProvider`, never inlined in a Service.
 3. **공공데이터 API** — company founding year lookup, falls back to manual user input if not found.
 
 Retry rule (`RestClient` + `@Retryable`): 5xx and network/timeout exceptions must be re-thrown as-is so `@Retryable` can catch them; 4xx must be converted to a non-retryable domain exception (e.g. `InvalidSajuDataException`). Never convert 5xx into a custom exception — it breaks retry.
@@ -94,4 +94,4 @@ Two independent Spring Security configurations:
 
 ## Feature specs
 
-Design docs for each phase live under `../specs/`: `001-career-fortune-api`, `002-user-management`, `003-admin-dashboard` (each has `spec.md`/`plan.md`/`tasks.md`). Check the relevant spec before implementing a new feature in that area.
+Design docs for each phase live under `../specs/`: `001-career-fortune-api`, `002-user-management`, `003-admin-dashboard` plus `004-redis-hardening-refactor`, `005-compatibility-ai-narrative`, and `006-career-json-migration` (each has `spec.md`/`plan.md`/`tasks.md`). Check the relevant spec before implementing a new feature in that area.

@@ -8,7 +8,7 @@
 
 ## US1: 개인화된 해설 텍스트 확인
 
-1. 서로 다른 사용자/기업명/직군 조합으로 `POST /api/compatibility`를 5회 이상 요청(spec.md User Story 1의 Independent Test와 동일 표본 수)
+1. 서로 다른 사용자/기업명/직군 조합으로 `POST /api/company/compatibility`를 5회 이상 요청(spec.md User Story 1의 Independent Test와 동일 표본 수)
 2. 응답의 `summary`, `targetRoleAnalysis.synergy/warning`, `fiveElements.synergyDescription`, `actionableStrategy.weaknessDefense`, `expectedInterviewQuestions[]`, `roleCompatibility[].reason`, `monthlyForecast[].advice`, `cautions[]`를 표본 전체에서 서로 비교
 
 **기대 결과**: 8개 영역 모두, 표본 내에서 동일한 문구가 반복되는 비율이 5% 미만이다(SC-001과 동일 기준). [contracts/compatibility-narrative-contract.md](contracts/compatibility-narrative-contract.md) 참고.
@@ -44,3 +44,5 @@ cd SSAju
 ```
 
 `BUILD SUCCESSFUL` 확인 및 [SSAju/CLAUDE.md](../../SSAju/CLAUDE.md) 기준 커밋 전 필수 테스트 통과 확인.
+
+**검증 상태 (2026-10-12)**: AI 응답·재시도·점수·쿼터 보상 테스트는 구현되어 있다. 로컬 키 설정(T001), clean test(T017), 위 수동 시나리오(T018)는 사용자 요청에 따라 완료 처리했다. 이번 문서 수정에서 해당 항목을 새로 실행하거나 재검증하지 않았다.

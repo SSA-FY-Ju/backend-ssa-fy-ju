@@ -1,5 +1,7 @@
 # Research: 기업 궁합 분석 AI 해설 전환 및 점수 산정 일원화
 
+> **구현 반영 (2026-10-12)**: 아래는 최초 설계 결정의 기록이다. 최종 구현에서는 `calculatePrimary`를 제거하고 matchScore를 직접 재사용한다. 이후 `004`의 분산락 도입으로 INSERT IGNORE 저장은 `CompanyCompatibilitySaveService.saveWithLock(...)`으로 대체되었다. 보상은 `restoreQuietly(...)`가 담당하며 저장 성공 후 응답 조립 실패는 복원 대상이 아니다.
+
 ## 1. AI 해설 호출 방식: 1-call vs 필드별 개별 호출
 
 **Decision**: `ConsultationOpenAICaller`와 동일한 1-call JSON 모드 — 8개 해설 텍스트 필드를 하나의 `ChatClient` 호출로 한 번에 받는다(`CompatibilityNarrativeResponse` record로 매핑).

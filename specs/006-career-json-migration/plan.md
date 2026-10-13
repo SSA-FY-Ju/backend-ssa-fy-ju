@@ -4,9 +4,11 @@
 
 **Input**: Feature specification from `/specs/006-career-json-migration/spec.md`
 
+> **현재 상태 (2026-10-12)**: 구현 병합 완료(PR #47). 궁합은 `CompatibilityAnalysisData`를 JSON에 저장하고 summary는 별도 컬럼으로 유지한다. 이후 `004`의 저장 분산락·사용자 접근 매핑을 반영했다. 실제 개발 DB 적용 및 수동 검증은 사용자 요청에 따라 완료 처리했다([tasks.md](tasks.md)); 이번 문서 수정에서 재실행하지 않았다.
+
 ## Summary
 
-관운분석(`SajuResult`에 딸린 `TenGodData`/`HiddenStemData`), 커리어 컨설팅(`CareerConsultation`), 기업 궁합 분석(`CompanyCompatibility`) — 세 루트 엔티티에 딸린 정규화 자식 엔티티(각각 2/14/8개 직계, 다수의 손자 엔티티 포함)를 제거하고, AI/내부 분석 결과를 루트 엔티티당 JSON 컬럼 하나로 직렬화해 저장한다. (`CareerFortune` 자체는 이미 스칼라 컬럼뿐이라 변경 대상이 아니다.) 식별/조회에 쓰이는 스칼라 컬럼(예: `compatibilityMonth`, `consultationMonth`, 유니크 제약 필드)은 그대로 유지한다. 정합성 검사는 기존과 동일하게 AI 응답 DTO가 JSON으로 직렬화되기 *전* 단계(`ConsultationOpenAICaller.validate()` / `CompanyMatchingOpenAICaller.validate()`)에서 수행한다. 월(month) 범위는 기존 대상월 일치 검사가 이미 포괄하고, 점수(`MonthlyForecast.score`/`TargetRoleAnalysis.matchScore`)는 AI 응답 필드가 아니라 내부 결정론적 계산값이라 별도 caller 검증 코드 추가는 필요하지 않다 — 다만 그 계산(`JobRoleAnalyzer.calculateMatchScore()`)의 하한 클램프가 코드에 강제되어 있지 않음이 리뷰로 드러나 방어적 클램프를 추가한다(자세한 근거는 research.md #4 참고). 기존 저장 데이터는 개발 단계이므로 마이그레이션 스크립트 없이, 자식 테이블은 DROP, 컬럼 구조가 바뀌는 루트 테이블(`career_consultation`/`company_compatibility`/`saju_result`)은 스키마 변경 후 TRUNCATE로 제거한다. `saju_result`는 이를 FK로 참조하는 `saju_full_data`/`career_fortune`(구조 변경 없음)도 함께 TRUNCATE해 사주 결과 전체를 리셋하고, `user_satisfaction_feedback`은 행을 지우지 않고 `company_compatibility_id`/`career_consultation_id` FK만 NULL로 해제해 피드백 내용을 보존한다 — FK 그래프에 따른 절차는 research.md #5 참고.
+관운분석(`SajuResult`에 딸린 `TenGodData`/`HiddenStemData`), 커리어 컨설팅(`CareerConsultation`), 기업 궁합 분석(`CompanyCompatibility`) — 세 루트 엔티티에 딸린 정규화 자식 엔티티(각각 2/14/8개 직계, 다수의 손자 엔티티 포함)를 제거하고, AI/내부 분석 결과를 루트 엔티티당 JSON 컬럼 하나로 직렬화해 저장한다. (`CareerFortune` 자체는 이미 스칼라 컬럼뿐이라 변경 대상이 아니다.) 식별/조회에 쓰이는 스칼라 컬럼(예: `compatibilityMonth`, `consultationMonth`, 유니크 제약 필드)은 그대로 유지한다. 정합성 검사는 기존과 동일하게 AI 응답 DTO가 JSON으로 직렬화되기 *전* 단계(`ConsultationOpenAICaller.validate()` / `CompanyMatchingOpenAICaller.validate()`)에서 수행한다. 월(month) 범위는 기존 대상월 일치 검사가 이미 포괄하고, 점수(`MonthlyForecast.score`/`TargetRoleAnalysis.matchScore`)는 AI 응답 필드가 아니라 내부 결정론적 계산값이라 별도 caller 검증 코드 추가는 필요하지 않다 — 다만 그 계산(`JobRoleAnalyzer.calculateMatchScore()`)의 하한 클램프가 코드에 강제되어 있지 않음이 리뷰로 드러나 방어적 클램프를 추가한다(자세한 근거는 research.md #4 참고). 기존 개발 데이터 정리는 폐기 자식 테이블 DROP 및 유지 테이블 DELETE로 수행하며 피드백 내용을 보존한다. 현재 FK 및 스키마에 맞춘 적용 순서는 quickstart.md §2가 단일 기준이다.
 
 ## Technical Context
 
@@ -75,15 +77,15 @@ SSAju/src/main/java/ssafy/SSAju/
 │   │   └── CompanyMatchingOpenAICaller.java # 변경 없음(설계 근거 주석만 추가) — score/matchScore는 이 DTO에 없는 필드라 이관 불가, research.md #4 참고
 │   └── mapper/ConsultationMapper.java      # 변경: 엔티티 매핑 → JSON 직렬화로 교체
 ├── service/
-│   ├── CompatibilityChildSaveService.java  # 삭제 또는 단순 JSON 저장으로 교체
-│   ├── CompatibilityChildReadService.java  # 삭제 또는 단순 JSON 역직렬화로 교체
+│   ├── CompanyCompatibilitySaveService.java # 현재 JSON 저장 + 분산락(004 후속 반영)
+│   ├── CompatibilityChildReadService.java  # JSON 데이터로 응답 조립
 │   ├── ConsultationSaveService.java        # 변경
-│   └── ConsultationInsertService.java      # 변경
+│   └── (ConsultationInsertService.java)    # 이후 004에서 제거됨
 └── repository/
     ├── CareerFortuneRepository.java        # 영향 적음 (자식 리포지토리 없음)
     ├── CareerConsultationRepository.java    # 영향 적음
     ├── CompanyCompatibilityRepository.java  # 영향 적음
-    └── (Repository가 있는 자식/손자 엔티티 15개 전용 인터페이스만 삭제 대상 — 20개는 Repository 자체가 없어 엔티티 클래스만 삭제, data-model.md 참조)
+    └── (Repository가 있는 자식/손자 엔티티 15개 전용 인터페이스만 삭제 대상 — 18개는 Repository 자체가 없어 엔티티 클래스만 삭제, data-model.md 참조)
 
 SSAju/src/test/java/ssafy/SSAju/
 ├── career/caller/  # 기존 validate() 테스트 + JobRoleAnalyzer 하한 클램프 회귀 테스트 추가(T019a)
@@ -100,4 +102,4 @@ SSAju/src/test/java/ssafy/SSAju/
 |-----------|------------|-------------------------------------|
 | `SSAju/CLAUDE.md` "Data normalization pattern" 관례 위반 (JSON blob 대신 정규화 자식 엔티티를 선호하는 기존 문서화된 규칙과 반대 방향) | 저장소 전수 grep 결과, `compatibility_score`/`completed`/`confidence_score` 등 어떤 스칼라 결과 필드도 idempotency 조회 외 쿼리/필터/분석에 쓰이지 않음 — 정규화가 제공하는 "쿼리/인덱스 가능성"이라는 이점이 이 세 도메인에는 실질적으로 활용되지 않고 있음. 커리어 컨설팅은 정적 계산에서 AI 생성 콘텐츠로 전환 중이라 고정 스키마보다 유연한 구조가 필요 | 정규화 유지 시: (1) AI 응답 필드가 추가/변경될 때마다 자식 엔티티+마이그레이션+매퍼 코드를 계속 늘려야 함, (2) `REQUIRES_NEW` 다중 트랜잭션 저장 구조가 예정된 분산락 임계구역을 불필요하게 키움, (3) 실질적으로 조회조차 안 되는 필드를 위해 22개 테이블+리포지토리를 유지하는 비용이 이점보다 큼 |
 
-구현 완료 후 `SSAju/CLAUDE.md` "Data normalization pattern" 섹션을 이번 예외를 반영해 갱신해야 한다(별도 문서화 작업, tasks.md에 포함 권장).
+`SSAju/CLAUDE.md`의 JSON 저장 예외 문서화는 T025에서 완료됐다.

@@ -4,6 +4,8 @@
 
 **Input**: Feature specification from `specs/005-compatibility-ai-narrative/spec.md`
 
+> **현재 상태 (2026-10-12)**: `005` 구현 병합 완료(PR #45). 아래 계획의 INSERT IGNORE 경로는 이후 `004`의 `CompanyCompatibilitySaveService`로 대체되었다. 주 역할 점수는 matchScore를 직접 사용하며 `calculatePrimary`는 없다. 남은 환경·명령별 검증은 [tasks.md](tasks.md)에 기록한다.
+
 ## Summary
 
 `CompanyMatchingService.analyzeCompatibility`가 만들어내는 8개 해설 텍스트 필드(시너지/경고/오행 시너지 설명/약점 방어 전략/예상 면접 질문/역할별 사유/월별 조언/주의사항/요약)를 고정 템플릿 문자열 생성에서 `ConsultationOpenAICaller`와 동일한 1-call JSON 모드 OpenAI 호출로 대체한다. 숫자 점수(전체 궁합 점수, 직군 매칭 점수, 역할별 점수, 월별 운세 점수)는 기존 규칙 기반 계산을 그대로 유지하되, `JobRoleAnalyzer.matchScore`와 `RoleCompatibilityCalculator`가 각자 다른 가중치 공식을 쓰던 기존 불일치를 "역할별 점수가 이미 계산된 matchScore를 그대로 재사용"하는 방식으로 통합해 별도 산식을 없앤다. 분산락(`specs/004-redis-hardening-refactor` US5)은 이번 범위 밖이며, `analyzeCompatibility`는 지금과 동일하게 INSERT IGNORE 기반 경합 처리를 유지한다. 응답 JSON 필드 구조(`CompatibilityResponse` 및 하위 record)는 변경하지 않는다.
@@ -28,7 +30,7 @@
 - 외부 I/O(OpenAI)를 호출하는 `CompanyMatchingService.analyzeCompatibility`는 `@Transactional` 금지 원칙 유지(`skills/code-style-guide.md` 트랜잭션 절)
 - 분산락(`@DistributedLock`) 적용은 `specs/004-redis-hardening-refactor` US5(T035) 범위 — 이번 계획에서는 도입하지 않으며, 나중에 락이 적용될 때는 Redisson lease-time이 AI 호출 지연(최대 3회 재시도 포함)을 수용하는지만 재검토
 - 응답 JSON 필드 구조(`CompatibilityResponse` 및 모든 하위 record의 필드명·타입)는 변경 금지(FR-007, SC-005) — 프론트엔드 계약 유지
-- 쿼터 차감/복원은 `DailyApiUsageService.restoreDailyUsage` 보상 트랜잭션 패턴을 재사용하며, 기존 try/catch 범위를 AI 호출까지 확장
+- 쿼터 차감/복원은 `DailyApiUsageService.restoreDailyUsage` 보상 트랜잭션 패턴을 재사용하며, 기존 try/catch 범위를 AI 호출과 최종 저장까지 확장
 
 **Scale/Scope**: `career/util`(`JobRoleAnalyzer`, `RoleCompatibilityCalculator`, `AnalysisResponseBuilder`), `career/caller`(신규 `CompanyMatchingOpenAICaller`), `career/provider/PromptProvider`, `service/CompanyMatchingService`, `dto/external`(신규 `CompatibilityNarrativeResponse`)에 국한. 컨트롤러/DTO 구조, 엔티티 스키마, 인증/세션 등 다른 도메인은 범위 밖
 
@@ -87,7 +89,7 @@ SSAju/src/main/java/ssafy/SSAju/
 │   └── external/
 │       └── CompatibilityNarrativeResponse.java    # [신규] AI 해설 응답 record(8개 텍스트 필드 대응)
 └── service/
-    └── CompanyMatchingService.java                # [수정] AI 캐러 호출 추가, restoreDailyUsage try/catch 범위를 AI 호출까지 확장
+    └── CompanyMatchingService.java                # [수정] AI 캐러 호출 추가, restoreDailyUsage try/catch 범위를 AI 호출과 최종 저장까지 확장
 
 SSAju/src/test/java/ssafy/SSAju/
 ├── career/

@@ -14,19 +14,21 @@
 ./gradlew clean build
 ```
 
-기대 결과: `BUILD SUCCESSFUL`. 신규/변경된 컨버터 라운드트립 테스트(H2), MySQL JSON 컬럼 통합 테스트(Testcontainers), `validate()` range 검사 추가 테스트가 모두 통과해야 한다.
+기대 결과: `BUILD SUCCESSFUL`. 신규/변경된 컨버터 직접 직렬화/역직렬화 단위 테스트, MySQL JSON 컬럼 통합 테스트(Testcontainers), 기존 `validate()` 대상월 검사 및 matchScore 하한 클램프 회귀 테스트가 모두 통과해야 한다.
 
 ## 2. 스키마 수동 적용 (마이그레이션 스크립트 없음 — FR-009)
 
-research.md #5에서 확정한 절차에 따라 적용한다 (운영자가 로컬/개발 DB에서 수동 적용 — 이 문서/코드에 스크립트를 포함하지 않는다). `user_satisfaction_feedback`이 `company_compatibility`/`career_consultation`을, `saju_full_data`/`career_fortune`이 `saju_result`를 FK로 참조하고 있어 순서를 지키지 않으면 TRUNCATE가 거부된다:
+현재 엔티티와 실제 DB의 FK를 확인한 뒤 운영자가 로컬/개발 DB에 수동 적용한다. **이 문서는 적용 완료 기록이 아니다.** 이미 적용한 DB에서는 초기화를 반복하지 말고 스키마·데이터 상태만 확인한다.
 
-1. **사전 확인**: 대상 테이블(자식 24개 + 손자 다수, 루트 3개, `saju_full_data`/`career_fortune`, `user_satisfaction_feedback`)의 현재 행 수를 `SELECT COUNT(*)`로 기록해둔다. 별도 백업은 하지 않는다(운영 데이터 아님, 개발 단계 — FR-006 전제).
-2. **피드백 FK 해제 (삭제 아님)**: `UPDATE user_satisfaction_feedback SET company_compatibility_id = NULL, career_consultation_id = NULL WHERE company_compatibility_id IS NOT NULL OR career_consultation_id IS NOT NULL;` — 피드백 내용(행)은 보존하고 링크만 끊는다.
-3. **자식/손자 테이블 DROP**: `industry`, `interview_tip`, `monthly_forecast`, `target_role_analysis`, `ten_god_data`, `hidden_stem_data` 등(data-model.md 전체 목록) — **손자 → 자식 순**(가장 깊이 참조하는 테이블부터, 예: `ActionableKeyword`/`LuckyDay`를 `ActionableStrategy`보다 먼저)으로 DROP. 불확실하면 DROP 전 `information_schema.KEY_COLUMN_USAGE`로 참조 관계를 확인한다.
-4. **`career_consultation`/`company_compatibility` ALTER + TRUNCATE**: `result_json` JSON 컬럼을 추가하고 구 컬럼(`summary`, `day_master_description` 등)을 제거한 뒤 TRUNCATE.
-5. **`saju_full_data`/`career_fortune` TRUNCATE → `saju_result` ALTER + TRUNCATE**: 자식(`saju_full_data`, `career_fortune`)을 먼저 비운 뒤 `saju_result`에 `ten_god_hidden_stem_analysis` 컬럼을 추가하고 TRUNCATE — 구조적 일관성을 위해 사주 결과 전체를 리셋한다.
-6. **실패 시**: FK 제약으로 DROP/TRUNCATE가 거부되면 해당 테이블을 참조하는 다른 테이블을 먼저 처리하도록 순서를 재조정한다. `SET FOREIGN_KEY_CHECKS=0`으로 강제 우회하지 않는다.
-7. **검증**: DROP된 각 테이블에 대해 `SHOW TABLES LIKE '...'` 결과가 비어있는지, TRUNCATE된 각 테이블(`career_consultation`/`company_compatibility`/`saju_full_data`/`career_fortune`/`saju_result`)은 `SELECT COUNT(*)`가 0인지, `user_satisfaction_feedback`은 1단계에서 기록한 행 수와 동일한지(삭제 없음, FK만 NULL) 확인한다.
+MySQL InnoDB는 다른 테이블의 FK 제약이 남아 있으면 참조 행이 0건이거나 NULL이어도 부모 테이블의 TRUNCATE를 거부한다. 따라서 유지할 테이블의 데이터는 FK를 보존한 채 **DELETE**로 정리한다. [MySQL 8.0 TRUNCATE 문서](https://dev.mysql.com/doc/refman/8.0/en/truncate-table.html) 참고.
+
+1. 분석 요청을 중지하고 대상 테이블의 스키마·FK와 행 수를 기록한다. 사용자/프로필과 피드백 내용은 보존 대상이다.
+2. `user_satisfaction_feedback`의 `company_compatibility_id`/`career_consultation_id`만 NULL로 갱신한다. 행은 삭제하지 않는다.
+3. 폐기할 정규화 손자 → 자식 테이블을 DROP한다([data-model](data-model.md) 목록과 실제 FK 대조). `industry_recommended_role` 같은 연결 테이블도 포함한다.
+4. `career_consultation`, `company_compatibility`의 기존 결과 행을 DELETE한다. `saju_full_data`, `career_fortune`, `user_saju_access`의 결과 참조 행을 DELETE한 뒤 `saju_result`를 DELETE한다. 접근 매핑 테이블 자체와 users/user_profile 행은 유지한다.
+5. 빈 루트 테이블에 현재 엔티티와 동일한 JSON 컬럼을 적용한다: `career_consultation.result_json`(NOT NULL), `company_compatibility.result_json`, `saju_result.ten_god_hidden_stem_analysis`. 컨설팅의 `day_master_description`/`five_elements_analysis`는 제거하지만 **궁합의 `summary`는 유지**한다. 식별 컬럼·유니크 제약은 보존한다.
+6. 실패하면 실제 FK를 확인해 참조 해제/삭제 순서를 바로잡는다. `FOREIGN_KEY_CHECKS=0`으로 우회하지 않는다.
+7. 새 분석 요청 전에 폐기 테이블 부재, 결과·접근 매핑 테이블 행 수 0, 피드백 행 수 보존과 두 FK의 NULL 상태를 확인한다. 이후 신규 요청으로 JSON 저장·재조회와 `user_saju_access` 재생성을 검증한다.
 
 ## 3. 시나리오별 검증
 
@@ -34,9 +36,9 @@ research.md #5에서 확정한 절차에 따라 적용한다 (운영자가 로�
 
 **3.1.1 기업 궁합 분석**
 
-1. `POST /api/career/compatibility` 요청 (유효한 회사명/직군)
+1. `POST /api/company/compatibility` 요청 (유효한 회사명/직군)
 2. 응답이 정상적으로 반환되는지 확인
-3. DB에서 `company_compatibility.result_json` 컬럼을 직접 조회 — 검증을 통과한 AI 응답 전체가 JSON으로 저장되어 있는지, 응답 필드·값이 API 응답과 일치하는지 확인
+3. DB에서 `company_compatibility.result_json` 컬럼을 직접 조회 — AI 해설과 계산 결과를 합친 `CompatibilityAnalysisData`가 저장되는지 확인. `summary`/`compatibility_score`는 별도 루트 컬럼이며, 이 값과 JSON을 조합한 API 응답이 일치해야 한다
 4. 같은 조건으로 재조회 시 재계산 없이 저장된 결과가 그대로 반환되는지 확인 (idempotency 스칼라 컬럼 `compatibility_month` 등으로 조회됨)
 
 **3.1.2 커리어 컨설팅**
@@ -57,19 +59,19 @@ research.md #5에서 확정한 절차에 따라 적용한다 (운영자가 로�
 
 1. 테스트 더블/모킹으로 `monthlyAdvices`의 month 집합이 기대값과 다른 OpenAI 응답을 주입
 2. 저장이 거부되고 오류가 반환되는지 확인
-3. DB에 어떤 부분 데이터도 저장되지 않았는지 확인 (`result_json` NULL 또는 행 자체 없음)
+3. DB에 어떤 부분 데이터도 저장되지 않았는지 확인 (실패 요청이 신규 분석 결과를 남기지 않고 기존 결과를 변경하지 않아야 함)
 4. `monthlyAdvices`에 범위를 벗어나거나(13 이상 등) 기대 대상월과 다른 month 값을 담은 응답을 주입 — 신규 range 검사 코드가 아니라 기존 "대상월 집합 일치" 검사만으로 이미 거부되는지 확인 (research.md #4 — `score`/`matchScore`는 OpenAI 응답 필드가 아니라 내부 계산값이라 이 시나리오의 대상이 아님)
 
 ### 3.3 동시 요청 — 중복 방지 (Edge Case / FR-007)
 
 1. 동일 식별 키(같은 회사/직군/월)로 동시에 2개 요청 발송
-2. 최종적으로 정확히 1건의 `company_compatibility` 행만 생성되었는지 확인
+2. 외부 FastAPI/OpenAI 중복 호출은 허용된다(현재 `004`의 저장 구간 분산락 정책). 최종적으로 정확히 1건의 `company_compatibility` 행만 생성되었는지 확인
 3. 두 요청 모두 동일한 결과를 응답받는지 확인
 
 ### 3.4 기존 데이터 제거 확인 (User Story 3)
 
 1. §2에서 DROP한 자식/손자 테이블(`industry`, `monthly_forecast`, `ten_god_data` 등)이 더 이상 존재하지 않는지 확인 (`SHOW TABLES`)
-2. §2에서 ALTER+TRUNCATE한 테이블(`career_consultation`, `company_compatibility`, `saju_full_data`, `career_fortune`, `saju_result`)의 행 수가 0건인지 확인
+2. §2에서 정리한 테이블(`career_consultation`, `company_compatibility`, `saju_full_data`, `career_fortune`, `user_saju_access`, `saju_result`)의 행 수가 0건인지 확인
 3. `user_satisfaction_feedback`의 행 수가 §2 1단계 사전 확인 값과 동일하고(삭제되지 않음), `company_compatibility_id`/`career_consultation_id`가 모두 `NULL`인지 확인
 4. 신규 요청이 정상적으로 새 구조로 저장되는지 확인
 
@@ -78,3 +80,5 @@ research.md #5에서 확정한 절차에 따라 적용한다 (운영자가 로�
 - 저장-전 검증 계약: [contracts/json-storage-and-validation-contract.md](contracts/json-storage-and-validation-contract.md)
 - 엔티티/컬럼 변경 상세: [data-model.md](data-model.md)
 - 설계 근거: [research.md](research.md)
+
+**검증 상태 (2026-10-12)**: Testcontainers 테스트는 신규 스키마의 저장/조회 및 피드백 FK 해제 가능성을 검증한다. 실제 개발 DB 적용·재요청·수동 시나리오·clean build(T022/T024/T026/T027)는 사용자 요청에 따라 완료 처리했다. 이번 문서 수정에서 해당 항목을 새로 실행하거나 재검증하지 않았다.

@@ -6,6 +6,10 @@ description: "Task list for 기업 궁합 분석 AI 해설 전환 및 점수 산
 
 # Tasks: 기업 궁합 분석 AI 해설 전환 및 점수 산정 일원화
 
+**상태 정리 (2026-10-12)**: 구현은 `main`에 병합됨(7331796 / PR #45). 완료 체크는 현재 코드·테스트·커밋 이력을 대조한 결과이며, 이번 문서 정리에서 테스트나 DB 작업을 새로 실행한 기록이 아니다. 기존 2026-10-11 전체 테스트 기록은 387개 통과(실패/오류/스킵 0)다. 이전에 미확인으로 남겨둔 환경·수동 검증 및 clean 명령 항목은 2026-10-12 사용자 요청에 따라 완료 처리했다. Codex가 해당 항목을 새로 실행하거나 재검증한 것은 아니다.
+
+**남은 항목**: 없음(사용자 요청에 따른 완료 처리 포함).
+
 **Input**: Design documents from `specs/005-compatibility-ai-narrative/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/](./contracts/), [quickstart.md](./quickstart.md)
@@ -30,7 +34,7 @@ description: "Task list for 기업 궁합 분석 AI 해설 전환 및 점수 산
 
 **Purpose**: 신규 외부 의존성 없음(기존 Spring AI `ChatClient`/`spring-retry` 재사용) — 로컬 환경 확인만 필요
 
-- [ ] T001 로컬 `SSAju/application-local.yaml`에 `OPENAI_API_KEY`가 설정되어 있는지 확인(기존 `ConsultationOpenAICaller`와 동일 키 재사용, `build.gradle` 변경 불필요)
+- [x] T001 로컬 `SSAju/application-local.yaml`에 `OPENAI_API_KEY`가 설정되어 있는지 확인(기존 `ConsultationOpenAICaller`와 동일 키 재사용, `build.gradle` 변경 불필요)
 
 **Checkpoint**: `cd SSAju && ./gradlew build` 성공(기존과 동일, 신규 의존성 없으므로 변화 없어야 함)
 
@@ -52,17 +56,17 @@ description: "Task list for 기업 궁합 분석 AI 해설 전환 및 점수 산
 
 ### Tests for User Story 1
 
-- [ ] T002 [P] [US1] 단위 테스트 `SSAju/src/test/java/ssafy/SSAju/career/caller/CompanyMatchingOpenAICallerTest.java` 작성 — `ConsultationOpenAICallerTest` 패턴 참고: `ResourceAccessException`/`TransientAiException` 재시도(3회, 지수 백오프), `NonTransientAiException`→`OpenAIApiException` 비재시도 변환, 응답 검증 실패(필수 필드 누락) 시 `OpenAIApiException` 확인
-- [ ] T003 [P] [US1] `SSAju/src/test/java/ssafy/SSAju/service/CompanyMatchingServiceTest.java`에 케이스 추가 — `ChatClient`/`CompanyMatchingOpenAICaller`를 mock으로 대체했을 때 응답의 8개 텍스트 필드가 mock 응답값을 그대로 반영하는지, 캐시 히트 시 AI가 재호출되지 않는지 확인(구현 전 실패 확인 필수)
+- [x] T002 [P] [US1] `CompanyMatchingOpenAICallerTest.java`의 응답 검증·예외 분류 테스트와 `CompanyMatchingOpenAICallerRetryTest.java`의 Spring 프록시 기반 재시도 테스트 구현
+- [x] T003 [P] [US1] `SSAju/src/test/java/ssafy/SSAju/service/CompanyMatchingServiceTest.java`에 케이스 추가 — `ChatClient`/`CompanyMatchingOpenAICaller`를 mock으로 대체했을 때 응답의 8개 텍스트 필드가 mock 응답값을 그대로 반영하는지, 캐시 히트 시 AI가 재호출되지 않는지 확인(구현 전 실패 확인 필수)
 
 ### Implementation for User Story 1
 
-- [ ] T004 [P] [US1] `dto/external/CompatibilityNarrativeResponse.java` 생성(최상위 `ssafy.SSAju.dto.external` 패키지 — 기존 `FastAPIResponse`/`CareerAdviceResponse`와 동일 위치, `career/` 하위 아님) — [data-model.md](./data-model.md)의 필드 정의(`summary`, `roleSynergy`, `roleWarning`, `fiveElementsSynergyDescription`, `weaknessDefense`, `interviewQuestions[]`, `primaryRoleReason`, `secondaryRoleReason`, `monthlyAdvices[]`, `cautions[]`) 그대로 record로 작성
-- [ ] T005 [US1] `career/provider/PromptProvider.java`에 `getCompatibilityNarrativePrompt(...)` 메서드 추가 — [contracts/compatibility-narrative-contract.md](./contracts/compatibility-narrative-contract.md)의 입력(사용자/기업 오행·지장간·일간, 이미 계산된 점수 3종, 직군)을 받아 프롬프트 문자열 조립, "점수는 재계산하지 말고 해설만 작성" 지시 포함, `monthlyAdvices` 5개 고정 명시 (T004 의존)
-- [ ] T006 [US1] `career/caller/CompanyMatchingOpenAICaller.java` 생성 — `ConsultationOpenAICaller`와 동일하게 `@Retryable(retryFor={ResourceAccessException.class, TransientAiException.class}, noRetryFor={OpenAIApiException.class, HttpMessageConversionException.class}, maxAttempts=3)` + `@Recover` 3종 + `validate()`(null/blank 금지, `interviewQuestions` 최소 1개, `monthlyAdvices` 정확히 5개, `cautions` 최소 1개) 구현 (T004, T005 의존)
-- [ ] T007 [US1] `career/util/JobRoleAnalyzer.java` 수정 — `buildSynergyText`/`buildWarningText`(및 관련 문구 상수 `SYNERGY_*_FMT`/`WARNING_*_FMT`) 삭제, `analyze()`는 `matchScore` 계산만 반환하도록 축소(문구는 AI 응답으로 대체되므로 `RoleAnalysis` VO의 synergy/warning은 호출부에서 AI 값으로 채움)
-- [ ] T008 [US1] `career/util/AnalysisResponseBuilder.java` 수정 — `buildElementSynergyText`, `buildForecastMessage`(문구 생성부만, `status`/`score` 산정 로직은 유지), `buildInterviewQuestions`, `buildCautions`, `buildSummary`의 템플릿 문자열 생성 로직 제거하고 `CompatibilityNarrativeResponse` 값을 그대로 받아 조립하도록 시그니처 변경(`buildActionableStrategy`는 `weaknessDefense` 파라미터만 AI 값으로 교체, `luckyDays`/`preferredTime` 로직은 유지)
-- [ ] T009 [US1] `service/CompanyMatchingService.java` 수정 — 궁합 점수·`matchScore` 계산 완료 후 `CompanyMatchingOpenAICaller.call(...)` 호출 추가, 반환된 `CompatibilityNarrativeResponse`를 T007/T008에서 축소된 메서드들에 전달해 최종 응답 조립 (T006, T007, T008 의존)
+- [x] T004 [P] [US1] `dto/external/CompatibilityNarrativeResponse.java` 생성(최상위 `ssafy.SSAju.dto.external` 패키지 — 기존 `FastAPIResponse`/`CareerAdviceResponse`와 동일 위치, `career/` 하위 아님) — [data-model.md](./data-model.md)의 필드 정의(`summary`, `roleSynergy`, `roleWarning`, `fiveElementsSynergyDescription`, `weaknessDefense`, `interviewQuestions[]`, `primaryRoleReason`, `secondaryRoleReason`, `monthlyAdvices[]`, `cautions[]`) 그대로 record로 작성
+- [x] T005 [US1] `career/provider/PromptProvider.java`에 `getCompatibilityNarrativePrompt(...)` 메서드 추가 — [contracts/compatibility-narrative-contract.md](./contracts/compatibility-narrative-contract.md)의 입력(사용자/기업 오행·지장간·일간, 이미 계산된 점수 3종, 직군)을 받아 프롬프트 문자열 조립, "점수는 재계산하지 말고 해설만 작성" 지시 포함, `monthlyAdvices` 5개 고정 명시 (T004 의존)
+- [x] T006 [US1] `career/caller/CompanyMatchingOpenAICaller.java` 생성 — `ConsultationOpenAICaller`와 동일하게 `@Retryable(retryFor={ResourceAccessException.class, TransientAiException.class}, noRetryFor={OpenAIApiException.class, HttpMessageConversionException.class}, maxAttempts=3)` + `@Recover` 3종 + `validate()`(null/blank 금지, `interviewQuestions` 최소 1개, `monthlyAdvices` 정확히 5개, `cautions` 최소 1개) 구현 (T004, T005 의존)
+- [x] T007 [US1] `career/util/JobRoleAnalyzer.java` 수정 — `buildSynergyText`/`buildWarningText`(및 관련 문구 상수 `SYNERGY_*_FMT`/`WARNING_*_FMT`) 삭제, `analyze()`는 `matchScore` 계산만 반환하도록 축소(문구는 AI 응답으로 대체되므로 `RoleAnalysis` VO의 synergy/warning은 호출부에서 AI 값으로 채움)
+- [x] T008 [US1] `career/util/AnalysisResponseBuilder.java` 수정 — `buildElementSynergyText`, `buildForecastMessage`(문구 생성부만, `status`/`score` 산정 로직은 유지), `buildInterviewQuestions`, `buildCautions`, `buildSummary`의 템플릿 문자열 생성 로직 제거하고 `CompatibilityNarrativeResponse` 값을 그대로 받아 조립하도록 시그니처 변경(`buildActionableStrategy`는 `weaknessDefense` 파라미터만 AI 값으로 교체, `luckyDays`/`preferredTime` 로직은 유지)
+- [x] T009 [US1] `service/CompanyMatchingService.java` 수정 — 궁합 점수·`matchScore` 계산 완료 후 `CompanyMatchingOpenAICaller.call(...)` 호출 추가, 반환된 `CompatibilityNarrativeResponse`를 T007/T008에서 축소된 메서드들에 전달해 최종 응답 조립 (T006, T007, T008 의존)
 
 **Checkpoint**: `cd SSAju && ./gradlew test`로 US1 관련 테스트 통과 확인 — 이 시점에 궁합 분석 해설 텍스트가 AI 기반으로 완전히 전환됨
 
@@ -76,14 +80,14 @@ description: "Task list for 기업 궁합 분석 AI 해설 전환 및 점수 산
 
 ### Tests for User Story 2
 
-- [ ] T010 [P] [US2] `SSAju/src/test/java/ssafy/SSAju/career/util/RoleCompatibilityCalculatorTest.java` 갱신 — `calculatePrimary(int matchScore)`가 입력값을 그대로 반환(cap 100)하는지, `calculateSecondary`가 `-15` 페널티를 적용하되 결과가 음수면 0으로 하한 적용하는지(예: `matchScore=10` → `secondaryScore=0`, `matchScore=50` → `secondaryScore=35`) 검증(구현 전 컴파일 실패 확인 — 시그니처 변경 대상)
-- [ ] T011 [P] [US2] `SSAju/src/test/java/ssafy/SSAju/career/util/JobRoleAnalyzerTest.java` 갱신 — 텍스트(synergy/warning) 관련 단언 제거, `matchScore` 계산 케이스만 유지·검증
+- [x] T010 [P] [US2] `RoleCompatibilityCalculatorTest.java`에서 보조 역할의 -15 페널티와 하한 0을 검증. 주 역할이 matchScore를 재사용하는 흐름은 `CompanyMatchingServiceTest.java`에서 확인
+- [x] T011 [P] [US2] `SSAju/src/test/java/ssafy/SSAju/career/util/JobRoleAnalyzerTest.java` 갱신 — 텍스트(synergy/warning) 관련 단언 제거, `matchScore` 계산 케이스만 유지·검증
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] `career/util/RoleCompatibilityCalculator.java` 수정 — `calculatePrimary(FiveElements, JobCategoryEnum)` 시그니처를 `calculatePrimary(int matchScore)`로 단순화하고 자체 산식(`주오행×30+40`) 및 관련 상수 사용 제거, `calculateSecondary`는 변경 없음 (T010 의존)
-- [ ] T013 [US2] `career/util/AnalysisResponseBuilder.java`의 `buildRoleCompatibilities(...)` 수정 — `JobRoleAnalyzer.analyze(...)`가 반환한 `matchScore`를 `roleCompatibilityCalculator.calculatePrimary(matchScore)`에 전달하도록 호출부 변경(T008과 같은 파일이므로 **US1 완료 후 진행**, T012 의존)
-- [ ] T014 [P] [US2] `career/util/AnalysisConstants.java`에서 더 이상 쓰이지 않는 `PRIMARY_ROLE_SCORE_MULTIPLIER`, `PRIMARY_ROLE_SCORE_BASE` 상수 제거(F: 죽은 코드 정리, T012 완료 후 사용처 없음을 확인한 뒤 진행)
+- [x] T012 [US2] `RoleCompatibilityCalculator`의 주 역할 산식 및 `calculatePrimary` 메서드 제거. `CompanyMatchingService`가 이미 계산한 matchScore를 주 역할 점수로 직접 재사용하며 계산기는 `calculateSecondary(int)`만 담당
+- [x] T013 [US2] `CompanyMatchingService`가 matchScore와 secondaryScore를 `AnalysisResponseBuilder.buildRoleCompatibilities(...)`에 전달하도록 변경. 별도 주 역할 계산 호출 없음 (T008, T012 의존)
+- [x] T014 [P] [US2] `career/util/AnalysisConstants.java`에서 더 이상 쓰이지 않는 `PRIMARY_ROLE_SCORE_MULTIPLIER`, `PRIMARY_ROLE_SCORE_BASE` 상수 제거(F: 죽은 코드 정리, T012 완료 후 사용처 없음을 확인한 뒤 진행)
 
 **Checkpoint**: `cd SSAju && ./gradlew test`로 US1+US2 테스트 모두 통과 확인 — 직군 매칭 점수와 역할별 점수가 하나의 산식에서 파생됨
 
@@ -97,11 +101,11 @@ description: "Task list for 기업 궁합 분석 AI 해설 전환 및 점수 산
 
 ### Tests for User Story 3
 
-- [ ] T015 [US3] `SSAju/src/test/java/ssafy/SSAju/service/CompanyMatchingServiceTest.java`에 케이스 2종 추가 — (1) `CompanyMatchingOpenAICaller.call(...)`이 예외를 던지도록 mock 설정 시, (2) AI 호출은 성공하지만 이후 `companyCompatibilityJdbcRepository.insertOrIgnore`/`childSaveService.saveAllAndMarkCompleted`가 예외를 던지도록 mock 설정 시 — 두 경우 모두 `dailyApiUsageService.restoreDailyUsage(userId, usageDate)`가 호출되고 원본 예외가 그대로 전파되는지 검증(구현 전 실패 확인 필수, T009 완료 후 작성 — 같은 대상 메서드)
+- [x] T015 [US3] `CompanyMatchingServiceTest.java`에서 AI 호출 실패와 `CompanyCompatibilitySaveService.saveWithLock(...)` 실패 시 `restoreQuietly(userId, usageDate, originalException)` 호출 및 원본 예외 전파 확인. 경합으로 기존 행 재사용 시 복원, 저장 성공 후 응답 조립 실패 시 미복원도 검증
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] `service/CompanyMatchingService.java` 수정 — 기존 `try { calculateSajuData(...) } catch (RuntimeException e) { restoreDailyUsage(...); throw e; }` 블록의 범위를 T009에서 추가한 `CompanyMatchingOpenAICaller.call(...)` 호출과 이후 `insertOrIgnore`/`childSaveService.saveAllAndMarkCompleted` 저장 단계까지 확장(사주 계산·AI 호출·최종 저장 중 어디서 실패하든 동일하게 보상 — spec.md US3 Acceptance Scenario 2, `specs/004-redis-hardening-refactor` US6/T045-2와 동일한 확장 방식) (T009, T015 의존)
+- [x] T016 [US3] `CompanyMatchingService.analyzeCompatibility`에서 `analyzeAndPersist(...)`의 사주 계산·AI 호출·최종 저장을 보상 범위로 포함. 실패 시 `restoreQuietly(...)`로 복원하고 원본 예외 전파. 저장 성공 후 응답 조립은 보상 범위 밖 (T009, T015 의존)
 
 **Checkpoint**: `cd SSAju && ./gradlew test`로 US1+US2+US3 전체 테스트 통과 확인 — AI 실패가 쿼터에 영향을 주지 않음이 검증됨
 
@@ -111,9 +115,9 @@ description: "Task list for 기업 궁합 분석 AI 해설 전환 및 점수 산
 
 **Purpose**: 전체 통합 검증 및 마무리
 
-- [ ] T017 `cd SSAju && ./gradlew clean test` 실행 — 전체 스위트 `BUILD SUCCESSFUL` 확인
-- [ ] T018 [P] `quickstart.md`의 US1~US3 시나리오를 로컬(`./gradlew bootRun`)에서 수동 실행하여 최종 확인
-- [ ] T019 [P] `SSAju/CLAUDE.md` 갱신 여부 검토 — `career/caller/CompanyMatchingOpenAICaller` 신설 등 아키텍처 변경 사항이 문서화 기준에 해당하면 반영
+- [x] T017 `cd SSAju && ./gradlew clean test` 실행 — 전체 스위트 `BUILD SUCCESSFUL` 확인
+- [x] T018 [P] `quickstart.md`의 US1~US3 시나리오를 로컬(`./gradlew bootRun`)에서 수동 실행하여 최종 확인
+- [x] T019 [P] `SSAju/CLAUDE.md` 갱신 여부 검토 — `career/caller/CompanyMatchingOpenAICaller` 신설 등 아키텍처 변경 사항이 문서화 기준에 해당하면 반영
 
 ---
 
@@ -186,4 +190,4 @@ Task: "CompatibilityNarrativeResponse.java 생성"
 - `[Story]` 라벨은 각 태스크의 추적성을 위해 부여됨
 - 각 태스크 또는 논리적 그룹 단위로 커밋(`skills/git-workflow.md` 규칙 준수, 커밋 메시지에 `[Test Passed]` 푸터 필수)
 - 체크포인트마다 스토리 단독 동작을 검증 후 정지 가능
-- 분산락(`@DistributedLock`) 적용은 이번 tasks.md 범위 밖 — `specs/004-redis-hardening-refactor`의 US5(T035)에서 별도 진행하며, 합류 시 Redisson lease-time만 재검토(spec.md Assumptions 참고)
+- 분산락(`@DistributedLock`) 적용은 이 스펙의 최초 구현 범위 밖이었으며, 현재는 `004` US5에서 구현된 `CompanyCompatibilitySaveService`가 DB 저장 구간을 보호한다. 외부 AI 호출 중복은 허용하고 결과 행 중복을 막는다
