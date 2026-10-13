@@ -254,17 +254,23 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 
 - [ ] T058 [P] [US9] `controller/CareerTimingController.java`, `controller/CompatibilityController.java`, `controller/ConsultationController.java`를 `career/controller/`로 이동, 패키지 선언 및 import 갱신(C1) — `FeedbackController.java`는 T047에서 이미 이동 완료
 - [ ] T059 [P] [US9] `dto/request/CareerTimingRequest.java`, `CompatibilityRequest.java`, `ConsultationRequest.java` 및 `dto/response/CareerTimingResponse.java`, `CompatibilityResponse.java`, `ConsultationResponse.java`를 `career/dto/request/`, `career/dto/response/`로 이동(C1) — `SatisfactionFeedbackRequest`/`Response`는 T047에서 이미 이동 완료. 이동 후 T064의 `CompatibilityRequest` 검증 추가 위치도 새 경로 기준으로 적용
-- [ ] T060 [US9] 빈 클래스 `config/WebMvcConfig.java` 삭제(C6)
+- [x] T060 [US9] 빈 클래스 `config/WebMvcConfig.java` 삭제(C6)
 - [ ] T061 [US9] `config/AsyncConfig.java`에 `AsyncUncaughtExceptionHandler` 구현체 등록(C8)
 - [ ] T062 [US9] 코드베이스 전수 검색(`Instant.now()`/`LocalDateTime.now()`)으로 잔여 시스템 시간 직접 호출 지점을 찾아 주입된 `Clock`으로 교체(C7, T018에서 다룬 `AuthService` 외 잔여 지점)
 - [ ] T063 [P] [US9] `admin/dto/UsageAdjustmentRequestDTO.java`의 `action`/`amount` 필드에 `@NotNull` 추가(E1)
 - [ ] T064 [P] [US9] (T059 이동 후) `career/dto/request/CompatibilityRequest.java`의 시간 관련 필드(`userBirthTime`, `companyFoundingTime` 등)에 `@NotNull` 추가(E2, 필수/선택 여부는 US7의 선택적 출생시간 정책과 충돌하지 않는 필드만 대상 — 사용자 궁합 분석 요청 자체의 필수 입력 검증)
 - [ ] T065 [US9] `exception/FeedbackNotAllowedException.java`, `exception/TokenHashException.java`를 `exception/SajuException` 계층 하위로 편입, `handler/SajuGlobalExceptionHandler.java`에 `TokenHashException` 전용 `@ExceptionHandler` 추가(D1)
-- [ ] T066 [P] [US9] 죽은 코드 삭제 — `exception/InvalidPasswordException.java` 및 `handler/SajuGlobalExceptionHandler.java` 내 대응 핸들러, 그 외 사용되지 않는 상수/리포지토리 메서드/DTO 전수 검색 후 삭제(F)
-- [ ] T067 [US9] `entity/RefreshToken.java`, `repository/RefreshTokenRepository.java` 삭제(US1에서 Redis로 대체 완료 확인 후), `refresh_token` 테이블 DROP용 DDL을 별도 스키마 마이그레이션 파일로 준비(스키마 변경 스크립트는 데이터 마이그레이션과 달리 커밋 가능하나 실행은 배포 절차에 따름)
+- [x] T066 [P] [US9] 죽은 코드 삭제 — `exception/InvalidPasswordException.java` 및 `handler/SajuGlobalExceptionHandler.java` 내 대응 핸들러, 그 외 사용되지 않는 상수/리포지토리 메서드/DTO 전수 검색 후 삭제(F)
+- [x] T067 [US9] `entity/RefreshToken.java`, `repository/RefreshTokenRepository.java` 삭제(US1에서 Redis로 대체 완료 확인 후), `refresh_token` 테이블 DROP용 DDL을 별도 스키마 마이그레이션 파일로 준비(스키마 변경 스크립트는 데이터 마이그레이션과 달리 커밋 가능하나 실행은 배포 절차에 따름)
 - [x] T068 [US9] `admin/service/AdminUsageAdjustmentService.java`의 "커밋 이후 완료 로그 기록" 패턴을 공통 유틸(`admin/service/AdminAuditLogUtil.java` 등)로 추출하고, `AdminUsageAdjustmentService` 및 T057에서 작성한 `AdminAuthenticationService` 감사로그 기록 코드가 이 유틸을 사용하도록 리팩토링(G2)
 - [ ] T069 [P] [US9] 서로 다른 4가지 페이지네이션 방식을 사용하는 컨트롤러(`admin/controller/*`, `controller/*` 전수 검색으로 식별)에 각 방식의 채택 이유를 주석으로 문서화(H1)
 - [ ] T070 [US9] `admin/repository/AdminUserQueryRepository.java`의 `findUserById` 내 N+1 위험 쿼리를 조인/배치 조회로 분리·호이스팅(H2)
+
+**죽은 코드 정리 검증 (2026-10-13)**: US7(회원가입 생년월일/선택적 출생시간)은 계속 보류하고 T060·T066·T067을 완료했다. `InvalidPasswordException`과 대응 핸들러, 빈 `WebMvcConfig`, 미사용 `AdminLoginResponseDTO`·`SuccessMessageConstants`, 리포지토리 메서드 9개, 상수 9개, 폐기된 T049 테스트 TODO를 제거했다. 로그인 실패 통합 테스트에 `INVALID_CREDENTIALS` 응답 코드 확인을 보강했다. Spring 자동 등록 설정·리포지토리 및 쿼터 검증 테스트에서 사용하는 조회 메서드는 유지했다.
+
+Redis 경로만 사용함을 확인한 뒤 JPA `RefreshToken`·`RefreshTokenRepository`를 제거했다. [테이블 삭제 DDL](migrations/20261013_drop_legacy_refresh_token.sql)은 수동 배포용으로 준비했으며 DB에는 실행하지 않았다. 모든 인스턴스의 Redis 인증 전환 완료 후 대상 DB·백업을 확인해 적용한다.
+
+각 코드 커밋 전 `cd SSAju && ./gradlew test` → `BUILD SUCCESSFUL`, 387개 테스트 통과(실패/오류/스킵 0). T074의 삭제 대상 타입·메서드 잔여 참조 검색도 완료했다. 다른 US9 태스크와 전체 수동 시나리오 검증은 미완료 상태를 유지한다.
 
 **Checkpoint**: `./gradlew test` 통과 — 모든 User Story가 구조적으로 정리된 상태로 함께 동작
 
@@ -277,7 +283,7 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 - [ ] T071 `cd SSAju && ./gradlew clean test` 실행 — 전체 스위트(단위+통합+동시성) `BUILD SUCCESSFUL` 확인
 - [ ] T072 [P] `SSAju/CLAUDE.md` 갱신 — `career/controller`, `career/dto` 신설, Redis/Redisson 도입, `AbstractJwtValidationFilter` 등 아키텍처 변경 사항 반영
 - [ ] T073 `quickstart.md`의 9개 User Story 시나리오를 로컬(`./gradlew bootRun` + Redis/MySQL 컨테이너)에서 수동 실행하여 최종 확인
-- [ ] T074 최종 전수 검색 — `FeedbackType`, `InvalidPasswordException`, `entity/RefreshToken`(JPA), `insertOrIgnore` 관련 잔여 참조가 코드베이스에 없는지 확인
+- [x] T074 최종 전수 검색 — `FeedbackType`, `InvalidPasswordException`, `entity/RefreshToken`(JPA), `insertOrIgnore` 관련 잔여 참조가 코드베이스에 없는지 확인
 
 ---
 

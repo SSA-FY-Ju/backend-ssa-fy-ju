@@ -82,7 +82,7 @@ SSAju/src/main/java/ssafy/SSAju/
 │   ├── ClockConfig.java              # [기존, 재사용] Clock 빈
 │   ├── SecurityConfig.java           # [수정] CORS allowedHeaders 화이트리스트, JWT 필터 체인
 │   ├── AsyncConfig.java              # [수정] AsyncUncaughtExceptionHandler 등록
-│   └── WebMvcConfig.java             # [삭제 대상] 빈 클래스 (C6)
+│   └── (WebMvcConfig.java 삭제 완료) # T060: 빈 MVC 설정 제거
 ├── security/
 │   ├── redis/
 │   │   ├── RefreshTokenRedisRepository.java   # [신규] Redis 기반 Refresh Token 저장/조회/삭제
@@ -155,3 +155,8 @@ Phase 1 설계(데이터 모델, 컨트랙트) 반영 후 재평가 — 신규 �
 US7과 US8은 서로 독립적이다(tasks.md의 User Story Dependencies 참고). US7은 프론트엔드 협의를 기다리고 US8(T055~T057)을 먼저 진행한다. 감사 계약이 요구하는 G2 공통 유틸(T068)은 함께 선행 구현해 `AdminUsageAdjustmentService`의 완료 로그도 동일한 커밋 이후 처리로 통합한다.
 
 `AdminAuthenticationService.validateAdminCredentials()`의 자격 검증 결과를 감사 대상으로 삼는다. 성공은 admin ID와 `Clock` 시각을 커밋 이후 기록하고, 인증 실패는 이메일 SHA-256 해시와 사유 코드만 즉시 기록해 롤백 후에도 남긴다. 관리자 인증에는 기존 `@AuditLog`를 적용한다. 전용 `AdminAuthenticationAuditAspect`가 반환 admin ID와 실패 사유를 담은 `AdminAuthenticationException`을 사용해 기록한다. 서비스에서 로그 유틸 호출을 제거하고 공통 Aspect에서는 관리자 인증을 제외해 중복을 방지한다. `AdminLoginFailureReason`은 `admin/enums`의 별도 파일로 분리한다. 감사 기록의 RuntimeException은 격리하고 실패 횟수와 예외 종류를 별도 보고해, 커밋 결과나 원래 인증 예외를 바꾸지 않는다. 토큰 발급 결과나 요청 DTO 검증 오류로 감사 대상을 확장하지 않는다. 신규 DB 테이블과 응답 계약 변경은 없다.
+
+
+## 죽은 코드 정리 기록 (2026-10-13)
+
+US7은 보류하고 US9의 T060·T066·T067을 완료했다. 실제 사용 경로가 없는 예외·DTO·상수·리포지토리 메서드와 빈 MVC 설정을 제거했다. Redis 인증 전환 이후 미사용인 JPA 토큰 엔티티·리포지토리도 제거했으며, 기존 테이블 삭제는 [수동 배포 DDL](migrations/20261013_drop_legacy_refresh_token.sql)로 분리했다. DDL은 실행하지 않았다. 삭제 대상 참조 검색(T074)과 각 코드 커밋 전 전체 테스트 387개 통과를 확인했다. 나머지 US9 및 수동 종합 검증은 후속 작업으로 남는다.
