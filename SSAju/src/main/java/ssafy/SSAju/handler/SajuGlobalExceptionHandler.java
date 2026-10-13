@@ -27,7 +27,6 @@ import ssafy.SSAju.exception.DailyLimitExceededException;
 import ssafy.SSAju.exception.DuplicateEmailException;
 import ssafy.SSAju.exception.ExternalApiException;
 import ssafy.SSAju.exception.FastAPITimeoutException;
-import ssafy.SSAju.exception.InvalidPasswordException;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.exception.PublicDataApiException;
@@ -202,26 +201,6 @@ public class SajuGlobalExceptionHandler {
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.USER_NOT_FOUND.getCode(),
                         ErrorMessageConstants.USER_NOT_FOUND.getMessage(), generateRequestId())));
-    }
-
-    /**
-     * 비밀번호 오류 예외를 처리합니다.
-     *
-     * <p>로그인 시 비밀번호가 일치하지 않는 경우 발생합니다.
-     * 사용자 열거 공격 방지를 위해 "이메일 또는 비밀번호가 일치하지 않습니다"로 응답합니다.
-     *
-     * @param e InvalidPasswordException
-     * @param request HTTP 요청
-     * @return 401 Unauthorized, 에러 코드: INVALID_CREDENTIALS
-     */
-    @ExceptionHandler(InvalidPasswordException.class)
-    public ResponseEntity<ApiResponse<Void>> handleInvalidPassword(
-            InvalidPasswordException e, HttpServletRequest request) {
-        log.warn("비밀번호 오류: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.failure(new ErrorInfo(
-                        ErrorMessageConstants.INVALID_CREDENTIALS.getCode(),
-                        ErrorMessageConstants.INVALID_CREDENTIALS.getMessage(), generateRequestId())));
     }
 
     /**
