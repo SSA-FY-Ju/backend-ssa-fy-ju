@@ -82,7 +82,7 @@ SSAju/src/main/java/ssafy/SSAju/
 │   ├── ClockConfig.java              # [기존, 재사용] Clock 빈
 │   ├── SecurityConfig.java           # [수정] CORS allowedHeaders 화이트리스트, JWT 필터 체인
 │   ├── AsyncConfig.java              # [수정] AsyncUncaughtExceptionHandler 등록
-│   └── WebMvcConfig.java             # [삭제 대상] 빈 클래스 (C6)
+│   └── (WebMvcConfig.java 삭제 완료) # T060: 빈 MVC 설정 제거
 ├── security/
 │   ├── redis/
 │   │   ├── RefreshTokenRedisRepository.java   # [신규] Redis 기반 Refresh Token 저장/조회/삭제

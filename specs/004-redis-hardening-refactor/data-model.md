@@ -94,6 +94,6 @@
 
 ## 삭제 대상 (F, 죽은 코드)
 
-- `entity/RefreshToken.java`, `repository/RefreshTokenRepository.java`, 대응 테이블 `refresh_token`(Redis 이전 검증 완료 후 별도 DDL로 DROP — Git 커밋 대상 마이그레이션 스크립트는 스키마 DDL이므로 데이터 마이그레이션과 달리 커밋 포함 가능, 단 실행은 운영 배포 절차에 따름).
+- `entity/RefreshToken.java`, `repository/RefreshTokenRepository.java`, 대응 테이블 `refresh_token`(Redis 이전 검증 완료 후 별도 DDL로 DROP — DDL은 사용자에게 대화로만 전달하고 Git에는 포함하지 않으며, 실행은 운영 배포 절차에 따름).
 - `career/enums/FeedbackType.java`.
 - `SajuResultJdbcRepository`의 T049 TODO 주석 블록(B1 재설계로 논의 자체가 해소됨).

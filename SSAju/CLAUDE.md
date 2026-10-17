@@ -41,7 +41,8 @@ When adding code, decide first which of these three areas it belongs to — they
 - **`admin/service/AdminAuditLogUtil`** — 관리자 자격 검증 감사로그와 사용량 조정 완료 로그를 공유한다. 관리자 인증은 `@AuditLog` + `aspect/AdminAuthenticationAuditAspect`가 기록하고 공통 Aspect는 해당 메서드를 제외한다. 기록 예외는 업무 결과로 전파하지 않고 실패 횟수/예외 종류로 보고한다. 성공/완료는 커밋 이후, 인증 실패는 즉시 기록하며 시각은 주입된 `Clock`을 사용한다. 관리자 인증 조회는 `admin/repository/AdminUserAuthQueryRepository`를 사용한다.
 - **`event/`** — Spring application events (e.g. `LoginAttemptEvent` + listener) for decoupling side effects (like login-failure tracking) from the main auth flow.
 - **`security/`** — JWT plumbing separate from `config/SecurityConfig.java`: `JwtAuthenticationEntryPoint`, `JwtAccessDeniedHandler`, `JwtExceptionFilter`.
-- **`config/`** also includes `AsyncConfig`, `ClockConfig` (inject `Clock` instead of `new Date()`/`LocalDateTime.now()` for testability), `JacksonConfig`, `WebMvcConfig`, `JpaAuditingConfig`, besides the security/REST-client configs below.
+- **`security/redis/`** — Refresh Token 저장·소비와 Access Token 블랙리스트는 Redis TTL로 관리한다. 기존 JPA `RefreshToken` 엔티티·리포지토리는 제거했다. 수동 운영 마이그레이션 SQL은 사용자에게 대화로만 전달하고 Git에 추가하지 않는다. 기존 토큰 테이블 정리 SQL도 이 방식으로 전달했으며 DB에는 실행하지 않았다.
+- **`config/`** also includes `AsyncConfig`, `ClockConfig` (inject `Clock` instead of `new Date()`/`LocalDateTime.now()` for testability), `JacksonConfig`, `JpaAuditingConfig`, besides the security/REST-client configs below.
 
 ### Request flow & layering (all three areas)
 
