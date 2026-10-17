@@ -261,14 +261,14 @@ description: "Task list for Redis 도입 및 백엔드 전면 하드닝/리팩�
 - [ ] T064 [P] [US9] (T059 이동 후) `career/dto/request/CompatibilityRequest.java`의 시간 관련 필드(`userBirthTime`, `companyFoundingTime` 등)에 `@NotNull` 추가(E2, 필수/선택 여부는 US7의 선택적 출생시간 정책과 충돌하지 않는 필드만 대상 — 사용자 궁합 분석 요청 자체의 필수 입력 검증)
 - [ ] T065 [US9] `exception/FeedbackNotAllowedException.java`, `exception/TokenHashException.java`를 `exception/SajuException` 계층 하위로 편입, `handler/SajuGlobalExceptionHandler.java`에 `TokenHashException` 전용 `@ExceptionHandler` 추가(D1)
 - [x] T066 [P] [US9] 죽은 코드 삭제 — `exception/InvalidPasswordException.java` 및 `handler/SajuGlobalExceptionHandler.java` 내 대응 핸들러, 그 외 사용되지 않는 상수/리포지토리 메서드/DTO 전수 검색 후 삭제(F)
-- [x] T067 [US9] `entity/RefreshToken.java`, `repository/RefreshTokenRepository.java` 삭제(US1에서 Redis로 대체 완료 확인 후), `refresh_token` 테이블 DROP용 DDL을 별도 스키마 마이그레이션 파일로 준비(스키마 변경 스크립트는 데이터 마이그레이션과 달리 커밋 가능하나 실행은 배포 절차에 따름)
+- [x] T067 [US9] `entity/RefreshToken.java`, `repository/RefreshTokenRepository.java` 삭제(US1에서 Redis로 대체 완료 확인 후), `refresh_token` 테이블 DROP용 DDL은 사용자에게 대화로만 전달하고 Git에는 포함하지 않음(실행은 배포 절차에 따름)
 - [x] T068 [US9] `admin/service/AdminUsageAdjustmentService.java`의 "커밋 이후 완료 로그 기록" 패턴을 공통 유틸(`admin/service/AdminAuditLogUtil.java` 등)로 추출하고, `AdminUsageAdjustmentService` 및 T057에서 작성한 `AdminAuthenticationService` 감사로그 기록 코드가 이 유틸을 사용하도록 리팩토링(G2)
 - [ ] T069 [P] [US9] 서로 다른 4가지 페이지네이션 방식을 사용하는 컨트롤러(`admin/controller/*`, `controller/*` 전수 검색으로 식별)에 각 방식의 채택 이유를 주석으로 문서화(H1)
 - [ ] T070 [US9] `admin/repository/AdminUserQueryRepository.java`의 `findUserById` 내 N+1 위험 쿼리를 조인/배치 조회로 분리·호이스팅(H2)
 
 **죽은 코드 정리 검증 (2026-10-13)**: US7(회원가입 생년월일/선택적 출생시간)은 계속 보류하고 T060·T066·T067을 완료했다. `InvalidPasswordException`과 대응 핸들러, 빈 `WebMvcConfig`, 미사용 `AdminLoginResponseDTO`·`SuccessMessageConstants`, 리포지토리 메서드 9개, 상수 9개, 폐기된 T049 테스트 TODO를 제거했다. 로그인 실패 통합 테스트에 `INVALID_CREDENTIALS` 응답 코드 확인을 보강했다. Spring 자동 등록 설정·리포지토리 및 쿼터 검증 테스트에서 사용하는 조회 메서드는 유지했다.
 
-Redis 경로만 사용함을 확인한 뒤 JPA `RefreshToken`·`RefreshTokenRepository`를 제거했다. [테이블 삭제 DDL](migrations/20261013_drop_legacy_refresh_token.sql)은 수동 배포용으로 준비했으며 DB에는 실행하지 않았다. 모든 인스턴스의 Redis 인증 전환 완료 후 대상 DB·백업을 확인해 적용한다.
+Redis 경로만 사용함을 확인한 뒤 JPA `RefreshToken`·`RefreshTokenRepository`를 제거했다. 테이블 삭제 DDL은 사용자에게 대화로 전달했으며 Git에는 포함하지 않는다. DB에는 실행하지 않았다. 모든 인스턴스의 Redis 인증 전환 완료 후 대상 DB·백업을 확인해 적용한다.
 
 각 코드 커밋 전 `cd SSAju && ./gradlew test` → `BUILD SUCCESSFUL`, 387개 테스트 통과(실패/오류/스킵 0). T074의 삭제 대상 타입·메서드 잔여 참조 검색도 완료했다. 다른 US9 태스크와 전체 수동 시나리오 검증은 미완료 상태를 유지한다.
 
