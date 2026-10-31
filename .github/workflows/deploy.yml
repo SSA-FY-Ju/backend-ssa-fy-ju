@@ -5,6 +5,11 @@ on:
     branches: [ "main" ]
     paths:
       - 'SSAju/src/**'
+      - 'SSAju/build.gradle'
+      - 'SSAju/Dockerfile'
+
+permissions:
+  contents: read
 
 jobs:
   build-and-deploy:

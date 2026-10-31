@@ -47,7 +47,7 @@ erDiagram
 | user_profile_id | BIGINT | NOT NULL FK user_profile, UNIQUE |
 | data_json | JSON | NOT NULL, ManseData record로 다루는 만세력 전체 계산 데이터 |
 | fetched_at | Instant | NOT NULL, 신규 요청의 FastAPI 취득 시각 |
-| created_at | Instant | 만세력 최초 저장 시각 |
+| created_at | Instant | NOT NULL, 만세력 최초 저장 시각 |
 
 신규 요청에서 프로필의 만세력이 없으면 FastAPI 결과와 공통 계산을 `data_json` 하나에 담아 한 행을 원자적으로 저장한다. 개별 계산 필드를 조건 검색·집계하지 않고 프로필로 찾아 전체를 읽으므로 별도 계산 컬럼이나 JSON 컬럼으로 나누지 않는다. 테이블 컬럼은 id, user_profile_id, data_json, fetched_at, created_at이다.
 

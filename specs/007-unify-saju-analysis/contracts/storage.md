@@ -12,7 +12,7 @@
 
 ## 물리 형식과 DDL 일치
 
-신규 saju.id는 BIGINT AUTO_INCREMENT·Java Long이며 피드백 saju_id도 동일한 signed BIGINT로 일치시킨다. 기존 JSON 숫자 형식을 유지하고 과거 번호와 분리하기 위한 시작 번호 보정은 하지 않는다. 새 manse·saju의 Instant 컬럼은 DATETIME(6)·UTC 저장/조회로 맞추고 기존 감사 시각 컬럼의 자료형은 유지한다. saju.analysis_type과 피드백 satisfaction_status는 VARCHAR(32)로 저장하며 enum의 VARCHAR JDBC 매핑과 기존 허용값 검증을 명시한다. 최종 엔티티·로컬 DDL을 함께 수정하고 MySQL validate 및 숫자 ID·JSON·enum·UTC 시각 왕복으로 확인한다. 구체적인 DDL은 제외된 local/reset-runbook.md f절에만 둔다.
+신규 saju.id는 BIGINT AUTO_INCREMENT·Java Long이며 피드백 saju_id도 동일한 signed BIGINT로 일치시킨다. 기존 JSON 숫자 형식을 유지하고 과거 번호와 분리하기 위한 시작 번호 보정은 하지 않는다. 새 manse·saju의 Instant 컬럼은 DATETIME(6)·UTC 저장/조회로 맞추고 기존 감사 시각 컬럼의 자료형은 유지한다. JPA는 공통 application.yaml에 spring.jpa.properties.hibernate.jdbc.time_zone=UTC를 명시하고 신규 Instant는 DATETIME(6)에 대응하는 JDBC TIMESTAMP 매핑을 명시한다. JdbcTemplate의 created_at 조회는 ResultSet.getTimestamp("created_at", Calendar.getInstance(TimeZone.getTimeZone("UTC"))).toInstant()로 UTC Calendar를 전달하며 JVM 기본 시간대에 의존하지 않는다. 실제 MySQL에서 JVM 기본 시간대를 Asia/Seoul 등 비UTC로 설정한 뒤 마이크로초 정밀도의 고정 Instant를 JPA로 저장·flush/clear하고 JPA와 직접 JDBC로 다시 읽어 원본과 같은지 검증한다. 테스트가 변경한 JVM 시간대는 finally에서 복원한다. saju.analysis_type과 피드백 satisfaction_status는 VARCHAR(32)로 저장하며 enum의 VARCHAR JDBC 매핑과 기존 허용값 검증을 명시한다. 최종 엔티티·로컬 DDL을 함께 수정하고 MySQL validate 및 숫자 ID·JSON·enum·UTC 시각 왕복으로 확인한다. 구체적인 DDL은 제외된 local/reset-runbook.md f절에만 둔다.
 
 ## 기본 출생정보와 실제 분석 입력
 
@@ -22,7 +22,7 @@
 
 ## 만세력 data_json
 
-`manse`의 계산 데이터는 NOT NULL인 `data_json` 하나에 저장하며 Java에서는 `ManseData` record로 다룬다. ID·프로필 FK·fetched_at·created_at은 일반 컬럼으로 유지한다. 만세력의 개별 계산 필드를 별도 컬럼으로 중복 저장하지 않는다.
+`manse`의 계산 데이터는 NOT NULL인 `data_json` 하나에 저장하며 Java에서는 `ManseData` record로 다룬다. ID·프로필 FK·fetched_at·created_at은 일반 컬럼으로 유지한다. fetched_at과 created_at은 NOT NULL이다. 만세력의 개별 계산 필드를 별도 컬럼으로 중복 저장하지 않는다.
 
 | JSON 필드 | Java 형식과 검증 |
 |---|---|
