@@ -3,6 +3,8 @@ name: SSAju CI/CD with Docker
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'SSAju/src/**'
 
 jobs:
   build-and-deploy:
