@@ -12,7 +12,7 @@
 
 **확정 경계**:
 
-- 추출 시작부터 초기화 완료까지 관련 쓰기 경로의 트래픽 차단 또는 애플리케이션 중지를 필수로 유지하고 진행 중 쓰기를 모두 종료한다. 분석·피드백·프로필·사용량·회원 탈퇴 등 관련 쓰기 전체의 중단을 보장할 수 없으면 초기화를 중단한다. 차단 방법은 운영자가 선택하며 별도 차단 기능 개발은 범위에 포함하지 않는다. 차단이 해제되거나 쓰기가 발생하면 즉시 중단하고, 차단을 복구한 뒤 자료 재추출·대조와 운영자 재확인을 거쳐야 한다.
+- 추출 시작부터 새 스키마 DDL 적용·validate 통과·호환 애플리케이션 배포 완료까지 관련 쓰기 경로의 트래픽 차단 또는 애플리케이션 중지를 필수로 유지하고 진행 중 쓰기를 모두 종료한다. 분석·피드백·프로필·사용량·회원 탈퇴 등 관련 쓰기 전체의 중단을 보장할 수 없으면 초기화를 중단한다. 차단 방법은 운영자가 선택하며 별도 차단 기능 개발은 범위에 포함하지 않는다. 차단이 해제되거나 쓰기가 발생하면 즉시 중단하고, 차단을 복구한 뒤 자료 재추출·대조와 운영자 재확인을 거쳐야 한다.
 
 - 실제 분석 프로필은 `saju → manse → user_profile`로 조회한다. saju에 중복 프로필 FK를 두지 않으며 users의 기본 참조와 결과의 직접 소유자를 구분한다.
 - 과거 분석은 새 구조로 이동하지 않는다. 전환 시 기존 분석을 비우고 구형 전용 테이블을 제거한다. 전환 후 회원 탈퇴 시에는 새 분석을 유지한다.
@@ -84,15 +84,15 @@
 
 ### 먼저 작성할 테스트
 
-- [ ] T023 [P] [US2] `SSAju/src/test/java/ssafy/SSAju/service/UserServiceTest.java`와 `SSAju/src/test/java/ssafy/SSAju/integration/UserAnalysisReadIntegrationTest.java`에 소유자별 이력·유형/최근 1년 필터·동률 숫자 ID 정렬·페이지/count 일치·빈 이력·반복/연도 변경 상세·외부 호출/INSERT/차감 0 검증을 먼저 작성한다.
+- [ ] T023 [P] [US2] `SSAju/src/test/java/ssafy/SSAju/service/UserServiceTest.java`와 `SSAju/src/test/java/ssafy/SSAju/integration/UserAnalysisReadIntegrationTest.java`에 소유자별 전체 이력·유형 필터·동률 숫자 ID 정렬·페이지/count 일치·1년보다 오래된 분석의 목록 포함 및 count 반영·빈 이력·반복/연도 변경 상세·외부 호출/INSERT/차감 0 검증을 먼저 작성한다.
 - [ ] T024 [P] [US2] `SSAju/src/test/java/ssafy/SSAju/controller/AnalysisReadContractTest.java`에 마이페이지 목록·상세 숫자 ID, 없는/타인/유형 불일치 ID의 404와 숫자가 아닌 ID의 바인딩 오류 400, 미인증 거부 계약을 먼저 작성한다.
 
 ### 구현·통합·검증
 
-- [ ] T025 [US2] `SSAju/src/main/java/ssafy/SSAju/repository/AnalysisHistoryRepository.java`의 구형 UNION/접근 관계 조회를 saju.user_id·analysis_type·created_at 단일 조회로 바꾸고 필요한 출생정보는 manse→user_profile로 읽는다. `SSAju/src/main/java/ssafy/SSAju/dto/response/UserAnalysisDto.java`의 analysisId는 Long으로 유지하고 목록/count 조건·created_at DESC,id DESC 정렬과 기본 page=0/size=10·최근 1년을 맞춘다. created_at의 직접 JDBC 조회에는 저장 계약의 UTC Calendar를 전달한다.
+- [ ] T025 [US2] `SSAju/src/main/java/ssafy/SSAju/repository/AnalysisHistoryRepository.java`의 구형 UNION/접근 관계 조회를 saju.user_id·analysis_type·created_at 단일 조회로 바꾸고 필요한 출생정보는 manse→user_profile로 읽는다. `SSAju/src/main/java/ssafy/SSAju/dto/response/UserAnalysisDto.java`의 analysisId는 Long으로 유지하고 목록/count 조건·created_at DESC,id DESC 정렬과 기본 page=0/size=10을 유지한다. 기존 최근 1년 제한을 목록과 count 쿼리 모두에서 제거하고 기간 제한 없이 소유자의 전체 이력을 페이지 조회한다. created_at의 직접 JDBC 조회에는 저장 계약의 UTC Calendar를 전달한다.
 - [ ] T026 [US2] `SSAju/src/main/java/ssafy/SSAju/service/UserService.java`, `SSAju/src/main/java/ssafy/SSAju/dto/response/AnalysisDetailResponse.java`, `SSAju/src/main/java/ssafy/SSAju/career/mapper/AnalysisSnapshotMapper.java`에서 소유자·유형을 대조한 후 result_json의 완성 데이터를 반환한다. 생성 응답 ID를 컬럼에서 주입하고 birthDate 등 공통 메타데이터는 저장 입력/만세력 참조로 제공한다. 현재 코드·연도·모델로 결과/요약을 재생성하거나 회사/API를 재조회하지 않는다.
 - [ ] T027 [US2] `SSAju/src/main/java/ssafy/SSAju/controller/UserController.java`와 `SSAju/src/main/java/ssafy/SSAju/handler/SajuGlobalExceptionHandler.java`에서 상세 분석 ID의 기존 Long 바인딩을 유지하고 없는/타인/유형 불일치 ID는 404로 처리한다. 숫자가 아닌 ID의 바인딩 실패는 기존 400으로 유지한다. 일반 요청 검증 400·인증 정책은 유지하며 과거 ID 매핑·번호 범위 resolver를 추가하지 않는다.
-- [ ] T028 [US2] `SSAju/src/test/java/ssafy/SSAju/integration/UserAnalysisReadIntegrationTest.java`와 `SSAju/src/test/java/ssafy/SSAju/controller/AnalysisReadContractTest.java`를 실행해 같은 출생정보 사용자 간 소유권 분리·모든 유형 상세·필터/count·없는/타인/유형 불일치 ID 404·상세 부작용 0을 확인한다.
+- [ ] T028 [US2] `SSAju/src/test/java/ssafy/SSAju/integration/UserAnalysisReadIntegrationTest.java`와 `SSAju/src/test/java/ssafy/SSAju/controller/AnalysisReadContractTest.java`를 실행해 같은 출생정보 사용자 간 소유권 분리·모든 유형 상세·기간 제한 없는 전체 이력·유형 필터/count·없는/타인/유형 불일치 ID 404·상세 부작용 0을 확인한다.
 
 **완료 기준**: 위 독립 검증의 실제 결과를 확인한 뒤 관련 체크박스를 표시한다. 문서 존재만으로 구현·운영 검증을 완료 처리하지 않는다.
 
@@ -125,7 +125,7 @@
 
 - [ ] T036 [US5] `specs/007-unify-saju-analysis/local/reset-runbook.md` a~d절을 최종 확정한다. 원본 피드백은 모든 행/컬럼 그대로, 무조인·무가공·무마스킹·무필터이며 실제 탈퇴 사용자 행 0건도 정상이다. 건수는 세 원본 테이블 행 수·별도 user_saju_access 행 수와 원래 사용자 ID별 SAJU 접근/연결된 DISTINCT 컨설팅/직접 소유 궁합을 산정하고 미연결·NULL·공유 합계 차이를 포함한다. 실제 숫자는 빈칸으로 두고 원본/건수·모든 값의 양방향 대조 기준을 유지한다.
 - [ ] T037 [US5] `specs/007-unify-saju-analysis/local/reset-runbook.md` e·f절을 최종 엔티티의 BIGINT ID·enum VARCHAR·JSON·UTC 시각·인덱스·FK와 맞춘다. 9개 대상 행 삭제 후 구형 6개 테이블 DROP, 피드백 구형 두 대상 FK/컬럼·feedback_type 제거와 user_id NOT NULL·saju_id UNIQUE, 새 manse/saju·NULL 기본 프로필 FK를 명시한다. 실제 FK 이름/참조 자료형 사전 대조·DDL 암묵적 커밋·오류 시 즉시 중단·단일 실행·재실행 금지를 유지하며 SQL을 공개 문서로 복사하지 않는다. T036와 순차 진행한다.
-- [ ] T038 [US5] `specs/007-unify-saju-analysis/local/reset-runbook.md` g절과 `specs/007-unify-saju-analysis/quickstart.md`의 쓰기 중단→원본/건수 추출→DB 대조→운영자 확인→초기화→새 스키마→배포 순서를 맞춘다. 행 삭제 후·DROP 전 9개 테이블 0건과 DROP 후 새 구조 0건 검증을 구분하고 users·인증 보존·당일 쿼터 리셋·과거 ID 보정 없음·운영/로컬 validate 적용을 명시한다. 운영자 확인 전 전체 DB 백업·복구 가능성 검증·복구 리허설 결과 기록을 필수로 하고, 추출부터 초기화 완료까지 트래픽 차단 또는 앱 중지를 보장하지 못하면 중단하도록 명시한다. 기존 코드/로컬 update에 전환을 맡기지 않고 runner·공개 전환 API·운영 SQL 자동 테스트를 만들지 않는다. T037에 의존한다.
+- [ ] T038 [US5] `specs/007-unify-saju-analysis/local/reset-runbook.md` g절과 `specs/007-unify-saju-analysis/quickstart.md`의 쓰기 중단→원본/건수 추출→DB 대조→운영자 확인→초기화→새 스키마→배포 순서를 맞춘다. 행 삭제 후·DROP 전 9개 테이블 0건과 DROP 후 새 구조 0건 검증을 구분하고 users·인증 보존·당일 쿼터 리셋·과거 ID 보정 없음·운영/로컬 validate 적용을 명시한다. smoke test는 차단 해제 조건에 포함하지 않고 해제 후 수행한다. 운영자 확인 전 전체 DB 백업·복구 가능성 검증·복구 리허설 결과 기록을 필수로 하고, 추출부터 새 스키마 DDL 적용·validate 통과·호환 애플리케이션 배포 완료까지 트래픽 차단 또는 앱 중지를 보장하지 못하면 중단하도록 명시한다. 기존 코드/로컬 update에 전환을 맡기지 않고 runner·공개 전환 API·운영 SQL 자동 테스트를 만들지 않는다. T037에 의존한다.
 - [ ] T039 [US5] `specs/007-unify-saju-analysis/local/reset-runbook.md`와 `.git/info/exclude`의 로컬 폴더 제외를 git check-ignore -v·git status --porcelain·git ls-files --stage로 확인한다. `.gitignore`는 수정하지 않고 로컬 파일이 없는 clone도 `specs/007-unify-saju-analysis/spec.md`와 `specs/007-unify-saju-analysis/quickstart.md`의 항목 정의를 이해하도록 유지한다. 개인정보 원본/숫자를 추정·커밋·원격 업로드하지 않는다. T038에 의존한다.
 
 **완료 기준**: 위 독립 검증의 실제 결과를 확인한 뒤 관련 체크박스를 표시한다. 문서 존재만으로 구현·운영 검증을 완료 처리하지 않는다.
@@ -214,10 +214,10 @@
 - [ ] T073 `SSAju/build.gradle`의 기존 wrapper로 `SSAju/`에서 관련 단위/계약·MySQL/Redis 통합/동시성 테스트와 전체 `./gradlew test`를 실행한다. 실패는 해결하고 명령·실제 결과만 `specs/007-unify-saju-analysis/local/implementation-checks.md`에 기록한다. 테스트를 실행하지 않았거나 Docker 등이 없으면 통과로 표시하지 않는다.
 - [ ] T074 `specs/007-unify-saju-analysis/spec.md`, `specs/007-unify-saju-analysis/plan.md`, `specs/007-unify-saju-analysis/data-model.md`, `specs/007-unify-saju-analysis/contracts/api.md`, `specs/007-unify-saju-analysis/contracts/storage.md`, `specs/007-unify-saju-analysis/quickstart.md`, `specs/007-unify-saju-analysis/checklists/requirements.md`와 `specs/007-unify-saju-analysis/local/reset-runbook.md`를 최종 엔티티·API·테스트 결과에 맞춰 동기화한다. 전체 분석 ID 필드의 기존 숫자 타입 유지와 피드백 요청 feedbackType 제거를 추후 클라이언트 전달용으로 정리한다. 클라이언트 수정·동시 배포 조율은 이번 범위에 포함하지 않는다. 공개 문서에는 항목/기준만 두고 SQL·실제 개인정보는 제외된 로컬 문서에만 둔다. `.gitignore`·커밋·스테이징을 변경하지 않고 로컬 제외를 재확인한다.
 - [ ] T075 [운영자 전용·자동 구현 제외] `specs/007-unify-saju-analysis/local/reset-runbook.md`와 `specs/007-unify-saju-analysis/local/rehearsal-results.md`에 전체 DB 백업의 복구 가능성 검증·복구 리허설 결과와 복제 DB의 실제 스키마 대조·원본 추출/전수 대조·확인·초기화·DDL·새 코드 validate·기존 계정 로그인/빈 이력/없는 분석 ID 404·첫 분석/피드백·모든 관리자 경로 결과를 기록한다. 로컬도 명령행 validate로 update를 덮어써 확인한다. 대상별 명시적 실행 확인 없이 삭제/DDL을 실행하지 않으며 단계별 실패/복구를 확인한다. 모든 런타임 시나리오·T073·T074에 의존한다.
-- [ ] T076 [운영자 전용·자동 구현 제외] `specs/007-unify-saju-analysis/local/reset-runbook.md` a~d·g절에 따라 실제 운영의 분석/피드백/프로필/사용량/탈퇴 쓰기를 중지하고 진행 중 쓰기를 종료한 뒤 피드백 원본 전체와 정의별 모든 건수를 로컬로 추출·제공·DB 대조한다. 실제 대상/시점·숫자·파일 경로는 `specs/007-unify-saju-analysis/local/reset-report.md`에만 기록하고 아직 초기화하지 않는다. 추출부터 초기화 완료까지 관련 쓰기 전체의 트래픽 차단 또는 앱 중지를 유지하며 보장할 수 없으면 초기화를 중단한다. 대상 DB 전체 백업·복구 가능성 검증·복구 리허설 결과 기록을 운영자 확인 전에 완료한다. T075 완료와 별도의 운영 실행 지시에 의존한다.
+- [ ] T076 [운영자 전용·자동 구현 제외] `specs/007-unify-saju-analysis/local/reset-runbook.md` a~d·g절에 따라 실제 운영의 분석/피드백/프로필/사용량/탈퇴 쓰기를 중지하고 진행 중 쓰기를 종료한 뒤 피드백 원본 전체와 정의별 모든 건수를 로컬로 추출·제공·DB 대조한다. 실제 대상/시점·숫자·파일 경로는 `specs/007-unify-saju-analysis/local/reset-report.md`에만 기록하고 아직 초기화하지 않는다. 추출부터 새 스키마 DDL 적용·validate 통과·호환 애플리케이션 배포 완료까지 관련 쓰기 전체의 트래픽 차단 또는 앱 중지를 유지하며 보장할 수 없으면 초기화를 중단한다. 대상 DB 전체 백업·복구 가능성 검증·복구 리허설 결과 기록을 운영자 확인 전에 완료한다. T075 완료와 별도의 운영 실행 지시에 의존한다.
 - [ ] T077 [운영자 전용·자동 구현 제외] `specs/007-unify-saju-analysis/local/reset-report.md`에 원본 전체 제공·정의별 대조 일치·계정/인증 유지·과거 이력 소실·당일 쿼터 리셋·전체 DB 백업·복구 가능성 검증·복구 리허설 완료 및 결과 기록 확인에 대한 운영자의 명시적 확인을 기록한다. T076의 자료 불일치·확인 없음·백업/복구 검증/복구 리허설 기록 미완료·쓰기 차단 미보장은 중단 상태로 두며 tasks 생성/구현 요청이나 경과 시간을 실행 확인으로 해석하지 않는다.
 - [ ] T078 [운영자 전용·자동 구현 제외] T077 확인 이후에만 `specs/007-unify-saju-analysis/local/reset-runbook.md` e절로 지정 9개 테이블 행을 초기화·검증·커밋하고 f절 DDL을 별도로 한 번 적용한다. 계정/인증 보존·구형 6개 테이블/피드백 구형 컬럼/FK 부재·새 구조/일일 사용량 0건·기본 참조 NULL·새 FK/UNIQUE/인덱스를 확인해 `specs/007-unify-saju-analysis/local/reset-report.md`에 기록한다. 오류 시 자동 계속/재실행하지 않는다.
-- [ ] T079 [운영자 전용·자동 구현 제외] T078 완료 후 `specs/007-unify-saju-analysis/quickstart.md`의 순서대로 새 코드 스키마 validate·배포·기존 계정 로그인·빈 개인/관리자 이력·없는/타인/유형 불일치 ID 404를 확인하고 첫 신규 분석/피드백·기본 프로필·관리자 경로를 검증한다. smoke test 전 빈 상태와 이후 새 행을 구분해 `specs/007-unify-saju-analysis/local/reset-report.md`에 기록하고 관찰/중단 기준을 유지한다. 별도의 배포 지시 없이 자동 배포하지 않는다.
+- [ ] T079 [운영자 전용·자동 구현 제외] T078 완료 후 `specs/007-unify-saju-analysis/quickstart.md`의 순서대로 쓰기 차단을 유지한 채 새 코드 스키마 validate·호환 애플리케이션 배포를 완료하고 DDL 적용·validate 통과·배포 완료를 모두 확인한 뒤 차단을 해제한다. smoke test는 차단 해제 조건에 포함하지 않고 해제 후 기존 계정 로그인·빈 개인/관리자 이력·없는/타인/유형 불일치 ID 404를 확인하고 첫 신규 분석/피드백·기본 프로필·관리자 경로를 검증한다. smoke test 전 빈 상태와 이후 새 행을 구분해 `specs/007-unify-saju-analysis/local/reset-report.md`에 기록하고 관찰/중단 기준을 유지한다. 별도의 배포 지시 없이 자동 배포하지 않는다.
 
 **완료 기준**: 위 독립 검증의 실제 결과를 확인한 뒤 관련 체크박스를 표시한다. 문서 존재만으로 구현·운영 검증을 완료 처리하지 않는다.
 

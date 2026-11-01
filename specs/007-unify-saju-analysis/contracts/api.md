@@ -41,7 +41,7 @@
 
 ## 3. 마이페이지
 
-GET /api/mypage의 기존 type/page/size와 응답 구조를 유지한다. 기본 page=0,size=10, 최근 1년 조건을 유지하며 소유자의 새 분석만 조회한다. 목록 analysisId는 숫자이다. 정렬은 created_at DESC,id DESC이고 count·목록은 같은 소유자·유형·기간 조건이다. 초기화 직후에는 빈 목록과 0건을 반환한다.
+GET /api/mypage의 기존 type/page/size와 응답 구조를 유지한다. 기본 page=0,size=10을 유지하며 기간 제한 없이 소유자의 전체 분석 이력을 페이지 조회한다. 초기화 전 삭제된 분석은 포함하지 않는다. 목록 analysisId는 숫자이다. 정렬은 created_at DESC,id DESC이고 count·목록은 같은 소유자·유형 조건을 사용하며 둘 다 기간 조건을 두지 않는다. 초기화 직후에는 빈 목록과 0건을 반환한다.
 
 GET /api/mypage/analyses/{analysisId}?type=... 상세도 동일 숫자 ID·유형을 검증한다. 개인·관리자 목록과 상세의 createdAt은 모두 `saju.created_at`이다. 상세는 저장한 result_json 스냅샷만 반환하며 FastAPI/OpenAI/회사 조회·차감·새 분석 INSERT가 모두 0이다.
 
