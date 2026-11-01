@@ -6,6 +6,7 @@ on:
     paths:
       - 'SSAju/src/**'
       - 'SSAju/build.gradle'
+      - 'SSAju/settings.gradle'
       - 'SSAju/gradlew'
       - 'SSAju/gradle/wrapper/**'
       - 'SSAju/Dockerfile'
