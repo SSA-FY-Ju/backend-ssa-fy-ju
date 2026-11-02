@@ -92,6 +92,7 @@ public enum ErrorMessageConstants {
     ANALYSIS_TYPE_UNSUPPORTED("INVALID_SAJU_DATA", "지원하지 않는 분석 유형입니다."),
     ANALYSIS_SNAPSHOT_VERSION_UNSUPPORTED("INVALID_SAJU_DATA", "지원하지 않는 분석 스냅샷 버전입니다."),
     ANALYSIS_SNAPSHOT_REQUIRED("INVALID_SAJU_DATA", "분석 입력·결과 스냅샷은 필수입니다."),
+    ANALYSIS_RESULT_INVALID("INVALID_SAJU_DATA", "분석 결과가 유효하지 않아 저장할 수 없습니다."),
 
     // === Null 검증 예외 메시지 ===
     SAJU_DATA_NULL("INVALID_SAJU_DATA", "사주 데이터는 null이 아니어야 합니다"),
