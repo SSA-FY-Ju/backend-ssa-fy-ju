@@ -3,6 +3,16 @@ name: SSAju CI/CD with Docker
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'SSAju/src/**'
+      - 'SSAju/build.gradle'
+      - 'SSAju/settings.gradle'
+      - 'SSAju/gradlew'
+      - 'SSAju/gradle/wrapper/**'
+      - 'SSAju/Dockerfile'
+
+permissions:
+  contents: read
 
 jobs:
   build-and-deploy:
