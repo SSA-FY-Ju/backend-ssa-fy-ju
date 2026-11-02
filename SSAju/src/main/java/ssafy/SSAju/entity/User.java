@@ -9,6 +9,7 @@ import org.hibernate.annotations.SQLRestriction;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import ssafy.SSAju.career.entity.UserProfile;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
 
@@ -56,6 +57,18 @@ public class User {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    /**
+     * 분석 요청 화면에서 먼저 제안할 기본 출생정보. 설정하지 않으면 {@code null}이며 가입 직후에도
+     * 비어 있다.
+     *
+     * <p>분석 결과의 소유자나 실제 분석에 쓴 출생정보가 아니다 — 실제 분석 프로필은
+     * {@code saju → manse → user_profile}로 조회한다. 여러 사용자가 같은 출생정보 프로필을 기본값으로
+     * 가리킬 수 있어 UNIQUE가 아니며, 공유 행이므로 삭제 연쇄 전파도 두지 않는다.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_profile_id")
+    private UserProfile userProfile;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -74,6 +87,19 @@ public class User {
         this.status = status != null ? status : UserStatus.ACTIVE;
         this.termsAgreedAt = termsAgreedAt;
         this.privacyAgreedAt = privacyAgreedAt;
+    }
+
+    /**
+     * 기본 출생정보 참조를 교체한다. 공유 프로필 행 자체는 수정하지 않고 참조만 바꾼다.
+     * 분석 수행은 이 메서드를 호출하지 않는다 — 기본값은 사용자의 명시적인 저장으로만 바뀐다.
+     */
+    public void changeDefaultProfile(UserProfile userProfile) {
+        this.userProfile = userProfile;
+    }
+
+    /** 기본 출생정보 참조만 해제한다. 공유 프로필과 기존 분석은 그대로 둔다. */
+    public void releaseDefaultProfile() {
+        this.userProfile = null;
     }
 
     public void updateLastLoginAt() {

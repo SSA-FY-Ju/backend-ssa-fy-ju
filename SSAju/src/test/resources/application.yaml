@@ -10,6 +10,11 @@ spring:
       ddl-auto: create-drop
     database-platform: org.hibernate.dialect.H2Dialect
     show-sql: false
+    properties:
+      hibernate:
+        jdbc:
+          # 운영 application.yaml과 동일한 UTC 저장/조회 기준 (테스트 리소스가 운영 설정을 가린다)
+          time_zone: UTC
 
   ai:
     retry:

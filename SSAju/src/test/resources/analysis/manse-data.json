@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "yearPillar": "庚午",
+  "monthPillar": "甲戌",
+  "dayPillar": "己未",
+  "hourPillar": "丁寅",
+  "heavenlyStems": ["庚", "甲", "己", "丁"],
+  "earthlyBranches": ["午", "戌", "未", "寅"],
+  "dayMaster": "己",
+  "dayMasterElement": "土",
+  "fiveElements": {"木": 2, "火": 3, "土": 3, "金": 1, "水": 0},
+  "solarCorrection": {"applied": true, "offsetMinutes": -32},
+  "tenGodHiddenStemAnalysis": {
+    "tenGods": {"상관": 1, "정관": 1, "편인": 1},
+    "hiddenStems": {
+      "년지": ["丁", "己"],
+      "월지": ["戊", "辛", "丁"],
+      "일지": ["己", "丁", "乙"],
+      "시지": ["甲", "丙", "戊"]
+    }
+  }
+}

@@ -80,6 +80,19 @@ public enum ErrorMessageConstants {
     INVALID_HEAVENLY_STEM("INVALID_SAJU_DATA", "유효하지 않은 천간"),
     UNKNOWN_STEM_COMBINATION("INVALID_SAJU_DATA", "알 수 없는 천간 조합"),
 
+    // === 만세력(manse) 검증 예외 메시지 ===
+    MANSE_SCHEMA_VERSION_UNSUPPORTED("INVALID_SAJU_DATA", "지원하지 않는 만세력 데이터 버전입니다."),
+    MANSE_PILLAR_REQUIRED("INVALID_SAJU_DATA", "만세력의 사주 기둥(年月日時)은 필수입니다."),
+    MANSE_TEN_GOD_ANALYSIS_REQUIRED("INVALID_SAJU_DATA", "만세력의 십성·지장간 분석 데이터는 필수입니다."),
+    MANSE_DATA_REQUIRED("INVALID_SAJU_DATA", "만세력 계산 데이터는 필수입니다."),
+
+    // === 분석 시간 문맥·스냅샷 예외 메시지 ===
+    ANALYSIS_TIME_CONTEXT_INVALID("INVALID_SAJU_DATA", "분석 시간 문맥이 유효하지 않습니다."),
+    ANALYSIS_TARGET_MONTHS_INVALID("INVALID_SAJU_DATA", "분석 대상 월 목록이 유효하지 않습니다."),
+    ANALYSIS_TYPE_UNSUPPORTED("INVALID_SAJU_DATA", "지원하지 않는 분석 유형입니다."),
+    ANALYSIS_SNAPSHOT_VERSION_UNSUPPORTED("INVALID_SAJU_DATA", "지원하지 않는 분석 스냅샷 버전입니다."),
+    ANALYSIS_SNAPSHOT_REQUIRED("INVALID_SAJU_DATA", "분석 입력·결과 스냅샷은 필수입니다."),
+
     // === Null 검증 예외 메시지 ===
     SAJU_DATA_NULL("INVALID_SAJU_DATA", "사주 데이터는 null이 아니어야 합니다"),
     FIVE_ELEMENTS_REQUIRED("INVALID_SAJU_DATA", "오행(목화토금수) 데이터는 필수입니다"),
@@ -97,6 +110,9 @@ public enum ErrorMessageConstants {
     // === DB 접근 예외 메시지 ===
     SAJU_RESULT_ACCESS_FAILED("DATABASE_ERROR", "SajuResult 조회/생성 실패"),
     USER_PROFILE_ACCESS_FAILED("DATABASE_ERROR", "UserProfile 조회/생성 실패"),
+    MANSE_ACCESS_FAILED("DATABASE_ERROR", "만세력 조회/생성 실패"),
+    ANALYSIS_SNAPSHOT_SERIALIZE_FAILED("DATABASE_ERROR", "분석 스냅샷 직렬화 실패"),
+    ANALYSIS_SNAPSHOT_DESERIALIZE_FAILED("DATABASE_ERROR", "분석 스냅샷 역직렬화 실패"),
 
     // === 피드백 예외 메시지 ===
     SAJU_RESULT_NOT_FOUND("SAJU_RESULT_NOT_FOUND", "해당 SajuResult를 찾을 수 없습니다."),

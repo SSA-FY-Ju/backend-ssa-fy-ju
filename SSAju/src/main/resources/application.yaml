@@ -19,6 +19,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        jdbc:
+          # 신규 Instant 컬럼(manse/saju)을 JVM 기본 시간대가 아니라 UTC로 저장·조회한다.
+          # JdbcTemplate 직접 조회도 UTC Calendar를 전달해 같은 기준을 쓴다.
+          time_zone: UTC
 
   data:
     redis:

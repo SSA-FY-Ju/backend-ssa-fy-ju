@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "industries": [
+    {"name": "IT/소프트웨어", "reason": "논리적 사고와 체계적 설계 성향에 부합합니다.", "recommendedRoles": ["백엔드 개발", "데이터 엔지니어"]}
+  ],
+  "interviewTips": ["구체적인 수치로 성과를 설명하세요.", "협업 사례를 하나 준비하세요."],
+  "strengths": ["끈기", "문제 해결력"],
+  "openaiModelVersion": "gpt-4o-mini",
+  "favoredPeriod": "H1",
+  "confidenceScore": 72,
+  "reasoning": "상반기에 정관의 기운이 강해 공적인 기회가 늘어납니다.",
+  "sajuProfile": {
+    "dayMaster": "己",
+    "dayMasterDescription": "포용력이 크고 꾸준한 기운입니다.",
+    "fiveElements": {"木": 2, "火": 3, "土": 3, "金": 1, "水": 0},
+    "fiveElementsAnalysis": "화와 토가 강해 실행력이 좋습니다.",
+    "tenGodDistribution": {"상관": 1, "정관": 1, "편인": 1},
+    "keyTenGods": ["정관", "상관", "편인"],
+    "tenGodCharacteristics": {"정관": "조직 내 신뢰를 얻는 기운", "상관": "표현력과 기획력"}
+  },
+  "cautions": ["과로를 주의하세요."],
+  "wealthStyle": {
+    "incomeSource": "전문성 기반 근로소득",
+    "financialAdvice": "고정 지출을 먼저 줄이세요.",
+    "investmentTendency": "안정 지향",
+    "additionalIncome": "기술 강의"
+  },
+  "longTermRoadmap": {
+    "phase0to2years": {"goal": "실무 역량 확보", "focus": "핵심 기술 1개", "action": "사이드 프로젝트 2건"},
+    "phase3to5years": {"goal": "리드 경험", "focus": "설계와 리뷰", "action": "팀 과제 주도"},
+    "ultimateGoal": "기술 리더",
+    "goalDescription": "설계와 조직을 함께 이끄는 역할"
+  },
+  "personalBranding": {
+    "suitColor": "네이비",
+    "impression": "차분하고 신뢰감 있는",
+    "hairAndMakeup": "단정한 스타일",
+    "brandingKeyword": "안정적인 실행가",
+    "taglineForResume": "끝까지 책임지는 백엔드 개발자"
+  },
+  "powerKeywords": {
+    "keywords": [
+      {"keyword": "책임감", "element": "土", "description": "맡은 일을 끝까지 수행", "usageExample": "장애 대응을 주도했습니다.", "context": "면접 자기소개"}
+    ],
+    "selectionGuide": "강점 중 한 가지만 반복해 각인시키세요.",
+    "usageTips": ["자기소개 첫 문장에 배치"],
+    "avoidanceTip": "추상적인 수식어는 피하세요."
+  },
+  "mentalCare": {
+    "stressVulnerability": ["과도한 책임 분담"],
+    "rechargeMethod": ["산책", "짧은 낮잠"],
+    "mindsetMantra": "할 수 있는 것부터 하나씩",
+    "emergencyTactic": "10분 자리 비우기"
+  },
+  "environmentFit": {
+    "workVibe": "조용하고 집중적인",
+    "companySize": "중견 이상",
+    "colleagueType": "논리적인 동료",
+    "conflictApproach": "사실 중심 대화",
+    "physicalEnv": "독립 좌석",
+    "culturalFit": "문서화 문화"
+  },
+  "workStyle": {
+    "preferredCompanyType": "기술 중심 조직",
+    "leadershipType": "조율형",
+    "decisionMaking": "데이터 기반",
+    "conflictResolution": "중재"
+  },
+  "relationshipStrategy": {
+    "socialStyle": "소수 깊은 관계",
+    "networkingApproach": "스터디 참여",
+    "teamPosition": "중심 조율자",
+    "conflictResolution": "사실 확인 후 합의",
+    "careerNetworking": "기술 커뮤니티 기여"
+  },
+  "careerTimeline": {
+    "year": 2026,
+    "months": {
+      "1": {"type": "상승", "description": "새 과제를 맡기 좋은 달"},
+      "2": {"type": "유지", "description": "기존 과제 마무리"}
+    },
+    "pivotPoints": [{"month": 5, "type": "전환", "score": 80, "description": "이직 제안이 들어올 수 있습니다."}],
+    "warningMonths": [8],
+    "warningDescription": "8월에는 무리한 확장을 피하세요."
+  },
+  "analysisSummary": "2026년 상반기에 공적 기회가 늘어나는 흐름입니다."
+}
