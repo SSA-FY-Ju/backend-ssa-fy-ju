@@ -1,5 +1,7 @@
 # 작업 목록: 분석 결과 통합 및 기존 분석 전체 초기화
 
+**작업 브랜치**: 이번 기능의 구현·수정은 사용자가 별도로 지시할 때까지 `develop` 브랜치에서 진행한다. 사용자 지시 없이 `main`에 머지·푸시하거나 운영 배포하지 않는다.
+
 **기능**: `007-unify-saju-analysis` | **작성일**: 2026-10-29
 
 **입력 문서**: [명세](spec.md), [구현 계획](plan.md), [설계 결정](research.md), [데이터 모델](data-model.md), [API 계약](contracts/api.md), [저장 계약](contracts/storage.md), [전환 절차](quickstart.md).
