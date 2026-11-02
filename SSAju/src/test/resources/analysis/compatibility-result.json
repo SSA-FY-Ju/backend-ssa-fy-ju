@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "requestContext": {
+    "companyName": "테스트기업",
+    "targetRole": {"category": "TECH_BACKEND", "detailName": "백엔드 개발자"}
+  },
+  "compatibilityScore": 78,
+  "summary": "안정적인 조직 문화와 실행력이 잘 맞습니다.",
+  "targetRoleAnalysis": {"matchScore": 80, "synergy": "체계적인 설계 성향이 강점입니다.", "warning": "속도보다 완성도에 치우칠 수 있습니다."},
+  "fiveElements": {
+    "userDistribution": {"木": 2, "火": 3, "土": 3, "金": 1, "水": 0},
+    "companyDistribution": {"木": 1, "火": 2, "土": 2, "金": 3, "水": 1},
+    "synergyDescription": "금과 토의 상생 구조입니다."
+  },
+  "analysisBreakdown": {"characterMatch": 83, "potentialSynergy": 73, "longTermStability": 78},
+  "actionableStrategy": {
+    "interviewKeywords": ["안정성", "장애 대응"],
+    "weaknessDefense": "완성도와 일정의 균형 사례를 준비하세요.",
+    "bestTiming": {"luckyDays": ["2026-11-09", "2026-11-16", "2026-11-23"], "preferredTime": "오전 09:00 ~ 11:00"}
+  },
+  "expectedInterviewQuestions": [
+    {"question": "장애 대응 경험을 말씀해주세요.", "intent": "위기 상황의 판단 기준 확인"}
+  ],
+  "roleCompatibility": [
+    {"roleName": "백엔드 개발", "score": 80, "reason": "논리적 설계 성향", "tag": "강력 추천"},
+    {"roleName": "인프라/DevOps", "score": 65, "reason": "안정성 지향", "tag": "보통"}
+  ],
+  "monthlyForecast": [
+    {"month": 11, "score": 80, "status": "LUCKY", "advice": "지원 서류를 마무리하기 좋습니다."},
+    {"month": 12, "score": 70, "status": "NORMAL", "advice": "면접 준비에 집중하세요."},
+    {"month": 1, "score": 60, "status": "NORMAL", "advice": "컨디션 관리가 필요합니다."},
+    {"month": 2, "score": 50, "status": "CAUTION", "advice": "무리한 일정은 피하세요."},
+    {"month": 3, "score": 75, "status": "LUCKY", "advice": "새 기회를 적극적으로 검토하세요."}
+  ],
+  "cautions": ["설립일 정보가 추정값이면 해석이 달라질 수 있습니다."]
+}
