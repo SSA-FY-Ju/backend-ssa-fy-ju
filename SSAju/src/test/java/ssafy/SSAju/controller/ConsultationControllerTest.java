@@ -13,16 +13,21 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import ssafy.SSAju.career.domain.AnalysisExecution;
+import ssafy.SSAju.career.domain.AnalysisPayload;
+import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.career.mapper.AnalysisSnapshotMapper;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
 import ssafy.SSAju.dto.response.ConsultationResponse;
 import ssafy.SSAju.exception.OpenAIApiException;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
-import ssafy.SSAju.service.ConsultationService;
+import ssafy.SSAju.service.AnalysisService;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -32,13 +37,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("ConsultationController HTTP 레이어 테스트")
 class ConsultationControllerTest {
 
+    private static final Long ANALYSIS_ID = 101L;
+
     @Mock
-    private ConsultationService consultationService;
+    private AnalysisService analysisService;
 
     private MockMvc mockMvc;
 
-    private static final ConsultationResponse MOCK_RESPONSE = new ConsultationResponse(
-            null,
+    private static final AnalysisPayload.ConsultationResultData MOCK_RESULT =
+            new AnalysisPayload.ConsultationResultData(
+            AnalysisPayload.SCHEMA_VERSION,
             List.of(new CareerAdviceResponse.IndustryRecommendation(
                     "금융/핀테크", "오행 金 강세", List.of("백엔드 개발자"))),
             List.of("일관성 있는 자기소개 준비", "데이터 기반 성과 강조"),
@@ -102,7 +110,7 @@ class ConsultationControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new ConsultationController(consultationService))
+                .standaloneSetup(new ConsultationController(analysisService, new AnalysisSnapshotMapper()))
                 .setControllerAdvice(new SajuGlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
@@ -122,7 +130,8 @@ class ConsultationControllerTest {
     void shouldReturn200_WhenValidRequest() throws Exception {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(1L, null, List.of()));
-        given(consultationService.getCareerConsultation(any(), any())).willReturn(MOCK_RESPONSE);
+        given(analysisService.analyze(eq(AnalysisType.CAREER_CONSULTATION), any(), any()))
+                .willReturn(new AnalysisExecution(ANALYSIS_ID, MOCK_RESULT));
 
         mockMvc.perform(post("/api/career/consultation")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -151,6 +160,7 @@ class ConsultationControllerTest {
                 .andExpect(jsonPath("$.data.relationshipStrategy").exists())
                 .andExpect(jsonPath("$.data.careerTimeline").exists())
                 .andExpect(jsonPath("$.data.careerTimeline.year").value(2026))
+                .andExpect(jsonPath("$.data.consultationId").value(ANALYSIS_ID))
                 .andExpect(jsonPath("$.data.analysisSummary").isNotEmpty());
     }
 
@@ -189,7 +199,7 @@ class ConsultationControllerTest {
     void shouldReturn504_WhenOpenAITimeout() throws Exception {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(1L, null, List.of()));
-        given(consultationService.getCareerConsultation(any(), any()))
+        given(analysisService.analyze(eq(AnalysisType.CAREER_CONSULTATION), any(), any()))
                 .willThrow(new OpenAIApiException("OpenAI API 요청 시간 초과"));
 
         mockMvc.perform(post("/api/career/consultation")

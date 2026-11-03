@@ -13,12 +13,16 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import ssafy.SSAju.career.domain.AnalysisExecution;
+import ssafy.SSAju.career.domain.AnalysisPayload;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.ForecastStatus;
+import ssafy.SSAju.career.mapper.AnalysisSnapshotMapper;
 import ssafy.SSAju.career.util.JobCategoryEnum;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.exception.FastAPITimeoutException;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
-import ssafy.SSAju.service.CompanyMatchingService;
+import ssafy.SSAju.service.AnalysisService;
 
 import java.util.List;
 import java.util.Map;
@@ -34,13 +38,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("CompatibilityController HTTP 레이어 테스트")
 class CompatibilityControllerTest {
 
+    private static final Long ANALYSIS_ID = 55L;
+
     @Mock
-    private CompanyMatchingService companyMatchingService;
+    private AnalysisService analysisService;
 
     private MockMvc mockMvc;
 
-    private static final CompatibilityResponse MOCK_RESPONSE = new CompatibilityResponse(
-            null,
+    private static final AnalysisPayload.CompatibilityResultData MOCK_RESULT =
+            new AnalysisPayload.CompatibilityResultData(
+            AnalysisPayload.SCHEMA_VERSION,
             new CompatibilityResponse.RequestContext(
                     "현대오토에버",
                     new CompatibilityResponse.TargetRoleInfo(JobCategoryEnum.TECH_BACKEND, "백엔드 개발자")
@@ -68,7 +75,7 @@ class CompatibilityControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new CompatibilityController(companyMatchingService))
+                .standaloneSetup(new CompatibilityController(analysisService, new AnalysisSnapshotMapper()))
                 .setControllerAdvice(new SajuGlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
@@ -86,7 +93,8 @@ class CompatibilityControllerTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(userId, null, List.of()));
 
-        given(companyMatchingService.analyzeCompatibility(any(), eq(userId))).willReturn(MOCK_RESPONSE);
+        given(analysisService.analyze(eq(AnalysisType.COMPANY_COMPATIBILITY), any(), eq(userId)))
+                .willReturn(new AnalysisExecution(ANALYSIS_ID, MOCK_RESULT));
 
         mockMvc.perform(post("/api/company/compatibility")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -105,6 +113,8 @@ class CompatibilityControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.compatibilityId").value(ANALYSIS_ID))
+                .andExpect(jsonPath("$.data.compatibilityId").isNumber())
                 .andExpect(jsonPath("$.data.compatibilityScore").value(78))
                 .andExpect(jsonPath("$.data.requestContext.companyName").value("현대오토에버"));
     }
@@ -166,7 +176,7 @@ class CompatibilityControllerTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(userId, null, List.of()));
 
-        given(companyMatchingService.analyzeCompatibility(any(), eq(userId)))
+        given(analysisService.analyze(eq(AnalysisType.COMPANY_COMPATIBILITY), any(), eq(userId)))
                 .willThrow(new FastAPITimeoutException("FastAPI 응답 타임아웃"));
 
         mockMvc.perform(post("/api/company/compatibility")

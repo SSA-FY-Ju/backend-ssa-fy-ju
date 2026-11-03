@@ -15,6 +15,8 @@ import ssafy.SSAju.dto.external.FastAPIResponse;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.entity.enums.UserRole;
 import ssafy.SSAju.entity.enums.UserStatus;
+import ssafy.SSAju.repository.ManseRepository;
+import ssafy.SSAju.repository.SajuRepository;
 import ssafy.SSAju.repository.SajuResultRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 import ssafy.SSAju.repository.UserRepository;
@@ -67,6 +69,12 @@ class CareerApiIntegrationTest {
     private SajuResultRepository sajuResultRepository;
 
     @Autowired
+    private SajuRepository sajuRepository;
+
+    @Autowired
+    private ManseRepository manseRepository;
+
+    @Autowired
     private UserSajuAccessRepository userSajuAccessRepository;
 
     @Autowired
@@ -90,6 +98,8 @@ class CareerApiIntegrationTest {
         feedbackRepository.deleteAll();
         userSajuAccessRepository.deleteAll();
         sajuResultRepository.deleteAll();
+        sajuRepository.deleteAll();
+        manseRepository.deleteAll();
         userProfileRepository.deleteAll();
         userRepository.deleteAll();
 
@@ -122,8 +132,8 @@ class CareerApiIntegrationTest {
     // ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("T090-1: 관운 분석 요청 → UserProfile·SajuResult가 DB에 저장됨")
-    void careerTiming_persistsUserProfileAndSajuResult() throws Exception {
+    @DisplayName("T090-1: 관운 분석 요청 → UserProfile·만세력·분석 결과가 DB에 저장됨")
+    void careerTiming_persistsProfileManseAndAnalysis() throws Exception {
         // When
         mockMvc.perform(post("/api/career/timing")
                         .header("Authorization", authHeader)
@@ -133,17 +143,19 @@ class CareerApiIntegrationTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.sajuResultId").isNumber())
                 .andExpect(jsonPath("$.data.favoredPeriod").isNotEmpty())
                 .andExpect(jsonPath("$.data.confidenceScore").isNumber());
 
-        // Then: 실제 DB 저장 검증
+        // Then: 실제 DB 저장 검증 — 기초는 프로필·만세력 각 1건, 결과는 요청당 1건
         assertThat(userProfileRepository.count()).isEqualTo(1);
-        assertThat(sajuResultRepository.count()).isEqualTo(1);
+        assertThat(manseRepository.count()).isEqualTo(1);
+        assertThat(sajuRepository.count()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("T090-2: 동일 생년월일시 중복 요청 → DB에 1건만 유지 (멱등성 보장)")
-    void careerTiming_duplicateRequest_idempotent() throws Exception {
+    @DisplayName("T090-2: 동일 생년월일시 반복 요청 → 기초는 재사용하고 결과는 요청마다 새로 저장")
+    void careerTiming_repeatedRequest_keepsEveryResult() throws Exception {
         String body = """
                 {"birthDate": "1990-10-10", "birthTime": "14:30"}
                 """;
@@ -157,9 +169,10 @@ class CareerApiIntegrationTest {
                     .andExpect(status().isOk());
         }
 
-        // Then: Race Condition 방지 - SajuResult는 1건만 유지
+        // Then: 프로필·만세력은 공유하고 결과는 요청 수만큼 남는다
         assertThat(userProfileRepository.count()).isEqualTo(1);
-        assertThat(sajuResultRepository.count()).isEqualTo(1);
+        assertThat(manseRepository.count()).isEqualTo(1);
+        assertThat(sajuRepository.count()).isEqualTo(2);
     }
 
     // ─────────────────────────────────────────────────────────────────
