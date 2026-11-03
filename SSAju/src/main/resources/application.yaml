@@ -7,6 +7,11 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      data-source-properties:
+        # 일일 쿼터의 조건부 upsert가 "실제로 바뀐 행 수"를 반환해야 한도 도달을 0으로 판정할 수 있다.
+        # URL에 옵션을 붙이는 방식에 의존하면 환경마다 누락될 수 있어 공통 설정으로 고정한다.
+        useAffectedRows: true
 
   jackson:
     time-zone: Asia/Seoul
