@@ -91,11 +91,6 @@ server:
   cookie:
     secure: true   # 로컬 개발 시 application-local.yaml에서 false로 오버라이드
 
-redisson:
-  lock:
-    wait-time-ms: ${REDISSON_LOCK_WAIT_TIME_MS:2000}
-    lease-time-ms: ${REDISSON_LOCK_LEASE_TIME_MS:5000}
-
 saju:
   fastapi:
     url: ${FASTAPI_URL}

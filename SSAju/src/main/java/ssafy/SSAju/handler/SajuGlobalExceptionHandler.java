@@ -19,11 +19,9 @@ import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.exception.ConsentRequiredException;
 import ssafy.SSAju.exception.UnauthorizedException;
 import ssafy.SSAju.exception.FeedbackAlreadyExistsException;
-import ssafy.SSAju.exception.FeedbackNotAllowedException;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidTokenException;
 import ssafy.SSAju.exception.TokenExpiredException;
-import ssafy.SSAju.exception.LockAcquisitionException;
 import ssafy.SSAju.exception.DailyLimitExceededException;
 import ssafy.SSAju.exception.DuplicateEmailException;
 import ssafy.SSAju.exception.ExternalApiException;
@@ -223,16 +221,6 @@ public class SajuGlobalExceptionHandler {
                         ErrorMessageConstants.DAILY_LIMIT_EXCEEDED.getMessage(), generateRequestId())));
     }
 
-    @ExceptionHandler(FeedbackNotAllowedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleFeedbackNotAllowed(
-            FeedbackNotAllowedException e, HttpServletRequest request) {
-        log.warn("피드백 불가 요청: {}", e.getMessage());
-        return ResponseEntity.badRequest()
-                .body(ApiResponse.failure(new ErrorInfo(
-                        ErrorMessageConstants.FEEDBACK_NOT_ALLOWED.getCode(),
-                        ErrorMessageConstants.FEEDBACK_NOT_ALLOWED.getMessage(), generateRequestId())));
-    }
-
     /**
      * 같은 분석에 피드백을 다시 제출한 경우. 분석당 0..1개 제약은 DB UNIQUE가 보장하며,
      * 재제출은 실패가 아니라 이미 처리된 요청이므로 409로 돌려준다.
@@ -371,16 +359,6 @@ public class SajuGlobalExceptionHandler {
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.DATABASE_ERROR.getCode(),
                         ErrorMessageConstants.DATABASE_ERROR.getMessage(), generateRequestId())));
-    }
-
-    @ExceptionHandler(LockAcquisitionException.class)
-    public ResponseEntity<ApiResponse<Void>> handleLockAcquisitionException(
-            LockAcquisitionException e, HttpServletRequest request) {
-        log.warn("분산락 획득 실패: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(ApiResponse.failure(new ErrorInfo(
-                        ErrorMessageConstants.LOCK_ACQUISITION_FAILED.getCode(),
-                        ErrorMessageConstants.LOCK_ACQUISITION_FAILED.getMessage(), generateRequestId())));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

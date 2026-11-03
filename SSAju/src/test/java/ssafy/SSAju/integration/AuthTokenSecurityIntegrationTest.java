@@ -5,7 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.redisson.api.RedissonClient;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -56,7 +56,7 @@ class AuthTokenSecurityIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private RedissonClient redissonClient;
+    private RedisConnectionFactory redisConnectionFactory;
 
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
@@ -74,7 +74,8 @@ class AuthTokenSecurityIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        redissonClient.getKeys().flushall();
+        // Redisson 제거 후 인증용 Redis는 기본 Lettuce 연결을 쓴다 — 테스트 전용 컨테이너만 비운다.
+        redisConnectionFactory.getConnection().serverCommands().flushAll();
     }
 
     @Test
