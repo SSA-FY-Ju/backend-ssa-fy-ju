@@ -14,8 +14,6 @@ import ssafy.SSAju.admin.dto.FeedbackDetailDTO;
 import ssafy.SSAju.admin.dto.FeedbackListDTO;
 import ssafy.SSAju.admin.dto.FeedbackStatDTO;
 import ssafy.SSAju.admin.repository.AdminFeedbackQueryRepository;
-import ssafy.SSAju.career.entity.CareerConsultation;
-import ssafy.SSAju.career.entity.CompanyCompatibility;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
 import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.SatisfactionStatus;
@@ -24,6 +22,7 @@ import ssafy.SSAju.exception.InvalidFeedbackTypeException;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -109,45 +108,26 @@ class AdminFeedbackServiceTest {
     }
 
     @Test
-    @DisplayName("getFeedbackWithAnalysis - CareerConsultation 연결된 피드백 → analysisType=CONSULTATION")
+    @DisplayName("getFeedbackWithAnalysis - 유형과 분석 ID는 연결된 saju에서 읽는다 (컨설팅)")
     void getFeedbackWithAnalysis_consultationLinked_returnsConsultationType() {
-        UserSatisfactionFeedback feedback = mock(UserSatisfactionFeedback.class);
-        CareerConsultation consultation = mock(CareerConsultation.class);
-        given(feedback.getId()).willReturn(1L);
-        given(feedback.getUser()).willReturn(null);
-        given(feedback.getFeedbackType()).willReturn(AnalysisType.CAREER_CONSULTATION);
-        given(feedback.getSatisfactionStatus()).willReturn(SatisfactionStatus.SATISFIED);
-        given(feedback.getFeedbackContent()).willReturn("좋았습니다");
-        given(feedback.getCreatedAt()).willReturn(Instant.now());
-        given(feedback.getCareerConsultation()).willReturn(consultation);
-        given(feedback.getCompanyCompatibility()).willReturn(null);
-        given(consultation.getId()).willReturn(100L);
-        given(consultation.getGeneratedAt()).willReturn(Instant.now());
-        given(feedbackRepository.findFeedbackWithAnalysis(1L)).willReturn(List.of(feedback));
+        UserSatisfactionFeedback feedback = feedbackLinkedTo(1L, 100L,
+                AnalysisType.CAREER_CONSULTATION, SatisfactionStatus.SATISFIED, "좋았습니다");
+        given(feedbackRepository.findFeedbackWithAnalysis(1L)).willReturn(Optional.of(feedback));
 
         FeedbackDetailDTO result = adminFeedbackService.getFeedbackWithAnalysis(1L);
 
         assertThat(result.feedbackId()).isEqualTo(1L);
         assertThat(result.analysisType()).isEqualTo("CAREER_CONSULTATION");
+        assertThat(result.feedbackType()).isEqualTo("CAREER_CONSULTATION");
         assertThat(result.analysisId()).isEqualTo(100L);
     }
 
     @Test
-    @DisplayName("getFeedbackWithAnalysis - CompanyCompatibility 연결된 피드백 → analysisType=COMPATIBILITY")
+    @DisplayName("getFeedbackWithAnalysis - 유형과 분석 ID는 연결된 saju에서 읽는다 (궁합)")
     void getFeedbackWithAnalysis_compatibilityLinked_returnsCompatibilityType() {
-        UserSatisfactionFeedback feedback = mock(UserSatisfactionFeedback.class);
-        CompanyCompatibility compatibility = mock(CompanyCompatibility.class);
-        given(feedback.getId()).willReturn(2L);
-        given(feedback.getUser()).willReturn(null);
-        given(feedback.getFeedbackType()).willReturn(AnalysisType.COMPANY_COMPATIBILITY);
-        given(feedback.getSatisfactionStatus()).willReturn(SatisfactionStatus.DISSATISFIED);
-        given(feedback.getFeedbackContent()).willReturn("별로였어요");
-        given(feedback.getCreatedAt()).willReturn(Instant.now());
-        given(feedback.getCareerConsultation()).willReturn(null);
-        given(feedback.getCompanyCompatibility()).willReturn(compatibility);
-        given(compatibility.getId()).willReturn(200L);
-        given(compatibility.getCreatedAt()).willReturn(Instant.now());
-        given(feedbackRepository.findFeedbackWithAnalysis(2L)).willReturn(List.of(feedback));
+        UserSatisfactionFeedback feedback = feedbackLinkedTo(2L, 200L,
+                AnalysisType.COMPANY_COMPATIBILITY, SatisfactionStatus.DISSATISFIED, "별로였어요");
+        given(feedbackRepository.findFeedbackWithAnalysis(2L)).willReturn(Optional.of(feedback));
 
         FeedbackDetailDTO result = adminFeedbackService.getFeedbackWithAnalysis(2L);
 
@@ -156,10 +136,29 @@ class AdminFeedbackServiceTest {
         assertThat(result.satisfactionStatus()).isEqualTo("DISSATISFIED");
     }
 
+    /** 피드백과 그 대상 분석을 함께 세운다 — 유형은 saju 쪽에만 있다. */
+    private UserSatisfactionFeedback feedbackLinkedTo(Long feedbackId, Long analysisId,
+                                                      AnalysisType type,
+                                                      SatisfactionStatus status,
+                                                      String content) {
+        UserSatisfactionFeedback feedback = mock(UserSatisfactionFeedback.class);
+        ssafy.SSAju.career.entity.Saju saju = mock(ssafy.SSAju.career.entity.Saju.class);
+        given(feedback.getId()).willReturn(feedbackId);
+        given(feedback.getUser()).willReturn(null);
+        given(feedback.getSatisfactionStatus()).willReturn(status);
+        given(feedback.getFeedbackContent()).willReturn(content);
+        given(feedback.getCreatedAt()).willReturn(Instant.now());
+        given(feedback.getSaju()).willReturn(saju);
+        given(saju.getId()).willReturn(analysisId);
+        given(saju.getAnalysisType()).willReturn(type);
+        given(saju.getCreatedAt()).willReturn(Instant.now());
+        return feedback;
+    }
+
     @Test
     @DisplayName("getFeedbackWithAnalysis - 존재하지 않는 id → FeedbackNotFoundException")
     void getFeedbackWithAnalysis_notFound_throwsException() {
-        given(feedbackRepository.findFeedbackWithAnalysis(999L)).willReturn(List.of());
+        given(feedbackRepository.findFeedbackWithAnalysis(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> adminFeedbackService.getFeedbackWithAnalysis(999L))
                 .isInstanceOf(FeedbackNotFoundException.class)

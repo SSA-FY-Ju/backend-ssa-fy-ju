@@ -61,16 +61,7 @@ public class AdminUserQueryRepository {
                        COALESCE(ac.total, 0) AS total_analysis_count
                 FROM users u
                 LEFT JOIN (
-                    SELECT user_id, COUNT(*) AS total
-                    FROM (
-                        SELECT user_id FROM user_saju_access
-                        UNION ALL
-                        SELECT usa.user_id FROM career_consultation cc
-                            JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id
-                        UNION ALL
-                        SELECT user_id FROM company_compatibility
-                    ) all_analyses
-                    GROUP BY user_id
+                    SELECT user_id, COUNT(*) AS total FROM saju GROUP BY user_id
                 ) ac ON u.id = ac.user_id
                 """ + where + " ORDER BY u.id DESC LIMIT ?";
 
@@ -109,18 +100,13 @@ public class AdminUserQueryRepository {
         return rows.stream().findFirst();
     }
 
+    /**
+     * 회원별 분석 수 = 그 회원이 소유한 saju 행 수. 공유 접근 관계가 아니라 직접 소유 기준이며,
+     * 분석이 없는 회원도 0으로 집계된다(LEFT JOIN).
+     */
     private long countAnalysisByUser(Long userId) {
-        String countSql = """
-                SELECT COUNT(*) FROM (
-                    SELECT saju_result_id AS id FROM user_saju_access WHERE user_id = ?
-                    UNION ALL
-                    SELECT cc.id FROM career_consultation cc
-                    JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id WHERE usa.user_id = ?
-                    UNION ALL
-                    SELECT id FROM company_compatibility WHERE user_id = ?
-                ) t
-                """;
-        Long count = jdbcTemplate.queryForObject(countSql, Long.class, userId, userId, userId);
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM saju WHERE user_id = ?", Long.class, userId);
         return count != null ? count : 0L;
     }
 }

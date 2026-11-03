@@ -6,190 +6,126 @@ import org.springframework.stereotype.Repository;
 import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.service.AdminBaseService;
+import ssafy.SSAju.career.enums.AnalysisType;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TimeZone;
 
+/**
+ * 관리자 분석 조회. 세 유형이 {@code saju} 한 테이블에 모이면서 UNION 없이 단일 집계다.
+ *
+ * <p>소유자는 {@code saju.user_id}를 직접 읽는다 — User 엔티티로 조인하면
+ * {@code @SQLRestriction("deleted_at IS NULL")} 때문에 탈퇴 사용자의 분석이 관리자 화면에서
+ * 사라진다. 계정 표시가 필요하면 그때만 SQL로 users를 조인해 대체된 이름/이메일을 읽는다.
+ *
+ * <p>{@code created_at}은 UTC로 저장되므로 경계 파라미터와 조회 모두 UTC Calendar를 사용한다.
+ * JVM 기본 시간대에 의존하면 서울 날짜 경계가 한 칸씩 밀린다.
+ */
 @Repository
 @RequiredArgsConstructor
 public class AdminAnalyticsQueryRepository {
 
-    private static final String SAJU = "SAJU";
-    private static final String CAREER_CONSULTATION = "CAREER_CONSULTATION";
-    private static final String COMPANY_COMPATIBILITY = "COMPANY_COMPATIBILITY";
+    private static final Calendar UTC_CALENDAR_PROTOTYPE =
+            Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
     private final JdbcTemplate jdbcTemplate;
 
     public List<AnalyticsListDTO> findAnalyticsByDateAndType(
             String analysisType, LocalDate dateFrom, LocalDate dateTo, int page, int size) {
-        var fromInstant = dateFrom.atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
-        var toInstant = dateTo.plusDays(1).atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
+        Instant fromInstant = dateFrom.atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
+        Instant toInstant = dateTo.plusDays(1).atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
         int offset = page * size;
 
-        String sql = buildListSql(analysisType);
-        List<Object> params = buildListParams(analysisType, fromInstant, toInstant, size, offset);
+        String typeCondition = analysisType != null ? " AND s.analysis_type = ?" : "";
+        String sql = """
+                SELECT s.id, s.user_id, s.analysis_type, s.created_at
+                FROM saju s
+                WHERE s.created_at >= ? AND s.created_at < ?"""
+                + typeCondition
+                + " ORDER BY s.created_at DESC, s.id DESC LIMIT ? OFFSET ?";
 
-        return jdbcTemplate.query(sql, params.toArray(), (rs, rowNum) -> new AnalyticsListDTO(
+        return jdbcTemplate.query(
+                connection -> {
+                    PreparedStatement ps = connection.prepareStatement(sql);
+                    int index = bindRange(ps, fromInstant, toInstant);
+                    if (analysisType != null) {
+                        ps.setString(index++, analysisType);
+                    }
+                    ps.setInt(index++, size);
+                    ps.setInt(index, offset);
+                    return ps;
+                },
+                (rs, rowNum) -> new AnalyticsListDTO(
+                        rs.getLong("id"),
+                        rs.getLong("user_id"),
+                        rs.getString("analysis_type"),
+                        readCreatedAt(rs)));
+    }
+
+    /**
+     * 분석 ID·유형·소유자가 모두 일치하는 한 건만 조회한다. 목록에서 클릭한 행의 userId를 그대로
+     * 받아 다른 사용자의 결과가 섞이지 않게 한다.
+     */
+    public Optional<AnalyticsDetailDTO> findAnalyticsById(Long id, String analysisType, Long userId) {
+        String sql = """
+                SELECT s.id, s.user_id, s.analysis_type, s.result_json, s.created_at
+                FROM saju s
+                WHERE s.id = ? AND s.analysis_type = ? AND s.user_id = ?
+                """;
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new AnalyticsDetailDTO(
                 rs.getLong("id"),
                 rs.getLong("user_id"),
                 rs.getString("analysis_type"),
-                rs.getTimestamp("created_at").toInstant()
-        ));
+                rs.getString("result_json"),
+                readCreatedAt(rs)
+        ), id, analysisType, userId).stream().findFirst();
     }
 
-    /**
-     * B1: SajuResult는 여러 사용자가 공유하는 정본이라 sr.id 하나에 user_saju_access가
-     * 여럿 붙을 수 있다. 목록에서 관리자가 클릭한 행이 어떤 사용자의 접근 매핑인지를
-     * userId로 명시적으로 전달받아 그 매핑 하나만 정확히 조회한다(목록 행과 상세 모달의
-     * 표시 값이 항상 일치하도록 보장). analysisType/userId의 null 검증은 호출자인
-     * AdminAnalyticsService의 책임이다(Repository는 순수 데이터 접근만 담당).
-     */
-    public Optional<AnalyticsDetailDTO> findAnalyticsById(Long id, String analysisType, Long userId) {
-        return switch (analysisType) {
-            case SAJU -> findSajuDetail(id, userId);
-            case CAREER_CONSULTATION -> findConsultationDetail(id, userId);
-            case COMPANY_COMPATIBILITY -> findCompatibilityDetail(id, userId);
-            default -> Optional.empty();
-        };
-    }
-
+    /** 서울 날짜 하루의 유형별 분석 수. 새 분석 한 행이 성공 한 건이다. */
     public Map<String, Long> findDailyAnalysisSummary(LocalDate date) {
-        var fromInstant = date.atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
-        var toInstant = date.plusDays(1).atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
+        Instant fromInstant = date.atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
+        Instant toInstant = date.plusDays(1).atStartOfDay(AdminBaseService.SEOUL_ZONE).toInstant();
 
         Map<String, Long> result = new HashMap<>();
-        result.put(SAJU, countSaju(fromInstant, toInstant));
-        result.put(CAREER_CONSULTATION, countConsultation(fromInstant, toInstant));
-        result.put(COMPANY_COMPATIBILITY, countCompatibility(fromInstant, toInstant));
+        for (AnalysisType type : AnalysisType.values()) {
+            result.put(type.name(), 0L);
+        }
+
+        jdbcTemplate.query(
+                connection -> {
+                    PreparedStatement ps = connection.prepareStatement("""
+                            SELECT s.analysis_type, COUNT(*) AS total
+                            FROM saju s
+                            WHERE s.created_at >= ? AND s.created_at < ?
+                            GROUP BY s.analysis_type
+                            """);
+                    bindRange(ps, fromInstant, toInstant);
+                    return ps;
+                },
+                rs -> {
+                    result.put(rs.getString("analysis_type"), rs.getLong("total"));
+                });
         return result;
     }
 
-    private String buildListSql(String analysisType) {
-        if (analysisType == null) {
-            return """
-                    SELECT * FROM (
-                        SELECT 'SAJU' AS analysis_type, sr.id, usa.user_id, usa.created_at AS created_at
-                        FROM saju_result sr
-                        JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-                        UNION ALL
-                        SELECT 'CAREER_CONSULTATION', cc.id, usa.user_id, cc.generated_at
-                        FROM career_consultation cc
-                        JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id
-                        UNION ALL
-                        SELECT 'COMPANY_COMPATIBILITY', compat.id, compat.user_id, compat.created_at
-                        FROM company_compatibility compat
-                    ) combined
-                    WHERE created_at >= ? AND created_at < ?
-                    ORDER BY created_at DESC LIMIT ? OFFSET ?
-                    """;
-        }
-        return switch (analysisType) {
-            case SAJU -> "SELECT 'SAJU' AS analysis_type, sr.id, usa.user_id, usa.created_at AS created_at FROM saju_result sr JOIN user_saju_access usa ON usa.saju_result_id = sr.id WHERE usa.created_at >= ? AND usa.created_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
-            case CAREER_CONSULTATION -> "SELECT 'CAREER_CONSULTATION' AS analysis_type, cc.id, usa.user_id, cc.generated_at AS created_at FROM career_consultation cc JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id WHERE cc.generated_at >= ? AND cc.generated_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
-            case COMPANY_COMPATIBILITY -> "SELECT 'COMPANY_COMPATIBILITY' AS analysis_type, id, user_id, created_at FROM company_compatibility WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
-            default -> throw new IllegalArgumentException("Unknown analysisType: " + analysisType);
-        };
+    private int bindRange(PreparedStatement ps, Instant from, Instant to) throws SQLException {
+        Calendar utc = (Calendar) UTC_CALENDAR_PROTOTYPE.clone();
+        ps.setTimestamp(1, Timestamp.from(from), utc);
+        ps.setTimestamp(2, Timestamp.from(to), utc);
+        return 3;
     }
 
-    private List<Object> buildListParams(String analysisType, Object fromInstant, Object toInstant, int size, int offset) {
-        List<Object> params = new ArrayList<>();
-        params.add(fromInstant);
-        params.add(toInstant);
-        params.add(size);
-        params.add(offset);
-        return params;
-    }
-
-    /**
-     * B1: SajuResult는 여러 사용자가 공유하는 정본이라 sr.id 하나에 user_saju_access가
-     * 여럿 붙을 수 있다. 목록에서 클릭한 행의 userId를 그대로 받아 그 사용자의 접근
-     * 매핑 하나만 정확히 조회한다 — 임의로 대표값을 고르지 않는다.
-     */
-    private Optional<AnalyticsDetailDTO> findSajuDetail(Long id, Long userId) {
-        String sql = """
-                SELECT sr.id, usa.user_id,
-                       CONCAT(sfd.year_pillar, sfd.month_pillar, sfd.day_pillar, sfd.hour_pillar) AS json_data,
-                       usa.created_at AS created_at
-                FROM saju_result sr
-                LEFT JOIN saju_full_data sfd ON sfd.saju_result_id = sr.id
-                JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-                WHERE sr.id = ? AND usa.user_id = ?
-                """;
-        return jdbcTemplate.query(sql, (rs, rowNum) -> new AnalyticsDetailDTO(
-                rs.getLong("id"),
-                rs.getLong("user_id"),
-                SAJU,
-                rs.getString("json_data"),
-                rs.getTimestamp("created_at").toInstant()
-        ), id, userId).stream().findFirst();
-    }
-
-    /** B1: 조회 기준은 {@link #findSajuDetail}과 동일 — 클릭한 행의 userId로 정확히 필터링. */
-    private Optional<AnalyticsDetailDTO> findConsultationDetail(Long id, Long userId) {
-        String sql = """
-                SELECT cc.id, usa.user_id, cc.day_master_description AS json_data, cc.generated_at AS created_at
-                FROM career_consultation cc
-                JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id
-                WHERE cc.id = ? AND usa.user_id = ?
-                """;
-        return jdbcTemplate.query(sql, (rs, rowNum) -> new AnalyticsDetailDTO(
-                rs.getLong("id"),
-                rs.getLong("user_id"),
-                CAREER_CONSULTATION,
-                rs.getString("json_data"),
-                rs.getTimestamp("created_at").toInstant()
-        ), id, userId).stream().findFirst();
-    }
-
-    private Optional<AnalyticsDetailDTO> findCompatibilityDetail(Long id, Long userId) {
-        String sql = """
-                SELECT id, user_id, summary AS json_data, created_at
-                FROM company_compatibility
-                WHERE id = ? AND user_id = ?
-                """;
-        return jdbcTemplate.query(sql, (rs, rowNum) -> new AnalyticsDetailDTO(
-                rs.getLong("id"),
-                rs.getLong("user_id"),
-                COMPANY_COMPATIBILITY,
-                rs.getString("json_data"),
-                rs.getTimestamp("created_at").toInstant()
-        ), id, userId).stream().findFirst();
-    }
-
-    /**
-     * B1: SajuResult는 여러 사용자가 공유하는 정본이라 "정본 수"와 "정본을 받은 사용자 수"가
-     * 다르다. 이 요약은 목록(buildListSql)과 동일하게 "오늘 관운 분석을 받은 사용자 수"를
-     * 세는 게 관리자에게 더 유용하므로(내부 FastAPI 호출 수가 아니라), user_saju_access를
-     * 조인해 접근자 수 기준으로 카운트한다 — 목록 행 수와 항상 일치한다.
-     *
-     * <p>날짜 필터도 정본 자체의 생성 시점(sr.fetched_at)이 아니라 이 사용자가 실제로 접근한
-     * 시점(usa.created_at)을 기준으로 한다 — 정본은 한 번 생성되면 다시 만들어지지 않으므로,
-     * 몇 달 전 만들어진 정본에 오늘 처음 접근한 사용자도 "오늘" 집계에 잡혀야 한다.
-     */
-    private long countSaju(Object from, Object to) {
-        Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM saju_result sr " +
-                        "JOIN user_saju_access usa ON usa.saju_result_id = sr.id " +
-                        "WHERE usa.created_at >= ? AND usa.created_at < ?", Long.class, from, to);
-        return count != null ? count : 0L;
-    }
-
-    /** 기준은 {@link #countSaju}와 동일 — 목록 행 수와 일치하도록 접근자 수 기준으로 카운트. */
-    private long countConsultation(Object from, Object to) {
-        Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM career_consultation cc " +
-                        "JOIN user_saju_access usa ON usa.saju_result_id = cc.saju_result_id " +
-                        "WHERE cc.generated_at >= ? AND cc.generated_at < ?", Long.class, from, to);
-        return count != null ? count : 0L;
-    }
-
-    private long countCompatibility(Object from, Object to) {
-        Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM company_compatibility WHERE created_at >= ? AND created_at < ?", Long.class, from, to);
-        return count != null ? count : 0L;
+    private Instant readCreatedAt(ResultSet rs) throws SQLException {
+        return rs.getTimestamp("created_at", (Calendar) UTC_CALENDAR_PROTOTYPE.clone()).toInstant();
     }
 }

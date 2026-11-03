@@ -20,4 +20,11 @@ public final class DatabaseConstraints {
      * <p>MySQL에서 {@code @Column(unique = true)}로 생성 시 컬럼명({@code "email"})이 제약명이 됩니다.
      */
     public static final String USER_EMAIL_UNIQUE = "email";
+
+    /**
+     * {@code user_satisfaction_feedback} 테이블 {@code saju_id} UNIQUE 제약 조건명.
+     *
+     * <p>분석 한 건당 피드백 0..1개를 보장한다. 동시 중복 제출은 이 제약에서 걸러진다.
+     */
+    public static final String FEEDBACK_SAJU_UNIQUE = "uk_feedback_saju";
 }
