@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "requestedUserBirthDate": "1995-03-20",
+  "requestedUserBirthTime": "09:15:00",
+  "resolvedUserBirthTime": "09:15:00",
+  "companyName": "테스트기업",
+  "targetRoleCategory": "TECH_BACKEND",
+  "targetRoleDetailName": "백엔드 개발자",
+  "requestedCompanyFoundingDate": "2010-05-01",
+  "requestedCompanyFoundingTime": null,
+  "resolvedCompanyFoundingDate": "2010-05-01",
+  "resolvedCompanyFoundingTime": "12:00:00",
+  "companyFoundingDateSource": "REQUEST",
+  "compatibilityMonth": 202611,
+  "analysisYear": 2026
+}

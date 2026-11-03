@@ -3,143 +3,101 @@ package ssafy.SSAju.repository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import ssafy.SSAju.career.converter.AnalysisSnapshotCodec;
+import ssafy.SSAju.career.domain.AnalysisPayload;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.dto.response.UserAnalysisDto;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Calendar;
 import java.util.List;
+import java.util.TimeZone;
 
 /**
  * 마이페이지 분석 이력 조회 리포지토리.
  *
- * <p>SajuResult(SAJU), CareerFortune(CAREER_FORTUNE), CompanyCompatibility(COMPANY_COMPATIBILITY)를
- * UNION ALL 쿼리로 통합하여 최근 1년 분석 이력을 반환합니다.
- * JPA UNION 미지원 문제를 우회하기 위해 JdbcTemplate을 사용합니다.
+ * <p>세 유형이 {@code saju} 한 테이블로 통합되어 UNION 없이 단일 조회다. 소유권은 공유 접근 관계가
+ * 아니라 {@code saju.user_id}로 직접 판단한다.
  *
- * <p>B1: SajuResult는 더 이상 user_id 컬럼을 갖지 않는(여러 사용자가 공유하는 정본) 관계로,
- * SAJU/CAREER_CONSULTATION 이력의 소유권은 user_saju_access 매핑 테이블을 통해 확인합니다.
+ * <p>기간 제한을 두지 않는다 — 목록과 count가 같은 조건을 써야 페이지 수와 실제 행이 어긋나지 않고,
+ * 명세상 소유자의 전체 이력을 제공한다.
+ *
+ * <p>{@code created_at}은 UTC로 저장되므로 JVM 기본 시간대에 의존하지 않도록 UTC Calendar를 넘겨
+ * 읽는다(저장 계약).
  */
 @Repository
 @RequiredArgsConstructor
 public class AnalysisHistoryRepository {
 
+    private static final Calendar UTC_CALENDAR_PROTOTYPE =
+            Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+
+    private static final String LIST_QUERY = """
+            SELECT s.analysis_type AS type, s.id AS analysis_id, u.name AS user_name,
+                   up.birth_date AS birth_date, s.created_at AS created_at, s.input_json AS input_json
+            FROM saju s
+            JOIN manse m ON s.manse_id = m.id
+            JOIN user_profile up ON m.user_profile_id = up.id
+            JOIN users u ON s.user_id = u.id
+            WHERE s.user_id = ?
+            """;
+
+    private static final String ORDER_AND_PAGE = " ORDER BY s.created_at DESC, s.id DESC LIMIT ? OFFSET ?";
+
+    private static final String TYPE_CONDITION = " AND s.analysis_type = ?";
+
+    private static final String COUNT_QUERY = "SELECT COUNT(*) FROM saju s WHERE s.user_id = ?";
+
     private final JdbcTemplate jdbcTemplate;
-
-    private static final String UNION_QUERY = """
-            SELECT 'SAJU' AS type, sr.id AS analysis_id, u.name AS target_name,
-                   up.birth_date, usa.created_at AS created_at
-            FROM saju_result sr
-            JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-            JOIN user_profile up ON sr.user_profile_id = up.id
-            JOIN users u ON usa.user_id = u.id
-            WHERE usa.user_id = ?
-              AND usa.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
-
-            UNION ALL
-
-            SELECT 'CAREER_CONSULTATION' AS type, cc.id AS analysis_id, u.name AS target_name,
-                   up.birth_date, cc.generated_at AS created_at
-            FROM career_consultation cc
-            JOIN saju_result sr ON cc.saju_result_id = sr.id
-            JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-            JOIN user_profile up ON sr.user_profile_id = up.id
-            JOIN users u ON usa.user_id = u.id
-            WHERE usa.user_id = ?
-              AND cc.generated_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
-
-            UNION ALL
-
-            SELECT 'COMPANY_COMPATIBILITY' AS type, cc.id AS analysis_id,
-                   cc.company_name AS target_name, up.birth_date, cc.created_at
-            FROM company_compatibility cc
-            JOIN user_profile up ON cc.user_profile_id = up.id
-            WHERE cc.user_id = ?
-              AND cc.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
-            """;
-
-    private static final String COUNT_QUERY = """
-            SELECT COUNT(*) FROM (
-                SELECT sr.id FROM saju_result sr
-                JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-                WHERE usa.user_id = ?
-                  AND usa.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
-
-                UNION ALL
-
-                SELECT cc.id FROM career_consultation cc
-                JOIN saju_result sr ON cc.saju_result_id = sr.id
-                JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-                WHERE usa.user_id = ?
-                  AND cc.generated_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
-
-                UNION ALL
-
-                SELECT compat.id FROM company_compatibility compat
-                WHERE compat.user_id = ?
-                  AND compat.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
-            ) total
-            """;
-
-    private static final String COUNT_BY_TYPE_QUERY = """
-            SELECT COUNT(*) FROM (
-                SELECT sr.id, 'SAJU' AS type FROM saju_result sr
-                JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-                WHERE usa.user_id = ?
-                  AND usa.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
-
-                UNION ALL
-
-                SELECT cc.id, 'CAREER_CONSULTATION' AS type FROM career_consultation cc
-                JOIN saju_result sr ON cc.saju_result_id = sr.id
-                JOIN user_saju_access usa ON usa.saju_result_id = sr.id
-                WHERE usa.user_id = ?
-                  AND cc.generated_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
-
-                UNION ALL
-
-                SELECT compat.id, 'COMPANY_COMPATIBILITY' AS type FROM company_compatibility compat
-                WHERE compat.user_id = ?
-                  AND compat.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
-            ) filtered WHERE filtered.type = ?
-            """;
+    private final AnalysisSnapshotCodec snapshotCodec;
 
     public List<UserAnalysisDto> findAllByUserId(Long userId, int page, int size) {
-        String sql = UNION_QUERY + " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        int offset = page * size;
         return jdbcTemplate.query(
-                sql,
-                (rs, rowNum) -> new UserAnalysisDto(
-                        rs.getString("type"),
-                        rs.getLong("analysis_id"),
-                        rs.getString("target_name"),
-                        rs.getDate("birth_date").toLocalDate(),
-                        rs.getTimestamp("created_at").toInstant()
-                ),
-                userId, userId, userId, size, offset);
+                LIST_QUERY + ORDER_AND_PAGE,
+                this::mapRow,
+                userId, size, page * size);
     }
 
     public List<UserAnalysisDto> findAllByUserIdAndType(Long userId, String type, int page, int size) {
-        String typeSql = "SELECT * FROM (" + UNION_QUERY + ") AS combined_result " +
-                "WHERE type = ? ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        int offset = page * size;
         return jdbcTemplate.query(
-                typeSql,
-                (rs, rowNum) -> new UserAnalysisDto(
-                        rs.getString("type"),
-                        rs.getLong("analysis_id"),
-                        rs.getString("target_name"),
-                        rs.getDate("birth_date").toLocalDate(),
-                        rs.getTimestamp("created_at").toInstant()
-                ),
-                userId, userId, userId, type, size, offset);
+                LIST_QUERY + TYPE_CONDITION + ORDER_AND_PAGE,
+                this::mapRow,
+                userId, type, size, page * size);
     }
 
     public long countAllByUserId(Long userId) {
-        Long count = jdbcTemplate.queryForObject(COUNT_QUERY, Long.class, userId, userId, userId);
+        Long count = jdbcTemplate.queryForObject(COUNT_QUERY, Long.class, userId);
         return count != null ? count : 0L;
     }
 
     public long countAllByUserIdAndType(Long userId, String type) {
-        Long count = jdbcTemplate.queryForObject(COUNT_BY_TYPE_QUERY, Long.class,
-                userId, userId, userId, type);
+        Long count = jdbcTemplate.queryForObject(
+                COUNT_QUERY + " AND s.analysis_type = ?", Long.class, userId, type);
         return count != null ? count : 0L;
+    }
+
+    /**
+     * 궁합은 기존 목록처럼 회사명을 대상 이름으로 보여준다. 회사명은 입력 스냅샷에 들어 있으므로
+     * 행마다 추가 조회 없이 같은 결과 집합에서 읽어 변환한다.
+     */
+    private UserAnalysisDto mapRow(ResultSet rs, int rowNum) throws SQLException {
+        AnalysisType type = AnalysisType.valueOf(rs.getString("type"));
+        String targetName = type == AnalysisType.COMPANY_COMPATIBILITY
+                ? companyNameOf(rs.getString("input_json"))
+                : rs.getString("user_name");
+
+        return new UserAnalysisDto(
+                type.name(),
+                rs.getLong("analysis_id"),
+                targetName,
+                rs.getDate("birth_date").toLocalDate(),
+                rs.getTimestamp("created_at", (Calendar) UTC_CALENDAR_PROTOTYPE.clone()).toInstant());
+    }
+
+    private String companyNameOf(String inputJson) {
+        AnalysisPayload.Input input =
+                snapshotCodec.readInput(AnalysisType.COMPANY_COMPATIBILITY, inputJson);
+        return ((AnalysisPayload.CompatibilityInput) input).companyName();
     }
 }

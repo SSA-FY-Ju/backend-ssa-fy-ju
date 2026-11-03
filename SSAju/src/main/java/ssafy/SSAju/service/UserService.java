@@ -4,25 +4,19 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ssafy.SSAju.career.entity.CareerConsultation;
-import ssafy.SSAju.career.entity.CareerFortune;
-import ssafy.SSAju.career.entity.CompanyCompatibility;
-import ssafy.SSAju.career.entity.SajuResult;
-import ssafy.SSAju.career.entity.UserProfile;
+import ssafy.SSAju.career.converter.AnalysisSnapshotCodec;
+import ssafy.SSAju.career.domain.AnalysisPayload;
+import ssafy.SSAju.career.entity.Saju;
 import ssafy.SSAju.career.enums.AnalysisType;
-import ssafy.SSAju.career.mapper.ConsultationMapper;
+import ssafy.SSAju.career.mapper.AnalysisSnapshotMapper;
 import ssafy.SSAju.dto.response.AnalysisDetailResponse;
-import ssafy.SSAju.dto.response.CompatibilityResponse;
-import ssafy.SSAju.dto.response.ConsultationResponse;
 import ssafy.SSAju.dto.response.MyPageResponse;
 import ssafy.SSAju.dto.response.UserAnalysisDto;
 import ssafy.SSAju.entity.User;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.exception.UserNotFoundException;
 import ssafy.SSAju.repository.AnalysisHistoryRepository;
-import ssafy.SSAju.repository.CareerConsultationRepository;
-import ssafy.SSAju.repository.CompanyCompatibilityRepository;
-import ssafy.SSAju.repository.SajuResultRepository;
+import ssafy.SSAju.repository.SajuRepository;
 import ssafy.SSAju.repository.UserRepository;
 
 import java.util.List;
@@ -34,11 +28,9 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final AnalysisHistoryRepository analysisHistoryRepository;
-    private final SajuResultRepository sajuResultRepository;
-    private final CareerConsultationRepository careerConsultationRepository;
-    private final CompanyCompatibilityRepository companyCompatibilityRepository;
-    private final ConsultationMapper consultationMapper;
-    private final CompatibilityChildReadService compatibilityChildReadService;
+    private final SajuRepository sajuRepository;
+    private final AnalysisSnapshotCodec snapshotCodec;
+    private final AnalysisSnapshotMapper analysisSnapshotMapper;
 
     @Transactional(readOnly = true)
     public MyPageResponse getMyPage(Long userId, AnalysisType type, int page, int size) {
@@ -63,61 +55,24 @@ public class UserService {
                 new MyPageResponse.PaginationInfo(page, size, total, totalPages));
     }
 
+    /**
+     * 저장된 결과 스냅샷만 읽어 상세를 돌려준다.
+     *
+     * <p>없는 ID·타인의 ID·요청 유형과 다른 ID를 모두 같은 미존재 오류로 처리한다 — 셋을 구분해
+     * 알려주면 남의 분석이 존재한다는 사실이 드러난다.
+     */
     @Transactional(readOnly = true)
     public AnalysisDetailResponse getAnalysisDetail(Long userId, Long analysisId, AnalysisType type) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
-        return switch (type) {
-            case SAJU -> buildSajuDetail(user, analysisId);
-            case CAREER_CONSULTATION -> buildCareerConsultationDetail(user, analysisId);
-            case COMPANY_COMPATIBILITY -> buildCompatibilityDetail(user, analysisId);
-        };
+        Saju saju = sajuRepository.findByIdAndUserIdAndAnalysisType(analysisId, userId, type)
+                .orElseThrow(() -> new SajuResultNotFoundException("분석 결과를 찾을 수 없습니다."));
+
+        AnalysisPayload.Input input = snapshotCodec.readInput(type, saju.getInputJson());
+        AnalysisPayload.Result result = snapshotCodec.readResult(type, saju.getResultJson());
+
+        return analysisSnapshotMapper.toDetailResponse(
+                saju, user.getName(), saju.getManse().getUserProfile().getBirthDate(), input, result);
     }
-
-    // ─────────────────────────────────────────
-    // private: detail builders
-    // ─────────────────────────────────────────
-
-    private AnalysisDetailResponse buildSajuDetail(User user, Long analysisId) {
-        SajuResult sajuResult = sajuResultRepository
-                .findByIdAndUserIdWithProfileAndFortune(analysisId, user.getId())
-                .orElseThrow(() -> new SajuResultNotFoundException("사주 분석 결과를 찾을 수 없습니다."));
-
-        UserProfile profile = sajuResult.getUserProfile();
-        CareerFortune cf = sajuResult.getCareerFortune();
-        AnalysisDetailResponse.CareerFortuneDetail cfDetail = cf == null ? null :
-                new AnalysisDetailResponse.CareerFortuneDetail(
-                        cf.getFavoredPeriod(), cf.getConfidenceScore(), cf.getReasoning());
-
-        return new AnalysisDetailResponse(
-                AnalysisType.SAJU.name(), sajuResult.getId(), user.getName(), profile.getBirthDate(),
-                sajuResult.getFetchedAt(), null, null, cfDetail, null, null);
-    }
-
-    private AnalysisDetailResponse buildCareerConsultationDetail(User user, Long analysisId) {
-        CareerConsultation cc = careerConsultationRepository
-                .findByIdAndUserIdWithSajuResultAndProfile(analysisId, user.getId())
-                .orElseThrow(() -> new SajuResultNotFoundException("커리어 컨설팅 결과를 찾을 수 없습니다."));
-
-        UserProfile profile = cc.getSajuResult().getUserProfile();
-        ConsultationResponse consultationDetail = consultationMapper.toResponseFromEntity(cc);
-
-        return new AnalysisDetailResponse(
-                AnalysisType.CAREER_CONSULTATION.name(), cc.getId(), user.getName(), profile.getBirthDate(),
-                cc.getGeneratedAt(), null, null, null, consultationDetail, null);
-    }
-
-    private AnalysisDetailResponse buildCompatibilityDetail(User user, Long analysisId) {
-        CompanyCompatibility cc = companyCompatibilityRepository.findByIdAndUser(analysisId, user)
-                .orElseThrow(() -> new SajuResultNotFoundException("기업 궁합 분석 결과를 찾을 수 없습니다."));
-
-        UserProfile profile = cc.getUserProfile();
-        CompatibilityResponse compatibilityDetail = compatibilityChildReadService.buildFromExisting(cc);
-
-        return new AnalysisDetailResponse(
-                AnalysisType.COMPANY_COMPATIBILITY.name(), cc.getId(), cc.getCompanyName(), profile.getBirthDate(),
-                cc.getCreatedAt(), null, null, null, null, compatibilityDetail);
-    }
-
 }

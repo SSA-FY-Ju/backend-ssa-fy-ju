@@ -4,11 +4,16 @@ import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.AnalysisExecution;
 import ssafy.SSAju.career.domain.AnalysisPayload;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
+import ssafy.SSAju.career.entity.Saju;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.dto.response.AnalysisDetailResponse;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.dto.response.ConsultationResponse;
 import ssafy.SSAju.exception.InvalidSajuDataException;
+
+import java.time.LocalDate;
 
 /**
  * 분석 결과와 저장 스냅샷 사이의 변환을 담당한다.
@@ -127,5 +132,45 @@ public class AnalysisSnapshotMapper {
             throw new InvalidSajuDataException(ErrorMessageConstants.ANALYSIS_TYPE_UNSUPPORTED.getMessage());
         }
         return type.cast(execution.result());
+    }
+
+    /**
+     * 저장된 스냅샷만으로 마이페이지 상세 응답을 만든다. 현재 연도·모델·회사 조회에 의존하지 않고
+     * 외부 호출이나 새 분석도 하지 않는다 — 조회는 저장된 내용을 그대로 돌려준다.
+     *
+     * @param birthDate 분석에 실제 사용한 출생일(saju → manse → user_profile)
+     */
+    public AnalysisDetailResponse toDetailResponse(Saju saju,
+                                                    String userName,
+                                                    LocalDate birthDate,
+                                                    AnalysisPayload.Input input,
+                                                    AnalysisPayload.Result result) {
+        AnalysisType type = saju.getAnalysisType();
+        AnalysisExecution execution = new AnalysisExecution(saju.getId(), result);
+
+        return switch (type) {
+            case SAJU -> {
+                AnalysisPayload.SajuResultData data = require(execution, AnalysisPayload.SajuResultData.class);
+                yield new AnalysisDetailResponse(
+                        type.name(), saju.getId(), userName, birthDate, saju.getCreatedAt(),
+                        null, null,
+                        new AnalysisDetailResponse.CareerFortuneDetail(
+                                data.favoredPeriod(), data.confidenceScore(), data.reasoning()),
+                        null, null);
+            }
+            case CAREER_CONSULTATION -> new AnalysisDetailResponse(
+                    type.name(), saju.getId(), userName, birthDate, saju.getCreatedAt(),
+                    null, null, null, toConsultationResponse(execution), null);
+            case COMPANY_COMPATIBILITY -> new AnalysisDetailResponse(
+                    type.name(), saju.getId(), companyNameOf(input), birthDate, saju.getCreatedAt(),
+                    null, null, null, null, toCompatibilityResponse(execution));
+        };
+    }
+
+    private String companyNameOf(AnalysisPayload.Input input) {
+        if (!(input instanceof AnalysisPayload.CompatibilityInput compatibilityInput)) {
+            throw new InvalidSajuDataException(ErrorMessageConstants.ANALYSIS_TYPE_UNSUPPORTED.getMessage());
+        }
+        return compatibilityInput.companyName();
     }
 }

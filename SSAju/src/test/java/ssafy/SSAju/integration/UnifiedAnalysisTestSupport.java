@@ -48,6 +48,7 @@ public final class UnifiedAnalysisTestSupport {
     public static final String SAJU_RESULT_FIXTURE = "saju-result.json";
     public static final String CONSULTATION_RESULT_FIXTURE = "consultation-result.json";
     public static final String COMPATIBILITY_RESULT_FIXTURE = "compatibility-result.json";
+    public static final String COMPATIBILITY_INPUT_FIXTURE = "compatibility-input.json";
 
     private UnifiedAnalysisTestSupport() {
     }
