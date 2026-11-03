@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 import ssafy.SSAju.dto.request.CareerTimingRequest;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.CareerTimingResponse;
-import ssafy.SSAju.service.CareerFortuneService;
+import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.career.mapper.AnalysisSnapshotMapper;
+import ssafy.SSAju.service.AnalysisService;
 
 @Slf4j
 @RestController
@@ -26,7 +28,8 @@ import ssafy.SSAju.service.CareerFortuneService;
 @Tag(name = "관운 분석", description = "생년월일시 기반 직업 관련 운세 분석 API")
 public class CareerTimingController {
 
-    private final CareerFortuneService careerFortuneService;
+    private final AnalysisService analysisService;
+    private final AnalysisSnapshotMapper analysisSnapshotMapper;
 
     @PostMapping("/timing")
     @Operation(summary = "관운 분석", description = "생년월일시로부터 상반기(H1)/하반기(H2) 관운 판정, 신뢰도 점수 및 근거 반환")
@@ -43,8 +46,8 @@ public class CareerTimingController {
             @AuthenticationPrincipal Long userId
     ) {
         log.info("관운 분석 요청 수신");
-        CareerTimingResponse response = careerFortuneService.analyzeCareerTiming(
-                request.birthDate(), request.birthTime(), userId);
+        CareerTimingResponse response = analysisSnapshotMapper.toCareerTimingResponse(
+                analysisService.analyze(AnalysisType.SAJU, request, userId));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

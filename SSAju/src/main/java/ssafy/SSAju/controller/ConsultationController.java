@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 import ssafy.SSAju.dto.request.ConsultationRequest;
 import ssafy.SSAju.dto.response.ApiResponse;
 import ssafy.SSAju.dto.response.ConsultationResponse;
-import ssafy.SSAju.service.ConsultationService;
+import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.career.mapper.AnalysisSnapshotMapper;
+import ssafy.SSAju.service.AnalysisService;
 
 @Slf4j
 @RestController
@@ -26,7 +28,8 @@ import ssafy.SSAju.service.ConsultationService;
 @Tag(name = "커리어 상담", description = "사주 + AI 기반 커리어 컨설팅 API (23개 필드)")
 public class ConsultationController {
 
-    private final ConsultationService consultationService;
+    private final AnalysisService analysisService;
+    private final AnalysisSnapshotMapper analysisSnapshotMapper;
 
     @PostMapping("/consultation")
     @Operation(summary = "AI 커리어 상담", description = "사주 데이터(십신+지장간)와 OpenAI를 활용하여 23개 필드의 커리어 조언 반환")
@@ -40,7 +43,8 @@ public class ConsultationController {
             @AuthenticationPrincipal Long userId
     ) {
         log.info("커리어 컨설팅 요청 수신");
-        ConsultationResponse response = consultationService.getCareerConsultation(request, userId);
+        ConsultationResponse response = analysisSnapshotMapper.toConsultationResponse(
+                analysisService.analyze(AnalysisType.CAREER_CONSULTATION, request, userId));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

@@ -18,9 +18,10 @@ import ssafy.SSAju.dto.response.CareerTimingResponse;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
 import ssafy.SSAju.dto.response.ConsultationResponse;
 import ssafy.SSAju.career.dto.response.SatisfactionFeedbackResponse;
-import ssafy.SSAju.service.CareerFortuneService;
-import ssafy.SSAju.service.CompanyMatchingService;
-import ssafy.SSAju.service.ConsultationService;
+import ssafy.SSAju.career.domain.AnalysisExecution;
+import ssafy.SSAju.career.domain.AnalysisPayload;
+import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.service.AnalysisService;
 import ssafy.SSAju.service.FeedbackService;
 
 import java.time.Instant;
@@ -29,6 +30,7 @@ import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -47,13 +49,7 @@ class CareerApiControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private CareerFortuneService careerFortuneService;
-
-    @MockitoBean
-    private ConsultationService consultationService;
-
-    @MockitoBean
-    private CompanyMatchingService companyMatchingService;
+    private AnalysisService analysisService;
 
     @MockitoBean
     private FeedbackService feedbackService;
@@ -79,8 +75,9 @@ class CareerApiControllerTest {
     @DisplayName("T089-1: POST /api/career/timing - 유효한 요청 → H1/H2 판정 응답")
     void us1_careerTiming_validRequest_returnsH1orH2() throws Exception {
         // Given
-        given(careerFortuneService.analyzeCareerTiming(any(), any(), any()))
-                .willReturn(new CareerTimingResponse(null, "H1", 75, "상반기가 취업에 유리합니다."));
+        given(analysisService.analyze(eq(AnalysisType.SAJU), any(), any()))
+                .willReturn(new AnalysisExecution(1L,
+                        AnalysisPayload.SajuResultData.of("H1", 75, "상반기가 취업에 유리합니다.")));
 
         // When & Then
         mockMvc.perform(post("/api/career/timing")
@@ -118,8 +115,8 @@ class CareerApiControllerTest {
     @DisplayName("T089-2: POST /api/career/consultation - 유효한 요청 → 23개 필드 응답")
     void us2_consultation_validRequest_returns23Fields() throws Exception {
         // Given
-        given(consultationService.getCareerConsultation(any(), any()))
-                .willReturn(buildMockConsultationResponse());
+        given(analysisService.analyze(eq(AnalysisType.CAREER_CONSULTATION), any(), any()))
+                .willReturn(new AnalysisExecution(2L, toResultData(buildMockConsultationResponse())));
 
         // When & Then
         mockMvc.perform(post("/api/career/consultation")
@@ -226,8 +223,8 @@ class CareerApiControllerTest {
     @DisplayName("T089-4: POST /api/company/compatibility - 유효한 요청 → 호환성 점수 반환")
     void us3_compatibility_validRequest_returnsScore() throws Exception {
         // Given
-        given(companyMatchingService.analyzeCompatibility(any(), any()))
-                .willReturn(buildMockCompatibilityResponse());
+        given(analysisService.analyze(eq(AnalysisType.COMPANY_COMPATIBILITY), any(), any()))
+                .willReturn(new AnalysisExecution(3L, toResultData(buildMockCompatibilityResponse())));
 
         // When & Then
         mockMvc.perform(post("/api/company/compatibility")
@@ -427,5 +424,25 @@ class CareerApiControllerTest {
                 List.of(new CompatibilityResponse.MonthlyForecast(5, 75, ForecastStatus.LUCKY, "조언")),
                 List.of("주의사항 1")
         );
+    }
+
+    /** 기존 응답 fixture를 저장 스냅샷(분석 ID 제외)으로 옮긴다. */
+    private AnalysisPayload.ConsultationResultData toResultData(ConsultationResponse r) {
+        return new AnalysisPayload.ConsultationResultData(
+                AnalysisPayload.SCHEMA_VERSION,
+                r.industries(), r.interviewTips(), r.strengths(), r.openaiModelVersion(),
+                r.favoredPeriod(), r.confidenceScore(), r.reasoning(), r.sajuProfile(),
+                r.cautions(), r.wealthStyle(), r.longTermRoadmap(), r.personalBranding(),
+                r.powerKeywords(), r.mentalCare(), r.environmentFit(), r.workStyle(),
+                r.relationshipStrategy(), r.careerTimeline(), r.analysisSummary());
+    }
+
+    private AnalysisPayload.CompatibilityResultData toResultData(CompatibilityResponse r) {
+        return new AnalysisPayload.CompatibilityResultData(
+                AnalysisPayload.SCHEMA_VERSION,
+                r.requestContext(), r.compatibilityScore(), r.summary(), r.targetRoleAnalysis(),
+                r.fiveElements(), r.analysisBreakdown(), r.actionableStrategy(),
+                r.expectedInterviewQuestions(), r.roleCompatibility(), r.monthlyForecast(),
+                r.cautions());
     }
 }

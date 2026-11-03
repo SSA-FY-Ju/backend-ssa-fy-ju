@@ -1,9 +1,14 @@
 package ssafy.SSAju.career.mapper;
 
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.domain.AnalysisExecution;
 import ssafy.SSAju.career.domain.AnalysisPayload;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
+import ssafy.SSAju.career.enums.ErrorMessageConstants;
+import ssafy.SSAju.dto.response.CareerTimingResponse;
 import ssafy.SSAju.dto.response.CompatibilityResponse;
+import ssafy.SSAju.dto.response.ConsultationResponse;
+import ssafy.SSAju.exception.InvalidSajuDataException;
 
 /**
  * 분석 결과와 저장 스냅샷 사이의 변환을 담당한다.
@@ -60,5 +65,67 @@ public class AnalysisSnapshotMapper {
                                 f.month(), f.score(), f.status(), f.advice()))
                         .toList(),
                 data.cautions());
+    }
+
+    /**
+     * 저장된 결과 스냅샷에 컬럼에서 읽은 숫자 ID를 붙여 관운 응답을 만든다.
+     * 기존 응답의 필드명과 Long/JSON 숫자 타입을 그대로 유지한다.
+     */
+    public CareerTimingResponse toCareerTimingResponse(AnalysisExecution execution) {
+        AnalysisPayload.SajuResultData data = require(execution, AnalysisPayload.SajuResultData.class);
+        return new CareerTimingResponse(
+                execution.analysisId(), data.favoredPeriod(), data.confidenceScore(), data.reasoning());
+    }
+
+    public ConsultationResponse toConsultationResponse(AnalysisExecution execution) {
+        AnalysisPayload.ConsultationResultData data =
+                require(execution, AnalysisPayload.ConsultationResultData.class);
+        return new ConsultationResponse(
+                execution.analysisId(),
+                data.industries(),
+                data.interviewTips(),
+                data.strengths(),
+                data.openaiModelVersion(),
+                data.favoredPeriod(),
+                data.confidenceScore(),
+                data.reasoning(),
+                data.sajuProfile(),
+                data.cautions(),
+                data.wealthStyle(),
+                data.longTermRoadmap(),
+                data.personalBranding(),
+                data.powerKeywords(),
+                data.mentalCare(),
+                data.environmentFit(),
+                data.workStyle(),
+                data.relationshipStrategy(),
+                data.careerTimeline(),
+                data.analysisSummary());
+    }
+
+    public CompatibilityResponse toCompatibilityResponse(AnalysisExecution execution) {
+        AnalysisPayload.CompatibilityResultData data =
+                require(execution, AnalysisPayload.CompatibilityResultData.class);
+        return new CompatibilityResponse(
+                execution.analysisId(),
+                data.requestContext(),
+                data.compatibilityScore(),
+                data.summary(),
+                data.targetRoleAnalysis(),
+                data.fiveElements(),
+                data.analysisBreakdown(),
+                data.actionableStrategy(),
+                data.expectedInterviewQuestions(),
+                data.roleCompatibility(),
+                data.monthlyForecast(),
+                data.cautions());
+    }
+
+    /** 유형과 저장된 스냅샷 record가 어긋나면 결과를 만들지 않고 기존 오류 체계로 실패한다. */
+    private <T extends AnalysisPayload.Result> T require(AnalysisExecution execution, Class<T> type) {
+        if (!type.isInstance(execution.result())) {
+            throw new InvalidSajuDataException(ErrorMessageConstants.ANALYSIS_TYPE_UNSUPPORTED.getMessage());
+        }
+        return type.cast(execution.result());
     }
 }
