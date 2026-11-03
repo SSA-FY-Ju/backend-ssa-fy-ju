@@ -192,4 +192,67 @@ class AuthServiceTest {
         // Then
         verify(refreshTokenRedisRepository, never()).delete(anyString());
     }
+
+    // ===== deleteUser(회원 탈퇴) 테스트 =====
+
+    @Test
+    void deleteUser_비밀번호일치_피드백삭제와기본참조해제와softDelete를함께처리() {
+        // Given
+        testUser.changeDefaultProfile(ssafy.SSAju.career.entity.UserProfile.builder()
+                .birthDate(java.time.LocalDate.of(1995, 3, 20))
+                .birthTime(java.time.LocalTime.of(9, 15))
+                .build());
+        given(userRepository.findByIdForUpdate(1L)).willReturn(Optional.of(testUser));
+        given(passwordEncoder.matches("raw-password", "encoded-password")).willReturn(true);
+
+        // When
+        authService.deleteUser(1L, "raw-password");
+
+        // Then
+        verify(analysisResultMaskingService).maskForUser(testUser);
+        assertThat(testUser.getUserProfile()).isNull();
+        assertThat(testUser.getStatus()).isEqualTo(UserStatus.INACTIVE);
+        assertThat(testUser.getDeletedAt()).isNotNull();
+        assertThat(testUser.getName()).isEqualTo("탈퇴한 사용자");
+        assertThat(testUser.getEmail()).startsWith("deleted_1_");
+    }
+
+    @Test
+    void deleteUser_탈퇴는사용자행쓰기잠금으로조회한다() {
+        // Given
+        given(userRepository.findByIdForUpdate(1L)).willReturn(Optional.of(testUser));
+        given(passwordEncoder.matches("raw-password", "encoded-password")).willReturn(true);
+
+        // When
+        authService.deleteUser(1L, "raw-password");
+
+        // Then: 최종 분석 저장·피드백·기본값 저장과 순서를 정하려면 잠금 조회여야 한다
+        verify(userRepository).findByIdForUpdate(1L);
+        verify(userRepository, never()).findById(1L);
+    }
+
+    @Test
+    void deleteUser_비밀번호불일치_아무것도변경하지않는다() {
+        // Given
+        given(userRepository.findByIdForUpdate(1L)).willReturn(Optional.of(testUser));
+        given(passwordEncoder.matches("wrong-password", "encoded-password")).willReturn(false);
+
+        // When / Then
+        assertThatThrownBy(() -> authService.deleteUser(1L, "wrong-password"))
+                .isInstanceOf(ssafy.SSAju.exception.AuthException.class);
+        verify(analysisResultMaskingService, never()).maskForUser(any());
+        assertThat(testUser.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(testUser.getDeletedAt()).isNull();
+    }
+
+    @Test
+    void deleteUser_이미탈퇴한사용자_조회되지않아거부된다() {
+        // Given: @SQLRestriction으로 이미 탈퇴한 계정은 조회되지 않는다
+        given(userRepository.findByIdForUpdate(1L)).willReturn(Optional.empty());
+
+        // When / Then
+        assertThatThrownBy(() -> authService.deleteUser(1L, "raw-password"))
+                .isInstanceOf(ssafy.SSAju.exception.UserNotFoundException.class);
+        verify(analysisResultMaskingService, never()).maskForUser(any());
+    }
 }

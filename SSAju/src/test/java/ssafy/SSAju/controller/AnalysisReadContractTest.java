@@ -19,6 +19,7 @@ import ssafy.SSAju.dto.response.UserAnalysisDto;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.handler.SajuGlobalExceptionHandler;
 import ssafy.SSAju.service.AuthService;
+import ssafy.SSAju.service.DefaultProfileService;
 import ssafy.SSAju.service.UserService;
 import ssafy.SSAju.util.CookieUtil;
 
@@ -49,6 +50,7 @@ class AnalysisReadContractTest {
 
     @Mock private UserService userService;
     @Mock private AuthService authService;
+    @Mock private DefaultProfileService defaultProfileService;
     @Mock private CookieUtil cookieUtil;
 
     private MockMvc mockMvc;
@@ -56,7 +58,7 @@ class AnalysisReadContractTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new UserController(authService, userService, cookieUtil))
+                .standaloneSetup(new UserController(authService, userService, defaultProfileService, cookieUtil))
                 .setControllerAdvice(new SajuGlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
