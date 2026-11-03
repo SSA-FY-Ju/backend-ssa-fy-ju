@@ -77,7 +77,7 @@ class ConsultationAnalysisStrategyTest {
     @DisplayName("저장된 만세력으로 OpenAI를 호출하고 완성 스냅샷을 만든다")
     void shouldBuildCompletedSnapshot() {
         // Given
-        given(openAICaller.call(any(), any(), any(), eq("己"))).willReturn(advice());
+        given(openAICaller.call(any(), any(), any(), eq("己"), any())).willReturn(advice());
 
         // When
         AnalysisOutcome<AnalysisPayload.ConsultationResultData> outcome = strategy.analyze(
@@ -105,7 +105,7 @@ class ConsultationAnalysisStrategyTest {
     @DisplayName("요약은 현재 연도가 아니라 요청 시작 시 확정된 연도를 따른다")
     void shouldBuildSummaryWithRequestYear() {
         // Given
-        given(openAICaller.call(any(), any(), any(), any())).willReturn(advice());
+        given(openAICaller.call(any(), any(), any(), any(), any())).willReturn(advice());
 
         // When
         AnalysisOutcome<AnalysisPayload.ConsultationResultData> outcome = strategy.analyze(
@@ -121,7 +121,7 @@ class ConsultationAnalysisStrategyTest {
     @DisplayName("OpenAI에 전달하는 사주 데이터는 저장된 만세력에서 복원한다")
     void shouldPassStoredManseToOpenAI() {
         // Given
-        given(openAICaller.call(any(), any(), any(), any())).willReturn(advice());
+        given(openAICaller.call(any(), any(), any(), any(), any())).willReturn(advice());
 
         // When
         strategy.analyze(new ConsultationRequest(BIRTH_DATE, BIRTH_TIME),
@@ -130,7 +130,7 @@ class ConsultationAnalysisStrategyTest {
         // Then
         org.mockito.ArgumentCaptor<FastAPIResponse> captor =
                 org.mockito.ArgumentCaptor.forClass(FastAPIResponse.class);
-        verify(openAICaller).call(captor.capture(), any(), any(), any());
+        verify(openAICaller).call(captor.capture(), any(), any(), any(), any());
         FastAPIResponse passed = captor.getValue();
         assertThat(passed.dayPillar()).isEqualTo("己未");
         assertThat(passed.birthDate()).isEqualTo(BIRTH_DATE.toString());
@@ -142,7 +142,7 @@ class ConsultationAnalysisStrategyTest {
     void shouldPropagateOpenAIFailure() {
         // Given
         willThrow(new OpenAIApiException("OpenAI 실패"))
-                .given(openAICaller).call(any(), any(), any(), any());
+                .given(openAICaller).call(any(), any(), any(), any(), any());
 
         // When / Then
         assertThatThrownBy(() -> strategy.analyze(
@@ -155,7 +155,7 @@ class ConsultationAnalysisStrategyTest {
     @DisplayName("필수 항목이 빠진 결과는 저장 전에 거부된다")
     void shouldRejectIncompleteResult() {
         // Given
-        given(openAICaller.call(any(), any(), any(), any())).willReturn(advice());
+        given(openAICaller.call(any(), any(), any(), any(), any())).willReturn(advice());
         AnalysisPayload.ConsultationResultData valid = strategy.analyze(
                 new ConsultationRequest(BIRTH_DATE, BIRTH_TIME),
                 UnifiedAnalysisTestSupport.manseData(), TIME_CONTEXT).result();

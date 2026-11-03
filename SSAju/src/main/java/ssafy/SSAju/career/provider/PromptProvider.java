@@ -3,13 +3,13 @@ package ssafy.SSAju.career.provider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ssafy.SSAju.career.domain.CompatibilityNarrativeRequest;
+import ssafy.SSAju.career.domain.AnalysisTimeContext;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.util.AnalysisConstants;
 import ssafy.SSAju.dto.external.FastAPIResponse;
 
-import java.time.Clock;
-import java.time.LocalDate;
+
 import java.util.List;
 
 /**
@@ -25,26 +25,26 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PromptProvider {
 
-    /** KST 기준 현재 연도 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
-    private final Clock clock;
-
     /**
      * 커리어 컨설팅 요청에 사용할 프롬프트를 생성합니다.
      *
      * <p>일간, 천간/지지, 오행 분포, 지장간, 십신 분포를 포함하며
-     * 현재 연도 기준 12개월 월별 운세·타임라인 형식을 지정합니다.
+     * 요청 시작 시 확정된 연도 기준 12개월 월별 운세·타임라인 형식을 지정합니다 — 재시도가
+     * 해를 넘겨 실행돼도 프롬프트의 연도가 흔들리지 않는다.
      *
      * @param sajuData           FastAPI에서 받은 사주 원본 데이터
      * @param tenGodDistribution 십신 분포 (계산된 값)
      * @param hiddenStems        지장간 데이터 (계산된 값)
      * @param dayMaster          일간 (예: "己")
+     * @param time               요청 시작 시 확정한 시간 문맥
      * @return OpenAI에 전달할 한국어 프롬프트 문자열
      */
     public String getCareerConsultationPrompt(FastAPIResponse sajuData,
                                                TenGodDistribution tenGodDistribution,
                                                HiddenStems hiddenStems,
-                                               String dayMaster) {
-        int currentYear = LocalDate.now(clock).getYear();
+                                               String dayMaster,
+                                               AnalysisTimeContext time) {
+        int analysisYear = time.year();
         return """
                 당신은 사주 명리학 전문가이자 취업 커리어 컨설턴트입니다.
                 아래 사주 데이터를 분석하여 취업 준비생에게 맞춤 커리어 조언을 한글로 제공해주세요.
@@ -77,7 +77,7 @@ public class PromptProvider {
                 sajuData.fiveElements(),
                 hiddenStems,
                 tenGodDistribution,
-                currentYear,
+                analysisYear,
                 dayMaster
         );
     }

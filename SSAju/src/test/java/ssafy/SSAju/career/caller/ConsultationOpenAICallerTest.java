@@ -11,6 +11,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.ai.retry.TransientAiException;
+import ssafy.SSAju.career.domain.AnalysisTimeContext;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.provider.PromptProvider;
@@ -46,6 +47,11 @@ import static org.mockito.Mockito.mock;
 @DisplayName("ConsultationOpenAICaller 단위 테스트")
 class ConsultationOpenAICallerTest {
 
+    /** 요청 시작 시 확정된 시간 문맥 — 재시도 중 시각이 흘러도 바뀌지 않는다. */
+    private static final AnalysisTimeContext TIME_CONTEXT =
+            AnalysisTimeContext.from(java.time.Clock.fixed(
+                    java.time.Instant.parse("2026-01-15T03:00:00Z"), java.time.ZoneId.of("Asia/Seoul")));
+
     @Mock
     private PromptProvider promptProvider;
 
@@ -66,7 +72,7 @@ class ConsultationOpenAICallerTest {
     void setUp() {
         chatClient = mock(ChatClient.class, RETURNS_DEEP_STUBS);
         caller = new ConsultationOpenAICaller(chatClient, promptProvider);
-        given(promptProvider.getCareerConsultationPrompt(any(), any(), any(), any())).willReturn("prompt");
+        given(promptProvider.getCareerConsultationPrompt(any(), any(), any(), any(), any())).willReturn("prompt");
     }
 
     @Test
@@ -75,7 +81,7 @@ class ConsultationOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
                 .willThrow(new NonTransientAiException("401 Unauthorized"));
 
-        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
     }
 
@@ -86,7 +92,7 @@ class ConsultationOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
                 .willThrow(new NonTransientAiException("401 - Incorrect API key provided"));
 
-        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class)
                 .extracting(ex -> ((OpenAIApiException) ex).getStatusCode())
                 .isEqualTo(401);
@@ -98,7 +104,7 @@ class ConsultationOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
                 .willThrow(new NonTransientAiException("429 - Rate limit reached for requests"));
 
-        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class)
                 .extracting(ex -> ((OpenAIApiException) ex).getStatusCode())
                 .isEqualTo(429);
@@ -110,7 +116,7 @@ class ConsultationOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
                 .willThrow(new NonTransientAiException("Unauthorized"));
 
-        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class)
                 .extracting(ex -> ((OpenAIApiException) ex).getStatusCode())
                 .isEqualTo(0);
@@ -124,7 +130,7 @@ class ConsultationOpenAICallerTest {
 
         // AOP(@Retryable) 없이 직접 호출하므로, 여기서 원본 TransientAiException이 그대로 나와야
         // @Retryable의 retryFor 목록에 포함되어 정상적으로 재시도 대상이 됨을 보장한다.
-        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(TransientAiException.class);
     }
 
@@ -152,7 +158,7 @@ class ConsultationOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
                 .willReturn(response);
 
-        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("산업 추천 정보가 누락되었습니다");
     }
@@ -166,7 +172,7 @@ class ConsultationOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
                 .willReturn(response);
 
-        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("산업 추천 항목에 빈 name 또는 reason이 포함되어 있습니다");
     }
@@ -180,7 +186,7 @@ class ConsultationOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
                 .willReturn(response);
 
-        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("면접 팁 정보가 누락되었습니다");
     }
@@ -194,7 +200,7 @@ class ConsultationOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
                 .willReturn(response);
 
-        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class)
                 .hasMessageContaining("강점 분석 정보가 누락되었습니다");
     }
@@ -208,7 +214,7 @@ class ConsultationOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CareerAdviceResponse.class))
                 .willReturn(response);
 
-        CareerAdviceResponse result = caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己");
+        CareerAdviceResponse result = caller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT);
 
         assertThat(result.industries()).hasSize(1);
         assertThat(result.strengths()).containsExactly("강점");

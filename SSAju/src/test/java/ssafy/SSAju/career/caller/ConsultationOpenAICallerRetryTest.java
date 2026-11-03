@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.client.ResourceAccessException;
+import ssafy.SSAju.career.domain.AnalysisTimeContext;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
@@ -33,6 +34,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 @DisplayName("OpenAI 연결 실패 재시도 회귀 테스트 (US2)")
 class ConsultationOpenAICallerRetryTest {
+
+    /** 요청 시작 시 확정된 시간 문맥 — 재시도 중 시각이 흘러도 바뀌지 않는다. */
+    private static final AnalysisTimeContext TIME_CONTEXT =
+            AnalysisTimeContext.from(java.time.Clock.fixed(
+                    java.time.Instant.parse("2026-01-15T03:00:00Z"), java.time.ZoneId.of("Asia/Seoul")));
 
     @DynamicPropertySource
     static void unreachableOpenAiEndpoint(DynamicPropertyRegistry registry) {
@@ -71,7 +77,7 @@ class ConsultationOpenAICallerRetryTest {
     void consultationOpenAICaller_connectionFailure_failsFastWithoutDoubleRetry() {
         long start = System.currentTimeMillis();
 
-        assertThatThrownBy(() -> consultationOpenAICaller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> consultationOpenAICaller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
 
         long elapsedMs = System.currentTimeMillis() - start;

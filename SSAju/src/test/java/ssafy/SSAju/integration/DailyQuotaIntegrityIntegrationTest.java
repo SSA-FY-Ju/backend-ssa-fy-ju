@@ -151,7 +151,7 @@ class DailyQuotaIntegrityIntegrationTest {
     void quotaDecrementedByOneWhenAnalysisSucceeds() {
         given(sajuDataService.fetchSajuFromFastAPI(any(), any()))
                 .willReturn(fakeFastApiResponse());
-        given(companyMatchingOpenAICaller.call(any()))
+        given(companyMatchingOpenAICaller.call(any(), any()))
                 .willReturn(fakeNarrativeResponse());
 
         companyMatchingService.analyzeCompatibility(request, testUser.getId());

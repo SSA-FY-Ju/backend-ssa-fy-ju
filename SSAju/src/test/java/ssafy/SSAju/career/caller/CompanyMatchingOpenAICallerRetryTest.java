@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import ssafy.SSAju.career.domain.AnalysisTimeContext;
 import ssafy.SSAju.career.domain.CompatibilityNarrativeRequest;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
@@ -29,6 +30,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 @DisplayName("궁합 해설 OpenAI 연결 실패 재시도 회귀 테스트 (US1)")
 class CompanyMatchingOpenAICallerRetryTest {
+
+    /** 요청 시작 시 확정된 시간 문맥 — 재시도 중 시각이 흘러도 바뀌지 않는다. */
+    private static final AnalysisTimeContext TIME_CONTEXT =
+            AnalysisTimeContext.from(java.time.Clock.fixed(
+                    java.time.Instant.parse("2026-01-15T03:00:00Z"), java.time.ZoneId.of("Asia/Seoul")));
 
     @DynamicPropertySource
     static void unreachableOpenAiEndpoint(DynamicPropertyRegistry registry) {
@@ -57,7 +63,7 @@ class CompanyMatchingOpenAICallerRetryTest {
     void companyMatchingOpenAICaller_connectionFailure_failsFastWithoutDoubleRetry() {
         long start = System.currentTimeMillis();
 
-        assertThatThrownBy(() -> companyMatchingOpenAICaller.call(REQUEST))
+        assertThatThrownBy(() -> companyMatchingOpenAICaller.call(REQUEST, TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
 
         long elapsedMs = System.currentTimeMillis() - start;

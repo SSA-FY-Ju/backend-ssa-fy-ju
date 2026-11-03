@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import ssafy.SSAju.career.domain.AnalysisTimeContext;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
@@ -39,6 +40,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 @DisplayName("OpenAI 5xx 응답 재시도 회귀 테스트 (US2)")
 class ConsultationOpenAICallerServerErrorInvestigationTest {
+
+    /** 요청 시작 시 확정된 시간 문맥 — 재시도 중 시각이 흘러도 바뀌지 않는다. */
+    private static final AnalysisTimeContext TIME_CONTEXT =
+            AnalysisTimeContext.from(java.time.Clock.fixed(
+                    java.time.Instant.parse("2026-01-15T03:00:00Z"), java.time.ZoneId.of("Asia/Seoul")));
 
     private static HttpServer stubServer;
     private static final AtomicInteger hitCount = new AtomicInteger(0);
@@ -100,7 +106,7 @@ class ConsultationOpenAICallerServerErrorInvestigationTest {
     @Test
     @DisplayName("ConsultationOpenAICaller.call: 500 응답은 재시도(3회) 후 OpenAIApiException으로 실패한다")
     void consultationOpenAICaller_serverError_retriesThenFails() {
-        assertThatThrownBy(() -> consultationOpenAICaller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己"))
+        assertThatThrownBy(() -> consultationOpenAICaller.call(SAJU_DATA, TEN_GOD, HIDDEN_STEMS, "己", TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
 
         // @Retryable(maxAttempts=3)이 TransientAiException을 재시도 대상으로 인식했다면 스텁 서버가 3번 호출된다.

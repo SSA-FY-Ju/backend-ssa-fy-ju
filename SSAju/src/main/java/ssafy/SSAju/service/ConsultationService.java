@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ssafy.SSAju.career.caller.ConsultationOpenAICaller;
+import ssafy.SSAju.career.domain.AnalysisTimeContext;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.entity.CareerConsultation;
@@ -120,7 +121,8 @@ public class ConsultationService {
         LocalDate usageDate = dailyApiUsageService.checkAndIncrementDailyUsage(userId);
         CareerAdviceResponse advice;
         try {
-            advice = openAICaller.call(sajuData, tenGodDistribution, hiddenStems, dayMaster);
+            advice = openAICaller.call(sajuData, tenGodDistribution, hiddenStems, dayMaster,
+                    AnalysisTimeContext.from(clock));
         } catch (RuntimeException e) {
             dailyApiUsageService.restoreQuietly(userId, usageDate, e);
             throw e;

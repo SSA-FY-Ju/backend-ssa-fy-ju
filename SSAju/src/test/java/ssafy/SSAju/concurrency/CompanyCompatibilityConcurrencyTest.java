@@ -139,7 +139,7 @@ class CompanyCompatibilityConcurrencyTest {
         );
 
         given(sajuDataService.fetchSajuFromFastAPI(any(), any())).willReturn(fakeFastApiResponse());
-        given(companyMatchingOpenAICaller.call(any())).willReturn(fakeNarrativeResponse());
+        given(companyMatchingOpenAICaller.call(any(), any())).willReturn(fakeNarrativeResponse());
     }
 
     @AfterEach
@@ -221,6 +221,6 @@ class CompanyCompatibilityConcurrencyTest {
                 .as("경합에서 진 요청은 쿼터가 보상 복원되므로, 실제로 새 행을 만든 요청 1건만 남는다")
                 .isEqualTo(1);
         verify(sajuDataService, times(THREAD_COUNT * 2)).fetchSajuFromFastAPI(any(), any()); // 스레드마다 사용자 1회 + 기업 1회
-        verify(companyMatchingOpenAICaller, times(THREAD_COUNT)).call(any());
+        verify(companyMatchingOpenAICaller, times(THREAD_COUNT)).call(any(), any());
     }
 }

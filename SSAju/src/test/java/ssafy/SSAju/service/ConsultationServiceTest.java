@@ -196,7 +196,7 @@ class ConsultationServiceTest {
         given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
-        given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(openAICaller.call(any(), any(), any(), any(), any())).willReturn(MOCK_ADVICE);
         given(consultationSaveService.saveOrUpdate(any(), any(), any(), any()))
                 .willReturn(new ConsultationSaveService.SaveOutcome(100L, true));
 
@@ -257,7 +257,7 @@ class ConsultationServiceTest {
         given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, newSajuResult)).willReturn(newSajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
-        given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(openAICaller.call(any(), any(), any(), any(), any())).willReturn(MOCK_ADVICE);
         given(consultationSaveService.saveOrUpdate(any(), any(), any(), any()))
                 .willReturn(new ConsultationSaveService.SaveOutcome(100L, true));
 
@@ -304,7 +304,7 @@ class ConsultationServiceTest {
         service.getCareerConsultation(VALID_REQUEST, USER_ID);
 
         // 캐시 히트 → OpenAI 미호출, 일일 한도 차감/복원 모두 없음
-        verify(openAICaller, never()).call(any(), any(), any(), any());
+        verify(openAICaller, never()).call(any(), any(), any(), any(), any());
         verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(any());
         verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
         verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
@@ -328,7 +328,7 @@ class ConsultationServiceTest {
         given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
-        given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(openAICaller.call(any(), any(), any(), any(), any())).willReturn(MOCK_ADVICE);
         // 이 스레드가 만든 advice(MOCK_ADVICE)는 버려지고, 락 안 재확인에서 이미 완료된 다른
         // 스레드가 실제로 저장한 행(WINNER_ADVICE)으로 수렴한다.
         given(consultationSaveService.saveOrUpdate(any(), any(), any(), any()))
@@ -365,7 +365,7 @@ class ConsultationServiceTest {
         given(sajuResultProvider.findOrCreate(MOCK_USER, userProfile, sajuResult)).willReturn(sajuResult);
         given(careerConsultationRepository.findBySajuResultAndConsultationMonth(any(), any()))
                 .willReturn(Optional.empty());
-        given(openAICaller.call(any(), any(), any(), any())).willReturn(MOCK_ADVICE);
+        given(openAICaller.call(any(), any(), any(), any(), any())).willReturn(MOCK_ADVICE);
         given(consultationSaveService.saveOrUpdate(any(), any(), any(), any())).willThrow(saveFailure);
 
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
@@ -391,7 +391,7 @@ class ConsultationServiceTest {
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any(), any())).willReturn(sajuResult);
-        given(openAICaller.call(any(), any(), any(), any()))
+        given(openAICaller.call(any(), any(), any(), any(), any()))
                 .willThrow(new OpenAIApiException("OpenAI API 호출 실패: connection failed"));
 
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
@@ -414,7 +414,7 @@ class ConsultationServiceTest {
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any(), any())).willReturn(sajuResult);
-        given(openAICaller.call(any(), any(), any(), any()))
+        given(openAICaller.call(any(), any(), any(), any(), any()))
                 .willThrow(new OpenAIApiException("OpenAI 응답이 비어있습니다"));
 
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
@@ -436,7 +436,7 @@ class ConsultationServiceTest {
         given(sajuResultMapper.buildSajuResult(any(), any(), any(), any(), any(), anyInt(), any()))
                 .willReturn(sajuResult);
         given(sajuResultProvider.findOrCreate(any(), any(), any())).willReturn(sajuResult);
-        given(openAICaller.call(any(), any(), any(), any()))
+        given(openAICaller.call(any(), any(), any(), any(), any()))
                 .willThrow(new OpenAIApiException("산업 추천 정보가 누락되었습니다"));
 
         assertThatThrownBy(() -> service.getCareerConsultation(VALID_REQUEST, USER_ID))
