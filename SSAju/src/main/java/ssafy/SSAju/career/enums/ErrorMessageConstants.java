@@ -105,11 +105,9 @@ public enum ErrorMessageConstants {
     USER_DAY_MASTER_NULL("INVALID_SAJU_DATA", "사용자 일간이 null이거나 비어있습니다."),
     COMPANY_HIDDEN_STEM_NULL("INVALID_SAJU_DATA", "기업 지장간 데이터가 null입니다."),
     COMPANY_DAY_MASTER_NULL("INVALID_SAJU_DATA", "기업 일간이 null이거나 비어있습니다."),
-    SAJU_PROFILE_NULL("INVALID_SAJU_DATA", "userProfile과 newResult는 null이 아니어야 합니다"),
-    USER_PROFILE_MISMATCH("INVALID_SAJU_DATA", "newResult의 userProfile이 전달받은 userProfile과 불일치합니다"),
+    SAJU_PROFILE_NULL("INVALID_SAJU_DATA", "출생정보 프로필은 null이 아니어야 합니다"),
 
     // === DB 접근 예외 메시지 ===
-    SAJU_RESULT_ACCESS_FAILED("DATABASE_ERROR", "SajuResult 조회/생성 실패"),
     USER_PROFILE_ACCESS_FAILED("DATABASE_ERROR", "UserProfile 조회/생성 실패"),
     MANSE_ACCESS_FAILED("DATABASE_ERROR", "만세력 조회/생성 실패"),
     ANALYSIS_SNAPSHOT_SERIALIZE_FAILED("DATABASE_ERROR", "분석 스냅샷 직렬화 실패"),
@@ -121,7 +119,6 @@ public enum ErrorMessageConstants {
     FEEDBACK_NOT_FOUND("FEEDBACK_NOT_FOUND", "해당 피드백을 찾을 수 없습니다."),
     INVALID_DATE_RANGE("INVALID_DATE_RANGE", "시작일이 종료일보다 늦을 수 없습니다."),
     INVALID_FEEDBACK_TYPE("INVALID_FEEDBACK_TYPE", "SAJU는 피드백 조회 대상이 아닙니다."),
-    FEEDBACK_NOT_ALLOWED("FEEDBACK_NOT_ALLOWED", "관운 분석은 피드백 대상이 아닙니다."),
     FEEDBACK_TARGET_REQUIRED("INVALID_SAJU_DATA", "피드백의 작성자와 대상 분석은 필수입니다."),
     FEEDBACK_ALREADY_EXISTS("FEEDBACK_ALREADY_EXISTS", "이미 이 분석에 대한 피드백을 작성했습니다."),
 
@@ -134,10 +131,7 @@ public enum ErrorMessageConstants {
     DAILY_LIMIT_EXCEEDED("DAILY_LIMIT_EXCEEDED", "하루 3회 분석 제한에 도달했습니다."),
     TERMS_AGREEMENT_REQUIRED("TERMS_AGREEMENT_REQUIRED", "이용약관 및 개인정보 수집에 동의해야 합니다."),
     UNAUTHORIZED("UNAUTHORIZED", "인증이 필요합니다."),
-    ACCESS_DENIED("ACCESS_DENIED", "접근 권한이 없습니다."),
-
-    // === 분산락 예외 메시지 ===
-    LOCK_ACQUISITION_FAILED("LOCK_ACQUISITION_FAILED", "요청이 몰려 처리 중입니다. 잠시 후 다시 시도해주세요.");
+    ACCESS_DENIED("ACCESS_DENIED", "접근 권한이 없습니다.");
 
     private final String code;
     private final String message;

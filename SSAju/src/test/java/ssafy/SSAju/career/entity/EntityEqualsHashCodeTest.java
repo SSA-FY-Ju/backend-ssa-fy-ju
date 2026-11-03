@@ -3,6 +3,7 @@ package ssafy.SSAju.career.entity;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import ssafy.SSAju.integration.UnifiedAnalysisTestSupport;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -50,15 +51,14 @@ class EntityEqualsHashCodeTest {
     }
 
     // ─────────────────────────────────────────
-    // SajuResult
+    // Saju (분석 결과)
     // ─────────────────────────────────────────
 
     @Test
-    @DisplayName("SajuResult: 같은 id → equals true")
-    void sajuResult_sameId_equals() {
-        var profile = UserProfile.builder().birthDate(LocalDate.of(1990, 1, 1)).birthTime(LocalTime.NOON).build();
-        var a = SajuResult.builder().userProfile(profile).build();
-        var b = SajuResult.builder().userProfile(profile).build();
+    @DisplayName("Saju: 같은 id → equals true")
+    void saju_sameId_equals() {
+        var a = newSaju();
+        var b = newSaju();
         ReflectionTestUtils.setField(a, "id", 10L);
         ReflectionTestUtils.setField(b, "id", 10L);
 
@@ -66,15 +66,45 @@ class EntityEqualsHashCodeTest {
     }
 
     @Test
-    @DisplayName("SajuResult: 다른 id → equals false")
-    void sajuResult_differentId_notEquals() {
-        var profile = UserProfile.builder().birthDate(LocalDate.of(1990, 1, 1)).birthTime(LocalTime.NOON).build();
-        var a = SajuResult.builder().userProfile(profile).build();
-        var b = SajuResult.builder().userProfile(profile).build();
+    @DisplayName("Saju: 다른 id → equals false")
+    void saju_differentId_notEquals() {
+        var a = newSaju();
+        var b = newSaju();
         ReflectionTestUtils.setField(a, "id", 10L);
         ReflectionTestUtils.setField(b, "id", 11L);
 
         assertThat(a).isNotEqualTo(b);
+    }
+
+    @Test
+    @DisplayName("Manse: 같은 id → equals true")
+    void manse_sameId_equals() {
+        var a = newManse();
+        var b = newManse();
+        ReflectionTestUtils.setField(a, "id", 20L);
+        ReflectionTestUtils.setField(b, "id", 20L);
+
+        assertThat(a).isEqualTo(b);
+        assertThat(a.hashCode()).isEqualTo(b.hashCode());
+    }
+
+    private Manse newManse() {
+        return Manse.builder()
+                .userProfile(UserProfile.builder()
+                        .birthDate(LocalDate.of(1990, 1, 1)).birthTime(LocalTime.NOON).build())
+                .data(UnifiedAnalysisTestSupport.manseData())
+                .fetchedAt(java.time.Instant.parse("2026-11-02T03:00:00Z"))
+                .build();
+    }
+
+    private Saju newSaju() {
+        return Saju.builder()
+                .userId(1L)
+                .analysisType(ssafy.SSAju.career.enums.AnalysisType.SAJU)
+                .manse(newManse())
+                .inputJson("{}")
+                .resultJson("{}")
+                .build();
     }
 
     // ─────────────────────────────────────────

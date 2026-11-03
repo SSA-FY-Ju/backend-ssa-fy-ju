@@ -2,137 +2,86 @@ package ssafy.SSAju.career.mapper;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import ssafy.SSAju.career.domain.TenGodHiddenStemAnalysis;
-import ssafy.SSAju.career.entity.CareerConsultation;
-import ssafy.SSAju.career.entity.CareerFortune;
-import ssafy.SSAju.career.entity.SajuFullData;
-import ssafy.SSAju.career.entity.SajuResult;
+import ssafy.SSAju.career.domain.AnalysisPayload;
+import ssafy.SSAju.career.domain.ManseData;
+import ssafy.SSAju.career.provider.SajuAnalysisFacade;
+import ssafy.SSAju.career.util.CareerFortuneAnalyzer;
+import ssafy.SSAju.career.util.HiddenStemCalculator;
+import ssafy.SSAju.career.util.TenGodCalculator;
 import ssafy.SSAju.dto.external.CareerAdviceResponse;
-import ssafy.SSAju.dto.response.ConsultationResponse;
+import ssafy.SSAju.integration.UnifiedAnalysisTestSupport;
 
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
 
-@DisplayName("ConsultationMapper.toResponseFromEntity() 단위 테스트")
+/**
+ * 컨설팅 결과 스냅샷 변환 검증.
+ *
+ * <p>요약 문구는 저장 시점에 한 번만 만들고 조회할 때 다시 만들지 않으므로, 현재 시각이 아니라
+ * 요청 시작 시 확정된 연도를 쓰는지 확인한다.
+ */
+@DisplayName("ConsultationMapper 단위 테스트")
 class ConsultationMapperTest {
 
-    /** 고정 시각 주입으로 자정 경계·시간대 차이에 무관한 재현 가능한 테스트 보장 */
-    private static final Clock FIXED_CLOCK = Clock.fixed(
-            Instant.parse("2026-05-27T12:00:00Z"), ZoneId.of("Asia/Seoul"));
-    private final ConsultationMapper mapper = new ConsultationMapper(FIXED_CLOCK);
+    private final TenGodCalculator tenGodCalculator = new TenGodCalculator();
+    private final SajuAnalysisFacade facade = new SajuAnalysisFacade(
+            tenGodCalculator, new HiddenStemCalculator(), new CareerFortuneAnalyzer(tenGodCalculator));
+    /** 매퍼의 Clock은 2026년 — 아래 테스트는 2030년을 넘겨 문맥 연도가 쓰이는지 본다. */
+    private final ConsultationMapper mapper = new ConsultationMapper(UnifiedAnalysisTestSupport.fixedClock());
 
-    private static CareerAdviceResponse advice(String dayMasterDescription, String fiveElementsAnalysis) {
-        return new CareerAdviceResponse(
-                List.of(), List.of(), List.of(), List.of(),
-                null, null, null, null, null, null, null, null, null,
-                List.of("정관"),
-                dayMasterDescription, fiveElementsAnalysis
-        );
-    }
+    private final ManseData manseData = UnifiedAnalysisTestSupport.manseData();
 
     @Test
-    @DisplayName("CareerConsultation 엔티티 → ConsultationResponse 정상 복원")
-    void shouldRestoreConsultationResponse_FromEntity() {
+    @DisplayName("만세력과 AI 응답으로 완성 결과 스냅샷을 만든다")
+    void shouldBuildResultSnapshot() {
         // Given
-        var sajuResult = mock(SajuResult.class);
-        var sfd = mock(SajuFullData.class);
-        var cf = mock(CareerFortune.class);
-        var cc = mock(CareerConsultation.class);
-
-        given(sajuResult.getSajuFullData()).willReturn(sfd);
-        given(sajuResult.getCareerFortune()).willReturn(cf);
-        given(sajuResult.getTenGodHiddenStemAnalysis())
-                .willReturn(new TenGodHiddenStemAnalysis(Map.of("정관", 2), Map.of()));
-
-        given(sfd.getDayMaster()).willReturn("己");
-        given(sfd.getFiveElements()).willReturn(Map.of("木", 1, "火", 2, "土", 2, "金", 2, "水", 1));
-
-        given(cf.getFavoredPeriod()).willReturn("H1");
-        given(cf.getConfidenceScore()).willReturn(80);
-        given(cf.getReasoning()).willReturn("상반기 유리");
-
-        given(cc.getId()).willReturn(42L);
-        given(cc.getSajuResult()).willReturn(sajuResult);
-        given(cc.getOpenaiModelVersion()).willReturn("gpt-4o-mini");
-        given(cc.getResultJson()).willReturn(advice("己土 - 수용적 성향", "金 강세"));
+        SajuAnalysisFacade.SajuAnalysisContext ctx = facade.analyze(manseData);
 
         // When
-        ConsultationResponse result = mapper.toResponseFromEntity(cc);
+        AnalysisPayload.ConsultationResultData result =
+                mapper.toResultSnapshot(manseData, ctx, advice(), "gpt-4o-mini", 2030);
 
         // Then
-        assertThat(result.consultationId()).isEqualTo(42L);
+        assertThat(result.schemaVersion()).isEqualTo(AnalysisPayload.SCHEMA_VERSION);
         assertThat(result.openaiModelVersion()).isEqualTo("gpt-4o-mini");
-        assertThat(result.favoredPeriod()).isEqualTo("H1");
-        assertThat(result.confidenceScore()).isEqualTo(80);
-        assertThat(result.reasoning()).isEqualTo("상반기 유리");
-        assertThat(result.sajuProfile()).isNotNull();
-        assertThat(result.sajuProfile().dayMaster()).isEqualTo("己");
-        assertThat(result.sajuProfile().fiveElements()).containsKey("木");
-        assertThat(result.sajuProfile().tenGodDistribution()).containsKey("정관");
-        assertThat(result.sajuProfile().tenGodDistribution().get("정관")).isEqualTo(2);
+        assertThat(result.sajuProfile().dayMaster()).isEqualTo(manseData.dayMaster());
+        assertThat(result.sajuProfile().fiveElements()).isEqualTo(manseData.fiveElements());
+        assertThat(result.sajuProfile().keyTenGods()).containsExactly("정관");
+        assertThat(result.sajuProfile().tenGodCharacteristics()).isNotEmpty();
+        assertThat(result.industries()).hasSize(1);
+        assertThat(result.favoredPeriod()).isIn("H1", "H2");
     }
 
     @Test
-    @DisplayName("SajuFullData가 null인 경우 → dayMaster 빈 문자열, fiveElements 빈 맵으로 안전하게 처리")
-    void shouldHandleNullSajuFullData_Safely() {
-        var sajuResult = mock(SajuResult.class);
-        var cf = mock(CareerFortune.class);
-        var cc = mock(CareerConsultation.class);
+    @DisplayName("요약은 현재 연도가 아니라 전달받은 분석 연도를 쓴다")
+    void shouldUseGivenAnalysisYearForSummary() {
+        // When
+        String summary = mapper.buildAnalysisSummary(
+                manseData.dayMaster(), manseData.tenGodDistribution(), manseData.fiveElements(), "H1", 2030);
 
-        given(sajuResult.getSajuFullData()).willReturn(null);
-        given(sajuResult.getCareerFortune()).willReturn(cf);
-        given(sajuResult.getTenGodHiddenStemAnalysis())
-                .willReturn(new TenGodHiddenStemAnalysis(Map.of(), Map.of()));
-
-        given(cf.getFavoredPeriod()).willReturn("H2");
-        given(cf.getConfidenceScore()).willReturn(60);
-        given(cf.getReasoning()).willReturn("하반기 유리");
-
-        given(cc.getId()).willReturn(1L);
-        given(cc.getSajuResult()).willReturn(sajuResult);
-        given(cc.getOpenaiModelVersion()).willReturn("gpt-4o");
-        given(cc.getResultJson()).willReturn(advice("", ""));
-
-        ConsultationResponse result = mapper.toResponseFromEntity(cc);
-
-        assertThat(result.sajuProfile().dayMaster()).isEmpty();
-        assertThat(result.sajuProfile().fiveElements()).isEmpty();
-        assertThat(result.favoredPeriod()).isEqualTo("H2");
+        // Then
+        assertThat(summary).contains("2030년").doesNotContain("2026년");
     }
 
     @Test
-    @DisplayName("CareerFortune이 null인 경우 → favoredPeriod null, confidenceScore 0으로 안전하게 처리")
-    void shouldHandleNullCareerFortune_Safely() {
-        var sajuResult = mock(SajuResult.class);
-        var sfd = mock(SajuFullData.class);
-        var cc = mock(CareerConsultation.class);
+    @DisplayName("관운 해석이 없으면 요약에 null을 노출하지 않는다")
+    void shouldNotExposeNullInSummary() {
+        // When
+        String summary = mapper.buildAnalysisSummary(
+                manseData.dayMaster(), manseData.tenGodDistribution(), manseData.fiveElements(), null, 2030);
 
-        given(sajuResult.getSajuFullData()).willReturn(sfd);
-        given(sajuResult.getCareerFortune()).willReturn(null);
-        given(sajuResult.getTenGodHiddenStemAnalysis())
-                .willReturn(new TenGodHiddenStemAnalysis(Map.of(), Map.of()));
+        // Then
+        assertThat(summary).contains("분석 미포함").doesNotContain("null");
+    }
 
-        given(sfd.getDayMaster()).willReturn("甲");
-        given(sfd.getFiveElements()).willReturn(Map.of("木", 3));
-
-        given(cc.getId()).willReturn(2L);
-        given(cc.getSajuResult()).willReturn(sajuResult);
-        given(cc.getOpenaiModelVersion()).willReturn("gpt-4o-mini");
-        given(cc.getResultJson()).willReturn(advice("甲木", "木 강세"));
-
-        ConsultationResponse result = mapper.toResponseFromEntity(cc);
-
-        assertThat(result.favoredPeriod()).isNull();
-        assertThat(result.confidenceScore()).isEqualTo(0);
-        assertThat(result.reasoning()).isNull();
-        // analysisSummary에 "(null)" 문자열이 노출되지 않아야 함
-        assertThat(result.analysisSummary()).doesNotContain("(null)").contains("분석 미포함");
+    private CareerAdviceResponse advice() {
+        return new CareerAdviceResponse(
+                List.of(new CareerAdviceResponse.IndustryRecommendation("IT", "적성", List.of("백엔드"))),
+                List.of("면접 팁"), List.of("강점"), List.of("주의"),
+                null, null, null, null, null, null, null, null,
+                new CareerAdviceResponse.CareerTimeline(2030, Map.of(), List.of(), List.of(), "주의"),
+                List.of("정관"), "일간 설명", "오행 설명");
     }
 }

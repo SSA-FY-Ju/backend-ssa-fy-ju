@@ -49,13 +49,10 @@ dependencies {
 	// Security (Phase 2에서 활성화 예정)
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 
-	// Redis / Redisson (세션 저장, 블랙리스트, 분산락)
+	// Redis (인증 세션 저장, 액세스 토큰 블랙리스트)
+	// 분산락을 쓰지 않게 되면서 Redisson 의존성은 제거했다 — 프로필·만세력·결과의 중복은
+	// DB 유일 제약으로 막고, 인증용 Redis는 기본 Lettuce 연결로 동작한다.
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-	// redisson-spring-boot-starter 3.25.1(tasks.md 명시값)은 Spring Boot 3.2 대상이라
-	// Boot 4.0.5의 리패키징된 org.springframework.boot.data.redis.autoconfigure 패키지와
-	// 충돌(ClassNotFoundException: 구 패키지 org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration)한다.
-	// Boot 4.0.x를 명시적으로 지원하는 4.0.0으로 대체.
-	implementation 'org.redisson:redisson-spring-boot-starter:4.0.0'
 
 	// Retry
 	// spring-boot-starter-aop는 Spring Boot 4.0.5-M에서 제공되지 않아 spring-aspects 직접 사용

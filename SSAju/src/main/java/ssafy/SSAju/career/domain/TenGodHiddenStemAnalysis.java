@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * {@code SajuResult.tenGodHiddenStemAnalysis} JSON 컬럼에 저장되는 값 객체.
+ * 만세력 데이터({@code manse.data_json})의 십성·지장간 분석 값 객체.
  *
  * <p>{@link TenGodDistribution#asMap()}과 {@link HiddenStems#asMap()}을 하나의 구조로 묶는다.
  * 계산 결과가 비어 있어도 {@code null}이 아닌 빈 맵으로 채워, JSON 직렬화 시 키 자체는 항상 남는다

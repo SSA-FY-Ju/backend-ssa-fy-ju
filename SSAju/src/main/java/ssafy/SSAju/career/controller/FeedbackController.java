@@ -33,7 +33,7 @@ public class FeedbackController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "피드백 저장 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 검증 실패 (sajuResultId/feedbackType/satisfactionStatus 누락)", content = @Content(schema = @Schema(hidden = true))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 SajuResult", content = @Content(schema = @Schema(hidden = true)))
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "없는 분석·타인 분석·관운 분석 대상", content = @Content(schema = @Schema(hidden = true)))
     })
     public ResponseEntity<ApiResponse<SatisfactionFeedbackResponse>> submitFeedback(
             @Valid @RequestBody SatisfactionFeedbackRequest request,
