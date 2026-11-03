@@ -122,6 +122,8 @@ public enum ErrorMessageConstants {
     INVALID_DATE_RANGE("INVALID_DATE_RANGE", "시작일이 종료일보다 늦을 수 없습니다."),
     INVALID_FEEDBACK_TYPE("INVALID_FEEDBACK_TYPE", "SAJU는 피드백 조회 대상이 아닙니다."),
     FEEDBACK_NOT_ALLOWED("FEEDBACK_NOT_ALLOWED", "관운 분석은 피드백 대상이 아닙니다."),
+    FEEDBACK_TARGET_REQUIRED("INVALID_SAJU_DATA", "피드백의 작성자와 대상 분석은 필수입니다."),
+    FEEDBACK_ALREADY_EXISTS("FEEDBACK_ALREADY_EXISTS", "이미 이 분석에 대한 피드백을 작성했습니다."),
 
     // === 인증 예외 메시지 ===
     DUPLICATE_EMAIL("DUPLICATE_EMAIL", "이미 사용 중인 이메일입니다."),

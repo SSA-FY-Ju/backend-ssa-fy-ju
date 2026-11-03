@@ -10,8 +10,7 @@ import ssafy.SSAju.admin.dto.FeedbackDetailDTO;
 import ssafy.SSAju.admin.dto.FeedbackListDTO;
 import ssafy.SSAju.admin.dto.FeedbackStatDTO;
 import ssafy.SSAju.admin.repository.AdminFeedbackQueryRepository;
-import ssafy.SSAju.career.entity.CareerConsultation;
-import ssafy.SSAju.career.entity.CompanyCompatibility;
+import ssafy.SSAju.career.entity.Saju;
 import ssafy.SSAju.career.entity.UserSatisfactionFeedback;
 import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
@@ -46,42 +45,29 @@ public class AdminFeedbackService extends AdminBaseService {
     public FeedbackDetailDTO getFeedbackWithAnalysis(Long feedbackId) {
         UserSatisfactionFeedback feedback = feedbackRepository
                 .findFeedbackWithAnalysis(feedbackId)
-                .stream()
-                .findFirst()
                 .orElseThrow(() -> new FeedbackNotFoundException(
                         ErrorMessageConstants.FEEDBACK_NOT_FOUND.getMessage() + " (id=" + feedbackId + ")"));
 
         return toDetailDTO(feedback);
     }
 
+    /**
+     * 응답의 feedbackType은 기존 화면 호환을 위해 유지하되 값은 연결된 분석의 유형에서 얻는다.
+     */
     private FeedbackDetailDTO toDetailDTO(UserSatisfactionFeedback f) {
-        CareerConsultation consultation = f.getCareerConsultation();
-        CompanyCompatibility compatibility = f.getCompanyCompatibility();
-
-        String analysisType = null;
-        Long analysisId = null;
-        java.time.Instant analysisCreatedAt = null;
-
-        if (consultation != null) {
-            analysisType = AnalysisType.CAREER_CONSULTATION.name();
-            analysisId = consultation.getId();
-            analysisCreatedAt = consultation.getGeneratedAt();
-        } else if (compatibility != null) {
-            analysisType = AnalysisType.COMPANY_COMPATIBILITY.name();
-            analysisId = compatibility.getId();
-            analysisCreatedAt = compatibility.getCreatedAt();
-        }
+        Saju saju = f.getSaju();
+        String analysisType = saju.getAnalysisType().name();
 
         return new FeedbackDetailDTO(
                 f.getId(),
                 f.getUser() != null ? f.getUser().getId() : null,
-                f.getFeedbackType().name(),
+                analysisType,
                 f.getSatisfactionStatus().name(),
                 f.getFeedbackContent(),
                 f.getCreatedAt(),
                 analysisType,
-                analysisId,
-                analysisCreatedAt
+                saju.getId(),
+                saju.getCreatedAt()
         );
     }
 }

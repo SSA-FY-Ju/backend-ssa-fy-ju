@@ -180,20 +180,31 @@ class CareerApiIntegrationTest {
     // ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("T090-3: SAJU 피드백 시도 → 400 FeedbackNotAllowedException")
-    void saveFeedback_withCareerTimingType_returns400() throws Exception {
+    @DisplayName("T090-3: 관운 분석 대상 피드백 → 404 (미존재와 동일한 거부)")
+    void saveFeedback_withSajuAnalysis_returns404() throws Exception {
+        // Given: 관운 분석을 하나 만든다
+        String createResponse = mockMvc.perform(post("/api/career/timing")
+                        .header("Authorization", authHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"birthDate": "1990-10-10", "birthTime": "14:30"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Number analysisId = com.jayway.jsonpath.JsonPath.read(createResponse, "$.data.sajuResultId");
+
+        // When / Then: 소유자여도 관운은 피드백 대상이 아니다
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .header("Authorization", authHeader)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "analysisId": 1,
-                                  "feedbackType": "SAJU",
+                                  "analysisId": %s,
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "테스트"
                                 }
-                                """))
-                .andExpect(status().isBadRequest())
+                                """.formatted(analysisId.longValue())))
+                .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
 
         // Then: 피드백이 저장되지 않음
@@ -209,7 +220,6 @@ class CareerApiIntegrationTest {
                         .content("""
                                 {
                                   "analysisId": 999999,
-                                  "feedbackType": "COMPANY_COMPATIBILITY",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))

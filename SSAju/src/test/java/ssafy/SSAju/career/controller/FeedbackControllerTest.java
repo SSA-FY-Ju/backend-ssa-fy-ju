@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import ssafy.SSAju.career.dto.response.SatisfactionFeedbackResponse;
+import ssafy.SSAju.exception.FeedbackAlreadyExistsException;
 import ssafy.SSAju.exception.SajuResultNotFoundException;
 import ssafy.SSAju.service.FeedbackService;
 
@@ -27,6 +28,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * 피드백 작성 API 계약(T054). 요청 필드는 analysisId(숫자)·satisfactionStatus·feedbackContent이며
+ * 분석 유형은 받지 않는다.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("FeedbackController HTTP 레이어 테스트")
 class FeedbackControllerTest {
@@ -39,15 +44,15 @@ class FeedbackControllerTest {
 
     private MockMvc mockMvc;
 
+    private static final UsernamePasswordAuthenticationToken AUTH =
+            new UsernamePasswordAuthenticationToken(1L, null, List.of());
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
                 .apply(springSecurity())
                 .build();
     }
-
-    private static final UsernamePasswordAuthenticationToken AUTH =
-            new UsernamePasswordAuthenticationToken(1L, null, List.of());
 
     @Test
     @DisplayName("유효한 피드백 요청 → 200 OK + feedbackId 반환")
@@ -61,7 +66,6 @@ class FeedbackControllerTest {
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "SATISFIED",
                                   "feedbackContent": "좋았습니다"
                                 }
@@ -84,40 +88,21 @@ class FeedbackControllerTest {
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "DISSATISFIED"
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.feedbackId").value(2));
     }
 
     @Test
-    @DisplayName("sajuResultId 누락 → 400 Bad Request")
-    void shouldReturn400_WhenSajuResultIdMissing() throws Exception {
+    @DisplayName("analysisId 누락 → 400 Bad Request")
+    void shouldReturn400_WhenAnalysisIdMissing() throws Exception {
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .with(authentication(AUTH))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "feedbackType": "SAJU",
-                                  "satisfactionStatus": "SATISFIED"
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false));
-    }
-
-    @Test
-    @DisplayName("feedbackType 누락 → 400 Bad Request")
-    void shouldReturn400_WhenFeedbackTypeMissing() throws Exception {
-        mockMvc.perform(post("/api/feedback/satisfaction")
-                        .with(authentication(AUTH))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "analysisId": 1,
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))
@@ -133,8 +118,7 @@ class FeedbackControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "analysisId": 1,
-                                  "feedbackType": "SAJU"
+                                  "analysisId": 1
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -142,10 +126,26 @@ class FeedbackControllerTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 SajuResult → 404 Not Found")
-    void shouldReturn404_WhenSajuResultNotFound() throws Exception {
+    @DisplayName("숫자가 아닌 analysisId → 400 Bad Request")
+    void shouldReturn400_WhenAnalysisIdIsNotNumeric() throws Exception {
+        mockMvc.perform(post("/api/feedback/satisfaction")
+                        .with(authentication(AUTH))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "analysisId": "not-a-number",
+                                  "satisfactionStatus": "SATISFIED"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("없는 분석·타인 분석·관운 분석 대상은 모두 404")
+    void shouldReturn404_WhenAnalysisIsNotAvailableForFeedback() throws Exception {
         given(feedbackService.saveFeedback(any(), anyLong()))
-                .willThrow(new SajuResultNotFoundException("해당 SajuResult를 찾을 수 없습니다. id=999"));
+                .willThrow(new SajuResultNotFoundException("분석 결과를 찾을 수 없습니다."));
 
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .with(authentication(AUTH))
@@ -153,7 +153,6 @@ class FeedbackControllerTest {
                         .content("""
                                 {
                                   "analysisId": 999,
-                                  "feedbackType": "CAREER_CONSULTATION",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))
@@ -163,19 +162,42 @@ class FeedbackControllerTest {
     }
 
     @Test
-    @DisplayName("유효하지 않은 feedbackType → 400 Bad Request")
-    void shouldReturn400_WhenInvalidFeedbackType() throws Exception {
+    @DisplayName("같은 분석에 중복 제출 → 409 Conflict")
+    void shouldReturn409_WhenDuplicateFeedback() throws Exception {
+        given(feedbackService.saveFeedback(any(), anyLong()))
+                .willThrow(new FeedbackAlreadyExistsException("이미 이 분석에 대한 피드백을 작성했습니다."));
+
         mockMvc.perform(post("/api/feedback/satisfaction")
                         .with(authentication(AUTH))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "analysisId": 1,
-                                  "feedbackType": "INVALID_TYPE",
                                   "satisfactionStatus": "SATISFIED"
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("FEEDBACK_ALREADY_EXISTS"));
+    }
+
+    @Test
+    @DisplayName("예전 클라이언트가 보낸 feedbackType은 무시한다")
+    void shouldIgnoreLegacyFeedbackTypeField() throws Exception {
+        given(feedbackService.saveFeedback(any(), anyLong()))
+                .willReturn(new SatisfactionFeedbackResponse(3L, Instant.now(), null));
+
+        mockMvc.perform(post("/api/feedback/satisfaction")
+                        .with(authentication(AUTH))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "analysisId": 1,
+                                  "feedbackType": "CAREER_CONSULTATION",
+                                  "satisfactionStatus": "SATISFIED"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.feedbackId").value(3));
     }
 }

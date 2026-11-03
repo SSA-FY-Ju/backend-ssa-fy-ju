@@ -18,6 +18,7 @@ import ssafy.SSAju.dto.response.ErrorInfo;
 import ssafy.SSAju.exception.AuthException;
 import ssafy.SSAju.exception.ConsentRequiredException;
 import ssafy.SSAju.exception.UnauthorizedException;
+import ssafy.SSAju.exception.FeedbackAlreadyExistsException;
 import ssafy.SSAju.exception.FeedbackNotAllowedException;
 import ssafy.SSAju.exception.DataAccessException;
 import ssafy.SSAju.exception.InvalidTokenException;
@@ -230,6 +231,21 @@ public class SajuGlobalExceptionHandler {
                 .body(ApiResponse.failure(new ErrorInfo(
                         ErrorMessageConstants.FEEDBACK_NOT_ALLOWED.getCode(),
                         ErrorMessageConstants.FEEDBACK_NOT_ALLOWED.getMessage(), generateRequestId())));
+    }
+
+    /**
+     * 같은 분석에 피드백을 다시 제출한 경우. 분석당 0..1개 제약은 DB UNIQUE가 보장하며,
+     * 재제출은 실패가 아니라 이미 처리된 요청이므로 409로 돌려준다.
+     */
+    @ExceptionHandler(FeedbackAlreadyExistsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFeedbackAlreadyExists(
+            FeedbackAlreadyExistsException e, HttpServletRequest request) {
+        log.warn("피드백 중복 제출: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.failure(new ErrorInfo(
+                        ErrorMessageConstants.FEEDBACK_ALREADY_EXISTS.getCode(),
+                        e.getMessage(),
+                        request.getRequestURI())));
     }
 
     @ExceptionHandler(SajuResultNotFoundException.class)

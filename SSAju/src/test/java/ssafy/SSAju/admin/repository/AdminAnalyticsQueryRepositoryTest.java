@@ -5,176 +5,235 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import ssafy.SSAju.admin.dto.AnalyticsDetailDTO;
 import ssafy.SSAju.admin.dto.AnalyticsListDTO;
 import ssafy.SSAju.admin.service.AdminBaseService;
-import ssafy.SSAju.career.entity.CareerConsultation;
-import ssafy.SSAju.career.entity.SajuResult;
+import ssafy.SSAju.career.entity.Manse;
+import ssafy.SSAju.career.entity.Saju;
 import ssafy.SSAju.career.entity.UserProfile;
-import ssafy.SSAju.career.entity.UserSajuAccess;
-import ssafy.SSAju.dto.external.CareerAdviceResponse;
+import ssafy.SSAju.career.enums.AnalysisType;
 import ssafy.SSAju.entity.User;
-import ssafy.SSAju.entity.enums.UserRole;
-import ssafy.SSAju.entity.enums.UserStatus;
-import ssafy.SSAju.repository.CareerConsultationRepository;
-import ssafy.SSAju.repository.SajuResultRepository;
+import ssafy.SSAju.integration.UnifiedAnalysisTestSupport;
+import ssafy.SSAju.repository.ManseRepository;
+import ssafy.SSAju.repository.SajuRepository;
 import ssafy.SSAju.repository.UserProfileRepository;
 import ssafy.SSAju.repository.UserRepository;
-import ssafy.SSAju.repository.UserSajuAccessRepository;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.YearMonth;
-import java.time.temporal.ChronoUnit;
+import java.util.Calendar;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * B1: SajuResult/CareerConsultation은 여러 사용자가 공유하는 정본이라, "정본 수"와
- * "정본에 접근하는 사용자 수"가 다를 수 있다. 관리자 대시보드 요약(findDailyAnalysisSummary)이
- * 목록(findAnalyticsByDateAndType)과 동일하게 "접근자 수" 기준으로 집계하는지 검증한다.
+ * 관리자 분석 조회가 새 saju 단일 집계로 동작하는지 검증한다(T056).
+ *
+ * <p>세 유형이 한 테이블에 모였으므로 "정본 수와 접근자 수가 다른" 문제가 사라졌고, 한 행이 성공
+ * 분석 한 건이다. 서울 날짜 경계와 탈퇴 사용자 포함 여부를 함께 확인한다.
  */
+@Testcontainers
 @SpringBootTest
-@DisplayName("AdminAnalyticsQueryRepository — 정본 공유 시 요약/목록 카운트 일치 검증")
+@DisplayName("AdminAnalyticsQueryRepository — 새 분석 구조 집계 검증")
 class AdminAnalyticsQueryRepositoryTest {
+
+    private static final LocalDate BIRTH_DATE = LocalDate.of(1995, 3, 20);
+    private static final LocalTime BIRTH_TIME = LocalTime.of(9, 15);
+
+    @Container
+    static MySQLContainer<?> mysql = UnifiedAnalysisTestSupport.newMySqlContainer();
+
+    @DynamicPropertySource
+    static void mysqlProperties(DynamicPropertyRegistry registry) {
+        UnifiedAnalysisTestSupport.registerMySqlProperties(registry, mysql);
+    }
 
     @Autowired private AdminAnalyticsQueryRepository analyticsQueryRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private UserProfileRepository userProfileRepository;
-    @Autowired private SajuResultRepository sajuResultRepository;
-    @Autowired private UserSajuAccessRepository userSajuAccessRepository;
-    @Autowired private CareerConsultationRepository careerConsultationRepository;
+    @Autowired private ManseRepository manseRepository;
+    @Autowired private SajuRepository sajuRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
+
+    private User owner;
+    private Manse manse;
 
     @BeforeEach
     void setUp() {
-        careerConsultationRepository.deleteAllInBatch();
-        userSajuAccessRepository.deleteAllInBatch();
-        sajuResultRepository.deleteAllInBatch();
+        jdbcTemplate.update("DELETE FROM user_satisfaction_feedback");
+        sajuRepository.deleteAllInBatch();
+        manseRepository.deleteAllInBatch();
+        // soft delete된 계정은 @SQLRestriction 때문에 JPA deleteAll에서 빠지므로 직접 지운다.
+        jdbcTemplate.update("DELETE FROM users");
         userProfileRepository.deleteAllInBatch();
-        userRepository.deleteAllInBatch();
-    }
 
-    private User newUser(String email) {
-        return userRepository.save(User.builder()
-                .email(email)
-                .passwordHash("hash")
-                .name("테스트")
-                .role(UserRole.USER)
-                .status(UserStatus.ACTIVE)
-                .termsAgreedAt(Instant.now())
-                .privacyAgreedAt(Instant.now())
-                .build());
-    }
-
-    private static CareerAdviceResponse minimalAdvice() {
-        return new CareerAdviceResponse(
-                List.of(), List.of(), List.of(), List.of(),
-                null, null, null, null, null, null, null, null, null,
-                List.of("정관"), "일간 설명", "오행 분석");
-    }
-
-    @Test
-    @DisplayName("SAJU: 정본 1건을 2명이 공유하면 요약 카운트는 목록 행 수(2)와 일치한다")
-    void countSaju_sharedResult_matchesListRowCount() {
-        User userA = newUser("share-a@test.com");
-        User userB = newUser("share-b@test.com");
-        UserProfile profile = userProfileRepository.save(UserProfile.builder()
-                .birthDate(LocalDate.of(1990, 7, 15))
-                .birthTime(LocalTime.of(12, 0))
-                .build());
-        SajuResult sajuResult = sajuResultRepository.save(SajuResult.builder()
+        owner = userRepository.save(UnifiedAnalysisTestSupport.newUser("admin-analytics@test.com"));
+        UserProfile profile = userProfileRepository.save(
+                UnifiedAnalysisTestSupport.newProfile(BIRTH_DATE, BIRTH_TIME));
+        manse = manseRepository.saveAndFlush(Manse.builder()
                 .userProfile(profile)
+                .data(UnifiedAnalysisTestSupport.manseData())
+                .fetchedAt(Instant.now())
                 .build());
-        userSajuAccessRepository.save(UserSajuAccess.builder().user(userA).sajuResult(sajuResult).build());
-        userSajuAccessRepository.save(UserSajuAccess.builder().user(userB).sajuResult(sajuResult).build());
-
-        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
-        long summaryCount = analyticsQueryRepository.findDailyAnalysisSummary(today).get("SAJU");
-        List<AnalyticsListDTO> listRows = analyticsQueryRepository.findAnalyticsByDateAndType(
-                "SAJU", today, today, 0, 20);
-
-        assertThat(summaryCount).isEqualTo(2);
-        assertThat(listRows).hasSize(2);
-        assertThat(summaryCount).isEqualTo(listRows.size());
     }
 
     @Test
-    @DisplayName("CAREER_CONSULTATION: 정본 1건을 2명이 공유하면 요약 카운트는 목록 행 수(2)와 일치한다")
-    void countConsultation_sharedResult_matchesListRowCount() {
-        User userA = newUser("consult-a@test.com");
-        User userB = newUser("consult-b@test.com");
-        UserProfile profile = userProfileRepository.save(UserProfile.builder()
-                .birthDate(LocalDate.of(1992, 3, 3))
-                .birthTime(LocalTime.of(9, 30))
-                .build());
-        SajuResult sajuResult = sajuResultRepository.save(SajuResult.builder()
-                .userProfile(profile)
-                .build());
-        userSajuAccessRepository.save(UserSajuAccess.builder().user(userA).sajuResult(sajuResult).build());
-        userSajuAccessRepository.save(UserSajuAccess.builder().user(userB).sajuResult(sajuResult).build());
-        careerConsultationRepository.save(CareerConsultation.builder()
-                .sajuResult(sajuResult)
-                .openaiModelVersion("gpt-4o-mini")
-                .consultationMonth(YearMonth.now().getYear() * 100 + YearMonth.now().getMonthValue())
-                .resultJson(minimalAdvice())
-                .build());
-
+    @DisplayName("유형별 당일 집계는 저장된 분석 행 수와 같다")
+    void shouldCountEachAnalysisRowOnce() {
+        // Given
         LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
-        long summaryCount = analyticsQueryRepository.findDailyAnalysisSummary(today).get("CAREER_CONSULTATION");
-        List<AnalyticsListDTO> listRows = analyticsQueryRepository.findAnalyticsByDateAndType(
-                "CAREER_CONSULTATION", today, today, 0, 20);
-
-        assertThat(summaryCount).isEqualTo(2);
-        assertThat(listRows).hasSize(2);
-        assertThat(summaryCount).isEqualTo(listRows.size());
-    }
-
-    @Test
-    @DisplayName("SAJU: 접근 매핑이 없는 정본은 요약/목록 어느 쪽에도 잡히지 않는다")
-    void countSaju_resultWithoutAccessMapping_excludedFromBoth() {
-        UserProfile profile = userProfileRepository.save(UserProfile.builder()
-                .birthDate(LocalDate.of(1985, 11, 20))
-                .birthTime(LocalTime.of(18, 0))
-                .build());
-        sajuResultRepository.save(SajuResult.builder().userProfile(profile).build());
-        // 의도적으로 UserSajuAccess를 생성하지 않음 (접근 불가능한 정본)
-
-        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
-        long summaryCount = analyticsQueryRepository.findDailyAnalysisSummary(today).get("SAJU");
-        List<AnalyticsListDTO> listRows = analyticsQueryRepository.findAnalyticsByDateAndType(
-                "SAJU", today, today, 0, 20);
-
-        assertThat(summaryCount).isZero();
-        assertThat(listRows).isEmpty();
-    }
-
-    @Test
-    @DisplayName("SAJU: 13개월 전 만들어진 정본에 오늘 처음 접근해도 오늘 집계/목록에 잡힌다")
-    void countSaju_oldCanonicalResult_newAccessToday_stillCountedToday() {
-        // Given — 정본은 13개월 전에 생성됐지만(1년 창을 벗어남), UserSajuAccess는 오늘 생성됨
-        User user = newUser("late-access@test.com");
-        UserProfile profile = userProfileRepository.save(UserProfile.builder()
-                .birthDate(LocalDate.of(1988, 4, 4))
-                .birthTime(LocalTime.of(6, 0))
-                .build());
-        SajuResult sajuResult = sajuResultRepository.save(SajuResult.builder()
-                .userProfile(profile)
-                .build());
-        ReflectionTestUtils.setField(sajuResult, "fetchedAt", Instant.now().minus(400, ChronoUnit.DAYS));
-        sajuResultRepository.save(sajuResult);
-        userSajuAccessRepository.save(UserSajuAccess.builder().user(user).sajuResult(sajuResult).build());
-
-        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
+        insertAt(AnalysisType.SAJU, seoulInstant(today, 10, 0));
+        insertAt(AnalysisType.SAJU, seoulInstant(today, 11, 0));
+        insertAt(AnalysisType.CAREER_CONSULTATION, seoulInstant(today, 12, 0));
 
         // When
-        long summaryCount = analyticsQueryRepository.findDailyAnalysisSummary(today).get("SAJU");
-        List<AnalyticsListDTO> listRows = analyticsQueryRepository.findAnalyticsByDateAndType(
-                "SAJU", today, today, 0, 20);
+        Map<String, Long> summary = analyticsQueryRepository.findDailyAnalysisSummary(today);
 
-        // Then — 정본 자체는 1년도 더 전에 생성됐지만, 이 사용자의 접근은 오늘이므로 잡혀야 한다
-        assertThat(summaryCount).isEqualTo(1);
-        assertThat(listRows).hasSize(1);
+        // Then
+        assertThat(summary.get("SAJU")).isEqualTo(2);
+        assertThat(summary.get("CAREER_CONSULTATION")).isEqualTo(1);
+        assertThat(summary.get("COMPANY_COMPATIBILITY")).isZero();
+    }
+
+    @Test
+    @DisplayName("목록은 숫자 ID·소유자·유형을 돌려주고 최신순으로 정렬한다")
+    void shouldReturnListOrderedByCreatedAtDesc() {
+        // Given
+        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
+        Long older = insertAt(AnalysisType.SAJU, seoulInstant(today, 9, 0));
+        Long newer = insertAt(AnalysisType.SAJU, seoulInstant(today, 18, 0));
+
+        // When
+        List<AnalyticsListDTO> list = analyticsQueryRepository
+                .findAnalyticsByDateAndType(null, today, today, 0, 20);
+
+        // Then
+        assertThat(list).extracting(AnalyticsListDTO::id).containsExactly(newer, older);
+        assertThat(list).allSatisfy(dto -> {
+            assertThat(dto.userId()).isEqualTo(owner.getId());
+            assertThat(dto.analysisType()).isEqualTo(AnalysisType.SAJU.name());
+        });
+    }
+
+    @Test
+    @DisplayName("유형 필터는 해당 유형만 돌려준다")
+    void shouldFilterByAnalysisType() {
+        // Given
+        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
+        insertAt(AnalysisType.SAJU, seoulInstant(today, 9, 0));
+        Long compatibilityId = insertAt(AnalysisType.COMPANY_COMPATIBILITY, seoulInstant(today, 10, 0));
+
+        // When
+        List<AnalyticsListDTO> list = analyticsQueryRepository.findAnalyticsByDateAndType(
+                AnalysisType.COMPANY_COMPATIBILITY.name(), today, today, 0, 20);
+
+        // Then
+        assertThat(list).extracting(AnalyticsListDTO::id).containsExactly(compatibilityId);
+    }
+
+    @Test
+    @DisplayName("서울 자정 경계로 날짜를 가른다")
+    void shouldSplitBySeoulMidnight() {
+        // Given
+        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
+        Long lastSecondOfToday = insertAt(AnalysisType.SAJU, seoulInstant(today, 23, 59));
+        Long firstSecondOfTomorrow = insertAt(AnalysisType.SAJU, seoulInstant(today.plusDays(1), 0, 0));
+
+        // When
+        List<AnalyticsListDTO> todayList = analyticsQueryRepository
+                .findAnalyticsByDateAndType(null, today, today, 0, 20);
+        Map<String, Long> todaySummary = analyticsQueryRepository.findDailyAnalysisSummary(today);
+
+        // Then
+        assertThat(todayList).extracting(AnalyticsListDTO::id)
+                .containsExactly(lastSecondOfToday)
+                .doesNotContain(firstSecondOfTomorrow);
+        assertThat(todaySummary.get("SAJU")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("탈퇴한 사용자의 분석도 집계와 목록에 남는다")
+    void shouldIncludeAnalysisOfWithdrawnUser() {
+        // Given
+        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
+        Long analysisId = insertAt(AnalysisType.SAJU, seoulInstant(today, 10, 0));
+        jdbcTemplate.update("UPDATE users SET deleted_at = NOW(), status = 'INACTIVE' WHERE id = ?",
+                owner.getId());
+
+        // When
+        List<AnalyticsListDTO> list = analyticsQueryRepository
+                .findAnalyticsByDateAndType(null, today, today, 0, 20);
+        Map<String, Long> summary = analyticsQueryRepository.findDailyAnalysisSummary(today);
+
+        // Then: User 엔티티 조인을 쓰지 않으므로 soft delete 필터에 가려지지 않는다
+        assertThat(list).extracting(AnalyticsListDTO::id).containsExactly(analysisId);
+        assertThat(summary.get("SAJU")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("상세는 분석 ID·유형·소유자가 모두 맞아야 조회된다")
+    void shouldRequireIdTypeAndOwnerForDetail() {
+        // Given
+        LocalDate today = LocalDate.now(AdminBaseService.SEOUL_ZONE);
+        Long analysisId = insertAt(AnalysisType.CAREER_CONSULTATION, seoulInstant(today, 10, 0));
+
+        // When
+        Optional<AnalyticsDetailDTO> found = analyticsQueryRepository.findAnalyticsById(
+                analysisId, AnalysisType.CAREER_CONSULTATION.name(), owner.getId());
+        Optional<AnalyticsDetailDTO> wrongType = analyticsQueryRepository.findAnalyticsById(
+                analysisId, AnalysisType.SAJU.name(), owner.getId());
+        Optional<AnalyticsDetailDTO> wrongOwner = analyticsQueryRepository.findAnalyticsById(
+                analysisId, AnalysisType.CAREER_CONSULTATION.name(), owner.getId() + 999);
+
+        // Then
+        assertThat(found).isPresent();
+        assertThat(found.get().jsonData()).contains("schemaVersion");
+        assertThat(wrongType).isEmpty();
+        assertThat(wrongOwner).isEmpty();
+    }
+
+    private Instant seoulInstant(LocalDate date, int hour, int minute) {
+        return date.atTime(hour, minute).atZone(AdminBaseService.SEOUL_ZONE).toInstant();
+    }
+
+    /** 생성 시각을 지정해야 하므로 감사 시각 대신 직접 INSERT한다. */
+    private Long insertAt(AnalysisType type, Instant createdAt) {
+        Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        String resultJson = switch (type) {
+            case SAJU -> UnifiedAnalysisTestSupport.readFixture(
+                    UnifiedAnalysisTestSupport.SAJU_RESULT_FIXTURE);
+            case CAREER_CONSULTATION -> UnifiedAnalysisTestSupport.readFixture(
+                    UnifiedAnalysisTestSupport.CONSULTATION_RESULT_FIXTURE);
+            case COMPANY_COMPATIBILITY -> UnifiedAnalysisTestSupport.readFixture(
+                    UnifiedAnalysisTestSupport.COMPATIBILITY_RESULT_FIXTURE);
+        };
+        String inputJson = UnifiedAnalysisTestSupport.readFixture(
+                UnifiedAnalysisTestSupport.COMPATIBILITY_INPUT_FIXTURE);
+
+        jdbcTemplate.update(connection -> {
+            var ps = connection.prepareStatement("""
+                    INSERT INTO saju (user_id, analysis_type, manse_id, created_at, input_json, result_json)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """);
+            ps.setLong(1, owner.getId());
+            ps.setString(2, type.name());
+            ps.setLong(3, manse.getId());
+            ps.setTimestamp(4, Timestamp.from(createdAt), utc);
+            ps.setString(5, inputJson);
+            ps.setString(6, resultJson);
+            return ps;
+        });
+        return jdbcTemplate.queryForObject("SELECT MAX(id) FROM saju", Long.class);
     }
 }
