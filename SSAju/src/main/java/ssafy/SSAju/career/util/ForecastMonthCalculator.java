@@ -21,6 +21,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ForecastMonthCalculator {
 
+    private static final int MONTHS_IN_YEAR = 12;
+
     /** KST 기준 현재 날짜 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
     private final Clock clock;
 
@@ -29,10 +31,20 @@ public class ForecastMonthCalculator {
      * 12월 경계는 순환합니다(예: 11월 → [11, 12, 1, 2, 3]).
      */
     public List<Integer> currentTargetMonths() {
-        int currentMonth = LocalDate.now(clock).getMonthValue();
+        return targetMonthsFrom(LocalDate.now(clock).getMonthValue());
+    }
+
+    /**
+     * 시작 월부터 {@link AnalysisConstants#FORECAST_MONTH_COUNT}개월의 대상 월을 계산한다.
+     *
+     * <p>정적 메서드인 이유: 요청 시간 문맥({@code AnalysisTimeContext})도 같은 규칙으로 대상 월을
+     * 확정해야 하는데, record의 정적 팩터리는 빈을 주입받을 수 없다. 계산 규칙이 두 곳에 복사되지
+     * 않도록 여기 한 곳에만 둔다.
+     */
+    public static List<Integer> targetMonthsFrom(int startMonth) {
         List<Integer> targetMonths = new ArrayList<>();
         for (int i = 0; i < AnalysisConstants.FORECAST_MONTH_COUNT; i++) {
-            targetMonths.add(((currentMonth - 1 + i) % 12) + 1);
+            targetMonths.add(((startMonth - 1 + i) % MONTHS_IN_YEAR) + 1);
         }
         return targetMonths;
     }

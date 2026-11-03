@@ -127,7 +127,8 @@ public class CompanyCompatibilityAnalysisStrategy
                                 companyFiveElements, companyHiddenStems, companyDayMaster),
                         new CompatibilityNarrativeRequest.ScoreSet(
                                 compatibilityScore, matchScore, matchScore, secondaryScore),
-                        category, input.targetRole().detailName()));
+                        category, input.targetRole().detailName()),
+                time);
 
         CompatibilityAnalysisData analysisData = new CompatibilityAnalysisData(
                 new CompatibilityAnalysisData.RoleAnalysis(
@@ -135,12 +136,12 @@ public class CompanyCompatibilityAnalysisStrategy
                 responseBuilder.buildFiveElementsData(
                         userFiveElements, companyFiveElements, narrative.fiveElementsSynergyDescription()),
                 responseBuilder.buildAnalysisBreakdown(compatibilityScore),
-                responseBuilder.buildActionableStrategy(category, narrative.weaknessDefense()),
+                responseBuilder.buildActionableStrategy(category, narrative.weaknessDefense(), time),
                 responseBuilder.buildInterviewQuestions(narrative.interviewQuestions()),
                 responseBuilder.buildRoleCompatibilities(
                         category, matchScore, secondaryScore,
                         narrative.primaryRoleReason(), narrative.secondaryRoleReason()),
-                responseBuilder.buildMonthlyForecasts(userFiveElements, narrative.monthlyAdvices()),
+                responseBuilder.buildMonthlyForecasts(userFiveElements, narrative.monthlyAdvices(), time),
                 narrative.cautions());
 
         return new AnalysisOutcome<>(
@@ -165,6 +166,15 @@ public class CompanyCompatibilityAnalysisStrategy
         }
         if (result.monthlyForecast() == null
                 || result.monthlyForecast().size() != AnalysisConstants.FORECAST_MONTH_COUNT) {
+            throw new InvalidSajuDataException(ErrorMessageConstants.ANALYSIS_RESULT_INVALID.getMessage());
+        }
+        // 조회는 이 스냅샷만 읽고 회사·계산기를 다시 부르지 않으므로 중첩 항목이 비어 있으면 안 된다.
+        if (result.targetRoleAnalysis() == null || result.fiveElements() == null
+                || result.analysisBreakdown() == null || result.actionableStrategy() == null) {
+            throw new InvalidSajuDataException(ErrorMessageConstants.ANALYSIS_RESULT_INVALID.getMessage());
+        }
+        if (result.expectedInterviewQuestions() == null || result.expectedInterviewQuestions().isEmpty()
+                || result.roleCompatibility() == null || result.roleCompatibility().isEmpty()) {
             throw new InvalidSajuDataException(ErrorMessageConstants.ANALYSIS_RESULT_INVALID.getMessage());
         }
     }

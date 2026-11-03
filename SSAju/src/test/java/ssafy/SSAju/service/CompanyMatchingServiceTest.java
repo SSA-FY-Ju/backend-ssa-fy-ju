@@ -145,17 +145,17 @@ class CompanyMatchingServiceTest {
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(MOCK_USER));
         given(userProfileProvider.findOrCreate(any(), any())).willReturn(MOCK_USER_PROFILE);
 
-        given(companyMatchingOpenAICaller.call(any())).willReturn(DEFAULT_NARRATIVE);
+        given(companyMatchingOpenAICaller.call(any(), any())).willReturn(DEFAULT_NARRATIVE);
         given(analysisResponseBuilder.buildFiveElementsData(any(), any(), any()))
                 .willReturn(new CompatibilityAnalysisData.FiveElementsInfo(Map.of(), Map.of(), "테스트 시너지"));
         given(analysisResponseBuilder.buildAnalysisBreakdown(anyInt()))
                 .willReturn(new CompatibilityAnalysisData.ScoreBreakdown(80, 70, 75));
-        given(analysisResponseBuilder.buildActionableStrategy(any(), any()))
+        given(analysisResponseBuilder.buildActionableStrategy(any(), any(), any()))
                 .willReturn(new CompatibilityAnalysisData.StrategyInfo(List.of(), "약점 방어", List.of(), "09:00"));
         given(analysisResponseBuilder.buildInterviewQuestions(any())).willReturn(List.of());
         given(analysisResponseBuilder.buildRoleCompatibilities(any(), anyInt(), anyInt(), any(), any()))
                 .willReturn(List.of());
-        given(analysisResponseBuilder.buildMonthlyForecasts(any(), any())).willReturn(List.of());
+        given(analysisResponseBuilder.buildMonthlyForecasts(any(), any(), any())).willReturn(List.of());
 
         // 이번 달 캐시 기본값: 캐시 미스 (lenient)
         given(companyCompatibilityRepository
@@ -234,7 +234,7 @@ class CompanyMatchingServiceTest {
         assertThat(dataCaptor.getValue().roleAnalysis().matchScore()).isEqualTo(85);
         assertThat(dataCaptor.getValue().roleAnalysis().synergy()).isEqualTo(DEFAULT_NARRATIVE.roleSynergy());
         assertThat(dataCaptor.getValue().roleAnalysis().warning()).isEqualTo(DEFAULT_NARRATIVE.roleWarning());
-        verify(companyMatchingOpenAICaller).call(any());
+        verify(companyMatchingOpenAICaller).call(any(), any());
     }
 
     // ─────────────────────────────────────────
@@ -267,7 +267,7 @@ class CompanyMatchingServiceTest {
         verify(sajuDataService, never()).fetchSajuFromFastAPI(any(), any());
         verify(compatibilitySaveService, never()).saveWithLock(any(), any());
         verify(dailyApiUsageService, never()).checkAndIncrementDailyUsage(USER_ID);
-        verify(companyMatchingOpenAICaller, never()).call(any());
+        verify(companyMatchingOpenAICaller, never()).call(any(), any());
     }
 
     // ─────────────────────────────────────────
@@ -346,7 +346,7 @@ class CompanyMatchingServiceTest {
                 .willReturn(78);
         given(jobRoleAnalyzer.analyze(any(FiveElements.class), any(JobCategoryEnum.class)))
                 .willReturn(85);
-        given(companyMatchingOpenAICaller.call(any())).willThrow(aiFailure);
+        given(companyMatchingOpenAICaller.call(any(), any())).willThrow(aiFailure);
 
         // When & Then
         assertThatThrownBy(() -> service.analyzeCompatibility(request, USER_ID))

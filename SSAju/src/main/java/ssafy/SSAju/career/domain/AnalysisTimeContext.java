@@ -2,11 +2,11 @@ package ssafy.SSAju.career.domain;
 
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
 import ssafy.SSAju.career.util.AnalysisConstants;
+import ssafy.SSAju.career.util.ForecastMonthCalculator;
 import ssafy.SSAju.exception.InvalidSajuDataException;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -57,11 +57,8 @@ public record AnalysisTimeContext(
     public static AnalysisTimeContext from(Clock clock) {
         LocalDate analysisDate = LocalDate.now(clock);
         int month = analysisDate.getMonthValue();
-        List<Integer> targetMonths = new ArrayList<>();
-        for (int i = 0; i < AnalysisConstants.FORECAST_MONTH_COUNT; i++) {
-            targetMonths.add(((month - 1 + i) % MAX_MONTH) + 1);
-        }
-        return new AnalysisTimeContext(analysisDate, analysisDate.getYear(), month, targetMonths);
+        return new AnalysisTimeContext(analysisDate, analysisDate.getYear(), month,
+                ForecastMonthCalculator.targetMonthsFrom(month));
     }
 
     /** 기존 컨설팅·궁합 월 식별자와 같은 {@code yyyyMM} 정수. */

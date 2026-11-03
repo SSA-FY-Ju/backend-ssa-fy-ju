@@ -2,13 +2,13 @@ package ssafy.SSAju.career.util;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import ssafy.SSAju.career.domain.AnalysisTimeContext;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.enums.FiveElement;
 import ssafy.SSAju.career.enums.ForecastStatus;
 import ssafy.SSAju.dto.external.CompatibilityNarrativeResponse;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,9 +27,6 @@ import java.util.stream.Collectors;
 public class AnalysisResponseBuilder {
 
     private final ForecastScoreCalculator forecastScoreCalculator;
-    private final ForecastMonthCalculator forecastMonthCalculator;
-    /** KST 기준 현재 날짜 계산용 Clock. 테스트에서 고정 시각 주입 가능. */
-    private final Clock clock;
 
     /**
      * 오행 분포와 AI가 생성한 상생 설명 문구로 오행 분포 분석 데이터를 빌드합니다.
@@ -57,9 +54,10 @@ public class AnalysisResponseBuilder {
      * 직군 카테고리와 AI가 생성한 약점 방어 전략 문구로 실행 전략을 빌드합니다.
      */
     public CompatibilityAnalysisData.StrategyInfo buildActionableStrategy(JobCategoryEnum category,
-                                                                            String weaknessDefense) {
-        // 자정 경계에서 서로 다른 날짜 기준으로 계산되는 것을 방지하기 위해 한 번만 호출
-        LocalDate today = LocalDate.now(clock);
+                                                                            String weaknessDefense,
+                                                                            AnalysisTimeContext time) {
+        // 요청 시작 시 확정한 날짜를 쓴다 — 응답 조립 중 자정을 넘겨도 행운의 날이 흔들리지 않는다.
+        LocalDate today = time.analysisDate();
         List<String> luckyDays = List.of(
                 today.plusDays(AnalysisConstants.LUCKY_DAY_FIRST_OFFSET).toString(),
                 today.plusDays(AnalysisConstants.LUCKY_DAY_SECOND_OFFSET).toString(),
@@ -105,20 +103,20 @@ public class AnalysisResponseBuilder {
      * {@code monthlyAdvices}가 대상 월 전체를 정확히 커버함은 {@code CompanyMatchingOpenAICaller.validate}
      * 가 이미 보장하므로, 여기서는 {@code Map.get}이 항상 값을 찾는다고 가정한다.
      *
-     * <p>대상 월 목록은 {@link ForecastMonthCalculator#currentTargetMonths()}를 그대로 재사용한다 —
-     * 여기서 별도로 계산하면 AI 프롬프트/검증이 쓴 기준과 어긋날 수 있고(자정/월 경계),
-     * 같은 계산 로직이 두 곳에 중복되는 것도 방지한다.
+     * <p>대상 월 목록은 요청 시작 시 확정한 {@link AnalysisTimeContext#targetMonths()}를 그대로
+     * 재사용한다 — 여기서 다시 계산하면 AI 프롬프트/검증이 쓴 기준과 어긋날 수 있다(자정·월 경계).
      */
     public List<CompatibilityAnalysisData.MonthlyForecast> buildMonthlyForecasts(
             FiveElements userFiveElements,
-            List<CompatibilityNarrativeResponse.MonthlyAdvice> monthlyAdvices) {
+            List<CompatibilityNarrativeResponse.MonthlyAdvice> monthlyAdvices,
+            AnalysisTimeContext time) {
         Map<Integer, String> adviceByMonth = monthlyAdvices.stream()
                 .collect(Collectors.toMap(
                         CompatibilityNarrativeResponse.MonthlyAdvice::month,
                         CompatibilityNarrativeResponse.MonthlyAdvice::advice));
 
         List<CompatibilityAnalysisData.MonthlyForecast> forecasts = new ArrayList<>();
-        for (int forecastMonth : forecastMonthCalculator.currentTargetMonths()) {
+        for (int forecastMonth : time.targetMonths()) {
             String seasonElement = FiveElement.fromMonth(forecastMonth).getSymbol();
             int elementCount = userFiveElements.getCount(seasonElement);
 

@@ -65,15 +65,27 @@ public class ConsultationAnalysisStrategy
 
         CareerAdviceResponse advice = openAICaller.call(
                 manseData.toFastApiResponse(input.birthDate().toString(), input.birthTime().toString()),
-                ctx.tenGodDistribution(), ctx.hiddenStems(), ctx.dayMaster());
+                ctx.tenGodDistribution(), ctx.hiddenStems(), ctx.dayMaster(), time);
 
         return new AnalysisOutcome<>(
                 AnalysisPayload.ConsultationInput.of(input.birthDate(), input.birthTime(), time),
                 consultationMapper.toResultSnapshot(manseData, ctx, advice, modelVersion, time.year()));
     }
 
+    /**
+     * 저장 직전 완성 스냅샷 검증. 조회는 이 스냅샷만 읽고 재분석하지 않으므로, 비어 있는 채로
+     * 저장되면 영구히 빈 상세가 남는다.
+     */
     @Override
     public void validateResult(AnalysisPayload.ConsultationResultData result) {
+        if (isEmpty(result.industries()) || isEmpty(result.interviewTips()) || isEmpty(result.strengths())) {
+            throw new InvalidSajuDataException(ErrorMessageConstants.ANALYSIS_RESULT_INVALID.getMessage());
+        }
+        if (result.sajuProfile() != null
+                && (result.sajuProfile().dayMaster() == null || result.sajuProfile().dayMaster().isBlank()
+                || isEmpty(result.sajuProfile().fiveElements()))) {
+            throw new InvalidSajuDataException(ErrorMessageConstants.ANALYSIS_RESULT_INVALID.getMessage());
+        }
         if (result.sajuProfile() == null
                 || result.openaiModelVersion() == null || result.openaiModelVersion().isBlank()
                 || result.analysisSummary() == null || result.analysisSummary().isBlank()) {
@@ -84,5 +96,13 @@ public class ConsultationAnalysisStrategy
                 || result.confidenceScore() > AnalysisConstants.MAX_SCORE) {
             throw new InvalidSajuDataException(ErrorMessageConstants.ANALYSIS_RESULT_INVALID.getMessage());
         }
+    }
+
+    private boolean isEmpty(java.util.Collection<?> values) {
+        return values == null || values.isEmpty();
+    }
+
+    private boolean isEmpty(java.util.Map<?, ?> values) {
+        return values == null || values.isEmpty();
     }
 }

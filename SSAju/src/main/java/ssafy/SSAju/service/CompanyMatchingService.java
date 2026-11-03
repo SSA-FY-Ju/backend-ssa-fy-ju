@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ssafy.SSAju.career.caller.CompanyMatchingOpenAICaller;
+import ssafy.SSAju.career.domain.AnalysisTimeContext;
 import ssafy.SSAju.career.domain.CompatibilityAnalysisData;
 import ssafy.SSAju.career.domain.CompatibilityNarrativeRequest;
 import ssafy.SSAju.career.domain.FiveElements;
@@ -161,19 +162,20 @@ public class CompanyMatchingService {
                 new CompatibilityNarrativeRequest.ScoreSet(
                         compatibilityScore, matchScore, matchScore, secondaryScore),
                 category, request.targetRole().detailName());
-        CompatibilityNarrativeResponse narrative = companyMatchingOpenAICaller.call(narrativeRequest);
+        AnalysisTimeContext timeContext = AnalysisTimeContext.from(clock);
+        CompatibilityNarrativeResponse narrative = companyMatchingOpenAICaller.call(narrativeRequest, timeContext);
 
         CompatibilityAnalysisData analysisData = new CompatibilityAnalysisData(
                 new CompatibilityAnalysisData.RoleAnalysis(matchScore, narrative.roleSynergy(), narrative.roleWarning()),
                 responseBuilder.buildFiveElementsData(
                         userFiveElements, companyFiveElements, narrative.fiveElementsSynergyDescription()),
                 responseBuilder.buildAnalysisBreakdown(compatibilityScore),
-                responseBuilder.buildActionableStrategy(category, narrative.weaknessDefense()),
+                responseBuilder.buildActionableStrategy(category, narrative.weaknessDefense(), timeContext),
                 responseBuilder.buildInterviewQuestions(narrative.interviewQuestions()),
                 responseBuilder.buildRoleCompatibilities(
                         category, matchScore, secondaryScore,
                         narrative.primaryRoleReason(), narrative.secondaryRoleReason()),
-                responseBuilder.buildMonthlyForecasts(userFiveElements, narrative.monthlyAdvices()),
+                responseBuilder.buildMonthlyForecasts(userFiveElements, narrative.monthlyAdvices(), timeContext),
                 narrative.cautions()
         );
         String summary = narrative.summary();

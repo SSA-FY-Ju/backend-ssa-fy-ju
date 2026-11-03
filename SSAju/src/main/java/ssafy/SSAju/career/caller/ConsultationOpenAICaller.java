@@ -11,6 +11,7 @@ import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
+import ssafy.SSAju.career.domain.AnalysisTimeContext;
 import ssafy.SSAju.career.domain.HiddenStems;
 import ssafy.SSAju.career.domain.TenGodDistribution;
 import ssafy.SSAju.career.enums.ErrorMessageConstants;
@@ -53,8 +54,11 @@ public class ConsultationOpenAICaller {
     public CareerAdviceResponse call(FastAPIResponse sajuData,
                                      TenGodDistribution tenGodDistribution,
                                      HiddenStems hiddenStems,
-                                     String dayMaster) {
-        String prompt = promptProvider.getCareerConsultationPrompt(sajuData, tenGodDistribution, hiddenStems, dayMaster);
+                                     String dayMaster,
+                                     AnalysisTimeContext time) {
+        // 재시도가 해를 넘겨 실행돼도 같은 연도 기준 프롬프트를 쓰도록 요청 시작 시 확정한 문맥을 넘긴다.
+        String prompt = promptProvider.getCareerConsultationPrompt(
+                sajuData, tenGodDistribution, hiddenStems, dayMaster, time);
         CareerAdviceResponse response = OpenAIRetrySupport.callAndClassifyErrors(
                 () -> chatClient.prompt().user(prompt).call().entity(CareerAdviceResponse.class),
                 log);
@@ -67,7 +71,8 @@ public class ConsultationOpenAICaller {
                                                    FastAPIResponse sajuData,
                                                    TenGodDistribution tenGodDistribution,
                                                    HiddenStems hiddenStems,
-                                                   String dayMaster) {
+                                                   String dayMaster,
+                                                   AnalysisTimeContext time) {
         throw OpenAIRetrySupport.wrapAsTimeout(ex, log);
     }
 
@@ -76,7 +81,8 @@ public class ConsultationOpenAICaller {
                                                        FastAPIResponse sajuData,
                                                        TenGodDistribution tenGodDistribution,
                                                        HiddenStems hiddenStems,
-                                                       String dayMaster) {
+                                                       String dayMaster,
+                                                       AnalysisTimeContext time) {
         throw OpenAIRetrySupport.wrapAsTransientError(ex, log);
     }
 
@@ -85,7 +91,8 @@ public class ConsultationOpenAICaller {
                                                       FastAPIResponse sajuData,
                                                       TenGodDistribution tenGodDistribution,
                                                       HiddenStems hiddenStems,
-                                                      String dayMaster) {
+                                                      String dayMaster,
+                                                      AnalysisTimeContext time) {
         throw ex;
     }
 

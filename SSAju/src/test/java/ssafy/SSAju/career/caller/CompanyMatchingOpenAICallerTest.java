@@ -11,6 +11,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.ai.retry.TransientAiException;
+import ssafy.SSAju.career.domain.AnalysisTimeContext;
 import ssafy.SSAju.career.domain.CompatibilityNarrativeRequest;
 import ssafy.SSAju.career.domain.FiveElements;
 import ssafy.SSAju.career.domain.HiddenStems;
@@ -42,6 +43,11 @@ import static org.mockito.Mockito.mock;
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("CompanyMatchingOpenAICaller 단위 테스트")
 class CompanyMatchingOpenAICallerTest {
+
+    /** 요청 시작 시 확정된 시간 문맥 — 재시도 중 시각이 흘러도 바뀌지 않는다. */
+    private static final AnalysisTimeContext TIME_CONTEXT =
+            AnalysisTimeContext.from(java.time.Clock.fixed(
+                    java.time.Instant.parse("2026-01-15T03:00:00Z"), java.time.ZoneId.of("Asia/Seoul")));
 
     @Mock
     private PromptProvider promptProvider;
@@ -85,9 +91,8 @@ class CompanyMatchingOpenAICallerTest {
     @BeforeEach
     void setUp() {
         chatClient = mock(ChatClient.class, RETURNS_DEEP_STUBS);
-        caller = new CompanyMatchingOpenAICaller(chatClient, promptProvider, forecastMonthCalculator);
+        caller = new CompanyMatchingOpenAICaller(chatClient, promptProvider);
         given(promptProvider.getCompatibilityNarrativePrompt(any(), any())).willReturn("prompt");
-        given(forecastMonthCalculator.currentTargetMonths()).willReturn(TARGET_MONTHS);
     }
 
     @Test
@@ -96,7 +101,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willThrow(new NonTransientAiException("401 Unauthorized"));
 
-        assertThatThrownBy(() -> caller.call(REQUEST))
+        assertThatThrownBy(() -> caller.call(REQUEST, TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
     }
 
@@ -106,7 +111,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willThrow(new TransientAiException("500 Internal Server Error"));
 
-        assertThatThrownBy(() -> caller.call(REQUEST))
+        assertThatThrownBy(() -> caller.call(REQUEST, TIME_CONTEXT))
                 .isInstanceOf(TransientAiException.class);
     }
 
@@ -116,7 +121,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willReturn(null);
 
-        assertThatThrownBy(() -> caller.call(REQUEST))
+        assertThatThrownBy(() -> caller.call(REQUEST, TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
     }
 
@@ -132,7 +137,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willReturn(response);
 
-        assertThatThrownBy(() -> caller.call(REQUEST))
+        assertThatThrownBy(() -> caller.call(REQUEST, TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
     }
 
@@ -148,7 +153,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willReturn(response);
 
-        assertThatThrownBy(() -> caller.call(REQUEST))
+        assertThatThrownBy(() -> caller.call(REQUEST, TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
     }
 
@@ -165,7 +170,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willReturn(response);
 
-        assertThatThrownBy(() -> caller.call(REQUEST))
+        assertThatThrownBy(() -> caller.call(REQUEST, TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
     }
 
@@ -184,7 +189,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willReturn(response);
 
-        assertThatThrownBy(() -> caller.call(REQUEST))
+        assertThatThrownBy(() -> caller.call(REQUEST, TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
     }
 
@@ -203,7 +208,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willReturn(response);
 
-        assertThatThrownBy(() -> caller.call(REQUEST))
+        assertThatThrownBy(() -> caller.call(REQUEST, TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
     }
 
@@ -222,7 +227,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willReturn(response);
 
-        CompatibilityNarrativeResponse result = caller.call(REQUEST);
+        CompatibilityNarrativeResponse result = caller.call(REQUEST, TIME_CONTEXT);
 
         assertThat(result.monthlyAdvices()).hasSize(5);
     }
@@ -239,7 +244,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willReturn(response);
 
-        assertThatThrownBy(() -> caller.call(REQUEST))
+        assertThatThrownBy(() -> caller.call(REQUEST, TIME_CONTEXT))
                 .isInstanceOf(OpenAIApiException.class);
     }
 
@@ -249,7 +254,7 @@ class CompanyMatchingOpenAICallerTest {
         given(chatClient.prompt().user(anyString()).call().entity(CompatibilityNarrativeResponse.class))
                 .willReturn(validResponse());
 
-        CompatibilityNarrativeResponse result = caller.call(REQUEST);
+        CompatibilityNarrativeResponse result = caller.call(REQUEST, TIME_CONTEXT);
 
         assertThat(result.summary()).isEqualTo("요약");
         assertThat(result.monthlyAdvices()).hasSize(5);

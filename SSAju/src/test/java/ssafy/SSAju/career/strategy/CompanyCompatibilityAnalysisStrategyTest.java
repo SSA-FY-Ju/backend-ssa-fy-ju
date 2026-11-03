@@ -67,8 +67,7 @@ class CompanyCompatibilityAnalysisStrategyTest {
 
     @BeforeEach
     void setUp() {
-        AnalysisResponseBuilder responseBuilder = new AnalysisResponseBuilder(
-                new ForecastScoreCalculator(), forecastMonthCalculator, clock);
+        AnalysisResponseBuilder responseBuilder = new AnalysisResponseBuilder(new ForecastScoreCalculator());
         strategy = new CompanyCompatibilityAnalysisStrategy(
                 userProfileProvider, manseProvider, companyInfoService,
                 new CompatibilityScoreCalculator(new TenGodCalculator(), new CompatibilityValidator()),
@@ -168,7 +167,7 @@ class CompanyCompatibilityAnalysisStrategyTest {
         assertThatThrownBy(() -> strategy.analyze(request(null, null, null),
                 UnifiedAnalysisTestSupport.manseData(), timeContext))
                 .isInstanceOf(PublicDataApiException.class);
-        verify(openAICaller, never()).call(any());
+        verify(openAICaller, never()).call(any(), any());
     }
 
     @Test
@@ -227,7 +226,7 @@ class CompanyCompatibilityAnalysisStrategyTest {
     }
 
     private void givenNarrative() {
-        given(openAICaller.call(any())).willReturn(new CompatibilityNarrativeResponse(
+        given(openAICaller.call(any(), any())).willReturn(new CompatibilityNarrativeResponse(
                 "요약", "시너지", "경고", "오행 시너지", "약점 방어",
                 List.of(new CompatibilityNarrativeResponse.InterviewQuestion("질문", "의도")),
                 "주 직무 사유", "보조 직무 사유",
