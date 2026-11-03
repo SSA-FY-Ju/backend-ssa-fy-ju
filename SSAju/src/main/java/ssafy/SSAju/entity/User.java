@@ -106,9 +106,17 @@ public class User {
         this.lastLoginAt = Instant.now();
     }
 
+    /**
+     * 계정 soft delete. 이름·이메일을 대체하고 비활성으로 표시하며, 기본 출생정보 참조도 함께
+     * 해제한다 — 탈퇴 처리 어디에서도 빠뜨릴 수 없도록 한 곳에 모은다.
+     *
+     * <p>공유 프로필·만세력과 이미 커밋된 분석은 삭제하지 않는다. 출생정보와 결과 스냅샷, 내부
+     * user_id 연결이 남으므로 완전한 익명화가 아니다.
+     */
     public void softDelete() {
         // Instant 기반으로 통일: 타임존 독립적인 고유 epoch 초 값 + deletedAt 일관성 보장
         Instant now = Instant.now();
+        this.userProfile = null;
         this.name = "탈퇴한 사용자";
         this.email = "deleted_" + this.id + "_" + now.getEpochSecond() + "@deleted.local";
         this.status = UserStatus.INACTIVE;

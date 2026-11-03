@@ -13,15 +13,19 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ssafy.SSAju.career.enums.AnalysisType;
+import ssafy.SSAju.dto.request.DefaultProfileRequest;
 import ssafy.SSAju.dto.request.DeleteUserRequest;
 import ssafy.SSAju.dto.response.AnalysisDetailResponse;
 import ssafy.SSAju.dto.response.ApiResponse;
+import ssafy.SSAju.dto.response.DefaultProfileResponse;
 import ssafy.SSAju.dto.response.MyPageResponse;
 import ssafy.SSAju.service.AuthService;
+import ssafy.SSAju.service.DefaultProfileService;
 import ssafy.SSAju.service.UserService;
 import ssafy.SSAju.util.BearerTokenUtil;
 import ssafy.SSAju.util.CookieUtil;
@@ -34,6 +38,7 @@ public class UserController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final DefaultProfileService defaultProfileService;
     private final CookieUtil cookieUtil;
 
     @DeleteMapping("/api/users/me")
@@ -48,6 +53,27 @@ public class UserController {
         authService.invalidateSession(userId, refreshToken, accessToken);
         cookieUtil.clearRefreshTokenCookie(response);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    /**
+     * 기본 출생정보 조회. 설정하지 않았으면 {@code data}가 null이며, 클라이언트는 직접 입력을 받는다.
+     */
+    @GetMapping("/api/users/me/default-profile")
+    public ResponseEntity<ApiResponse<DefaultProfileResponse>> getDefaultProfile(
+            @AuthenticationPrincipal Long userId) {
+        return ResponseEntity.ok(ApiResponse.success(defaultProfileService.getDefaultProfile(userId)));
+    }
+
+    /**
+     * 기본 출생정보 저장·변경. 공유 프로필을 수정하지 않고 사용자의 참조만 교체한다.
+     * 외부 호출·만세력 생성·분석 저장·쿼터 차감이 모두 없다.
+     */
+    @PutMapping("/api/users/me/default-profile")
+    public ResponseEntity<ApiResponse<DefaultProfileResponse>> changeDefaultProfile(
+            @Valid @RequestBody DefaultProfileRequest request,
+            @AuthenticationPrincipal Long userId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                defaultProfileService.changeDefaultProfile(userId, request)));
     }
 
     @GetMapping("/api/mypage")

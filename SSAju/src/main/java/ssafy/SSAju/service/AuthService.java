@@ -208,9 +208,12 @@ public class AuthService {
      * <p><b>프로세스:</b>
      * <ol>
      *   <li>비밀번호 재확인</li>
-     *   <li>만족도 피드백 등 분석 데이터 삭제</li>
-     *   <li>User Soft Delete (이름/이메일 마스킹, deleted_at 설정)</li>
+     *   <li>만족도 피드백 삭제 (hard delete)</li>
+     *   <li>User Soft Delete (이름/이메일 대체, 기본 출생정보 참조 해제, deleted_at 설정)</li>
      * </ol>
+     *
+     * <p>세 단계는 사용자 행 쓰기 잠금 아래 한 트랜잭션으로 처리한다. 분석 결과와 공유
+     * 프로필·만세력은 유지하므로 완전한 익명화가 아니다.
      *
      * <p>탈퇴 시점에 유효했던 Access/RefreshToken 무효화는 이 메서드가 커밋된 후
      * {@link #invalidateSession(Long, String, String)}을 통해 별도로 수행한다(호출부 참고).
@@ -223,7 +226,9 @@ public class AuthService {
     @AuditLog
     @Transactional
     public void deleteUser(Long userId, String password) {
-        User user = userRepository.findById(userId)
+        // 사용자 행을 잠근 채로 처리해 진행 중인 최종 분석 저장·피드백·기본값 저장과 순서를 정한다.
+        // 외부 API 호출은 이 잠금 밖에서 이미 끝난 상태다.
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
