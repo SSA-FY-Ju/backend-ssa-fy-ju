@@ -67,6 +67,8 @@ public final class UnifiedAnalysisTestSupport {
         registry.add("spring.datasource.username", mysql::getUsername);
         registry.add("spring.datasource.password", mysql::getPassword);
         registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.MySQLDialect");
+        // 운영 공통 설정과 같은 방식으로 전달한다 — URL에 옵션을 덧붙이지 않는다.
+        registry.add("spring.datasource.hikari.data-source-properties.useAffectedRows", () -> "true");
     }
 
     public static GenericContainer<?> newRedisContainer() {

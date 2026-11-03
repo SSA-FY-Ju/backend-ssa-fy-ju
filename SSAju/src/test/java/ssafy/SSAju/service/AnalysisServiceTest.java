@@ -284,4 +284,47 @@ class AnalysisServiceTest {
                         "H1", 70, "근거", null, List.of(), null, null, null, null, null, null, null, null,
                         null, "요약"));
     }
+
+    @Test
+    @DisplayName("쿼터 복원이 실패해도 원래 예외를 전파하고 복원 실패를 덧붙인다")
+    void shouldPropagateOriginalExceptionWhenRestoreFails() {
+        // Given
+        givenConsultationStrategy();
+        givenBasisResolvedForConsultation();
+        given(dailyApiUsageService.checkAndIncrementDailyUsage(USER_ID)).willReturn(today);
+        OpenAIApiException original = new OpenAIApiException("OpenAI 실패");
+        willThrow(original).given(consultationStrategy).analyze(any(), any(), any());
+        // 보상은 "최선을 다해 되돌려주는" 성격이라 실패해도 원래 흐름을 막지 않는다
+        org.mockito.BDDMockito.willAnswer(invocation -> {
+            RuntimeException suppressInto = invocation.getArgument(2);
+            suppressInto.addSuppressed(new IllegalStateException("복원 실패"));
+            return null;
+        }).given(dailyApiUsageService).restoreQuietly(eq(USER_ID), eq(today), any(RuntimeException.class));
+
+        // When / Then
+        assertThatThrownBy(() -> service.analyze(AnalysisType.CAREER_CONSULTATION,
+                new ConsultationRequest(BIRTH_DATE, BIRTH_TIME), USER_ID))
+                .isSameAs(original)
+                .satisfies(thrown -> assertThat(thrown.getSuppressed()).hasSize(1));
+    }
+
+    @Test
+    @DisplayName("저장이 커밋된 뒤의 단계는 보상 범위 밖이다")
+    void shouldNotRestoreAfterCommit() {
+        // Given: 저장까지 성공한다
+        givenConsultationStrategy();
+        givenBasisResolvedForConsultation();
+        given(consultationStrategy.analyze(any(), any(), any())).willReturn(consultationOutcome());
+        given(dailyApiUsageService.checkAndIncrementDailyUsage(USER_ID)).willReturn(today);
+        given(sajuWriteService.save(any(), any(), any(), any(), any())).willReturn(ANALYSIS_ID);
+
+        // When: 서비스는 커밋 결과를 그대로 돌려준다 — 이후 응답 조립은 호출자(컨트롤러) 몫이다
+        AnalysisExecution execution = service.analyze(AnalysisType.CAREER_CONSULTATION,
+                new ConsultationRequest(BIRTH_DATE, BIRTH_TIME), USER_ID);
+
+        // Then
+        assertThat(execution.analysisId()).isEqualTo(ANALYSIS_ID);
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any(), any());
+        verify(dailyApiUsageService, never()).restoreQuietly(any(), any());
+    }
 }

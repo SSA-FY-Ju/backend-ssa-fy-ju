@@ -47,7 +47,9 @@ class DailyApiUsageIntegrationTest {
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.datasource.url", () -> mysql.getJdbcUrl() + "?useAffectedRows=true");
+        registry.add("spring.datasource.url", mysql::getJdbcUrl);
+        // URL 옵션이 아니라 운영과 같은 공통 Hikari 설정으로 전달한다.
+        registry.add("spring.datasource.hikari.data-source-properties.useAffectedRows", () -> "true");
         registry.add("spring.datasource.username", mysql::getUsername);
         registry.add("spring.datasource.password", mysql::getPassword);
         registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.MySQLDialect");
